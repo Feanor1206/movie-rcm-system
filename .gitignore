@@ -1,24 +1,22 @@
-# Compiled class file
-*.class
+#Python (FastAPI)
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.egg-info/
 
-# Log file
-*.log
+#Environment and secrets
+.env
+*.env.local
 
-# BlueJ files
-*.ctxt
+#IDE
+.idea/
+.vscode/
+*.iml
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+#Model checkpoints, dataset
+*.bin
+*.onnx
+*.safetensors
+distillation/checkpoints/
+data/raw/
