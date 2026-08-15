@@ -1,22 +1,79 @@
-#Python (FastAPI)
-__pycache__/
-*.pyc
-venv/
-.venv/
-*.egg-info/
-
-#Environment and secrets
+# Environment and secrets
 .env
+.env.*
 *.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
 
-#IDE
+# IDEs & OS
 .idea/
 .vscode/
 *.iml
+.DS_Store
+Thumbs.db
 
-#Model checkpoints, dataset
+# Frontend (Next.js / Node)
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+build/
+frontend/build/
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Java / Spring Boot
+target/
+backend/springboot/target/
+.mvn/
+backend/springboot/.mvn/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+.gradle/
+backend/springboot/.gradle/
+
+# Python / FastAPI / AI
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# AI Model Checkpoints & Large Datasets
 *.bin
 *.onnx
 *.safetensors
+*.pt
+*.pth
+*.h5
+*.ckpt
+ai/models/checkpoints/
+ai/datasets/raw/
+ai/datasets/processed/
 distillation/checkpoints/
 data/raw/
+
+# Docker & Database
+pgdata/
