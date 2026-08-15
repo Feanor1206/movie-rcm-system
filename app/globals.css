@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #09090b; color: #fafafa; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; }
+.font-editorial { font-family: Didot, "Bodoni MT", "Times New Roman", serif; }
+::selection { background: #e11d48; color: white; }
+.movie-row { scrollbar-width: none; }
+.movie-row::-webkit-scrollbar { display: none; }
+
+@layer components {
+  .page-shell { @apply mx-auto w-full max-w-6xl px-5 sm:px-8; }
+  .section-title { @apply text-[1.35rem] font-semibold leading-tight tracking-[-.025em] sm:text-2xl; }
+  .eyebrow { @apply font-mono text-[10px] uppercase tracking-[.18em] text-rose-400; }
+}
