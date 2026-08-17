@@ -11,42 +11,31 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#09090d',
-        foreground: '#f8fafc',
-        cinema: {
-          950: '#09090d',
-          900: '#0f0f18',
-          850: '#131322',
-          800: '#1a1a2e',
-          700: '#262642',
-          600: '#3c3a63',
-          500: '#5a578c',
-          400: '#8c89b8',
-          300: '#bcbae0',
-          200: '#deddf2',
-          100: '#f0f0fa',
+        background: '#000000',
+        foreground: '#ffffff',
+        surface: {
+          DEFAULT: '#0f0f10',
+          elevated: '#161618',
+          hover: '#1e1e22',
+          border: '#27272a',
         },
-        accent: {
-          rose: '#e11d48',
-          'rose-hover': '#f43f5e',
-          gold: '#f59e0b',
-          'gold-light': '#fbbf24',
+        cinema: {
+          red: '#e50914',
+          'red-hover': '#f40612',
+          'red-muted': '#2d0a0c',
         },
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        editorial: ['var(--font-editorial)', 'Didot', 'Bodoni MT', 'serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        sans: ['var(--font-inter)', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       boxShadow: {
-        'glow-rose': '0 0 25px -5px rgba(225, 29, 72, 0.35)',
-        'glow-gold': '0 0 25px -5px rgba(245, 158, 11, 0.35)',
-        'card-hover': '0 12px 30px -8px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(225, 29, 72, 0.25)',
+        'red-sm': '0 0 15px -3px rgba(229, 9, 20, 0.4)',
+        'red-lg': '0 0 30px -5px rgba(229, 9, 20, 0.5)',
+        'card-hover': '0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.15)',
       },
       animation: {
-        'fade-in': 'fadeIn 0.3s ease-out forwards',
-        'slide-up': 'slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        'pulse-subtle': 'pulseSubtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'fade-in': 'fadeIn 0.2s ease-out forwards',
+        'slide-up': 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
       keyframes: {
         fadeIn: {
@@ -54,12 +43,8 @@ const config: Config = {
           '100%': { opacity: '1' },
         },
         slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        pulseSubtle: {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.75' },
         },
       },
     },

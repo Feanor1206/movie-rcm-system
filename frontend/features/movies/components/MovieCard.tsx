@@ -18,90 +18,80 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
 
   return (
     <div
-      className={`group relative block outline-none transition-transform duration-300 hover:-translate-y-1.5 ${
-        fluid ? 'w-full' : 'w-[160px] shrink-0 sm:w-[190px] md:w-[210px]'
+      className={`group relative block outline-none transition-transform duration-200 hover:-translate-y-1 ${
+        fluid ? 'w-full' : 'w-[155px] shrink-0 sm:w-[185px] md:w-[205px]'
       }`}
     >
-      <article className="overflow-hidden rounded-xl border border-cinema-800/90 bg-cinema-900/80 backdrop-blur-md transition-all duration-300 group-hover:border-cinema-650 group-hover:shadow-card-hover">
-        {/* Poster Media Box */}
-        <div className="relative aspect-[2/3] w-full overflow-hidden bg-cinema-950">
+      <article className="overflow-hidden rounded-lg border border-zinc-850 bg-zinc-950 transition-all duration-200 group-hover:border-zinc-650 group-hover:shadow-card-hover">
+        {/* Poster Media */}
+        <div className="relative aspect-[2/3] w-full overflow-hidden bg-zinc-900">
           <Image
             src={movie.poster}
-            alt={`${movie.title} poster`}
+            alt={movie.title}
             fill
             sizes={
               fluid
                 ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw'
-                : '(max-width: 640px) 160px, (max-width: 1024px) 190px, 210px'
+                : '(max-width: 640px) 155px, (max-width: 1024px) 185px, 205px'
             }
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
 
-          {/* Vignette Gradients */}
-          <div className="absolute inset-0 bg-gradient-to-t from-cinema-950 via-transparent to-black/20 opacity-80" />
+          {/* Overlay gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 opacity-70" />
 
-          {/* Quick Rating Badge */}
-          <span className="absolute top-2.5 left-2.5 flex items-center gap-1 rounded-md bg-black/75 px-2 py-0.5 font-mono text-[11px] font-bold text-accent-gold backdrop-blur-md border border-white/10">
-            <Star size={11} className="fill-accent-gold" />
+          {/* Rating Badge */}
+          <span className="absolute top-2 left-2 flex items-center gap-1 rounded bg-black/80 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-white/10 backdrop-blur-md">
+            <Star size={11} className="fill-amber-400" />
             {movie.rating}
           </span>
 
-          {/* Quick Watchlist Bookmark Button */}
+          {/* Quick Watchlist Toggle */}
           <button
             type="button"
-            aria-label={inWatchlist ? `Remove ${movie.title} from watchlist` : `Add ${movie.title} to watchlist`}
+            aria-label={inWatchlist ? `Xóa ${movie.title} khỏi watchlist` : `Thêm ${movie.title} vào watchlist`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               toggleWatchlist(movie.id, movie.title);
             }}
-            className={`absolute top-2.5 right-2.5 rounded-full p-2 backdrop-blur-md transition-all duration-200 cursor-pointer ${
+            className={`absolute top-2 right-2 rounded-full p-2 backdrop-blur-md transition-all duration-150 cursor-pointer ${
               inWatchlist
-                ? 'bg-accent-rose text-white shadow-glow-rose'
-                : 'bg-black/60 text-cinema-300 opacity-85 hover:bg-accent-rose hover:text-white group-hover:opacity-100'
+                ? 'bg-cinema-red text-white'
+                : 'bg-black/70 text-zinc-300 opacity-90 hover:bg-cinema-red hover:text-white'
             }`}
           >
-            {inWatchlist ? <Check size={14} /> : <Bookmark size={14} />}
+            {inWatchlist ? <Check size={13} /> : <Bookmark size={13} />}
           </button>
 
-          {/* Hover Play Button Overlay */}
+          {/* Hover Play Overlay */}
           <Link
             href={`/movies/${movie.id}`}
-            aria-label={`View details for ${movie.title}`}
-            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100 cursor-pointer"
+            aria-label={`Xem ${movie.title}`}
+            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer"
           >
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-accent-rose text-white shadow-glow-rose transition-transform duration-200 hover:scale-110">
-              <Play size={18} className="fill-current ml-0.5" />
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-cinema-red text-white shadow-red-sm transition-transform duration-150 hover:scale-110">
+              <Play size={16} className="fill-current ml-0.5" />
             </span>
           </Link>
         </div>
 
-        {/* Content Meta */}
-        <div className="flex min-h-[90px] flex-col justify-between p-3.5">
-          <div>
-            <Link
-              href={`/movies/${movie.id}`}
-              className="block truncate font-sans text-sm font-semibold text-white transition-colors hover:text-rose-400 focus-visible:underline"
-            >
-              {movie.title}
-            </Link>
-            <p className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-cinema-400">
-              <span>{movie.year}</span>
-              <span className="text-cinema-700">•</span>
-              <span>{movie.runtime}</span>
-            </p>
+        {/* Content Info */}
+        <div className="p-3">
+          <Link
+            href={`/movies/${movie.id}`}
+            className="block truncate text-sm font-semibold text-white transition-colors hover:text-cinema-red"
+          >
+            {movie.title}
+          </Link>
+
+          <div className="mt-1 flex items-center justify-between text-xs text-zinc-400">
+            <span>{movie.year} · {movie.runtime}</span>
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-1">
-            {movie.genres.slice(0, 2).map((genre) => (
-              <span
-                key={genre}
-                className="rounded bg-cinema-850 px-1.5 py-0.5 font-mono text-[9px] text-cinema-400"
-              >
-                {genre}
-              </span>
-            ))}
-          </div>
+          <p className="mt-1 truncate text-xs text-zinc-500">
+            {movie.genres.join(', ')}
+          </p>
         </div>
       </article>
     </div>

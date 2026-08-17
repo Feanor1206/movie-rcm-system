@@ -5,7 +5,6 @@ import { EditorialHero } from '@/features/home/components/EditorialHero';
 import { MovieSection } from '@/features/movies/components/MovieSection';
 import { featuredMovie, movies } from '@/lib/data/movies';
 import Link from 'next/link';
-import { Compass, Sparkles, TrendingUp, Trophy } from 'lucide-react';
 
 export default function HomePage() {
   const trendingMovies = movies;
@@ -15,22 +14,22 @@ export default function HomePage() {
   return (
     <>
       <Navbar />
-      <main>
-        {/* Editorial Spotlight */}
+      <main className="bg-black">
+        {/* Spotlight Hero with prominent backdrop */}
         <EditorialHero movie={featuredMovie} />
 
-        {/* Categories Bar */}
-        <div className="border-y border-cinema-800/80 bg-cinema-900/40 py-4 backdrop-blur-md">
+        {/* Categories Bar: Clean rectangular tabs (No pill badges) */}
+        <div className="border-b border-zinc-800 bg-zinc-950 py-3">
           <div className="page-shell flex items-center justify-between overflow-x-auto gap-4 scrollbar-none">
-            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-cinema-400 shrink-0">
-              Browse by Vibe:
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 shrink-0">
+              Thể loại:
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {['Sci-Fi', 'Drama', 'Mystery', 'Thriller', 'Adventure', 'Romance', 'Crime'].map((genre) => (
                 <Link
                   key={genre}
                   href={`/search?genre=${encodeURIComponent(genre)}`}
-                  className="rounded-full border border-cinema-800 bg-cinema-900/80 px-3.5 py-1 font-mono text-xs text-cinema-300 transition-all hover:border-accent-rose hover:text-white shrink-0 cursor-pointer"
+                  className="rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white shrink-0 cursor-pointer"
                 >
                   {genre}
                 </Link>
@@ -39,32 +38,28 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Content Shell with Carousels */}
-        <div className="page-shell space-y-4 pt-6 pb-12">
-          {/* Trending Now */}
+        {/* Main Content Sections */}
+        <div className="page-shell space-y-4 pt-6 pb-16">
+          {/* Trending */}
           <MovieSection
-            title="Trending in Cinema"
-            subtitle="Most watched stories across our community this week"
+            title="Thịnh hành hôm nay"
+            subtitle="Các bộ phim được cộng đồng xem nhiều nhất trong tuần"
             movies={trendingMovies}
           />
 
-          {/* AI Recommended */}
-          <div className="relative overflow-hidden rounded-2xl border border-accent-rose/20 bg-gradient-to-r from-accent-rose/5 via-cinema-900/70 to-cinema-900/40 p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-accent-rose font-mono text-xs font-semibold uppercase tracking-wider">
-              <Sparkles size={14} className="animate-pulse" />
-              <span>Personalized For You</span>
-            </div>
+          {/* Recommended */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6">
             <MovieSection
-              title="Recommended Matches"
-              subtitle="Algorithmically ranked based on mood, themes, and viewing history"
+              title="Đề xuất dành riêng cho bạn"
+              subtitle="Lựa chọn dựa trên thể loại và lịch sử xem của bạn"
               movies={recommendedMovies}
             />
           </div>
 
-          {/* Top Rated Masterpieces */}
+          {/* Top Rated */}
           <MovieSection
-            title="Critically Acclaimed"
-            subtitle="Award-winning cinema scoring 8.0+ by global reviewers"
+            title="Được đánh giá cao nhất"
+            subtitle="Các kiệt tác điện ảnh đạt từ 8.0/10 điểm trở lên"
             movies={topRatedMovies}
           />
         </div>
