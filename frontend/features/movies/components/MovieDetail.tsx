@@ -1,17 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Bookmark,
   Check,
   Heart,
   Play,
   Star,
   Clock,
   Calendar,
+  X,
+  Maximize2,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
@@ -35,13 +38,52 @@ export function MovieDetail({
   } = useWatchlist();
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const inWatchlist = isWatchlisted(movie.id);
   const favorite = isFavorite(movie.id);
   const currentRating = getRating(movie.id);
 
+  const videoSource = movie.videoUrl || `/videos/${movie.id}.mp4`;
+
   return (
     <main className="min-h-screen bg-black">
+      {/* Video Player Modal / Player Overlay */}
+      {isPlaying && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 animate-fade-in">
+          <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-zinc-800 bg-black shadow-2xl">
+            {/* Player Header Bar */}
+            <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-cinema-red" />
+                <h3 className="text-sm font-bold text-white truncate">{movie.title}</h3>
+                <span className="text-xs text-zinc-400">• Đang phát 4K HD</span>
+              </div>
+              <button
+                onClick={() => setIsPlaying(false)}
+                className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+                aria-label="Đóng trình phát"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Video Container */}
+            <div className="relative aspect-video w-full bg-black">
+              <video
+                ref={videoRef}
+                src={videoSource}
+                controls
+                autoPlay
+                className="h-full w-full object-contain"
+              >
+                Trình duyệt của bạn không hỗ trợ thẻ video HTML5.
+              </video>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Backdrop */}
       <section className="relative overflow-hidden border-b border-zinc-800 bg-black">
         {/* Backdrop Image Layer */}
@@ -121,15 +163,15 @@ export function MovieDetail({
               {/* Action Buttons */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <button
-                  onClick={() => setIsPlaying(!isPlaying)}
+                  onClick={() => setIsPlaying(true)}
                   className="btn-primary px-6 py-2.5 text-sm font-bold shadow-red-sm"
                 >
                   <Play size={16} className="fill-current" />
-                  {isPlaying ? 'Tạm dừng' : 'Xem phim ngay'}
+                  Xem phim ngay
                 </button>
 
                 <button
-                  onClick={() => toggleWatchlist(movie.id, movie.title)}
+                  onClick={() => toggleWatchlist(movie.id, movie.title, movie.poster)}
                   className="btn-secondary px-4 py-2.5 text-sm font-semibold"
                   aria-label={inWatchlist ? 'Xóa khỏi Watchlist' : 'Thêm vào Watchlist'}
                 >

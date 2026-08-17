@@ -8,4 +8,5 @@ export type Movie = {
   description: string;
   poster: string;
   backdrop: string;
+  videoUrl?: string;
 };

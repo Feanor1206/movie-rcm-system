@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { CineBot, CineBotFloatingTrigger } from '@/features/chat/components/CineBot';
+import { AuthModal } from '@/features/auth/components/AuthModal';
 
 type Toast = {
   id: string;
@@ -13,13 +14,14 @@ type WatchlistContextType = {
   watchlist: string[];
   favorites: string[];
   ratings: Record<string, number>;
-  toggleWatchlist: (id: string, title?: string) => void;
+  toggleWatchlist: (id: string, title?: string, poster?: string) => void;
   toggleFavorite: (id: string, title?: string) => void;
   rateMovie: (id: string, rating: number, title?: string) => void;
   isWatchlisted: (id: string) => boolean;
   isFavorite: (id: string) => boolean;
   getRating: (id: string) => number | undefined;
   toasts: Toast[];
+  showToast: (message: string, type?: 'success' | 'info') => void;
   dismissToast: (id: string) => void;
   isChatOpen: boolean;
   openChat: () => void;
@@ -29,6 +31,8 @@ type WatchlistContextType = {
 
 const WatchlistContext = createContext<WatchlistContextType | undefined>(undefined);
 
+const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
+
 export function WatchlistProvider({ children }: { children: React.ReactNode }) {
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -37,6 +41,7 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
+  // Load from localStorage or sync from backend
   useEffect(() => {
     try {
       const savedWatchlist = localStorage.getItem('dippie_watchlist');
@@ -51,12 +56,37 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
 
       if (savedRatings) setRatings(JSON.parse(savedRatings));
       else setRatings({ 'the-last-orbit': 9 });
+
+      // If token exists, sync with backend
+      const token = localStorage.getItem('dippie_auth_token');
+      if (token) {
+        syncWithBackend(token);
+      }
     } catch {
       // ignore
     } finally {
       setIsLoaded(true);
     }
   }, []);
+
+  const syncWithBackend = async (token: string) => {
+    try {
+      const res = await fetch(`${SPRINGBOOT_API}/users/watchlist`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const backendIds = json.data.map((item: { movieId: string }) => item.movieId);
+          if (backendIds.length > 0) {
+            setWatchlist((prev) => Array.from(new Set([...prev, ...backendIds])));
+          }
+        }
+      }
+    } catch {
+      // Ignore backend sync failure
+    }
+  };
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -91,17 +121,39 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const toggleWatchlist = (id: string, title?: string) => {
-    setWatchlist((prev) => {
-      const exists = prev.includes(id);
-      if (exists) {
-        showToast(`Đã xóa ${title || 'phim'} khỏi Danh sách xem`, 'info');
-        return prev.filter((item) => item !== id);
-      } else {
-        showToast(`Đã thêm ${title || 'phim'} vào Danh sách xem`, 'success');
-        return [...prev, id];
+  const toggleWatchlist = async (id: string, title?: string, poster?: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('dippie_auth_token') : null;
+    const exists = watchlist.includes(id);
+
+    if (exists) {
+      setWatchlist((prev) => prev.filter((item) => item !== id));
+      showToast(`Đã xóa ${title || 'phim'} khỏi Danh sách xem`, 'info');
+
+      if (token) {
+        fetch(`${SPRINGBOOT_API}/users/watchlist/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
       }
-    });
+    } else {
+      setWatchlist((prev) => [...prev, id]);
+      showToast(`Đã thêm ${title || 'phim'} vào Danh sách xem`, 'success');
+
+      if (token) {
+        fetch(`${SPRINGBOOT_API}/users/watchlist`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            movieId: id,
+            movieTitle: title || id,
+            posterUrl: poster || '',
+          }),
+        }).catch(() => {});
+      }
+    }
   };
 
   const toggleFavorite = (id: string, title?: string) => {
@@ -118,11 +170,23 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
   };
 
   const rateMovie = (id: string, rating: number, title?: string) => {
-    setRatings((prev) => {
-      const next = { ...prev, [id]: rating };
-      showToast(`Đã chấm ${title || 'phim'} ${rating}/10 điểm ★`, 'success');
-      return next;
-    });
+    setRatings((prev) => ({ ...prev, [id]: rating }));
+    showToast(`Đã chấm ${title || 'phim'} ${rating}/10 điểm ★`, 'success');
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('dippie_auth_token') : null;
+    if (token) {
+      fetch(`${SPRINGBOOT_API}/users/ratings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          movieId: id,
+          rating,
+        }),
+      }).catch(() => {});
+    }
   };
 
   const isWatchlisted = (id: string) => watchlist.includes(id);
@@ -146,6 +210,7 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
         isFavorite,
         getRating,
         toasts,
+        showToast,
         dismissToast,
         isChatOpen,
         openChat,
@@ -154,6 +219,9 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+
+      {/* Global Auth Modal */}
+      <AuthModal />
 
       {/* Global CineBot Widget & Modal */}
       {!isChatOpen && <CineBotFloatingTrigger onClick={openChat} />}

@@ -1,23 +1,125 @@
 version: '3.8'
 
 services:
+  # =========================================================================
+  # 1. API GATEWAY (Nginx Reverse Proxy)
+  # =========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: movie_rcm_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - springboot
+      - fastapi
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 2. FRONTEND (Next.js 15 Web Application)
+  # =========================================================================
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: movie_rcm_frontend
+    restart: always
+    environment:
+      - NEXT_PUBLIC_SPRINGBOOT_API_URL=/api
+      - NEXT_PUBLIC_MODEL_API_URL=/api/chat
+    expose:
+      - "3000"
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 3. BACKEND SPRING BOOT (Auth, Users, Movie Catalog)
+  # =========================================================================
+  springboot:
+    build:
+      context: ../backend/springboot
+      dockerfile: Dockerfile
+    container_name: movie_rcm_springboot
+    restart: always
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/movie_rcm_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 4. BACKEND FASTAPI (AI Recommendation & Qwen Pipeline)
+  # =========================================================================
+  fastapi:
+    build:
+      context: ../backend/fastapi
+      dockerfile: Dockerfile
+    container_name: movie_rcm_fastapi
+    restart: always
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - MODEL_NAME_OR_PATH=Qwen/Qwen2.5-0.5B-Instruct
+      - DEVICE=cpu
+    volumes:
+      - ../ai/models:/app/models:ro
+    expose:
+      - "8000"
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 5. DATABASE (PostgreSQL 16)
+  # =========================================================================
   postgres:
     image: postgres:16-alpine
     container_name: movie_rcm_postgres
+    restart: always
     environment:
       POSTGRES_DB: movie_rcm_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ../database/schema/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ../database/seeds/01_seed_movies.sql:/docker-entrypoint-initdb.d/02_seed_movies.sql:ro
+      - ../database/seeds/02_seed_50_users.sql:/docker-entrypoint-initdb.d/03_seed_50_users.sql:ro
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d movie_rcm_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - movie_network
 
+  # =========================================================================
+  # 6. CACHE (Redis 7)
+  # =========================================================================
   redis:
     image: redis:7-alpine
     container_name: movie_rcm_redis
-    ports:
-      - "6379:6379"
+    restart: always
+    expose:
+      - "6379"
+    networks:
+      - movie_network
+
+networks:
+  movie_network:
+    driver: bridge
 
 volumes:
   pgdata:

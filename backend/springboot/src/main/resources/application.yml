@@ -1,0 +1,56 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: moviercm-backend
+  profiles:
+    active: dev
+  sql:
+    init:
+      mode: always
+
+app:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    expiration-ms: 86400000 # 24 hours (1 day)
+  cors:
+    allowed-origins: "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
+
+---
+# Development Profile (H2 In-Memory Database - Auto-create tables & 50 users)
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:moviercm_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+---
+# Production Profile (PostgreSQL Database)
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/movie_rcm_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
