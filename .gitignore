@@ -32,15 +32,14 @@ yarn-error.log*
 # Java / Spring Boot
 target/
 backend/springboot/target/
-.mvn/
-backend/springboot/.mvn/
 *.class
-*.jar
 *.war
 *.nar
 *.ear
 .gradle/
 backend/springboot/.gradle/
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
 
 # Python / FastAPI / AI
 __pycache__/
@@ -61,7 +60,7 @@ dist/
 .coverage
 htmlcov/
 
-# AI Model Checkpoints & Large Datasets
+# AI Model Checkpoints & Large Binary Weights (>50MB)
 *.bin
 *.onnx
 *.safetensors
@@ -69,11 +68,26 @@ htmlcov/
 *.pth
 *.h5
 *.ckpt
+*.gguf
+ai/models/*
+!ai/models/.gitkeep
+!ai/models/README.md
 ai/models/checkpoints/
-ai/datasets/raw/
-ai/datasets/processed/
+ai/datasets/raw/*
+!ai/datasets/raw/.gitkeep
+ai/datasets/processed/*
+!ai/datasets/processed/.gitkeep
 distillation/checkpoints/
 data/raw/
 
 # Docker & Database
 pgdata/
+
+# Large Media & Video Files (>100MB)
+*.mp4
+*.mkv
+*.mov
+*.avi
+storage/videos/
+frontend/public/videos/*
+!frontend/public/videos/.gitkeep

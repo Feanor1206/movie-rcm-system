@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { AuthProvider } from '@/lib/context/AuthContext';
 import { WatchlistProvider } from '@/lib/context/WatchlistContext';
 import './globals.css';
 
@@ -32,7 +33,9 @@ export default function RootLayout({
   return (
     <html lang="vi" className={`${inter.variable} dark`}>
       <body className="min-h-screen bg-black font-sans text-foreground antialiased selection:bg-cinema-red selection:text-white">
-        <WatchlistProvider>{children}</WatchlistProvider>
+        <AuthProvider>
+          <WatchlistProvider>{children}</WatchlistProvider>
+        </AuthProvider>
       </body>
     </html>
   );

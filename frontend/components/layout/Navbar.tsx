@@ -1,21 +1,43 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Search, User, X } from 'lucide-react';
+import { Menu, Search, User, X, LogOut, Bookmark, UserCheck } from 'lucide-react';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { watchlist, openChat } = useWatchlist();
+  const { user, isAuthenticated, openAuthModal, logout } = useAuth();
 
   const navLinks = [
     { name: 'Khám phá', href: '/' },
     { name: 'Kho phim', href: '/search' },
     { name: 'Danh sách xem', href: '/profile', count: watchlist.length },
   ];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/90 backdrop-blur-md">
@@ -56,7 +78,7 @@ export function Navbar() {
 
         {/* Right: Actions */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Chatbot Trigger (Clean button, no unnecessary robot icon) */}
+          {/* Chatbot Trigger */}
           <button
             onClick={openChat}
             className="rounded-md border border-zinc-700 bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-cinema-red hover:text-white cursor-pointer"
@@ -64,7 +86,7 @@ export function Navbar() {
             Hỏi CineBot
           </button>
 
-          {/* Search Button (Clean, no ⌘K pill badge) */}
+          {/* Search Button */}
           <Link
             href="/search"
             aria-label="Tìm kiếm phim"
@@ -74,24 +96,88 @@ export function Navbar() {
             <span>Tìm kiếm</span>
           </Link>
 
-          {/* Profile */}
-          <Link
-            href="/profile"
-            aria-label="Trang cá nhân"
-            className="grid h-8 w-8 place-items-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors"
-          >
-            <User size={14} />
-          </Link>
+          {/* User Auth Section */}
+          {isAuthenticated && user ? (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer"
+              >
+                <div className="grid h-6 w-6 place-items-center rounded bg-cinema-red text-[11px] font-bold text-white">
+                  {getInitials(user.fullName || user.username)}
+                </div>
+                <span className="font-medium max-w-[100px] truncate">
+                  {user.fullName || user.username}
+                </span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {userDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl animate-fade-in z-50">
+                  <div className="px-2.5 py-2 border-b border-zinc-850">
+                    <p className="text-xs font-bold text-white truncate">{user.fullName || user.username}</p>
+                    <p className="text-[11px] text-zinc-400 truncate">{user.email}</p>
+                  </div>
+
+                  <div className="mt-1.5 space-y-0.5">
+                    <Link
+                      href="/profile"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
+                    >
+                      <UserCheck size={14} /> Hồ sơ cá nhân
+                    </Link>
+                    <Link
+                      href="/profile"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
+                    >
+                      <Bookmark size={14} /> Watchlist ({watchlist.length})
+                    </Link>
+                  </div>
+
+                  <div className="mt-1.5 pt-1.5 border-t border-zinc-850">
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        logout();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                    >
+                      <LogOut size={14} /> Đăng xuất
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => openAuthModal('login')}
+              className="rounded-md bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-white hover:border-cinema-red hover:bg-cinema-red transition-all cursor-pointer"
+            >
+              Đăng nhập
+            </button>
+          )}
         </div>
 
         {/* Mobile Toggle */}
         <div className="flex items-center gap-2 md:hidden">
-          <button
-            onClick={openChat}
-            className="rounded-md bg-cinema-red px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
-          >
-            CineBot
-          </button>
+          {isAuthenticated ? (
+            <Link
+              href="/profile"
+              className="grid h-8 w-8 place-items-center rounded bg-cinema-red text-xs font-bold text-white"
+            >
+              {getInitials(user?.fullName || user?.username)}
+            </Link>
+          ) : (
+            <button
+              onClick={() => openAuthModal('login')}
+              className="rounded bg-cinema-red px-2.5 py-1 text-xs font-bold text-white cursor-pointer"
+            >
+              Đăng nhập
+            </button>
+          )}
+
           <button
             aria-label={open ? 'Đóng menu' : 'Mở menu'}
             onClick={() => setOpen(!open)}
