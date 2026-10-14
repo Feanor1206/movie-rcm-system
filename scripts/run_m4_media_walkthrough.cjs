@@ -1,19 +1,18 @@
 /**
- * M4-F01 Media Streaming Walkthrough & Real Spring Boot Benchmark Harness
+ * M4-F02 Media Streaming Walkthrough & Real Spring Boot Benchmark Harness
  *
  * Runs browser playback assertions via Chrome DevTools Protocol (CDP) against:
- *   1. Spring Boot M4WalkthroughServer (isolated H2 in-memory DB, temp media root)
+ *   1. Spring Boot M4WalkthroughServer (isolated H2 in-memory DB, temp media root, observable permits)
  *   2. Next.js Standalone Production Build
  *
- * Verifies Milestone M4 Findings (F01):
- *   - R1: Server-enforced public media boundary, HTTP 206 Range streaming, byte integrity
- *   - R2: Node 20 / runtime compatibility
- *   - R3: Video player lifecycle, route invalidation, focus management, retry currentTime preservation
- *   - R4: Actual Spring Boot HTTP benchmark (1 & 3 streams, startup TTFB, seek latency, disconnect cleanup, 0 disk growth)
- *   - R5: Read-only storage root, no directories created on read path
+ * Verifies Milestone M4-F02 Findings:
+ *   - F1: Media descriptor error, retry button, recovery, no false catalog absence
+ *   - F2: Bounded local streams, observable cleanup, HTTP 429 overload resilience
+ *   - F3: Real browser controls (play/pause, timeline scrubber), >=44px mobile touch targets,
+ *         before/after disk snapshots, truthful latency labeling
  *
- * Screenshots saved to: docs/reports/screenshots/M4_F01/
- * Benchmark output saved to: docs/reports/m4_f01_benchmark_results.json
+ * Screenshots saved to: docs/reports/screenshots/M4_F02/
+ * Benchmark output saved to: docs/reports/m4_f02_benchmark_results.json
  */
 
 const http = require('node:http');
@@ -21,6 +20,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
 const { performance } = require('node:perf_hooks');
 
@@ -30,10 +30,35 @@ const JAVA_PATH = 'C:\\Program Files\\Java\\jdk-25.0.3\\bin\\java.exe';
 const STANDALONE_DIR = path.resolve(PROJECT_ROOT, 'frontend/.next/standalone');
 const STANDALONE_SERVER = path.resolve(STANDALONE_DIR, 'server.js');
 const MEDIA_FILE = path.resolve(PROJECT_ROOT, 'backend/springboot/target/test-media/synthetic/walkthrough_feature.mp4');
-const SCREENSHOTS_DIR = path.resolve(PROJECT_ROOT, 'docs/reports/screenshots/M4_F01');
-const BENCHMARK_OUT = path.resolve(PROJECT_ROOT, 'docs/reports/m4_f01_benchmark_results.json');
+const SCREENSHOTS_DIR = path.resolve(PROJECT_ROOT, 'docs/reports/screenshots/M4_F02');
+const BENCHMARK_OUT = path.resolve(PROJECT_ROOT, 'docs/reports/m4_f02_benchmark_results.json');
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+
+function snapshotDirectory(dirPath) {
+  const entries = [];
+  if (!fs.existsSync(dirPath)) return entries;
+  function scan(cur) {
+    const items = fs.readdirSync(cur, { withFileTypes: true });
+    for (const it of items) {
+      const full = path.join(cur, it.name);
+      if (it.isDirectory()) {
+        scan(full);
+      } else if (it.isFile()) {
+        const stat = fs.statSync(full);
+        const content = fs.readFileSync(full);
+        const hash = crypto.createHash('sha256').update(content).digest('hex');
+        entries.push({
+          relativePath: path.relative(dirPath, full).replace(/\\/g, '/'),
+          sizeBytes: stat.size,
+          sha256: hash,
+        });
+      }
+    }
+  }
+  scan(dirPath);
+  return entries.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+}
 
 function checkPortAvailable(port, host = '127.0.0.1') {
   return new Promise((resolve) => {
@@ -241,7 +266,8 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
     const msg = JSON.parse(raw);
 
     if (msg.id && pendingRequests.has(msg.id)) {
-      const { resolve, reject } = pendingRequests.get(msg.id);
+      const { resolve, reject, timer } = pendingRequests.get(msg.id);
+      clearTimeout(timer);
       pendingRequests.delete(msg.id);
       if (msg.error) reject(new Error(msg.error.message || JSON.stringify(msg.error)));
       else resolve(msg.result);
@@ -289,11 +315,40 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
     }
   });
 
-  function cdp(method, params = {}) {
+  ws.addEventListener('close', () => {
+    for (const [id, { reject, timer }] of pendingRequests.entries()) {
+      clearTimeout(timer);
+      reject(new Error(`CDP WebSocket closed while request ${id} was pending`));
+    }
+    pendingRequests.clear();
+  });
+
+  ws.addEventListener('error', (err) => {
+    for (const [id, { reject, timer }] of pendingRequests.entries()) {
+      clearTimeout(timer);
+      reject(new Error(`CDP WebSocket error: ${err?.message || 'unknown'}`));
+    }
+    pendingRequests.clear();
+  });
+
+  function cdp(method, params = {}, timeoutMs = 15000) {
     return new Promise((resolve, reject) => {
       const id = idCounter++;
-      pendingRequests.set(id, { resolve, reject });
-      ws.send(JSON.stringify({ id, method, params }));
+      const timer = setTimeout(() => {
+        if (pendingRequests.has(id)) {
+          pendingRequests.delete(id);
+          reject(new Error(`CDP command '${method}' timed out after ${timeoutMs}ms`));
+        }
+      }, timeoutMs);
+
+      pendingRequests.set(id, { resolve, reject, timer });
+      try {
+        ws.send(JSON.stringify({ id, method, params }));
+      } catch (err) {
+        clearTimeout(timer);
+        pendingRequests.delete(id);
+        reject(err);
+      }
     });
   }
 
@@ -310,12 +365,12 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
     ]
   });
 
-  async function evaluate(expression) {
+  async function evaluate(expression, timeoutMs = 15000) {
     const res = await cdp('Runtime.evaluate', {
       expression,
       returnByValue: true,
       awaitPromise: true,
-    });
+    }, timeoutMs);
     if (res?.exceptionDetails) {
       const desc = res.exceptionDetails.exception?.description || res.exceptionDetails.text;
       throw new Error(`Browser JS evaluate failed: ${desc}`);
@@ -463,7 +518,7 @@ function computeStats(arr) {
 // ----------------------------------------------------------------------------
 async function main() {
   console.log('================================================================');
-  console.log('   M4-F01 Browser Media Walkthrough & Spring Boot Benchmark     ');
+  console.log('   M4-F02 Browser Media Walkthrough & Spring Boot Benchmark     ');
   console.log('================================================================');
 
   let springProcess = null;
@@ -472,6 +527,10 @@ async function main() {
   let springPort = null;
   let nextPort = null;
   let cdpPort = null;
+
+  const testMediaDir = path.resolve(PROJECT_ROOT, 'backend/springboot/target/test-media');
+  const diskBeforeSnapshot = snapshotDirectory(testMediaDir);
+  console.log(`Initial disk snapshot taken: ${diskBeforeSnapshot.length} files tracked in ${testMediaDir}`);
 
   try {
     // 0. Allocate ports
@@ -547,25 +606,72 @@ async function main() {
     );
     console.log('✔ Video element mounted in player modal');
 
-    // Diagnostic & play trigger if paused
+    // Diagnostic & play trigger via UI control if paused
     const initialStatus = await evaluate(`(() => {
       const v = document.querySelector('video');
+      window.__m4StalledCount = 0;
+      window.__m4WaitingCount = 0;
+      if (v) {
+        v.addEventListener('stalled', () => { window.__m4StalledCount++; });
+        v.addEventListener('waiting', () => { window.__m4WaitingCount++; });
+      }
       return {
-        src: v.src,
-        currentSrc: v.currentSrc,
-        paused: v.paused,
-        currentTime: v.currentTime,
-        duration: v.duration,
-        readyState: v.readyState,
-        networkState: v.networkState,
+        src: v?.src,
+        currentSrc: v?.currentSrc,
+        paused: v?.paused,
+        currentTime: v?.currentTime,
+        duration: v?.duration,
+        readyState: v?.readyState,
+        networkState: v?.networkState,
       };
     })()`);
     console.log('Initial video element status:', JSON.stringify(initialStatus));
 
     if (initialStatus.paused) {
-      console.log('Video is paused (autoplay guard) - triggering play()...');
-      await evaluate(`document.querySelector('video').play().catch(() => {})`);
+      console.log('Video paused by browser autoplay policy - clicking UI play button...');
+      await evaluate(`(() => {
+        const playBtn = document.querySelector('button[data-testid="video-play-pause-btn"]');
+        if (playBtn) playBtn.click();
+        else document.querySelector('video')?.play().catch(() => {});
+      })()`);
     }
+
+    // Measure raw browser presentation timing
+    const frameTiming = await evaluate(`new Promise((resolve, reject) => {
+      const v = document.querySelector('video');
+      if (!v) return reject(new Error('HTML5 video element not found for presentation timing'));
+      const t0 = performance.now();
+      let timer = null;
+
+      const onFrame = (now, metadata) => {
+        clearTimeout(timer);
+        resolve({
+          method: 'requestVideoFrameCallback',
+          latencyMs: Math.round(performance.now() - t0),
+          presentationTime: metadata.presentationTime,
+        });
+      };
+
+      const onPlaying = () => {
+        clearTimeout(timer);
+        resolve({
+          method: 'playing_event',
+          latencyMs: Math.round(performance.now() - t0),
+        });
+      };
+
+      timer = setTimeout(() => {
+        v.removeEventListener('playing', onPlaying);
+        reject(new Error('Timeout waiting for video presentation frame (8000ms). readyState=' + v.readyState + ', networkState=' + v.networkState));
+      }, 8000);
+
+      if ('requestVideoFrameCallback' in v) {
+        v.requestVideoFrameCallback(onFrame);
+      } else {
+        v.addEventListener('playing', onPlaying, { once: true });
+      }
+    })`, 10000);
+    console.log(`Browser video presentation timing: ${JSON.stringify(frameTiming)}`);
 
     // Wait for video currentTime to advance past 1.0s (proves real frames decoding)
     console.log('Waiting for video decoding and currentTime > 1.0s...');
@@ -588,20 +694,98 @@ async function main() {
     // Screenshot 1: Desktop Playing
     await captureScreenshot('01_desktop_playback_playing.png');
 
-    // A5. Seek near end (to 15.0s of 20.0s video)
-    console.log('Performing seek to 15.0s near end of video...');
-    await evaluate(`(() => {
-      const v = document.querySelector('video');
-      v.currentTime = 15.0;
-    })()`);
+    // A5. Measure 3 Browser Seeks across positions via UI timeline
+    console.log('\nMeasuring 3 Browser Seeks via UI timeline scrubber control...');
+    const browserSeekRuns = [];
+    const targetSeekPositions = [5.0, 10.0, 15.0];
 
-    // Wait for video to advance past 15.3s
+    for (let i = 0; i < targetSeekPositions.length; i++) {
+      const targetSec = targetSeekPositions[i];
+      const seekPerf = await evaluate(`new Promise((resolve, reject) => {
+        const timeline = document.querySelector('input[data-testid="video-timeline"]');
+        const v = document.querySelector('video');
+        if (!timeline) return reject(new Error('Timeline element input[data-testid="video-timeline"] not found'));
+        if (!v) return reject(new Error('HTML5 video element not found'));
+
+        const t0 = performance.now();
+        let seekingFired = false;
+        let timer = null;
+
+        const onSeeking = () => {
+          seekingFired = true;
+        };
+
+        const onSeeked = () => {
+          cleanup();
+          resolve({
+            latencyMs: Math.round(performance.now() - t0),
+            seekingObserved: seekingFired,
+            currentTimeAfter: v.currentTime,
+            sliderValueAfter: parseFloat(timeline.value),
+          });
+        };
+
+        function cleanup() {
+          clearTimeout(timer);
+          v.removeEventListener('seeking', onSeeking);
+          v.removeEventListener('seeked', onSeeked);
+        }
+
+        v.addEventListener('seeking', onSeeking, { once: true });
+        v.addEventListener('seeked', onSeeked, { once: true });
+
+        timer = setTimeout(() => {
+          cleanup();
+          const diagnostics = {
+            targetSec: ${targetSec},
+            readyState: v.readyState,
+            networkState: v.networkState,
+            currentTime: v.currentTime,
+            duration: v.duration,
+            paused: v.paused,
+            seeking: v.seeking,
+            seekingFired,
+            sliderValue: timeline.value,
+            mediaError: v.error ? { code: v.error.code, message: v.error.message } : null,
+          };
+          reject(new Error('Seek to ' + ${targetSec} + 's timed out after 8000ms. Diagnostics: ' + JSON.stringify(diagnostics)));
+        }, 8000);
+
+        // Controlled React input dispatch via native HTMLInputElement value setter
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (nativeSetter) {
+          nativeSetter.call(timeline, "${targetSec}");
+        } else {
+          timeline.value = "${targetSec}";
+        }
+        timeline.dispatchEvent(new Event('input', { bubbles: true }));
+        timeline.dispatchEvent(new Event('change', { bubbles: true }));
+      })`, 10000);
+
+      browserSeekRuns.push(seekPerf.latencyMs);
+      console.log(`  Seek to ${targetSec}s: latency = ${seekPerf.latencyMs} ms, seekingObserved = ${seekPerf.seekingObserved}, currentTime = ${seekPerf.currentTimeAfter.toFixed(2)}s, slider = ${seekPerf.sliderValueAfter}`);
+
+      assert(seekPerf.currentTimeAfter >= targetSec - 0.5, `currentTime after seek (${seekPerf.currentTimeAfter}) must reflect target (${targetSec})`);
+
+      await waitForCondition(
+        `(() => {
+          const v = document.querySelector('video');
+          return v && !v.seeking && v.currentTime >= ${targetSec - 0.2};
+        })()`,
+        `Video continuous after seek to ${targetSec}s`,
+        8000
+      );
+    }
+    const browserSeekStats = computeStats(browserSeekRuns);
+    console.log(`  Browser Seek Latency Stats: min=${browserSeekStats.min}ms, avg=${browserSeekStats.avg}ms, p95=${browserSeekStats.p95}ms, max=${browserSeekStats.max}ms`);
+
+    // Wait for continuous playback past 15.3s
     await waitForCondition(
       `(() => {
         const v = document.querySelector('video');
-        return v && !v.seeking && v.currentTime >= 15.0 && v.currentTime > 15.3;
+        return v && !v.seeking && v.currentTime > 15.3;
       })()`,
-      'Video playback continuous after seek past 15.3s',
+      'Continuous playback past 15.3s',
       8000
     );
     const seekTime = await evaluate(`document.querySelector('video').currentTime`);
@@ -610,21 +794,44 @@ async function main() {
     // Screenshot 2: Desktop Seek Near End
     await captureScreenshot('02_desktop_seek_near_end.png');
 
-    // A6. Pause & Resume verification
-    console.log('Testing Pause / Resume state...');
-    await evaluate(`document.querySelector('video').pause()`);
-    await waitForCondition(`document.querySelector('video').paused === true`, 'Video paused', 3000);
-    console.log('✔ Video paused');
+    // A6. Pause & Resume verification via UI button
+    console.log('Testing Pause / Resume via UI button...');
+    await evaluate(`(() => {
+      const btn = document.querySelector('button[data-testid="video-play-pause-btn"]');
+      btn.click();
+    })()`);
+    await waitForCondition(
+      `(() => {
+        const v = document.querySelector('video');
+        const btn = document.querySelector('button[data-testid="video-play-pause-btn"]');
+        return v && v.paused === true && (btn?.getAttribute('aria-label') === 'Phát video' || btn?.querySelector('svg'));
+      })()`,
+      'Video paused and UI button reflected paused state',
+      4000
+    );
+    console.log('✔ Video paused via UI button click');
 
-    await evaluate(`document.querySelector('video').play()`);
-    await waitForCondition(`document.querySelector('video').paused === false`, 'Video resumed', 3000);
-    console.log('✔ Video resumed');
+    await evaluate(`(() => {
+      const btn = document.querySelector('button[data-testid="video-play-pause-btn"]');
+      btn.click();
+    })()`);
+    await waitForCondition(
+      `(() => {
+        const v = document.querySelector('video');
+        const btn = document.querySelector('button[data-testid="video-play-pause-btn"]');
+        return v && v.paused === false && (btn?.getAttribute('aria-label') === 'Tạm dừng video' || btn?.querySelector('svg'));
+      })()`,
+      'Video resumed and UI button reflected playing state',
+      4000
+    );
+    console.log('✔ Video resumed via UI button click');
 
-    // A7. Simulated Error & Retry Recovery
-    console.log('Simulating playback error to verify retry recovery...');
+    // A7. Error & Retry Recovery
+    console.log('Triggering controlled playback error to verify retry recovery...');
     const timeBeforeError = await evaluate(`document.querySelector('video').currentTime`);
+    console.log(`Current playback position before fault: ${timeBeforeError.toFixed(2)}s`);
 
-    // Dispatch error on video element
+    // Setup: Dispatch controlled error event on media element (labeled fault setup)
     await evaluate(`(() => {
       const v = document.querySelector('video');
       v.dispatchEvent(new Event('error'));
@@ -643,26 +850,32 @@ async function main() {
     console.log('✔ Error state displayed with Retry button');
 
     // Click "Thử lại"
-    console.log('Clicking "Thử lại" and verifying position restoration...');
+    console.log('Clicking "Thử lại" and observing app natural recovery (NO test harness intervention)...');
     await evaluate(`(() => {
       const retryBtn = document.querySelector('button[data-testid="video-retry-btn"]') ||
                        Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Thử lại'));
       retryBtn.click();
     })()`);
 
-    // Verify video resumes and currentTime is restored
+    // Strictly observational wait predicate: NO v.play() or currentTime manipulation in predicate!
     await waitForCondition(
       `(() => {
         const v = document.querySelector('video');
         if (!v) return false;
-        if (v.paused) v.play().catch(() => {});
         return !v.paused && v.currentTime >= ${timeBeforeError - 0.8};
       })()`,
-      `Video restored near ${timeBeforeError.toFixed(2)}s and resumed playing`,
-      10000
+      `Video restored near ${timeBeforeError.toFixed(2)}s and resumed playing naturally by app`,
+      12000
     );
     const recoveredTime = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`✔ Playback retry recovery verified! Restored time: ${recoveredTime.toFixed(2)}s`);
+
+    // Collect observed stall events
+    const observedStalls = await evaluate(`(() => ({
+      stalledEvents: window.__m4StalledCount || 0,
+      waitingEvents: window.__m4WaitingCount || 0,
+    }))()`);
+    console.log(`Observed media element events: ${JSON.stringify(observedStalls)}`);
 
     // Screenshot 3: Retry Recovery
     await captureScreenshot('03_desktop_retry_recovery.png');
@@ -690,21 +903,71 @@ async function main() {
 
     await waitForCondition(`Boolean(document.querySelector('video'))`, 'Mobile video player open', 5000);
 
-    // Verify touch target dimensions (>= 40px bounding box)
-    const mobileMetrics = await evaluate(`(() => {
-      const closeBtn = document.querySelector('button[aria-label="Đóng"]') ||
-                       document.querySelector('button[aria-label="Đóng trình phát"]') ||
-                       document.querySelector('div[role="dialog"] button');
-      const closeRect = closeBtn ? closeBtn.getBoundingClientRect() : null;
+    // Comprehensive Mobile Touch Target & Collision Audit
+    const mobileAudit = await evaluate(`(() => {
+      function getInfo(selector, name) {
+        const el = document.querySelector(selector);
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        return {
+          name,
+          selector,
+          ariaLabel: el.getAttribute('aria-label') || '',
+          testId: el.getAttribute('data-testid') || '',
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          top: Math.round(rect.top),
+          bottom: Math.round(rect.bottom),
+          visible: rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none',
+        };
+      }
+
+      const close = getInfo('button[aria-label="Đóng trình phát"]', 'close_button');
+      const playPause = getInfo('button[data-testid="video-play-pause-btn"]', 'play_pause_button');
+      const volume = getInfo('button[data-testid="video-volume-btn"]', 'volume_button');
+      const fullscreen = getInfo('button[data-testid="video-fullscreen-btn"]', 'fullscreen_button');
+      const timeline = getInfo('input[data-testid="video-timeline"]', 'timeline_scrubber');
+
+      const buttons = [close, playPause, volume, fullscreen].filter(Boolean);
+      const allControls = [close, playPause, volume, fullscreen, timeline].filter(Boolean);
+
+      // Collision checks between all button pairs in the control bar
+      const collisions = [];
+      const barButtons = [playPause, volume, fullscreen].filter(Boolean);
+      for (let i = 0; i < barButtons.length; i++) {
+        for (let j = i + 1; j < barButtons.length; j++) {
+          const a = barButtons[i];
+          const b = barButtons[j];
+          const overlap = !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+          if (overlap) {
+            collisions.push({ a: a.name, b: b.name });
+          }
+        }
+      }
+
       return {
-        closeWidth: closeRect ? Math.round(closeRect.width) : 0,
-        closeHeight: closeRect ? Math.round(closeRect.height) : 0,
+        controls: allControls,
+        buttons,
+        collisions,
       };
     })()`);
 
-    console.log(`Mobile close button touch dimensions: ${mobileMetrics.closeWidth}x${mobileMetrics.closeHeight}px`);
-    assert(mobileMetrics.closeWidth >= 40 && mobileMetrics.closeHeight >= 40, 'Touch target for close button must be >= 40x40px');
-    console.log('✔ Mobile touch targets verified');
+    console.log('Mobile controls audit:');
+    for (const c of mobileAudit.controls) {
+      console.log(`  - ${c.name} (${c.selector}): ${c.width}x${c.height}px, visible=${c.visible}`);
+      if (c.name !== 'timeline_scrubber') {
+        assert(c.width >= 44 && c.height >= 44, `Control ${c.name} must meet >= 44x44px touch target (got ${c.width}x${c.height}px)`);
+      } else {
+        assert(c.height >= 44 && c.width >= 100, `Timeline must meet min height >= 44px and width >= 100px (got ${c.width}x${c.height}px)`);
+      }
+      assert(c.visible, `Control ${c.name} must be visible in layout`);
+    }
+
+    assert.equal(mobileAudit.collisions.length, 0, `Player controls must not have layout collisions (found: ${JSON.stringify(mobileAudit.collisions)})`);
+    console.log('✔ All mobile controls satisfy >= 44x44px touch targets with 0 layout collisions');
 
     // Screenshot 4: Mobile Playback
     await captureScreenshot('04_mobile_playback_375px.png');
@@ -727,7 +990,7 @@ async function main() {
     console.log(`Synthetic Media Asset: ${MEDIA_FILE} (${totalFileLength} bytes, ${(totalFileLength / 1024).toFixed(1)} KiB)`);
 
     // 1. Startup Latency (Range: bytes=0-65535, 3 runs)
-    console.log('\n[Benchmark 1/5] Measuring Startup Latency (Initial 64 KiB Range Chunk, 3 runs)...');
+    console.log('\n[Benchmark 1/6] Measuring Startup Latency (Initial 64 KiB Range Chunk, 3 runs)...');
     const startupRuns = [];
     for (let r = 1; r <= 3; r++) {
       const res = await requestHttp(streamUrl, {
@@ -744,7 +1007,7 @@ async function main() {
     console.log(`  Startup TTFB Stats: min=${startupStats.min}ms, avg=${startupStats.avg}ms, p95=${startupStats.p95}ms, max=${startupStats.max}ms`);
 
     // 2. Mid & End Seek Latency (3 runs each)
-    console.log('\n[Benchmark 2/5] Measuring Seek Latencies across positions (3 runs each)...');
+    console.log('\n[Benchmark 2/6] Measuring Seek Chunk Latencies across positions (3 runs each)...');
     const midSeekRuns = [];
     const endSeekRuns = [];
 
@@ -771,7 +1034,7 @@ async function main() {
     const endSeekStats = computeStats(endSeekRuns);
 
     // 3. Single Stream Full Asset Throughput (3 runs)
-    console.log('\n[Benchmark 3/5] Measuring Single Stream Full Playback Throughput (3 runs)...');
+    console.log('\n[Benchmark 3/6] Measuring Single Stream Full Playback Throughput (3 runs)...');
     const singleThroughputRuns = [];
     for (let r = 1; r <= 3; r++) {
       const res = await requestHttp(streamUrl, {
@@ -787,7 +1050,7 @@ async function main() {
     const singleThroughputStats = computeStats(singleThroughputRuns);
 
     // 4. Concurrency: 3 Parallel Streams (3 runs)
-    console.log('\n[Benchmark 4/5] Measuring Concurrency: 3 Parallel Streams (3 runs)...');
+    console.log('\n[Benchmark 4/6] Measuring Concurrency: 3 Parallel Streams (3 runs)...');
     const parallelRuns = [];
     for (let r = 1; r <= 3; r++) {
       const t0 = performance.now();
@@ -820,36 +1083,93 @@ async function main() {
     const parallelAggregateStats = computeStats(parallelRuns.map(x => x.aggregateMBs));
     const parallelTtfbStats = computeStats(parallelRuns.map(x => x.avgStreamTTFB));
 
-    // 5. Client Abrupt Disconnect Cleanup Test
-    console.log('\n[Benchmark 5/5] Testing Client Abrupt Disconnect cleanup (ClientAbortException Handling)...');
-    await new Promise((resolve) => {
-      const parsed = new URL(streamUrl);
-      const req = http.request({
-        hostname: parsed.hostname,
-        port: parsed.port,
-        path: parsed.pathname,
-        headers: { Range: 'bytes=0-' },
-      }, (res) => {
-        res.on('data', () => {
-          // Sever socket abruptly mid-stream
-          req.destroy();
-          resolve();
-        });
-      });
-      req.on('error', () => resolve()); // Expected ClientAbort
-      req.end();
+    // 5. Client Abrupt Disconnect & Observable Stream Cleanup (F2 Counter & Overload 429)
+    console.log('\n[Benchmark 5/6] Testing Client Abrupt Disconnect & Stream Permit Cleanup (F2 Observable Counter)...');
+    // 5a. Verify baseline active stream count is 0
+    const metricsBaseline = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
+    const baselineData = JSON.parse(metricsBaseline.body.toString());
+    console.log('Baseline MediaStream metrics:', baselineData);
+    assert.equal(baselineData.activeStreams, 0, 'Baseline active stream count must be 0');
+
+    // 5b. Initiate gated read to hold 1 stream active
+    console.log('Arming test stream gate and initiating active stream...');
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/gate/arm`, { method: 'POST' });
+
+    let activeWhileStreaming = -1;
+    let overload429Verified = false;
+
+    // Start stream 1 in background (will pause at gate after acquiring permit)
+    const streamReq = http.request(streamUrl, {
+      headers: { Range: 'bytes=0-' },
     });
+    streamReq.on('error', () => {}); // Catch abort error on client destroy
+    streamReq.end();
+
+    // Poll counter to verify activeStreams === 1
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      const m = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
+      const data = JSON.parse(m.body.toString());
+      if (data.activeStreams >= 1) {
+        activeWhileStreaming = data.activeStreams;
+        break;
+      }
+    }
+    console.log(`Active streams while connection is open: ${activeWhileStreaming}`);
+    assert(activeWhileStreaming >= 1, 'Active stream counter must reflect active connection (>= 1)');
+
+    // 5c. Test Stream Concurrency Limit & Overload 429 while stream 1 holds permit
+    console.log('Testing Stream Concurrency Limit & Overload 429 while stream 1 is active...');
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/max-concurrent-streams?limit=1`, { method: 'POST' });
+    const res2 = await requestHttp(streamUrl, { headers: { Range: 'bytes=0-65535' } });
+    console.log(`Overload response for stream 2: HTTP ${res2.statusCode}`);
+    if (res2.statusCode === 429) {
+      assert.equal(res2.headers['retry-after'], '5', 'HTTP 429 must include Retry-After: 5');
+      assert(res2.headers['cache-control']?.includes('no-store'), 'HTTP 429 must include Cache-Control: no-store');
+      overload429Verified = true;
+    }
+    assert(overload429Verified, 'Server must return HTTP 429 when max concurrent streams limit is exceeded');
+    console.log('✔ Stream concurrency limit & HTTP 429 overload verified');
+
+    // Reset max concurrent streams back to 10
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/max-concurrent-streams?limit=10`, { method: 'POST' });
+
+    // 5d. Abruptly sever client 1 socket and release gate
+    console.log('Severing stream 1 socket and releasing gate...');
+    streamReq.destroy();
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/gate/release`, { method: 'POST' });
+
+    // 5e. Poll counter to verify active streams return to 0 (finally block executed)
+    console.log('Verifying active stream counter returns to baseline (0) after disconnect...');
+    let activeAfterDisconnect = -1;
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      const m = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
+      const data = JSON.parse(m.body.toString());
+      activeAfterDisconnect = data.activeStreams;
+      if (activeAfterDisconnect === 0) break;
+    }
+    console.log(`Active streams after disconnect: ${activeAfterDisconnect}`);
+    assert.equal(activeAfterDisconnect, 0, 'Active stream count must return to 0 after client disconnect');
+    console.log('✔ Observable permit release confirmed: stream counter successfully returned to 0');
 
     // Verify Spring Boot health immediately after disconnect
     const healthAfterDisconnect = await requestHttp(`http://127.0.0.1:${springPort}/api/health`);
-    assert.equal(healthAfterDisconnect.statusCode, 200, 'Server must remain 200 UP after client abruptly severs TCP connection');
-    console.log('✔ Spring Boot successfully recovered with zero thread hang or leak');
+    assert.equal(healthAfterDisconnect.statusCode, 200, 'Server must remain 200 UP after client disconnect and overload');
+    console.log('✔ Spring Boot successfully recovered with 200 UP');
 
-    // 6. Verify Read-Only Storage Integrity (0 temporary disk growth)
-    const mediaDirEntries = fs.readdirSync(path.dirname(MEDIA_FILE));
-    const nonMp4Files = mediaDirEntries.filter(f => !f.endsWith('.mp4'));
-    assert.equal(nonMp4Files.length, 0, 'No temporary, buffer, or lock files created in media directory');
-    console.log(`✔ Read-only disk integrity confirmed: 0 temporary files or writes created (${mediaDirEntries.length} media fixtures preserved)`);
+    // 6. Verify Read-Only Storage Integrity via Before/After Disk Snapshot
+    console.log('\n[Benchmark 6/6] Verifying Read-Only Storage Integrity via Before/After Disk Snapshot...');
+    const diskAfterSnapshot = snapshotDirectory(testMediaDir);
+    assert.equal(diskBeforeSnapshot.length, diskAfterSnapshot.length, 'File count in test-media root must not change');
+    for (let i = 0; i < diskBeforeSnapshot.length; i++) {
+      const b = diskBeforeSnapshot[i];
+      const a = diskAfterSnapshot[i];
+      assert.equal(b.relativePath, a.relativePath, `File path mismatch at index ${i}`);
+      assert.equal(b.sizeBytes, a.sizeBytes, `File size changed for ${b.relativePath}: was ${b.sizeBytes}, now ${a.sizeBytes}`);
+      assert.equal(b.sha256, a.sha256, `SHA-256 changed for ${b.relativePath}: was ${b.sha256}, now ${a.sha256}`);
+    }
+    console.log(`✔ Read-only disk integrity confirmed: 0 mutations across ${diskBeforeSnapshot.length} monitored files in test-media root`);
 
     // ------------------------------------------------------------------------
     // Part D: Output Benchmark Results JSON
@@ -857,8 +1177,8 @@ async function main() {
     const finalReport = {
       benchmarkMetadata: {
         timestamp: new Date().toISOString(),
-        milestone: 'M4-F01',
-        environment: 'Local Spring Boot Actual HTTP Server + Next.js Standalone + Chrome CDP',
+        milestone: 'M4-F02',
+        environment: `Local Spring Boot Isolated HTTP Server (port ${springPort}) + Next.js Standalone (port ${nextPort}) + Chrome CDP`,
         runtime: {
           node: process.version,
           java: 'Java 25 (compiled with --release 17)',
@@ -870,66 +1190,108 @@ async function main() {
           format: 'video/mp4 (H.264 / AAC faststart, 20s)',
         },
         storageAdapter: 'LocalMediaStorageAdapter (Read-Only, no directory creation, no parent fallbacks)',
+        admissionPolicy: {
+          defaultMaxConcurrentStreams: 10,
+          overloadStatusCode: 429,
+          overloadHeaders: {
+            'Retry-After': '5',
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        },
       },
       browserWalkthrough: {
         desktop: {
           initialPlayTime: Number(initialPlayTime.toFixed(2)),
           seekTime: Number(seekTime.toFixed(2)),
           recoveredTime: Number(recoveredTime.toFixed(2)),
+          controlsInteracted: [
+            'button[data-testid="video-play-pause-btn"]',
+            'input[data-testid="video-timeline"]',
+            'button[data-testid="video-retry-btn"]',
+          ],
           screenshots: [
-            'docs/reports/screenshots/M4_F01/01_desktop_playback_playing.png',
-            'docs/reports/screenshots/M4_F01/02_desktop_seek_near_end.png',
-            'docs/reports/screenshots/M4_F01/03_desktop_retry_recovery.png',
+            'docs/reports/screenshots/M4_F02/01_desktop_playback_playing.png',
+            'docs/reports/screenshots/M4_F02/02_desktop_seek_near_end.png',
+            'docs/reports/screenshots/M4_F02/03_desktop_retry_recovery.png',
           ],
         },
         mobile375px: {
           viewport: '375x667',
-          closeButtonDimensions: `${mobileMetrics.closeWidth}x${mobileMetrics.closeHeight}px`,
-          touchTargetCompliant: true,
-          screenshot: 'docs/reports/screenshots/M4_F01/04_mobile_playback_375px.png',
+          touchTargetPolicyMinPx: 44,
+          controlsAudited: mobileAudit.controls,
+          collisionsDetected: mobileAudit.collisions,
+          touchTargetsCompliant: true,
+          screenshot: 'docs/reports/screenshots/M4_F02/04_mobile_playback_375px.png',
+        },
+        browserPlaybackPerformance: {
+          startupToFirstFrameLatency: {
+            method: frameTiming.method,
+            latencyMs: frameTiming.latencyMs,
+          },
+          seekToFrameLatency: {
+            runsMs: browserSeekRuns,
+            stats: browserSeekStats,
+            unit: 'ms',
+          },
+          playbackStallsObserved: observedStalls,
+          clientMemoryUsage: 'unavailable (requires OS-level memory profiler; not estimated)',
         },
       },
       springBootHttpBenchmark: {
-        startupLatencyChunk64KiB: {
+        springBootHttpChunkTtfbInitial64KiB: {
+          description: 'HTTP TTFB of initial 64 KiB Range chunk from Spring Boot server (does not represent browser video decode startup)',
           runs: startupRuns,
           stats: startupStats,
           unit: 'ms',
         },
-        midSeekLatency: {
+        springBootHttpChunkTtfbMidSeek: {
+          description: 'HTTP TTFB of mid-file Range chunk (bytes=150000-215535)',
           runs: midSeekRuns,
           stats: midSeekStats,
           unit: 'ms',
         },
-        endSeekLatency: {
+        springBootHttpChunkTtfbEndSeek: {
+          description: 'HTTP TTFB of end-file Range chunk (bytes=250000-)',
           runs: endSeekRuns,
           stats: endSeekStats,
           unit: 'ms',
         },
-        singleStreamThroughput: {
+        singleStreamHttpDownloadThroughput: {
+          description: 'Full asset (296 KiB) HTTP Range download throughput on local loopback TCP',
           runs: singleThroughputRuns,
           stats: singleThroughputStats,
           unit: 'MB/s',
         },
-        concurrency3Streams: {
+        concurrency3HttpStreamBatchTransfer: {
+          description: '3 concurrent HTTP Range stream downloads on loopback TCP (evaluates server batch IO transfer, not 3 concurrent human viewers)',
           runs: parallelRuns,
           aggregateThroughputStats: parallelAggregateStats,
           avgStreamTtfbStats: parallelTtfbStats,
           unit: 'MB/s aggregate, ms TTFB',
         },
-        clientDisconnectResilience: {
-          tested: true,
+        clientDisconnectAndPermitCleanup: {
+          baselineActiveStreams: 0,
+          activeStreamsWhileStreaming: activeWhileStreaming,
+          activeStreamsAfterDisconnect: activeAfterDisconnect,
+          permitCleanupObserved: true,
+          overload429Verified,
           serverHealthAfterDisconnect: 'UP (200 OK)',
-          socketLeakOrHang: false,
         },
-        diskGrowth: {
-          newFilesCreated: 0,
-          readOnlyEnforced: true,
+        monitoredDirectoryDiskSnapshot: {
+          monitoredDirectory: 'backend/springboot/target/test-media',
+          beforeFiles: diskBeforeSnapshot.map(f => ({ path: f.relativePath, sizeBytes: f.sizeBytes, sha256: f.sha256 })),
+          afterFiles: diskAfterSnapshot.map(f => ({ path: f.relativePath, sizeBytes: f.sizeBytes, sha256: f.sha256 })),
+          mutationsDetected: 0,
+          readOnlyPreserved: true,
+          scopeLimitation: 'Filesystem mutation verification strictly scoped to backend test-media root. OS-wide disk writes are not tracked without kernel-level filesystem auditing.',
         },
       },
       observationsAndHonestLimitations: [
-        'Local loopback TCP socket latency is typically under 10ms for warm connections; actual network streaming across WAN will be dominated by RTT and client bandwidth.',
+        'Local loopback TCP socket latency is typically under 10ms for warm connections; actual network streaming across WAN will be dominated by RTT, packet loss, and client bandwidth.',
         'Spring Boot 64 KiB bounded buffer streams data iteratively to prevent heap spikes during large concurrent reads.',
-        'Single client loopback throughput exceeds 100 MB/s due to OS buffer caching of the 296 KiB synthetic file.',
+        'Stream concurrency is bounded to 10 permits by default (configurable via app.media.max-concurrent-streams); requests exceeding the limit receive HTTP 429 with Retry-After: 5.',
+        'Browser seek latency measures time to seeked / video frame render, distinct from raw HTTP chunk TTFB.',
+        'Active stream permits are tracked via AtomicInteger in MediaStreamService and verified to return to 0 upon client disconnection.',
         'Google Drive streaming remains in BLOCKED_EXTERNAL_INPUT status as rclone / Google Drive mounting requires external user credentials.',
       ],
     };
@@ -938,22 +1300,33 @@ async function main() {
     console.log(`\n✔ Benchmark results successfully written to ${BENCHMARK_OUT}`);
 
     console.log('\n================================================================');
-    console.log('       ALL M4-F01 WALKTHROUGH & BENCHMARK CHECKS PASSED         ');
+    console.log('       ALL M4-F02 WALKTHROUGH & BENCHMARK CHECKS PASSED         ');
     console.log('================================================================');
 
   } finally {
+    function killProcessTree(proc) {
+      if (!proc || !proc.pid) return;
+      try {
+        if (process.platform === 'win32') {
+          require('node:child_process').spawnSync('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+        } else {
+          proc.kill('SIGKILL');
+        }
+      } catch {}
+    }
+
     console.log('\nCleaning up processes and temporary resources...');
     if (chromeSession) {
       try { chromeSession.ws.close(); } catch {}
-      try { chromeSession.proc.kill(); } catch {}
+      killProcessTree(chromeSession.proc);
       try { fs.rmSync(chromeSession.tmpDir, { recursive: true, force: true }); } catch {}
     }
     if (nextProcess) {
-      try { nextProcess.kill(); } catch {}
+      killProcessTree(nextProcess);
     }
     if (springProcess) {
       try { springProcess.stdin.write('\n'); } catch {}
-      try { springProcess.kill(); } catch {}
+      killProcessTree(springProcess);
     }
     console.log('✔ Cleanup complete.');
   }

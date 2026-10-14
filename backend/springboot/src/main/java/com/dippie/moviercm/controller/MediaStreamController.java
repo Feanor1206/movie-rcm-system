@@ -43,59 +43,78 @@ public class MediaStreamController {
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
             HttpServletResponse response) throws IOException {
 
-        MediaAsset asset = mediaStreamService.getMediaAsset(assetId);
-        Resource resource = mediaStreamService.getMediaResource(asset);
-        long totalLength = mediaStreamService.getResourceLength(asset);
-
-        MediaStreamService.RangeSpec range = mediaStreamService.parseRange(rangeHeader, totalLength);
-
-        response.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
-        response.setHeader(HttpHeaders.ETAG, "\"" + asset.getId() + "-" + asset.getVersion() + "\"");
-        response.setHeader(HttpHeaders.CACHE_CONTROL, "public, max-age=3600");
-        response.setContentType(asset.getMimeType());
-
-        if (!range.isRanged()) {
-            response.setStatus(HttpServletResponse.SC_OK);
-            response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(totalLength));
-            try (InputStream in = resource.getInputStream();
-                 OutputStream out = response.getOutputStream()) {
-                byte[] buffer = new byte[BUFFER_SIZE];
-                int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
-                out.flush();
-            }
-        } else {
-            response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-            long start = range.getStart();
-            long end = range.getEnd();
-            long contentLength = range.getLength();
-
-            response.setHeader(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + totalLength);
-            response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength));
-
-            try (InputStream in = resource.getInputStream();
-                 OutputStream out = response.getOutputStream()) {
-                long skipped = in.skip(start);
-                while (skipped < start) {
-                    long s = in.skip(start - skipped);
-                    if (s <= 0) break;
-                    skipped += s;
-                }
-
-                byte[] buffer = new byte[BUFFER_SIZE];
-                long remaining = contentLength;
-                while (remaining > 0) {
-                    int toRead = (int) Math.min(buffer.length, remaining);
-                    int bytesRead = in.read(buffer, 0, toRead);
-                    if (bytesRead == -1) break;
-                    out.write(buffer, 0, bytesRead);
-                    remaining -= bytesRead;
-                }
-                out.flush();
-            }
+        if (!mediaStreamService.acquireStreamPermit()) {
+            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setHeader(HttpHeaders.RETRY_AFTER, "5");
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate");
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.getWriter().write("{\"status\":429,\"error\":\"Too Many Requests\",\"message\":\"Hệ thống đang phục vụ tối đa luồng phát media đồng thời. Vui lòng thử lại sau 5 giây.\"}");
+            response.getWriter().flush();
+            return;
         }
+
+        try {
+            MediaStreamService.awaitTestStreamGate(5000);
+            MediaAsset asset = mediaStreamService.getMediaAsset(assetId);
+            Resource resource = mediaStreamService.getMediaResource(asset);
+            long totalLength = mediaStreamService.getResourceLength(asset);
+
+            MediaStreamService.RangeSpec range = mediaStreamService.parseRange(rangeHeader, totalLength);
+
+            response.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
+            response.setHeader(HttpHeaders.ETAG, "\"" + asset.getId() + "-" + asset.getVersion() + "\"");
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "public, max-age=3600");
+            response.setContentType(asset.getMimeType());
+
+            if (!range.isRanged()) {
+                response.setStatus(HttpServletResponse.SC_OK);
+                response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(totalLength));
+                try (InputStream in = resource.getInputStream();
+                     OutputStream out = response.getOutputStream()) {
+                    byte[] buffer = new byte[BUFFER_SIZE];
+                    int bytesRead;
+                    while ((bytesRead = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesRead);
+                    }
+                    out.flush();
+                }
+            } else {
+                response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+                long start = range.getStart();
+                long end = range.getEnd();
+                long contentLength = range.getLength();
+
+                response.setHeader(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + totalLength);
+                response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength));
+
+                try (InputStream in = resource.getInputStream();
+                     OutputStream out = response.getOutputStream()) {
+                    long skipped = in.skip(start);
+                    while (skipped < start) {
+                        long s = in.skip(start - skipped);
+                        if (s <= 0) break;
+                        skipped += s;
+                    }
+
+                    byte[] buffer = new byte[BUFFER_SIZE];
+                    long remaining = contentLength;
+                    while (remaining > 0) {
+                        int toRead = (int) Math.min(buffer.length, remaining);
+                        int bytesRead = in.read(buffer, 0, toRead);
+                        if (bytesRead == -1) break;
+                        out.write(buffer, 0, bytesRead);
+                        remaining -= bytesRead;
+                    }
+                    out.flush();
+                }
+            }
+        } finally {
+            mediaStreamService.releaseStreamPermit();
+        }
+    }
+
+    public int getActiveStreamCount() {
+        return mediaStreamService.getActiveStreamCount();
     }
 }
 

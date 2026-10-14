@@ -11,3 +11,7 @@ Codex chỉ review khi checkpoint mới thực sự frozen, source/artifact hash
 Nếu agent đã kết thúc lượt, file không tự khởi động lại nó. Người dùng cần bấm tiếp tục; không được claim tự thực thi hoặc đoán ended từ timestamp. Codex tiếp tục tự review checkpoint dù Gemini đã kết thúc. Sau local M4 acceptance, ghi rõ Drive gate riêng, stop và pause automation; không tự mở milestone mới.
 
 Không đổi OS/app settings, cài/mount/OAuth, DB live, model/GPU, kill process người khác hoặc deploy. Codex giữ quyền checkpoint Git trực tiếp dev đã được người dùng giao; chỉ thao tác khi source frozen và không ghi đè working tree.
+
+## Cập nhật hiện hành — người dùng đã quay lại
+
+Theo yêu cầu mới nhất, automation theo dõi đã PAUSED. M4 chuyển về bàn giao/review thủ công: hoàn tất nhiệm vụ đang được giao rồi freeze và kết thúc lượt, không polling/chờ prompt tự động. Các quy định vòng chờ phía trên là lịch sử. M4-F02 vẫn là phạm vi tiếp theo; không tự mở task mới.

@@ -27,7 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -393,5 +393,73 @@ public class MediaStreamingIntegrationTest {
     void testUnknownStorageProviderThrowsUnavailable() {
         assertThrows(MediaUnavailableException.class, () ->
                 mediaStreamService.getStorageAdapter("unknown-cloud-storage"));
+    }
+
+    @Test
+    @DisplayName("F2: Saturated concurrency returns 429 Too Many Requests with Retry-After and no-store headers")
+    void testMediaStreamConcurrencyLimitAndOverload429() throws Exception {
+        int originalLimit = mediaStreamService.getMaxConcurrentStreams();
+        try {
+            // Configure concurrency limit to 1
+            mediaStreamService.setMaxConcurrentStreams(1);
+            assertEquals(0, mediaStreamService.getActiveStreamCount());
+
+            // Acquire 1 permit (holding the single allowed stream)
+            assertTrue(mediaStreamService.acquireStreamPermit());
+            assertEquals(1, mediaStreamService.getActiveStreamCount());
+
+            // Next stream request MUST be rejected with HTTP 429
+            mockMvc.perform(get("/api/media/stream/ast-test-feat-1"))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(header().string(HttpHeaders.RETRY_AFTER, "5"))
+                    .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")))
+                    .andExpect(jsonPath("$.status", is(429)))
+                    .andExpect(jsonPath("$.error", is("Too Many Requests")));
+
+            // Active counter must still be 1 (the held permit)
+            assertEquals(1, mediaStreamService.getActiveStreamCount());
+            assertTrue(mediaStreamService.getTotalRejectedCount() >= 1);
+
+            // Release held permit
+            mediaStreamService.releaseStreamPermit();
+            assertEquals(0, mediaStreamService.getActiveStreamCount());
+
+            // Now request should succeed with 200 OK
+            mockMvc.perform(get("/api/media/stream/ast-test-feat-1"))
+                    .andExpect(status().isOk());
+
+            // And counter returns to 0 after completion
+            assertEquals(0, mediaStreamService.getActiveStreamCount());
+        } finally {
+            mediaStreamService.setMaxConcurrentStreams(originalLimit);
+        }
+    }
+
+    @Test
+    @DisplayName("F2: Active stream counter reliably returns to 0 on success, partial range, and 404/503 errors")
+    void testObservableStreamCleanupOnAllOutcomes() throws Exception {
+        assertEquals(0, mediaStreamService.getActiveStreamCount());
+
+        // 1. Success full stream -> counter returns to 0
+        mockMvc.perform(get("/api/media/stream/ast-test-feat-1"))
+                .andExpect(status().isOk());
+        assertEquals(0, mediaStreamService.getActiveStreamCount());
+
+        // 2. Partial range stream -> counter returns to 0
+        mockMvc.perform(get("/api/media/stream/ast-test-feat-1")
+                        .header(HttpHeaders.RANGE, "bytes=0-10"))
+                .andExpect(status().isPartialContent());
+        assertEquals(0, mediaStreamService.getActiveStreamCount());
+
+        // 3. Error outcome (404 MediaNotFoundException) -> counter returns to 0
+        mockMvc.perform(get("/api/media/stream/non-existent-asset-id"))
+                .andExpect(status().isNotFound());
+        assertEquals(0, mediaStreamService.getActiveStreamCount());
+
+        // 4. Invalid range (416 InvalidMediaRangeException) -> counter returns to 0
+        mockMvc.perform(get("/api/media/stream/ast-test-feat-1")
+                        .header(HttpHeaders.RANGE, "bytes=999999-9999999"))
+                .andExpect(status().isRequestedRangeNotSatisfiable());
+        assertEquals(0, mediaStreamService.getActiveStreamCount());
     }
 }

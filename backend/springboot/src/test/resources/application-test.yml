@@ -21,4 +21,5 @@ app:
   media:
     root: target/test-media
     drive-mount: ""
+    max-concurrent-streams: 10
 

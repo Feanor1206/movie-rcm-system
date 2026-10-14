@@ -691,3 +691,54 @@ test('12. Component Execution: Closing player restores body scroll and returns f
 
   harness.unmount();
 });
+
+test('13. Component Execution: 503 descriptor error displays role="alert" and retry button; clicking retry re-fetches and recovers 200 feature', async () => {
+  let attempt = 0;
+  const getMediaDescriptor = async (id) => {
+    attempt++;
+    if (attempt === 1) {
+      throw new Error('HTTP 503 Service Unavailable');
+    }
+    return {
+      movieId: id,
+      hasFeature: true,
+      hasTrailer: false,
+      feature: { streamUrl: `https://fixture.invalid/feature-${id}.mp4` },
+    };
+  };
+
+  const harness = createMovieDetailHarness({ getMediaDescriptor });
+  const movie = { id: 'm-retry', title: 'Retry Test Movie', genres: ['Drama'], year: 2026, rating: 9, videoUrl: null };
+
+  harness.render(movie);
+  await new Promise((r) => setImmediate(r));
+  harness.render(movie);
+
+  let tree = harness.getTree();
+  const alertNode = walk(tree, (n) => n.props?.role === 'alert');
+  assert.ok(alertNode, 'Error alert banner must be displayed on 503 failure');
+
+  const retryBtn = walk(tree, (n) => n.props?.['data-testid'] === 'descriptor-retry-btn');
+  assert.ok(retryBtn, 'Retry button must be visible');
+  assert.equal(attempt, 1);
+
+  const featureBtnError = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
+  assert.equal(featureBtnError, null, 'Feature button must not be visible on error');
+
+  retryBtn.props.onClick();
+  await new Promise((r) => setImmediate(r));
+  harness.render(movie);
+  await new Promise((r) => setImmediate(r));
+  harness.render(movie);
+
+  tree = harness.getTree();
+  assert.equal(attempt, 2, 'Retry button click must trigger second fetch attempt');
+
+  const alertAfterRetry = walk(tree, (n) => n.props?.role === 'alert');
+  assert.equal(alertAfterRetry, null, 'Error alert must be cleared after successful recovery');
+
+  const featureBtnRecovered = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
+  assert.ok(featureBtnRecovered, 'Feature button must appear after successful retry recovery');
+
+  harness.unmount();
+});

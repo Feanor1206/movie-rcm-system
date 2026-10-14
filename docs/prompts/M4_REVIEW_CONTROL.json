@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "reviewing",
-  "taskId": "M4-F01",
-  "promptVersion": 1,
+  "taskId": "M4-F02",
+  "promptVersion": 2,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
-  "lastReviewedCheckpoint": "M4-F01-CHECKPOINT-01",
-  "reviewMode": "heartbeat",
-  "note": "F01 review complete: source fixes accepted checkpoint; M4 not accepted. F02 prompt prepared for3remainingP2 groups: descriptor error/retry, bounded observable stream lifecycle, honest browser/benchmark assertions. Publish work after frozen checkpoint Git handling.",
-  "reviewingCheckpoint": "M4-F01-CHECKPOINT-01"
+  "lastReviewedCheckpoint": "M4-F02-CHECKPOINT-01",
+  "reviewMode": "manual",
+  "note": "F02 review complete, source/evidence checkpoint accepted except T1 descriptor timeout/malformed/mismatch terminal state. F03 multi-agent prompt prepared; no application edits by Codex. Publish work after checkpoint push.",
+  "reviewingCheckpoint": "M4-F02-CHECKPOINT-01"
 }

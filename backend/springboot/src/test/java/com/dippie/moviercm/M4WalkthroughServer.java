@@ -4,15 +4,29 @@ import com.dippie.moviercm.entity.MediaAsset;
 import com.dippie.moviercm.entity.Movie;
 import com.dippie.moviercm.repository.MediaAssetRepository;
 import com.dippie.moviercm.repository.MovieRepository;
+import com.dippie.moviercm.service.MediaStreamService;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 
 /**
  * Isolated Spring Boot test server for real HTTP Range media walkthrough and benchmark.
@@ -29,7 +43,11 @@ public class M4WalkthroughServer {
 
         String dbName = "m4_walkthrough_" + System.nanoTime();
 
-        ConfigurableApplicationContext ctx = new SpringApplicationBuilder(MovieRcmApplication.class)
+        ConfigurableApplicationContext ctx = new SpringApplicationBuilder(
+                MovieRcmApplication.class,
+                WalkthroughSecurityConfig.class,
+                WalkthroughDiagnosticsController.class
+        )
                 .run(
                         "--spring.profiles.active=test",
                         "--server.address=127.0.0.1",
@@ -54,8 +72,8 @@ public class M4WalkthroughServer {
                 .runtime("0h 20m")
                 .genres("Animation,Sci-Fi")
                 .description("A stunning synthetic animated space voyage used to verify real HTTP Range video streaming.")
-                .poster("https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800")
-                .backdrop("https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1600")
+                .poster("")
+                .backdrop("")
                 .videoUrl("/videos/fallback-walkthrough.mp4")
                 .build();
         movieRepo.save(movie);
@@ -109,6 +127,58 @@ public class M4WalkthroughServer {
         } finally {
             ctx.close();
             System.out.println("WALKTHROUGH_BACKEND_STOPPED");
+        }
+    }
+
+    public static class WalkthroughSecurityConfig {
+        @Bean
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        public SecurityFilterChain walkthroughTestFilterChain(HttpSecurity http) throws Exception {
+            http.securityMatcher(org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher("/api/test/**"))
+                    .csrf(csrf -> csrf.disable())
+                    .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            return http.build();
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/test/media")
+    public static class WalkthroughDiagnosticsController {
+        private final MediaStreamService mediaStreamService;
+
+        public WalkthroughDiagnosticsController(MediaStreamService mediaStreamService) {
+            this.mediaStreamService = mediaStreamService;
+        }
+
+        @GetMapping("/metrics")
+        public ResponseEntity<Map<String, Object>> getMetrics() {
+            return ResponseEntity.ok(Map.of(
+                    "activeStreams", mediaStreamService.getActiveStreamCount(),
+                    "maxConcurrentStreams", mediaStreamService.getMaxConcurrentStreams(),
+                    "totalRejectedCount", mediaStreamService.getTotalRejectedCount()
+            ));
+        }
+
+        @PostMapping("/max-concurrent-streams")
+        public ResponseEntity<Map<String, Object>> setMaxConcurrent(@RequestParam("limit") int limit) {
+            mediaStreamService.setMaxConcurrentStreams(limit);
+            return ResponseEntity.ok(Map.of(
+                    "maxConcurrentStreams", mediaStreamService.getMaxConcurrentStreams()
+            ));
+        }
+
+        @PostMapping("/gate/arm")
+        public ResponseEntity<Map<String, Object>> armGate() {
+            MediaStreamService.setTestStreamGate(new java.util.concurrent.CountDownLatch(1));
+            return ResponseEntity.ok(Map.of("gateArmed", true));
+        }
+
+        @PostMapping("/gate/release")
+        public ResponseEntity<Map<String, Object>> releaseGate() {
+            java.util.concurrent.CountDownLatch gate = MediaStreamService.getTestStreamGate();
+            MediaStreamService.setTestStreamGate(null);
+            if (gate != null) gate.countDown();
+            return ResponseEntity.ok(Map.of("gateReleased", true));
         }
     }
 }

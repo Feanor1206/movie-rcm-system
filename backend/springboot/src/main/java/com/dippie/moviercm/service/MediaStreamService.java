@@ -11,10 +11,14 @@ import com.dippie.moviercm.repository.MediaAssetRepository;
 import com.dippie.moviercm.repository.MovieRepository;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class MediaStreamService {
@@ -24,14 +28,79 @@ public class MediaStreamService {
     private final LocalMediaStorageAdapter localStorageAdapter;
     private final DriveMediaStorageAdapter driveStorageAdapter;
 
+    private final AtomicInteger activeStreamCount = new AtomicInteger(0);
+    private final AtomicLong totalRejectedCount = new AtomicLong(0);
+    private volatile int maxConcurrentStreams;
+
+    private static volatile java.util.concurrent.CountDownLatch testStreamGate = null;
+
+    public static void setTestStreamGate(java.util.concurrent.CountDownLatch gate) {
+        testStreamGate = gate;
+    }
+
+    public static java.util.concurrent.CountDownLatch getTestStreamGate() {
+        return testStreamGate;
+    }
+
+    public static void awaitTestStreamGate(long timeoutMs) {
+        java.util.concurrent.CountDownLatch gate = testStreamGate;
+        if (gate != null) {
+            try {
+                gate.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    @Autowired
     public MediaStreamService(MovieRepository movieRepository,
                               MediaAssetRepository mediaAssetRepository,
                               LocalMediaStorageAdapter localStorageAdapter,
-                              DriveMediaStorageAdapter driveStorageAdapter) {
+                              DriveMediaStorageAdapter driveStorageAdapter,
+                              @Value("${app.media.max-concurrent-streams:10}") int maxConcurrentStreams) {
         this.movieRepository = movieRepository;
         this.mediaAssetRepository = mediaAssetRepository;
         this.localStorageAdapter = localStorageAdapter;
         this.driveStorageAdapter = driveStorageAdapter;
+        this.maxConcurrentStreams = maxConcurrentStreams > 0 ? maxConcurrentStreams : 10;
+    }
+
+    public MediaStreamService(MovieRepository movieRepository,
+                              MediaAssetRepository mediaAssetRepository,
+                              LocalMediaStorageAdapter localStorageAdapter,
+                              DriveMediaStorageAdapter driveStorageAdapter) {
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, 10);
+    }
+
+    public boolean acquireStreamPermit() {
+        int current = activeStreamCount.incrementAndGet();
+        if (current > maxConcurrentStreams) {
+            activeStreamCount.decrementAndGet();
+            totalRejectedCount.incrementAndGet();
+            return false;
+        }
+        return true;
+    }
+
+    public void releaseStreamPermit() {
+        activeStreamCount.updateAndGet(c -> Math.max(0, c - 1));
+    }
+
+    public int getActiveStreamCount() {
+        return activeStreamCount.get();
+    }
+
+    public long getTotalRejectedCount() {
+        return totalRejectedCount.get();
+    }
+
+    public int getMaxConcurrentStreams() {
+        return maxConcurrentStreams;
+    }
+
+    public void setMaxConcurrentStreams(int maxConcurrentStreams) {
+        this.maxConcurrentStreams = maxConcurrentStreams > 0 ? maxConcurrentStreams : 10;
     }
 
     public MediaDescriptorResponse getMediaDescriptor(String movieId) {

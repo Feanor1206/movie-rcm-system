@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, RefreshCw, AlertCircle, Film, Compass } from 'lucide-react';
+import { RefreshCw, AlertCircle, Film, Compass } from 'lucide-react';
 import { Footer } from '@/components/layout/Footer';
 import { Navbar } from '@/components/layout/Navbar';
 import { MovieDetail } from '@/features/movies/components/MovieDetail';
-import { getCatalogMovieById, browseCatalog, CatalogApiError } from '@/lib/services/catalogService';
+import { getCatalogMovieById, browseCatalog } from '@/lib/services/catalogService';
 import type { Movie } from '@/types/movie';
 
 export default function MovieDetailPage() {
@@ -98,10 +98,9 @@ export default function MovieDetailPage() {
             <div className="page-shell pt-10 pb-12 flex flex-col md:flex-row gap-6 md:items-end">
               <div className="aspect-[2/3] w-44 sm:w-56 rounded-lg bg-surface-elevated shrink-0" />
               <div className="space-y-3 flex-1">
-                <div className="h-4 w-28 rounded bg-zinc-800" />
-                <div className="h-10 w-3/4 rounded bg-zinc-800" />
-                <div className="h-4 w-1/2 rounded bg-zinc-800" />
-                <div className="h-16 w-full max-w-2xl rounded bg-zinc-800" />
+                {['h-4 w-28', 'h-10 w-3/4', 'h-4 w-1/2', 'h-16 max-w-2xl'].map((c) => (
+                  <div key={c} className={`${c} rounded bg-zinc-800`} />
+                ))}
                 <div className="flex gap-3 pt-3">
                   <div className="h-10 w-36 rounded bg-zinc-800" />
                   <div className="h-10 w-36 rounded bg-zinc-800" />
@@ -110,43 +109,37 @@ export default function MovieDetailPage() {
             </div>
           </div>
         </main>
-      ) : notFoundState ? (
-        /* Real 404 View */
+      ) : notFoundState || error ? (
         <main className="min-h-[70vh] flex items-center justify-center bg-background px-4 py-16 text-center">
-          <div className="max-w-md space-y-4 rounded-xl border border-surface-border bg-surface p-8 shadow-xl">
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-zinc-850 text-zinc-400 mx-auto">
-              <Film size={26} />
+          <div className={`max-w-md space-y-4 rounded-xl border p-8 shadow-xl ${
+            notFoundState ? 'border-surface-border bg-surface' : 'border-red-500/30 bg-red-950/20'
+          }`}>
+            <div className={`grid h-14 w-14 place-items-center rounded-full mx-auto ${
+              notFoundState ? 'bg-zinc-850 text-zinc-400' : 'bg-red-900/40 text-red-400'
+            }`}>
+              {notFoundState ? <Film size={26} /> : <AlertCircle size={26} />}
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Không tìm thấy phim hoạt hình</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">
+              {notFoundState ? 'Không tìm thấy phim hoạt hình' : 'Không thể kết nối đến máy chủ'}
+            </h1>
             <p className="text-xs sm:text-sm text-zinc-400">
-              Tác phẩm có mã định danh <code className="text-brand font-mono">{canonicalId}</code> không tồn tại trên hệ thống hoặc đã được cập nhật.
+              {notFoundState
+                ? `Tác phẩm có mã định danh "${canonicalId}" không tồn tại trên hệ thống hoặc đã được cập nhật.`
+                : error}
             </p>
             <div className="pt-2 flex flex-wrap justify-center gap-3">
-              <Link href="/search?genre=Animation" className="btn-primary text-xs flex items-center gap-1.5">
-                <Compass size={14} /> Khám phá kho hoạt hình
-              </Link>
-              <Link href="/" className="btn-secondary text-xs">
-                Về trang chủ
-              </Link>
-            </div>
-          </div>
-        </main>
-      ) : error ? (
-        /* Server/Network Error with Retry - NOT fake 404 */
-        <main className="min-h-[70vh] flex items-center justify-center bg-background px-4 py-16 text-center">
-          <div className="max-w-md space-y-4 rounded-xl border border-red-500/30 bg-red-950/20 p-8 shadow-xl">
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-red-900/40 text-red-400 mx-auto">
-              <AlertCircle size={26} />
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Không thể kết nối đến máy chủ</h1>
-            <p className="text-xs sm:text-sm text-zinc-400">{error}</p>
-            <div className="pt-2 flex flex-wrap justify-center gap-3">
-              <button
-                onClick={() => setRetryTrigger((c) => c + 1)}
-                className="btn-primary text-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw size={13} /> Thử kết nối lại
-              </button>
+              {notFoundState ? (
+                <Link href="/search?genre=Animation" className="btn-primary text-xs flex items-center gap-1.5">
+                  <Compass size={14} /> Khám phá kho hoạt hình
+                </Link>
+              ) : (
+                <button
+                  onClick={() => setRetryTrigger((c) => c + 1)}
+                  className="btn-primary text-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw size={13} /> Thử kết nối lại
+                </button>
+              )}
               <Link href="/" className="btn-secondary text-xs">
                 Về trang chủ
               </Link>

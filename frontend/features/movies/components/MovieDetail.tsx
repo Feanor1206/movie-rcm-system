@@ -9,8 +9,6 @@ import {
   Heart,
   Play,
   Star,
-  Clock,
-  Calendar,
   X,
   Loader2,
   Maximize2,
@@ -26,6 +24,12 @@ import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { getMediaDescriptor, MediaDescriptor, resolveStreamUrl } from '@/lib/services/mediaService';
 import { MovieSection } from './MovieSection';
 
+
+const BTN_PLAY = 'min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5 cursor-pointer';
+const BTN_ICON = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition cursor-pointer';
+const UNCONF_CLS = 'border-amber-400 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 ring-1 ring-amber-400/40';
+const ALERT_BOX = 'mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-200';
+const ALERT_BTN = 'flex items-center gap-1 rounded bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-300 hover:bg-amber-500/30 transition cursor-pointer shrink-0';
 
 export function MovieDetail({
   movie,
@@ -53,6 +57,9 @@ export function MovieDetail({
   const [posterError, setPosterError] = useState(false);
   const [backdropError, setBackdropError] = useState(false);
   const [descriptor, setDescriptor] = useState<MediaDescriptor | null>(null);
+  const [descriptorLoading, setDescriptorLoading] = useState(true);
+  const [descriptorError, setDescriptorError] = useState<string | null>(null);
+  const [descriptorNonce, setDescriptorNonce] = useState(0);
   const [activeMediaKind, setActiveMediaKind] = useState<'feature' | 'trailer'>('trailer');
   const [activeMediaUrl, setActiveMediaUrl] = useState<string>('');
   const [playerState, setPlayerState] = useState<'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'error'>('idle');
@@ -70,8 +77,9 @@ export function MovieDetail({
 
   // Fetch descriptor for movie
   useEffect(() => {
-    // Immediately invalidate state for previous movie
     setDescriptor(null);
+    setDescriptorError(null);
+    setDescriptorLoading(true);
     setIsPlaying(false);
     setActiveMediaUrl('');
     setPlayerState('idle');
@@ -85,64 +93,38 @@ export function MovieDetail({
 
     getMediaDescriptor(movie.id, { signal: abortController?.signal })
       .then((desc) => {
-        if (mounted && desc.movieId === movie.id) {
+        if (mounted && desc && desc.movieId === movie.id) {
           setDescriptor(desc);
+          setDescriptorLoading(false);
+          setDescriptorError(null);
         }
       })
-      .catch(() => {
-        if (mounted && (!abortController || !abortController.signal.aborted)) {
-          setDescriptor({
-            movieId: movie.id,
-            hasFeature: false,
-            hasTrailer: Boolean(movie.videoUrl && movie.videoUrl.trim()),
-            feature: null,
-            trailer: movie.videoUrl && movie.videoUrl.trim()
-              ? {
-                  assetId: `legacy-${movie.id}`,
-                  kind: 'trailer',
-                  streamUrl: movie.videoUrl,
-                  mimeType: 'video/mp4',
-                  byteLength: 0,
-                  isPublic: true,
-                  version: 'legacy',
-                }
-              : null,
-          });
+      .catch((err: any) => {
+        if (!mounted || (abortController && abortController.signal.aborted) || err?.name === 'AbortError') {
+          return;
         }
+        setDescriptor(null);
+        setDescriptorLoading(false);
+        setDescriptorError('Không thể nạp dữ liệu phim từ máy chủ.');
       });
 
     return () => {
       mounted = false;
       abortController?.abort();
     };
-  }, [movie.id, movie.videoUrl]);
+  }, [movie.id, descriptorNonce]);
 
-  const formatTime = (secs: number) => {
-    if (isNaN(secs) || secs < 0) return '00:00';
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
+  const formatTime = (s: number) =>
+    isNaN(s) || s < 0 ? '00:00' : `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
   const startPlayback = (kind: 'feature' | 'trailer', opener?: HTMLElement | null) => {
-    if (opener) {
-      playerOpenerRef.current = opener;
-    }
+    if (opener) playerOpenerRef.current = opener;
     setActiveMediaKind(kind);
-    let targetUrl = '';
-    if (kind === 'feature') {
-      if (descriptor?.movieId === movie.id) {
-        targetUrl = descriptor?.feature?.streamUrl || '';
-      }
-    } else {
-      if (descriptor?.movieId === movie.id && descriptor?.trailer?.streamUrl) {
-        targetUrl = descriptor.trailer.streamUrl;
-      } else if (hasVideo) {
-        targetUrl = movie.videoUrl || '';
-      }
-    }
-    if (!targetUrl) return;
-    setActiveMediaUrl(resolveStreamUrl(targetUrl));
+    const url = kind === 'feature'
+      ? (descriptor?.movieId === movie.id ? descriptor?.feature?.streamUrl : '')
+      : (descriptor?.movieId === movie.id && descriptor?.trailer?.streamUrl ? descriptor.trailer.streamUrl : (hasVideo ? movie.videoUrl : ''));
+    if (!url) return;
+    setActiveMediaUrl(resolveStreamUrl(url));
     setPlayerState('buffering');
     setPlaybackError(null);
     setCurrentTime(0);
@@ -153,20 +135,15 @@ export function MovieDetail({
   const handleRetry = () => {
     setPlaybackError(null);
     setPlayerState('buffering');
-    if (videoRef.current) {
-      const v = videoRef.current;
-      v.load();
-      const onLoaded = () => {
-        v.removeEventListener('loadedmetadata', onLoaded);
-        if (retryTime > 0 && retryTime < (v.duration || Infinity)) {
-          try {
-            v.currentTime = retryTime;
-          } catch (_) {}
-        }
-        v.play().catch(() => setPlayerState('paused'));
-      };
-      v.addEventListener('loadedmetadata', onLoaded, { once: true });
-    }
+    const v = videoRef.current;
+    if (!v) return;
+    v.load();
+    v.addEventListener('loadedmetadata', () => {
+      if (retryTime > 0 && retryTime < (v.duration || Infinity)) {
+        try { v.currentTime = retryTime; } catch (_) {}
+      }
+      v.play().catch(() => setPlayerState('paused'));
+    }, { once: true });
   };
 
   const togglePlayPause = () => {
@@ -182,36 +159,30 @@ export function MovieDetail({
 
   const toggleMute = () => {
     if (!videoRef.current) return;
-    const nextMuted = !videoRef.current.muted;
-    setIsMuted(nextMuted);
-    videoRef.current.muted = nextMuted;
+    const m = !videoRef.current.muted;
+    setIsMuted(m);
+    videoRef.current.muted = m;
   };
 
   const toggleFullscreen = () => {
     if (!videoModalRef.current) return;
-    if (!document.fullscreenElement) {
-      videoModalRef.current.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
+    document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : videoModalRef.current.requestFullscreen().catch(() => {});
   };
 
-  const seekBy = (seconds: number) => {
+  const seekBy = (sec: number) => {
     if (!videoRef.current) return;
-    const dur = videoRef.current.duration || duration || 100;
-    const target = Math.min(Math.max(0, videoRef.current.currentTime + seconds), dur);
-    videoRef.current.currentTime = target;
-    setCurrentTime(target);
+    const t = Math.min(Math.max(0, videoRef.current.currentTime + sec), videoRef.current.duration || duration || 100);
+    videoRef.current.currentTime = t;
+    setCurrentTime(t);
   };
 
   const adjustVolume = (delta: number) => {
     if (!videoRef.current) return;
-    const currentVol = videoRef.current.volume;
-    const newVol = Math.min(Math.max(0, currentVol + delta), 1);
-    setVolume(newVol);
-    setIsMuted(newVol === 0);
-    videoRef.current.volume = newVol;
-    videoRef.current.muted = newVol === 0;
+    const v = Math.min(Math.max(0, videoRef.current.volume + delta), 1);
+    setVolume(v);
+    setIsMuted(v === 0);
+    videoRef.current.volume = v;
+    videoRef.current.muted = v === 0;
   };
 
   // Autoplay rejection handler: transition to paused so user can click to play
@@ -308,43 +279,18 @@ export function MovieDetail({
           e.preventDefault();
           togglePlayPause();
         }
-        return;
-      }
-
-      if (e.key === 'ArrowLeft') {
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
-        seekBy(-5);
-        return;
-      }
-
-      if (e.key === 'ArrowRight') {
+        seekBy(e.key === 'ArrowLeft' ? -5 : 5);
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        seekBy(5);
-        return;
-      }
-
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        adjustVolume(0.1);
-        return;
-      }
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        adjustVolume(-0.1);
-        return;
-      }
-
-      if (e.key === 'm' || e.key === 'M') {
+        adjustVolume(e.key === 'ArrowUp' ? 0.1 : -0.1);
+      } else if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
         toggleMute();
-        return;
-      }
-
-      if (e.key === 'f' || e.key === 'F') {
+      } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         toggleFullscreen();
-        return;
       }
     };
 
@@ -404,7 +350,7 @@ export function MovieDetail({
               </div>
               <button
                 onClick={() => setIsPlaying(false)}
-                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer shrink-0"
+                className={`shrink-0 ${BTN_ICON}`}
                 aria-label="Đóng trình phát"
               >
                 <X size={20} />
@@ -534,7 +480,7 @@ export function MovieDetail({
                     <button
                       data-testid="video-volume-btn"
                       onClick={toggleMute}
-                      className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                      className={BTN_ICON}
                       aria-label={isMuted || volume === 0 ? 'Bật âm thanh' : 'Tắt âm thanh'}
                     >
                       {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -564,7 +510,7 @@ export function MovieDetail({
                   <button
                     data-testid="video-fullscreen-btn"
                     onClick={toggleFullscreen}
-                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                    className={BTN_ICON}
                     aria-label="Toàn màn hình"
                   >
                     <Maximize2 size={18} />
@@ -593,8 +539,7 @@ export function MovieDetail({
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-zinc-900 via-zinc-950 to-black" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/30" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/75 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
         </div>
 
         {/* Content Layer */}
@@ -645,25 +590,42 @@ export function MovieDetail({
                 {movie.title}
               </h1>
 
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-zinc-300">
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-zinc-400">
                 <span className="flex items-center gap-1 text-white font-bold">
                   <Star size={14} className="fill-amber-400 text-amber-400" />
                   {movie.rating} / 10
                 </span>
-                <span className="flex items-center gap-1 text-zinc-400">
-                  <Calendar size={13} /> {movie.year}
-                </span>
-                <span className="flex items-center gap-1 text-zinc-400">
-                  <Clock size={13} /> {movie.runtime}
-                </span>
-                <span className="text-zinc-400">
-                  {movie.genres.join(', ')}
-                </span>
+                <span>{movie.year}</span>
+                <span>•</span>
+                <span>{movie.runtime}</span>
+                <span>{movie.genres.join(', ')}</span>
               </div>
 
               <p className="mt-4 max-w-2xl text-sm sm:text-base leading-relaxed text-zinc-200 drop-shadow">
                 {movie.description}
               </p>
+
+              {/* Descriptor Error Alert */}
+              {descriptorError && (
+                <div role="alert" className={ALERT_BOX}>
+                  <div className="flex items-center gap-2 truncate">
+                    <AlertCircle size={15} className="text-amber-400 shrink-0" />
+                    <span className="truncate">{descriptorError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="descriptor-retry-btn"
+                    onClick={() => {
+                      setDescriptorError(null);
+                      setDescriptorLoading(true);
+                      setDescriptorNonce((n) => n + 1);
+                    }}
+                    className={ALERT_BTN}
+                  >
+                    <RefreshCw size={13} /> Thử lại
+                  </button>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -673,7 +635,7 @@ export function MovieDetail({
                       ref={playButtonRef}
                       data-testid="play-feature-btn"
                       onClick={(e) => startPlayback('feature', e.currentTarget)}
-                      className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      className={`btn-primary ${BTN_PLAY}`}
                     >
                       <Play size={16} className="fill-current" />
                       Xem phim
@@ -690,15 +652,27 @@ export function MovieDetail({
                       </button>
                     )}
                   </>
-                ) : (descriptor && descriptor.movieId === movie.id && descriptor.hasTrailer) || (!descriptor && hasVideo) ? (
+                ) : descriptor && descriptor.movieId === movie.id && descriptor.hasTrailer ? (
                   <button
                     ref={playButtonRef}
                     data-testid="play-trailer-btn"
                     onClick={(e) => startPlayback('trailer', e.currentTarget)}
-                    className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                    className={`btn-primary ${BTN_PLAY}`}
                   >
                     <Play size={16} className="fill-current" />
                     Xem trailer / giới thiệu
+                  </button>
+                ) : hasVideo ? (
+                  <button
+                    ref={playButtonRef}
+                    data-testid="play-trailer-btn"
+                    onClick={(e) => startPlayback('trailer', e.currentTarget)}
+                    className={`${BTN_PLAY} ${
+                      descriptorError ? 'btn-secondary text-zinc-300 hover:text-white' : 'btn-primary'
+                    }`}
+                  >
+                    <Film size={16} />
+                    {descriptorError ? 'Xem trailer' : 'Xem trailer / giới thiệu'}
                   </button>
                 ) : null}
 
@@ -708,7 +682,7 @@ export function MovieDetail({
                   onClick={() => toggleWatchlist(movie.id, movie.title, movie.poster)}
                   className={`min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold disabled:opacity-60 cursor-pointer rounded-md border transition-all ${
                     isWatchlistUnconfirmed
-                      ? 'border-amber-400 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 ring-1 ring-amber-400/40'
+                      ? UNCONF_CLS
                       : inWatchlist
                       ? 'btn-secondary text-white'
                       : 'btn-secondary text-zinc-300'
@@ -755,7 +729,7 @@ export function MovieDetail({
                   onClick={() => toggleFavorite(movie.id, movie.title, movie.poster)}
                   className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md border p-2.5 transition-colors cursor-pointer disabled:opacity-60 ${
                     isFavoriteUnconfirmed
-                      ? 'border-amber-400 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 ring-1 ring-amber-400/40'
+                      ? UNCONF_CLS
                       : favorite
                       ? 'border-brand bg-brand/15 text-brand'
                       : 'border-zinc-700 bg-surface text-zinc-300 hover:border-zinc-500 hover:text-white'
@@ -840,42 +814,25 @@ export function MovieDetail({
                 })}
               </div>
 
-              {isRatingUnconfirmed && ratingIntent === 'rate' && (
-                <div
-                  data-testid="rating-unconfirmed-banner"
-                  className="mt-3 flex items-center justify-between rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
-                >
+              {isRatingUnconfirmed && (
+                <div data-testid="rating-unconfirmed-banner" className={ALERT_BOX}>
                   <span className="flex items-center gap-1.5 font-medium">
                     <AlertCircle size={14} className="text-amber-400 shrink-0" />
-                    Chưa xác nhận điểm {unconfirmedRatingScore || currentRating}/10 ★ trên máy chủ
+                    {ratingIntent === 'rate'
+                      ? `Chưa xác nhận điểm ${unconfirmedRatingScore || currentRating}/10 ★ trên máy chủ`
+                      : 'Chưa xác nhận xóa điểm đánh giá trên máy chủ'}
                   </span>
                   <button
                     disabled={isRatingPending}
-                    onClick={() => rateMovie(movie.id, unconfirmedRatingScore || currentRating || 10, movie.title)}
-                    className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 font-bold text-amber-300 hover:bg-amber-500/30 transition-colors cursor-pointer"
-                    aria-label="Thử lưu lại điểm đánh giá"
+                    onClick={() =>
+                      ratingIntent === 'rate'
+                        ? rateMovie(movie.id, unconfirmedRatingScore || currentRating || 10, movie.title)
+                        : removeRating(movie.id, movie.title)
+                    }
+                    className={ALERT_BTN}
+                    aria-label={ratingIntent === 'rate' ? 'Thử lưu lại điểm đánh giá' : 'Thử xóa lại điểm đánh giá'}
                   >
-                    <RefreshCw size={12} /> Thử lưu lại
-                  </button>
-                </div>
-              )}
-
-              {isRatingUnconfirmed && ratingIntent === 'remove_rating' && (
-                <div
-                  data-testid="rating-unconfirmed-banner"
-                  className="mt-3 flex items-center justify-between rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
-                >
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <AlertCircle size={14} className="text-amber-400 shrink-0" />
-                    Chưa xác nhận xóa điểm đánh giá trên máy chủ
-                  </span>
-                  <button
-                    disabled={isRatingPending}
-                    onClick={() => removeRating(movie.id, movie.title)}
-                    className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 font-bold text-amber-300 hover:bg-amber-500/30 transition-colors cursor-pointer"
-                    aria-label="Thử xóa lại điểm đánh giá"
-                  >
-                    <RefreshCw size={12} /> Thử xóa lại
+                    <RefreshCw size={12} /> {ratingIntent === 'rate' ? 'Thử lưu lại' : 'Thử xóa lại'}
                   </button>
                 </div>
               )}
@@ -927,25 +884,17 @@ export function MovieDetail({
                 </dd>
               </div>
 
-              <div className="pt-2 border-t border-surface-border">
-                <dt className="text-zinc-500">Năm sản xuất</dt>
-                <dd className="text-white font-medium mt-0.5">{movie.year}</dd>
-              </div>
-
-              <div className="pt-2 border-t border-surface-border">
-                <dt className="text-zinc-500">Thời lượng</dt>
-                <dd className="text-white font-medium mt-0.5">{movie.runtime}</dd>
-              </div>
-
-              <div className="pt-2 border-t border-surface-border">
-                <dt className="text-zinc-500">Điểm đánh giá</dt>
-                <dd className="text-white font-medium mt-0.5">{movie.rating} / 10</dd>
-              </div>
-
-              <div className="pt-2 border-t border-surface-border">
-                <dt className="text-zinc-500">Định dạng phát hành</dt>
-                <dd className="text-zinc-400 mt-0.5">Chưa có thông tin ấn bản</dd>
-              </div>
+              {[
+                ['Năm sản xuất', movie.year],
+                ['Thời lượng', movie.runtime],
+                ['Điểm đánh giá', `${movie.rating} / 10`],
+                ['Định dạng phát hành', 'Chưa có thông tin ấn bản'],
+              ].map(([k, v]) => (
+                <div key={k} className="pt-2 border-t border-surface-border">
+                  <dt className="text-zinc-500">{k}</dt>
+                  <dd className="text-white font-medium mt-0.5">{v}</dd>
+                </div>
+              ))}
             </dl>
           </div>
         </div>
