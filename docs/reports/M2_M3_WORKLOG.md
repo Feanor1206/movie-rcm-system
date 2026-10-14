@@ -179,3 +179,29 @@
   5. Browser walkthrough tự động chụp 14 ảnh màn hình desktop/mobile thành công.
   6. Patch `ROUND_8.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit 0.
   7. Freeze mã nguồn, bàn giao READY FOR REVIEW.
+
+---
+
+## Round 9 — Sửa Browser Harness và Cung cấp Bằng chứng M2 Đúng Thực tế (B1–B3)
+
+- **Started At:** 2026-10-14T09:50:00+07:00
+- **Completed At:** 2026-10-14T10:05:00+07:00
+- **targetRoundId:** 9 | **promptVersion:** 9
+- **Run ID:** `run-round9-20261014-0950`
+- **Reviewed Run ID:** `run-round8-20261014-0925` (Codex Review: CHANGES REQUESTED, findings B1–B3)
+- **Goal:**
+  1. Khắc phục triệt để B1: Thay thế quan sát text cố định bằng các assertion DOM & network thực tế (finite timeout, CDP evaluate exceptionDetails, CSS computed styles, activeElement outline, status code checking). Bổ sung negative self-check (`--negative-test`) chứng minh harness bắt buộc văng lỗi khi thiếu element.
+  2. Khắc phục B2: Đảm bảo đầy đủ static/public assets cho Next standalone (`.next/static` & `public`), ngăn chặn hoàn toàn lỗi 404 assets và đảm bảo hydration. Bổ sung endpoint `/api/auth/me` và `/api/auth/login` trên fixture server; thiết lập session xác thực `browser_user` qua production `AuthProvider`, kiểm chứng các POST watchlist/rating thực tế tới fixture.
+  3. Khắc phục B3: Thay thế `the-last-orbit` bằng canonical ID hoàn toàn synthetic `m2-synthetic-anim-001` ("The Quantum Garden", year 2026, rating 9.1) kèm assertion xác nhận ID không tồn tại trong `frontend/lib/data/movies.ts`. Mở tab "Đánh giá" trong `ProfileOverview` và assert điểm `9/10` được render trên UI.
+  4. Chụp mới 14 ảnh walkthrough lưu tại thư mục riêng `docs/reports/screenshots/ROUND_9/` (giữ nguyên ảnh Vòng 8 làm lịch sử), đảm bảo các ảnh có hash SHA256 độc lập (zero byte-identical).
+  5. Đóng gói báo cáo `ROUND_9_REPORT.md`, patch `ROUND_9.patch`, manifest `ROUND_9_MANIFEST.json` và cập nhật `M2_M3_STATUS.json` (`state: ready_for_review`).
+- **Completed:**
+  1. Negative self-check `node scripts/run_browser_walkthrough.cjs --negative-test` đạt PASS exit 0 (chứng minh harness văng lỗi khi cố tình thiếu selector/condition).
+  2. Browser walkthrough `node scripts/run_browser_walkthrough.cjs` chạy 14/14 bước đạt PASS exit 0 với đầy đủ DOM/network assertions trước khi chụp ảnh.
+  3. Lưu 14 ảnh PNG mới độc lập tại `docs/reports/screenshots/ROUND_9/` và xuất log bằng chứng cấu trúc `walkthrough_evidence.json`.
+  4. Toàn bộ 4 frontend suites đạt **54/54 PASS** (8 M2 journey, 12 search experience, 9 catalog service, 25 M1 resilience).
+  5. TypeScript `tsc --noEmit` đạt PASS exit 0.
+  6. Preview dry-run tool đạt 3/3 self-tests PASS.
+  7. Patch `ROUND_9.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit 0.
+  8. Freeze mã nguồn, bàn giao READY FOR REVIEW.
+

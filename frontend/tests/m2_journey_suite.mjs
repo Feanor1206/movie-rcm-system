@@ -44,6 +44,19 @@ const profileOverviewTranspiled = ts.transpileModule(fs.readFileSync(profileOver
 const editorialHeroTranspiled = ts.transpileModule(fs.readFileSync(editorialHeroCompFilePath, 'utf8'), transpileOptions).outputText;
 const watchlistProviderTranspiled = ts.transpileModule(fs.readFileSync(watchlistProviderFilePath, 'utf8'), transpileOptions).outputText;
 
+// Validate B3: synthetic canonical ID must not exist in local static fixture (frontend/lib/data/movies.ts)
+const moviesFilePath = path.join(root, 'lib/data/movies.ts');
+const moviesTranspiled = ts.transpileModule(fs.readFileSync(moviesFilePath, 'utf8'), transpileOptions).outputText;
+const moviesContext = { exports: {} };
+vm.runInNewContext(moviesTranspiled, moviesContext);
+const staticLocalMovies = moviesContext.exports.movies || [];
+
+export const SYNTHETIC_MOVIE_ID = 'm2-synthetic-anim-001';
+assert.ok(
+  !staticLocalMovies.some((m) => m.id === SYNTHETIC_MOVIE_ID),
+  `Synthetic movie ID "${SYNTHETIC_MOVIE_ID}" must NOT exist in frontend/lib/data/movies.ts`
+);
+
 const turn = () => new Promise((resolve) => setImmediate(resolve));
 
 function sampleMovie(overrides = {}) {
@@ -1073,15 +1086,15 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
   const persistedRatings = new Map();
   const capturedRequests = [];
 
-  // Canonical movie outside local fixture (not in frontend/lib/data/movies.ts)
+  // Canonical movie outside local fixture (guaranteed not in frontend/lib/data/movies.ts)
   const canonicalMovie = sampleMovie({
-    id: 'the-last-orbit',
-    title: 'The Last Orbit',
-    year: 2024,
-    rating: 8.4,
+    id: SYNTHETIC_MOVIE_ID,
+    title: 'The Quantum Garden',
+    year: 2026,
+    rating: 9.1,
     runtime: '1h 45m',
     genres: ['Animation', 'Sci-Fi'],
-    poster: 'https://images.unsplash.com/photo-the-last-orbit',
+    poster: 'https://images.unsplash.com/photo-synthetic-anim-001',
   });
 
   // 2. Persisted transport interceptor
@@ -1178,10 +1191,10 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
   await session1.settle();
 
   // Assertions on persisted transport and POST body
-  assert.ok(persistedWatchlist.has('the-last-orbit'), 'Persisted transport must record the-last-orbit in watchlist');
+  assert.ok(persistedWatchlist.has(SYNTHETIC_MOVIE_ID), 'Persisted transport must record synthetic movie in watchlist');
   const postWatchlist = capturedRequests.find((r) => r.endpoint === 'watchlist' && r.method === 'POST');
   assert.ok(postWatchlist, 'Must issue POST /users/watchlist upon hero button click');
-  assert.equal(postWatchlist.body.movieId, 'the-last-orbit', 'POST body must contain canonical movieId');
+  assert.equal(postWatchlist.body.movieId, SYNTHETIC_MOVIE_ID, 'POST body must contain canonical synthetic movieId');
 
   // Hero updates to reflect saved status
   const heroTreeAfterSave = renderEditorialHero(canonicalMovie, session1.value);
@@ -1201,18 +1214,18 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
   await session1.settle();
 
   // Assertions on persisted transport and POST body
-  assert.equal(persistedRatings.get('the-last-orbit'), 9, 'Persisted transport must record rating 9 for the-last-orbit');
+  assert.equal(persistedRatings.get(SYNTHETIC_MOVIE_ID), 9, 'Persisted transport must record rating 9 for synthetic movie');
   const postRating = capturedRequests.find((r) => r.endpoint === 'ratings' && r.method === 'POST');
   assert.ok(postRating, 'Must issue POST /users/ratings upon star rating button click');
-  assert.equal(postRating.body.movieId, 'the-last-orbit', 'Rating POST body must have canonical movieId');
+  assert.equal(postRating.body.movieId, SYNTHETIC_MOVIE_ID, 'Rating POST body must have canonical synthetic movieId');
   assert.equal(postRating.body.rating, 9, 'Rating POST body must have rating value 9');
 
   // --- Step 3: Simulate browser reload / provider remount for the user ---
   const session2 = mountProductionProvider(persistedFetcher);
   await session2.settle();
 
-  assert.equal(session2.value.isWatchlisted('the-last-orbit'), true, 'Reloaded provider must restore watchlist from backend');
-  assert.equal(session2.value.getRating('the-last-orbit'), 9, 'Reloaded provider must restore rating 9 from backend');
+  assert.equal(session2.value.isWatchlisted(SYNTHETIC_MOVIE_ID), true, 'Reloaded provider must restore watchlist from backend');
+  assert.equal(session2.value.getRating(SYNTHETIC_MOVIE_ID), 9, 'Reloaded provider must restore rating 9 from backend');
 
   // --- Step 4: ProfileOverview mounts under reloaded provider and resolves catalog metadata ---
   const profileHarness = createProfileHarness(
@@ -1222,18 +1235,40 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
       ratings: session2.value.ratings,
       watchlistContext: session2.value,
     },
-    async (id) => (id === 'the-last-orbit' ? canonicalMovie : null)
+    async (id) => (id === SYNTHETIC_MOVIE_ID ? canonicalMovie : null)
   );
 
   profileHarness.render();
   await profileHarness.settle();
 
-  // Watchlist tab renders MovieCard for the-last-orbit with exact canonical metadata
+  // Watchlist tab renders MovieCard for synthetic movie with exact canonical metadata
   const profileCards = findNodes(profileHarness.tree, (n) => n.type === 'MovieCard');
   assert.equal(profileCards.length, 1, 'Profile must render MovieCard for the persisted item');
-  assert.equal(profileCards[0].props.movie.id, 'the-last-orbit', 'Profile card must use canonical ID outside local fixture');
-  assert.equal(profileCards[0].props.movie.title, 'The Last Orbit', 'Profile card title must match');
-  assert.equal(profileCards[0].props.movie.year, 2024, 'Profile card year must match');
+  assert.equal(profileCards[0].props.movie.id, SYNTHETIC_MOVIE_ID, 'Profile card must use synthetic canonical ID');
+  assert.equal(profileCards[0].props.movie.title, 'The Quantum Garden', 'Profile card title must match');
+  assert.equal(profileCards[0].props.movie.year, 2026, 'Profile card year must match');
+
+  // --- Step 5: B3 UI Verification - Click "Đánh giá" tab and assert score 9 is actually rendered in Profile UI ---
+  const ratingsTabBtn = findNodes(
+    profileHarness.tree,
+    (n) => n.type === 'button' && (getText(n).includes('Đã chấm điểm') || getText(n).includes('ratings'))
+  )[0];
+  assert.ok(ratingsTabBtn, 'Profile must render "Đã chấm điểm" tab button');
+
+  // Click tab via component handler
+  await ratingsTabBtn.props.onClick();
+  await profileHarness.settle();
+
+  // Assert rating score 9 is rendered on the UI
+  const ratingScoreElements = findNodes(
+    profileHarness.tree,
+    (n) => /9\s*\/10/.test(getText(n))
+  );
+  assert.ok(ratingScoreElements.length > 0, 'Profile ratings tab must render score 9/10 for the synthetic movie');
+
+  const ratedCard = findNodes(profileHarness.tree, (n) => n.type === 'MovieCard')[0];
+  assert.ok(ratedCard, 'Profile ratings tab must render MovieCard for synthetic movie');
+  assert.equal(ratedCard.props.movie.id, SYNTHETIC_MOVIE_ID, 'Rated movie card must have synthetic ID');
 });
 
 test('8. Hero uncertain ADD/DELETE retry integration with production provider (commit response drop, reconcile error, retry recovery)', async () => {
@@ -1309,9 +1344,9 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   };
 
   const canonicalMovie = sampleMovie({
-    id: 'the-last-orbit',
-    title: 'The Last Orbit',
-    year: 2024,
+    id: SYNTHETIC_MOVIE_ID,
+    title: 'The Quantum Garden',
+    year: 2026,
   });
 
   const session = mountProductionProvider(transportFetcher);
@@ -1334,8 +1369,8 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   await session.settle();
 
   // 4. Provider detects uncertain outcome:
-  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), true, 'Action must be marked uncertain');
-  assert.equal(session.value.getActionIntent('the-last-orbit', 'watchlist'), 'add', 'Desired intent must be add');
+  assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), true, 'Action must be marked uncertain');
+  assert.equal(session.value.getActionIntent(SYNTHETIC_MOVIE_ID, 'watchlist'), 'add', 'Desired intent must be add');
 
   // 5. Hero UI displays uncertain state with badge and "Thử lưu lại" retry label
   heroTree = renderEditorialHero(canonicalMovie, session.value);
@@ -1355,8 +1390,8 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   await session.settle();
 
   // 8. Operation confirms: badge disappears, button returns to normal "Đã lưu Watchlist"
-  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), false, 'Action is confirmed');
-  assert.equal(session.value.isWatchlisted('the-last-orbit'), true, 'Watchlist is confirmed');
+  assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), false, 'Action is confirmed');
+  assert.equal(session.value.isWatchlisted(SYNTHETIC_MOVIE_ID), true, 'Watchlist is confirmed');
 
   heroTree = renderEditorialHero(canonicalMovie, session.value);
   const badgeAfterAddConfirm = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
@@ -1376,8 +1411,8 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   await session.settle();
 
   // 11. Provider detects uncertain remove outcome:
-  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), true, 'Action must be marked uncertain for remove');
-  assert.equal(session.value.getActionIntent('the-last-orbit', 'watchlist'), 'remove', 'Desired intent must be remove');
+  assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), true, 'Action must be marked uncertain for remove');
+  assert.equal(session.value.getActionIntent(SYNTHETIC_MOVIE_ID, 'watchlist'), 'remove', 'Desired intent must be remove');
 
   // 12. Hero UI displays uncertain state with badge and "Thử xóa lại" retry label
   heroTree = renderEditorialHero(canonicalMovie, session.value);
@@ -1397,8 +1432,8 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   await session.settle();
 
   // 15. Confirmed removal: badge disappears, button returns to "+ Thêm vào Watchlist"
-  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), false, 'Action is confirmed');
-  assert.equal(session.value.isWatchlisted('the-last-orbit'), false, 'Watchlist item is confirmed removed');
+  assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), false, 'Action is confirmed');
+  assert.equal(session.value.isWatchlisted(SYNTHETIC_MOVIE_ID), false, 'Watchlist item is confirmed removed');
 
   heroTree = renderEditorialHero(canonicalMovie, session.value);
   const badgeAfterDeleteConfirm = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];

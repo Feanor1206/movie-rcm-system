@@ -1,0 +1,11 @@
+{
+  "url": "http://127.0.0.1:3005/profile",
+  "hasRatingLabel": true,
+  "hasNine": true,
+  "tabs": [
+    {
+      "text": "Đã chấm điểm (1)",
+      "className": "flex items-center gap-2 border-b-2 px-4 py-3 text-xs sm:text-sm font-bold transition-colors cursor-pointer border-brand text-brand"
+    }
+  ]
+}

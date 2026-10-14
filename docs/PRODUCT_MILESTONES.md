@@ -1,3 +1,5 @@
+> Cập nhật 14/10/2026: Codex đã ACCEPTED M2 tại docs/reviews/LOOP_ROUND_9_REVIEW.md. M3 bắt đầu bằng docs/prompts/M3_UX_OPERATIONS_GEMINI_PROMPT.md (round10/version10). Manual handoff, automation tắt; nội dung autonomous/internal-gate cũ bên dưới không thay thế review gate hiện hành.
+
 # Milestones sản phẩm — ưu tiên web và nghiệp vụ, AI để sau
 
 Quyết định người dùng ngày 13/10/2026: giao Gemini theo milestone lớn, không dừng bàn giao ở từng ticket nhỏ. Codex lập prompt và nghiệm thu; Gemini triển khai. Tài liệu này thay thế thứ tự giao việc cũ trong START_HERE và ENGINEERING_EXECUTION_PLAN.
