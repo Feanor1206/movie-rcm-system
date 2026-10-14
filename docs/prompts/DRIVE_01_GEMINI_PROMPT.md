@@ -1,7 +1,7 @@
 # DRIVE-01 — Google Drive mounted storage, Windows, parallel agents
 
 taskId: DRIVE-01
-promptVersion: 1
+promptVersion: 2
 branch: dev
 baseline: 7c825b6 (M4 local ACCEPTED; verify current HEAD before work)
 handoff: manual; no automation or polling
@@ -14,18 +14,29 @@ Người dùng giao triển khai tiếp Google Drive để lưu/phát video ho�
 
 Topology được chọn: rclone + WinFsp read-only Windows mount -> Spring native cùng account/session -> API descriptor/GET/HEAD/Range hiện có -> production player. Không thêm Direct Drive API data plane thứ hai, không biến Drive share URL thành video src, không đưa Google token cho browser. Không thêm HLS/transcode/episodes/AI hoặc sửa giao diện không liên quan.
 
-## Điều phối bắt buộc: ba subagents thực, ownership riêng
+## Điều phối bắt buộc: sáu subagents thực, ownership riêng
 
-Agent chính khảo sát working tree trước, chốt contracts/config/error semantics và file ownership trước khi dispatch. Giữ nguyên thay đổi có sẵn, đặc biệt backend/fastapi/.env.example ngoài scope. Sau đó cho A/B/C chạy song song; không để cả ba chờ nhau hoặc sửa cùng file. Nếu tool chỉ cho ít agent hơn, chạy theo slots thực và ghi rõ; không bịa IDs/delegation. Không spawn agents chỉ để đốt quota. Thu kết quả trước tích hợp; agent chính sở hữu final artifacts.
+Ưu tiên mới của người dùng: tốc độ; dùng sáu subagents A–F nếu runtime hỗ trợ, parent điều phối và tích hợp. Nếu A/B/C đã chạy theo version1, GIỮ ownership đã giao và mọi thay đổi của họ, chỉ bổ sung D/E/F vào file độc lập; không restart hoặc giao lại cùng file cho agent mới. Parent ghi nhận promptVersion2 trong artifacts cuối; không viết lại lịch sử version1. Không đợi cả ba agent đầu hoàn tất mới dispatch D/E/F.
+
+Agent chính khảo sát working tree, chốt contracts/config/error semantics và ownership trước khi dispatch. Giữ nguyên thay đổi có sẵn, đặc biệt backend/fastapi/.env.example ngoài scope. Nếu tool chỉ cho ít slots hơn, dùng tối đa slots thực, queue phần còn lại và ghi rõ; không bịa sáu agent chạy đồng thời. Không tăng scope tính năng để lấp agent. Thu kết quả trước tích hợp; agent chính sở hữu final artifacts.
 
 | Owner | Công việc và file sở hữu |
 | --- | --- |
 | Agent A — storage boundary | DriveMediaStorageAdapter.java; helper/classes mới dưới service/storage nếu cần; tests mới DriveMediaStorageAdapterTest.java. Thay stub bằng reader read-only root chính xác, path boundary, availability/error semantics; không tự sửa controller/service/interface/config chung. |
 | Agent B — Windows operations | scripts/drive/*.ps1 và tests tooling riêng; docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md mới; template cấu hình không secrets. Preflight, mount command generator/launcher explicit, status và stop-owned-process; không chạy install/mount/OAuth trong lượt code. Không sửa adapter/backend/harness của C. |
 | Agent C — verification | scripts/run_drive_media_walkthrough.cjs mới; test-only DriveWalkthroughServer.java và DriveMediaStreamingIntegrationTest.java mới; fixture/evidence generator riêng. Test provider=drive qua production Spring HTTP và production browser; không dùng local provider rồi gắn nhãn Drive. Không sửa application source của A hoặc scripts M4 đã accepted. |
+| Agent D — IO failure/security verification | Tests mới DriveFaultIsolationTest.java và DrivePathSecurityTest.java, evidence riêng docs/reports/drive/DRIVE_01/agent-d/. Viết production-code tests blocked metadata/open/read, bounded queue/worker/circuit, cancellation accounting, local-provider isolation, path/reparse boundaries. Báo repro cho A/parent, không tự sửa production hoặc tests của A/C. Nếu chưa chốt API, soạn cases/fault reader fixture riêng trước rồi nối API khi được parent thông báo. |
+| Agent E — Windows toolkit verification | scripts/drive-tests/ và evidence riêng docs/reports/drive/DRIVE_01/agent-e/. Test scripts của B qua mock process/filesystem seams: arguments có space/Unicode, dry-run không side effects, occupied mount, cache-off/read-only, config secrecy, PID reuse/owned stop. Không sửa scripts/drive/ của B; gửi findings sớm để B xử lý. Không launch installer/mount/kill thật. B chuẩn bị test seams ngay trong lượt đầu. |
+| Agent F — mapping/performance handoff | scripts/preview_drive_media_mapping.cjs, test file scripts/drive_mapping_suite.cjs, docs/fixtures/drive_media_mapping.example.json, docs/runbooks/DRIVE_PERFORMANCE_PLAN.md. Xây validate-only mapping preview, idempotency/conflict tests, không ghi live DB; chuẩn hóa benchmark plan/raw metrics và phân biệt local fixture/Drive thật. Không sửa Windows runbook của B, browser harness của C hoặc contract của parent. Không chạy benchmark tranh server/build; phân tích evidence C khi có và báo input còn thiếu. |
 | Parent — contract/integration | MediaStorageAdapter.java nếu cần; MediaStreamService.java, MediaStreamController.java, shared streaming/deadline helpers/config/exception mapping, application YAML, package/CI nếu cần; docs/contracts/DRIVE_STORAGE_CONTRACT.md; current design/runbook links; final artifacts. Chỉ parent tích hợp cross-cutting, sau khi thông báo contract cho A/C. |
 
 Đường dẫn Java có prefix backend/springboot/src/main/java/com/dippie/moviercm/ hoặc src/test/java/com/dippie/moviercm/. Nếu cần đổi ownership, parent thông báo trước rồi mới chuyển; không có concurrent writers. Không sửa MovieDetail/mediaService/frontend features trừ khi integration chứng minh regression cần sửa; parent ghi lý do và thu hồi owner trước. Existing83 frontend và43 backend là baseline, không hardcode tổng khi thêm tests.
+
+### Critical path để tăng tốc
+
+Trong lượt đầu parent phát contract tối thiểu cho cả sáu: ranged-reader signatures, error semantics, deadline/capacity policy; B phát CLI parameters/test seams cho E, C phát evidence schema cho F. A/B/C triển khai, D/E viết tests độc lập, F làm mapping/plan song song. Gửi findings ngay khi có repro, không giữ tới báo cáo cuối. Parent dành thời gian cho shared integration thay vì làm lại việc của agents.
+
+Chỉ một owner chạy Maven vào target/ và một owner chạy Next build vào .next tại một thời điểm. Agents có thể chạy checks độc lập không ghi cùng output; build/test dùng shared artifacts phải qua parent điều phối. C là owner launch browser/server benchmark; agents khác không mở thêm servers tranh ports hoặc chạy full suites/build nhiều bản song song. Parent chạy một vòng regression cuối khi source ổn định; chỉ rerun checks bị ảnh hưởng bởi lỗi/sửa mới. Không chờ agent rảnh bằng polling/watchdog vô hạn. Quota không phải lý do giảm kiểm chứng; không hứa tốc độ tuyến tính theo số agents.
 
 ## Contract backend và IO cần chốt trước code
 
@@ -61,9 +72,9 @@ G1 IMPLEMENTATION: adapter thật + scripts + docs + isolated tests pass. G2 MOU
 
 ## Bàn giao có giới hạn, không tự lặp vô hạn
 
-Làm một checkpoint có nghĩa trong khoảng45–60phút; nếu toàn scope cần lâu hơn, hoàn tất phần coherent, ghi remaining rõ rồi freeze thay vì để polling/build loop. Parent chạy shared build/server tests tuần tự khi agents đã bàn giao; không3builds tranh cùng target/.next. Ghi agent IDs/tasks/files/commands/result thực tế; không coi self-report là evidence độc lập.
+Làm một checkpoint có nghĩa trong khoảng45–60phút, hoàn tất sớm nếu đủ acceptance; không chạy cho đủ thời lượng. Nếu toàn scope cần lâu hơn, hoàn tất phần coherent, ghi remaining rõ rồi freeze thay vì để polling/build loop. Parent chạy shared build/server tests tuần tự khi agents đã bàn giao; không nhiều builds tranh cùng target/.next. Ghi agent IDs/tasks/files/commands/result thực tế và slots/concurrency đã dùng; không coi self-report là evidence độc lập.
 
-Artifacts mới: docs/reports/DRIVE_01_REPORT.md, DRIVE_01_STATUS.json, DRIVE_01.patch, DRIVE_01_MANIFEST.json, DRIVE_01_WORKLOG.md; evidence dưới docs/reports/drive/DRIVE_01/. Status có taskId/runId/checkpointId/promptVersion1, state=ready_for_review,sourceFrozen=true,gateResults(G1/G2/G3),blockers và baseline commit. Ready_for_review nghĩa sẵn sàng Codex review, không nghĩa Drive accepted. Patch generated bằng Git tooling, actual baseline, reverse check; manifest SHA256+bytes final source/artifacts, finalize patch trước hash. Không include Codex-owned prompt/control/review như implementation, không re-hash frozen M4 artifacts. Giữ secrets/real config/state/log nhạy cảm ngoài Git, screenshots redact account info.
+Artifacts mới: docs/reports/DRIVE_01_REPORT.md, DRIVE_01_STATUS.json, DRIVE_01.patch, DRIVE_01_MANIFEST.json, DRIVE_01_WORKLOG.md; evidence dưới docs/reports/drive/DRIVE_01/. Status có taskId/runId/checkpointId/promptVersion2, state=ready_for_review,sourceFrozen=true,gateResults(G1/G2/G3),blockers và baseline commit. Ready_for_review nghĩa sẵn sàng Codex review, không nghĩa Drive accepted. Patch generated bằng Git tooling, actual baseline, reverse check; manifest SHA256+bytes final source/artifacts, finalize patch trước hash. Không include Codex-owned prompt/control/review như implementation, không re-hash frozen M4 artifacts. Giữ secrets/real config/state/log nhạy cảm ngoài Git, screenshots redact account info.
 
 Codex sở hữu docs/prompts/GEMINI_CURRENT_TASK.md, DRIVE_REVIEW_CONTROL.json, M4_REVIEW_CONTROL.json và reviews. Gemini chỉ đọc chúng; không tự publish reviewing/accepted hoặc sửa prompt tiếp. M4 control vẫn stop; DRIVE control mới là assignment này. Source freeze xong kết thúc lượt, bàn giao thủ công. Không tự commit/push/reset/create branch/deploy; Codex xử lý Git dev sau review theo quyền user. Không AI/FastAPI/Qwen/GPU/model, live DB, OS settings hoặc tự chạy installer/OAuth/mount trong coding checkpoint.
 
