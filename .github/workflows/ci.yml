@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "master", "develop", "chore/taicautruc" ]
+    branches: [ "main", "master", "develop", "dev", "chore/taicautruc" ]
   pull_request:
-    branches: [ "main", "master", "develop", "chore/taicautruc" ]
+    branches: [ "main", "master", "develop", "dev", "chore/taicautruc" ]
 
 jobs:
   frontend-check:
@@ -26,7 +26,7 @@ jobs:
       - name: TypeScript Check
         run: npx tsc --noEmit
       - name: Frontend Behavioral Test Suites
-        run: node --test tests/catalog_client_suite.mjs tests/m1_resilience_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs
+        run: npm test
       - name: Animation Catalog Baseline Check
         run: node ../scripts/preview_animation_catalog.cjs --test
       - name: Production Next.js Build

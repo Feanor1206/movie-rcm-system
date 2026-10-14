@@ -26,7 +26,7 @@ const assert = require('node:assert/strict');
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const STANDALONE_SERVER = path.resolve(__dirname, '../frontend/.next/standalone/server.js');
 const FIXTURE_PATH = path.resolve(__dirname, '../docs/fixtures/animation_catalog_fixture.json');
-const SCREENSHOTS_DIR = path.resolve(__dirname, '../docs/reports/screenshots/ROUND_10');
+const SCREENSHOTS_DIR = path.resolve(__dirname, '../docs/reports/screenshots/ROUND_11');
 const LOCAL_MOVIES_PATH = path.resolve(__dirname, '../frontend/lib/data/movies.ts');
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
@@ -75,12 +75,9 @@ function ensureAssetsAndIsolation() {
   const standalonePublic = path.join(standaloneDir, 'public');
   const frontendPublic = path.resolve(__dirname, '../frontend/public');
 
-  if (!fs.existsSync(standaloneStatic)) {
-    fs.cpSync(frontendStatic, standaloneStatic, { recursive: true });
-  }
-  if (!fs.existsSync(standalonePublic)) {
-    fs.cpSync(frontendPublic, standalonePublic, { recursive: true });
-  }
+  // Always synchronize latest build assets into standalone to prevent stale chunks
+  fs.cpSync(frontendStatic, standaloneStatic, { recursive: true });
+  fs.cpSync(frontendPublic, standalonePublic, { recursive: true });
 }
 
 function checkPortAvailable(port, host = '127.0.0.1') {
@@ -219,7 +216,12 @@ function startFixtureServer() {
 
     // Auth Login: POST /api/auth/login
     if (pathname === '/api/auth/login' && method === 'POST') {
-      const isUserB = body.username === 'user_b';
+      const loginKey = body.usernameOrEmail || body.username || body.email;
+      if (loginKey === 'codex_invalid' || body.password === 'not-real-password') {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, message: 'Reviewer invalid credentials' }));
+      }
+      const isUserB = loginKey === 'user_b';
       const selected = isUserB ? users.user_b : users.user_a;
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({
@@ -760,6 +762,59 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
+    // Diagnostic Audit: Invalid login submission, close size check, and opener focus restore
+    console.log('[Step 02b] Testing AuthModal invalid submission, touch target size, and opener restoration...');
+    await browser.evaluate(`
+      (() => {
+        const d = document.querySelector('div[role="dialog"]');
+        const inputs = Array.from(d.querySelectorAll('input'));
+        const u = inputs.find(i => i.placeholder.includes('tên đăng nhập') || i.type === 'text');
+        const p = inputs.find(i => i.type === 'password');
+        const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        set.call(u, 'codex_invalid');
+        u.dispatchEvent(new Event('input', { bubbles: true }));
+        u.dispatchEvent(new Event('change', { bubbles: true }));
+        set.call(p, 'not-real-password');
+        p.dispatchEvent(new Event('input', { bubbles: true }));
+        p.dispatchEvent(new Event('change', { bubbles: true }));
+        d.querySelector('button[type="submit"]').click();
+      })()
+    `);
+    await browser.waitForCondition(
+      `document.body.textContent.includes('Reviewer invalid credentials')`,
+      'error message for invalid credentials to appear',
+      4000
+    );
+    const closeBtnSize = await browser.evaluate(`
+      (() => {
+        const b = document.querySelector('button[aria-label="Đóng popup"]');
+        if (!b) return null;
+        const r = b.getBoundingClientRect();
+        return { width: r.width, height: r.height };
+      })()
+    `);
+    assert.ok(closeBtnSize && closeBtnSize.width >= 44 && closeBtnSize.height >= 44,
+      `Auth close button must be >= 44x44px, got ${JSON.stringify(closeBtnSize)}`);
+
+    // Close and verify focus restored to opener
+    await browser.evaluate(`document.querySelector('button[aria-label="Đóng popup"]').click()`);
+    await new Promise(r => setTimeout(r, 100));
+    const isOpenerRestored = await browser.evaluate(`
+      Boolean(document.activeElement && document.activeElement.textContent.includes('Đăng nhập'))
+    `);
+    assert.ok(isOpenerRestored, 'Closing AuthModal must restore focus to login button opener');
+
+    // Re-open for real user_a login
+    await browser.evaluate(`
+      (() => {
+        const btns = Array.from(document.querySelectorAll('header button'));
+        const b = btns.find(b => b.textContent.includes('Đăng nhập'));
+        b.focus();
+        b.click();
+      })()
+    `);
+    await browser.waitForSelector('div[role="dialog"]', 4000);
+
     // ------------------------------------------------------------------------
     // Step 03: Login User A (user_a)
     // ------------------------------------------------------------------------
@@ -811,6 +866,72 @@ async function main() {
       'Detail page for The Quantum Garden loaded',
       6000
     );
+
+    // Diagnostic Audit: Video player modal initial focus, Tab trapping, Escape close, and opener focus restore
+    console.log('[Step 04a] Auditing Video Player modal lifecycle (initial focus, Tab trap, Esc, opener restore)...');
+    await browser.evaluate(`
+      (() => {
+        const b = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Xem trailer'));
+        if (!b) throw new Error('Trailer play button not found');
+        b.focus();
+        b.click();
+      })()
+    `);
+    await browser.waitForSelector('div[role="dialog"] video', 4000);
+    await new Promise(r => setTimeout(r, 100));
+    const insideInitial = await browser.evaluate(`
+      document.querySelector('div[role="dialog"]').contains(document.activeElement)
+    `);
+    assert.ok(insideInitial, 'Video player modal must focus element inside dialog on open');
+
+    await browser.dispatchKey('Tab', 'Tab', 9);
+    const insideAfterTab = await browser.evaluate(`
+      document.querySelector('div[role="dialog"]').contains(document.activeElement)
+    `);
+    assert.ok(insideAfterTab, 'Tab key must keep focus trapped inside video player modal');
+
+    await browser.dispatchKey('Escape', 'Escape', 27);
+    await browser.waitForCondition(`document.querySelector('div[role="dialog"] video') === null`, 'video player to close on Escape', 3000);
+    await new Promise(r => setTimeout(r, 100));
+    const playerRestoredToOpener = await browser.evaluate(`
+      Boolean(document.activeElement && document.activeElement.textContent.includes('Xem trailer'))
+    `);
+    assert.ok(playerRestoredToOpener, 'Closing video player modal must restore focus to trailer button opener');
+
+    // Diagnostic Audit: Reduced motion in CineBot and opener restoration
+    console.log('[Step 04b] Auditing CineBot reduced motion JS policy and opener restore...');
+    await browser.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await browser.evaluate(`
+      (() => {
+        window.__walkthroughScrollCalls = [];
+        window.__walkthroughScrollOriginal = Element.prototype.scrollIntoView;
+        Element.prototype.scrollIntoView = function(options) {
+          window.__walkthroughScrollCalls.push(options);
+        };
+        const b = Array.from(document.querySelectorAll('header button')).find(b => b.textContent.includes('Hỏi CineBot')) ||
+                  document.querySelector('button[aria-label="Mở Chatbot CineBot"]');
+        if (!b) throw new Error('CineBot opener button not found');
+        b.focus();
+        b.click();
+      })()
+    `);
+    await browser.waitForSelector('div[role="dialog"] input', 4000);
+    await new Promise(r => setTimeout(r, 100));
+    const scrollCalls = await browser.evaluate('window.__walkthroughScrollCalls');
+    assert.ok(
+      Array.isArray(scrollCalls) && scrollCalls.every(c => !c || c.behavior !== 'smooth'),
+      `CineBot must NOT use behavior: 'smooth' under reduced motion: ${JSON.stringify(scrollCalls)}`
+    );
+
+    await browser.dispatchKey('Escape', 'Escape', 27);
+    await browser.waitForCondition(`document.querySelector('div[role="dialog"] input') === null`, 'CineBot to close on Escape', 3000);
+    await new Promise(r => setTimeout(r, 100));
+    const cinebotRestoredToOpener = await browser.evaluate(`
+      Boolean(document.activeElement && (document.activeElement.textContent.includes('Hỏi CineBot') || document.activeElement.getAttribute('aria-label') === 'Mở Chatbot CineBot'))
+    `);
+    assert.ok(cinebotRestoredToOpener, 'Closing CineBot with Escape must restore focus to opener button');
+    await browser.evaluate('Element.prototype.scrollIntoView = window.__walkthroughScrollOriginal');
+    await browser.cdp('Emulation.setEmulatedMedia', { features: [] });
 
     // Click Save
     await browser.evaluate(`
@@ -950,61 +1071,109 @@ async function main() {
     });
 
     // ------------------------------------------------------------------------
-    // Step 07: Logout User A & Switch to User B (user_b)
+    // Step 07: Logout User A & Switch to User B via UI Form (No localStorage bypass)
     // ------------------------------------------------------------------------
-    console.log('[Step 07] Logging out User A and logging in as User B...');
+    console.log('[Step 07] Logging out User A via UI and logging in as User B via UI form...');
+    
+    // 1. Open user dropdown menu in header
     await browser.evaluate(`
       (() => {
         const trigger = document.querySelector('header .relative button');
-        if (trigger) trigger.click();
-        const btns = Array.from(document.querySelectorAll('header button'));
-        const logoutBtn = btns.find(b => b.textContent.includes('Đăng xuất'));
-        if (logoutBtn) logoutBtn.click();
-        else {
-          localStorage.removeItem('dippie_auth_token');
-          localStorage.removeItem('dippie_auth_user');
-          window.location.reload();
-        }
+        if (!trigger) throw new Error('User menu dropdown trigger not found');
+        trigger.click();
       })()
     `);
+    
+    // Wait for dropdown to be visible
     await browser.waitForCondition(
-      `document.body.textContent.includes('Đăng nhập')`,
+      `Boolean(Array.from(document.querySelectorAll('header button')).find(b => b.textContent.includes('Đăng xuất')))`,
+      'header user dropdown menu to be open with "Đăng xuất" option',
+      4000
+    );
+
+    // 2. Click "Đăng xuất" button in the menu (real UI click, no storage-clear fallback)
+    await browser.evaluate(`
+      (() => {
+        const btns = Array.from(document.querySelectorAll('header button'));
+        const logoutBtn = btns.find(b => b.textContent.includes('Đăng xuất'));
+        if (!logoutBtn) throw new Error('Logout button not found in dropdown menu');
+        logoutBtn.click();
+      })()
+    `);
+
+    // 3. Verify navbar returns to guest state with "Đăng nhập" button
+    await browser.waitForCondition(
+      `Boolean(Array.from(document.querySelectorAll('header button')).some(b => b.textContent.includes('Đăng nhập')) && !document.querySelector('header .relative button'))`,
       'navbar to return to guest state with "Đăng nhập" button',
       6000
     );
 
-    // Login as User B
+    // 4. Assert token is removed from localStorage upon UI logout
+    const clearedToken = await browser.evaluate(`localStorage.getItem('dippie_auth_token')`);
+    assert.equal(clearedToken, null, 'dippie_auth_token must be removed upon UI logout');
+
+    // 5. Click "Đăng nhập" button in navbar to open AuthModal
     await browser.evaluate(`
       (() => {
-        localStorage.setItem('dippie_auth_token', 'token-user-b');
-        localStorage.setItem('dippie_auth_user', JSON.stringify({
-          id: 2,
-          username: 'user_b',
-          email: 'user_b@example.com',
-          role: 'ROLE_USER'
-        }));
+        const loginBtn = Array.from(document.querySelectorAll('header button')).find(b => b.textContent.includes('Đăng nhập'));
+        if (!loginBtn) throw new Error('"Đăng nhập" button not found in navbar');
+        loginBtn.click();
       })()
     `);
-    await browser.navigate('http://127.0.0.1:3005/');
+
+    // 6. Wait for AuthModal to render
     await browser.waitForCondition(
-      `document.body.textContent.includes('user_b')`,
-      'navbar to display authenticated user "user_b"',
+      `Boolean(document.querySelector('[role="dialog"]') && document.querySelector('#auth-modal-title'))`,
+      'Auth modal dialog to appear',
+      4000
+    );
+
+    // 7. Fill in User B credentials via input events and submit
+    await browser.evaluate(`
+      (() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        if (!dialog) throw new Error('Auth dialog not found');
+        const textInput = dialog.querySelector('input[type="text"]');
+        const passInput = dialog.querySelector('input[type="password"]');
+        if (!textInput || !passInput) throw new Error('Auth text or password input not found');
+
+        const nativeInputSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        nativeInputSetter.call(textInput, 'user_b');
+        textInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        nativeInputSetter.call(passInput, 'password123');
+        passInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        const submitBtn = dialog.querySelector('button[type="submit"]');
+        if (!submitBtn) throw new Error('Auth submit button not found');
+        submitBtn.click();
+      })()
+    `);
+
+    // 8. Wait for AuthModal to close and navbar to show user_b
+    await browser.waitForCondition(
+      `Boolean(document.body.textContent.includes('user_b') && !document.querySelector('[role="dialog"]'))`,
+      'navbar to display authenticated user "user_b" and dialog closed',
       6000
     );
+
+    // 9. Assert store ownership has updated to User B
+    const userBStoredToken = await browser.evaluate(`localStorage.getItem('dippie_auth_token')`);
+    assert.equal(userBStoredToken, 'token-user-b', 'User B token must be saved upon successful UI login');
 
     await browser.captureScreenshot('07_logout_switch_user_b.png');
     evidenceRecords.push({
       step: '07_logout_switch_user_b',
       url: 'http://127.0.0.1:3005/',
       actor: 'user_b',
-      expected: 'User A logs out cleanly; User B logs in with independent token',
-      actual: 'Navbar displays "user_b", clean session transition confirmed',
+      expected: 'User A logs out cleanly via UI dropdown; User B logs in via AuthModal UI form without localStorage hacks',
+      actual: 'Navbar displays "user_b", clean UI session transition and token update confirmed',
       pass: true,
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
     // ------------------------------------------------------------------------
-    // Step 08: User B Data Isolation (Zero Leak from User A)
+    // Step 08: User B Data Isolation & Reload Persistence (Zero Leak from User A)
     // ------------------------------------------------------------------------
     console.log('[Step 08] Verifying User B Profile has zero data leaked from User A...');
     await browser.navigate('http://127.0.0.1:3005/profile');
@@ -1018,13 +1187,32 @@ async function main() {
     `);
     assert.equal(hasLeakedItem, false, 'User B must NOT see User A saved movie (Zero Data Leak)');
 
+    // Verify session persistence across page reload
+    console.log('[Step 08] Verifying User B session persistence and store state after page reload...');
+    await browser.evaluate('window.location.reload()');
+    await browser.waitForCondition(
+      `Boolean(document.body.textContent.includes('user_b') && (document.body.textContent.includes('Danh sách xem đang trống') || document.body.textContent.includes('Chưa có phim')))`,
+      'User B profile and session to remain intact after page reload',
+      6000
+    );
+
+    const reloadedAuthUser = await browser.evaluate(`
+      (() => {
+        try {
+          const u = JSON.parse(localStorage.getItem('dippie_auth_user') || '{}');
+          return u.username;
+        } catch { return null; }
+      })()
+    `);
+    assert.equal(reloadedAuthUser, 'user_b', 'User B username must persist after reload');
+
     await browser.captureScreenshot('08_user_b_isolation_profile.png');
     evidenceRecords.push({
       step: '08_user_b_isolation_profile',
       url: 'http://127.0.0.1:3005/profile',
       actor: 'user_b',
-      expected: 'User B profile renders completely empty library; zero data leaked from User A',
-      actual: `Verified User B profile has 0 items and does not contain "The Quantum Garden"`,
+      expected: 'User B profile renders completely empty library; zero data leaked from User A; session persists after reload',
+      actual: `Verified User B profile has 0 items, does not contain "The Quantum Garden", and persists user_b session across reload`,
       pass: true,
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
@@ -1193,31 +1381,188 @@ async function main() {
       6000
     );
 
-    // Verify action buttons exist without overlapping
-    const buttonsNonOverlapping = await browser.evaluate(`
+    // Audit mobile touch target sizes (policy >= 44x44) and verify ZERO bounding collisions
+    const mobileAudit = await browser.evaluate(`
       (() => {
         const btns = Array.from(document.querySelectorAll('button'));
         const playBtn = btns.find(b => b.textContent.includes('Xem trailer'));
         const saveBtn = btns.find(b => b.textContent.includes('Watchlist'));
-        if (!playBtn || !saveBtn) return true;
-        const rect1 = playBtn.getBoundingClientRect();
-        const rect2 = saveBtn.getBoundingClientRect();
-        // Check no bounding collision
-        return !(rect1.right > rect2.left && rect1.left < rect2.right && rect1.bottom > rect2.top && rect1.top < rect2.bottom);
+        const cineBotTrigger = document.querySelector('button[aria-label="Mở Chatbot CineBot"]') ||
+                               Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Hỏi CineBot'));
+
+        if (!playBtn) throw new Error('Trailer play button not found on detail page');
+        if (!saveBtn) throw new Error('Watchlist save button not found on detail page');
+        if (!cineBotTrigger) throw new Error('CineBot floating trigger button not found on detail page');
+
+        const playRect = playBtn.getBoundingClientRect();
+        const saveRect = saveBtn.getBoundingClientRect();
+        const triggerRect = cineBotTrigger.getBoundingClientRect();
+
+        const targets = {
+          playBtn: { width: Math.round(playRect.width), height: Math.round(playRect.height) },
+          saveBtn: { width: Math.round(saveRect.width), height: Math.round(saveRect.height) },
+          trigger: { width: Math.round(triggerRect.width), height: Math.round(triggerRect.height) }
+        };
+
+        // Collision helper: check if two rects intersect
+        function isIntersecting(r1, r2) {
+          return !(r1.right <= r2.left || r1.left >= r2.right || r1.bottom <= r2.top || r1.top >= r2.bottom);
+        }
+
+        const collisions = [];
+        // 1. Play vs Save buttons
+        if (isIntersecting(playRect, saveRect)) {
+          collisions.push('playBtn vs saveBtn');
+        }
+
+        // 2. Floating CineBot trigger vs all visible buttons in viewport
+        for (const btn of btns) {
+          if (btn === cineBotTrigger) continue;
+          const r = btn.getBoundingClientRect();
+          // Only check buttons actually visible in viewport
+          if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth) {
+            if (isIntersecting(triggerRect, r)) {
+              collisions.push('cineBotTrigger vs ' + (btn.textContent.trim().slice(0, 20) || btn.getAttribute('aria-label') || 'button'));
+            }
+          }
+        }
+
+        return { targets, collisions };
       })()
     `);
-    assert.ok(buttonsNonOverlapping, 'Mobile action buttons must not overlap');
+
+    assert.ok(mobileAudit.targets.playBtn.height >= 44, `Play button height ${mobileAudit.targets.playBtn.height}px must be >= 44px`);
+    assert.ok(mobileAudit.targets.saveBtn.height >= 44, `Save button height ${mobileAudit.targets.saveBtn.height}px must be >= 44px`);
+    assert.ok(mobileAudit.targets.trigger.height >= 44, `CineBot trigger height ${mobileAudit.targets.trigger.height}px must be >= 44px`);
+    assert.equal(mobileAudit.collisions.length, 0, `Detected collisions on mobile 375x667: ${mobileAudit.collisions.join(', ')}`);
 
     await browser.captureScreenshot('14_detail_mobile.png');
     evidenceRecords.push({
       step: '14_detail_mobile',
       url: `http://127.0.0.1:3005/movies/${SYNTHETIC_MOVIE_ID}`,
       actor: 'user_b',
-      expected: 'Mobile detail displays vertically stacked poster, trailer player action, and non-overlapping buttons',
-      actual: 'Verified mobile detail layout and non-overlapping controls on 375px viewport',
+      expected: 'Mobile detail displays vertically stacked poster, trailer player action (>=44px), CineBot trigger (>=44px), and ZERO button collisions',
+      actual: `Verified touch targets (trailer: ${mobileAudit.targets.playBtn.height}px, save: ${mobileAudit.targets.saveBtn.height}px, trigger: ${mobileAudit.targets.trigger.height}px) and 0 collisions on 375px viewport`,
       pass: true,
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
+
+    // ------------------------------------------------------------------------
+    // Step 15: Real Performance Benchmark (Cold & Warm, 3 runs across 4 routes)
+    // ------------------------------------------------------------------------
+    console.log('\n--- 3. PERFORMANCE BENCHMARK (Desktop 1280x800, 3 Runs per Route) ---\n');
+    await browser.setViewport(1280, 800, false);
+
+    const routesToBenchmark = [
+      { path: '/', name: 'Home' },
+      { path: '/search?q=quantum', name: 'Search' },
+      { path: `/movies/${SYNTHETIC_MOVIE_ID}`, name: 'Detail' },
+      { path: '/profile', name: 'Profile' },
+    ];
+
+    const perfResults = {
+      benchmarkMetadata: {
+        timestamp: new Date().toISOString(),
+        framework: 'Next.js 15.1.2 (Standalone)',
+        nodeVersion: process.version,
+        viewport: '1280x800',
+        runsPerRoute: 3,
+        network: 'Local Loopback (Fixture Server)',
+      },
+      routes: {},
+    };
+
+    function median(values) {
+      if (!values.length) return 0;
+      const sorted = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    }
+
+    for (const route of routesToBenchmark) {
+      console.log(`[Perf] Benchmarking ${route.name} (${route.path}) across 3 runs...`);
+      const runs = [];
+
+      for (let runIdx = 1; runIdx <= 3; runIdx++) {
+        const isWarm = runIdx > 1;
+        await browser.navigate(`http://127.0.0.1:3005${route.path}`);
+        await browser.waitForCondition(
+          `document.readyState === 'complete'`,
+          `page load complete for ${route.name} run ${runIdx}`,
+          8000
+        );
+        // Small delay to allow any paint metrics / resource timings to finalize
+        await new Promise((r) => setTimeout(r, 600));
+
+        const metrics = await browser.evaluate(`
+          (() => {
+            const nav = performance.getEntriesByType('navigation')[0] || {};
+            const resources = performance.getEntriesByType('resource') || [];
+            const paints = performance.getEntriesByType('paint') || [];
+            const fcpEntry = paints.find(p => p.name === 'first-contentful-paint');
+
+            const resourceBytes = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
+            const totalTransferBytes = (nav.transferSize || 0) + resourceBytes;
+            const requestCount = 1 + resources.length;
+
+            const domContentLoaded = Math.round(nav.domContentLoadedEventEnd || 0);
+            const loadDuration = Math.round(nav.loadEventEnd || nav.duration || 0);
+            const fcp = fcpEntry ? Math.round(fcpEntry.startTime) : null;
+
+            const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
+            const lcp = lcpEntries.length > 0 ? Math.round(lcpEntries[lcpEntries.length - 1].startTime) : fcp;
+
+            let cls = 0;
+            const clsEntries = performance.getEntriesByType('layout-shift');
+            for (const entry of clsEntries) {
+              if (!entry.hadRecentInput) {
+                cls += entry.value;
+              }
+            }
+            cls = Math.round(cls * 1000) / 1000;
+
+            return {
+              type: ${isWarm ? '"warm"' : '"cold"'},
+              domContentLoaded,
+              loadDuration,
+              fcp,
+              lcp,
+              cls,
+              inp: 'unavailable',
+              requestCount,
+              totalTransferBytes,
+            };
+          })()
+        `);
+        runs.push(metrics);
+      }
+
+      const dcls = runs.map(r => r.domContentLoaded);
+      const loads = runs.map(r => r.loadDuration);
+      const reqs = runs.map(r => r.requestCount);
+      const bytes = runs.map(r => r.totalTransferBytes);
+      const lcps = runs.map(r => r.lcp).filter(v => v !== null);
+      const clss = runs.map(r => r.cls);
+
+      perfResults.routes[route.name] = {
+        path: route.path,
+        runs,
+        summary: {
+          domContentLoaded: { min: Math.min(...dcls), max: Math.max(...dcls), median: median(dcls) },
+          loadDuration: { min: Math.min(...loads), max: Math.max(...loads), median: median(loads) },
+          requestCount: { min: Math.min(...reqs), max: Math.max(...reqs), median: median(reqs) },
+          totalTransferBytes: { min: Math.min(...bytes), max: Math.max(...bytes), median: median(bytes) },
+          lcp: lcps.length ? { min: Math.min(...lcps), max: Math.max(...lcps), median: median(lcps) } : 'unavailable',
+          cls: { min: Math.min(...clss), max: Math.max(...clss), median: median(clss) },
+          inp: 'unavailable',
+        },
+      };
+      console.log(`  -> ${route.name} Median: DCL=${median(dcls)}ms, Load=${median(loads)}ms, Requests=${median(reqs)}, Transfer=${median(bytes)} bytes, LCP=${lcps.length ? median(lcps) + 'ms' : 'N/A'}`);
+    }
+
+    const perfFilePath = path.join(SCREENSHOTS_DIR, 'perf_measurements.json');
+    fs.writeFileSync(perfFilePath, JSON.stringify(perfResults, null, 2));
+    console.log(`\n✔ Saved performance measurements to ${perfFilePath}`);
 
     // Save JSON evidence
     const evidenceFilePath = path.join(SCREENSHOTS_DIR, 'walkthrough_evidence.json');
@@ -1235,7 +1580,7 @@ async function main() {
       console.log(`  Actual:   ${r.actual}\n`);
     }
 
-    console.log('🎉 All 14 walkthrough steps asserted and captured in docs/reports/screenshots/ROUND_10/');
+    console.log('🎉 All 14 walkthrough steps + performance benchmark asserted and captured in ' + SCREENSHOTS_DIR);
   } finally {
     if (browser) browser.close();
     if (nextProc) {

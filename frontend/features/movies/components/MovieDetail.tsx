@@ -52,13 +52,31 @@ export function MovieDetail({
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoModalRef = useRef<HTMLDivElement>(null);
   const playButtonRef = useRef<HTMLButtonElement>(null);
+  const playerOpenerRef = useRef<HTMLElement | null>(null);
 
   // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration
   useEffect(() => {
     if (!isPlaying) return;
 
+    // Save active element as opener if outside modal
+    if (document.activeElement && (!videoModalRef.current || !videoModalRef.current.contains(document.activeElement))) {
+      playerOpenerRef.current = document.activeElement as HTMLElement | null;
+    }
+
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
+    // Auto-focus first focusable element inside modal (initial focus)
+    const timer = setTimeout(() => {
+      if (videoModalRef.current) {
+        const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), video, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length > 0) {
+          focusable[0].focus();
+        }
+      }
+    }, 40);
 
     // Trap focus inside modal & listen for Escape
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -75,6 +93,14 @@ export function MovieDetail({
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
+
+        if (!videoModalRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          if (e.shiftKey) last.focus();
+          else first.focus();
+          return;
+        }
+
         if (e.shiftKey) {
           if (document.activeElement === first) {
             e.preventDefault();
@@ -92,9 +118,10 @@ export function MovieDetail({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      clearTimeout(timer);
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
-      playButtonRef.current?.focus();
+      (playerOpenerRef.current || playButtonRef.current)?.focus();
     };
   }, [isPlaying]);
 
@@ -141,10 +168,10 @@ export function MovieDetail({
               </div>
               <button
                 onClick={() => setIsPlaying(false)}
-                className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
                 aria-label="Đóng trình phát"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
@@ -257,8 +284,11 @@ export function MovieDetail({
                 {hasVideo && (
                   <button
                     ref={playButtonRef}
-                    onClick={() => setIsPlaying(true)}
-                    className="btn-primary px-6 py-2.5 text-sm font-bold shadow-brand-sm"
+                    onClick={(e) => {
+                      playerOpenerRef.current = e.currentTarget;
+                      setIsPlaying(true);
+                    }}
+                    className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5"
                   >
                     <Play size={16} className="fill-current" />
                     Xem trailer / giới thiệu
@@ -268,7 +298,7 @@ export function MovieDetail({
                 <button
                   disabled={isWatchlistPending}
                   onClick={() => toggleWatchlist(movie.id, movie.title, movie.poster)}
-                  className={`px-4 py-2.5 text-sm font-semibold disabled:opacity-60 cursor-pointer rounded-md border transition-all ${
+                  className={`min-h-[44px] inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold disabled:opacity-60 cursor-pointer rounded-md border transition-all ${
                     isWatchlistUnconfirmed
                       ? 'border-amber-400 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 ring-1 ring-amber-400/40'
                       : inWatchlist
@@ -315,7 +345,7 @@ export function MovieDetail({
                 <button
                   disabled={isFavoritePending}
                   onClick={() => toggleFavorite(movie.id, movie.title, movie.poster)}
-                  className={`rounded-md border p-2.5 transition-colors cursor-pointer disabled:opacity-60 ${
+                  className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md border p-2.5 transition-colors cursor-pointer disabled:opacity-60 ${
                     isFavoriteUnconfirmed
                       ? 'border-amber-400 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 ring-1 ring-amber-400/40'
                       : favorite
@@ -354,7 +384,7 @@ export function MovieDetail({
 
                 <button
                   onClick={openChat}
-                  className="rounded-md border border-zinc-700 bg-surface px-3.5 py-2.5 text-xs font-medium text-zinc-300 hover:border-brand hover:text-white cursor-pointer"
+                  className="min-h-[44px] inline-flex items-center justify-center rounded-md border border-zinc-700 bg-surface px-3.5 py-2.5 text-xs font-medium text-zinc-300 hover:border-brand hover:text-white cursor-pointer"
                 >
                   Hỏi CineBot
                 </button>

@@ -1,37 +1,31 @@
-# Vòng 11 — Gom sửa M3 R1–R4, chốt UX và số đo hiệu năng thật
+# Vòng 12 — Khép M3: production bootstrap và phép đo hiệu năng đúng
 
-promptVersion: 11
-targetRoundId: 11
+promptVersion: 12
+targetRoundId: 12
 milestone: M3
 reviewMode: manual
-reviewedRunId: run-round10-20261014-1015
+reviewedRunId: run-round11-20261014-1140
 
-Bạn là Gemini tại D:\Class\movie-rcm-system. Đọc docs/reviews/LOOP_ROUND_10_REVIEW.md và M3 prompt gốc. M3 chưa accepted; sửa chung các findings rồi bàn giao một checkpoint. Không làm lại M1/M2, không Drive/AI/GPU/DB live. Người dùng chọn nhánh dev, không tạo nhánh mới; Codex quản lý commit/push/merge, bạn không sửa Git index hoặc đổi nhánh.
+Bạn là Gemini tại D:\Class\movie-rcm-system, nhánh dev. Đọc docs/reviews/LOOP_ROUND_11_REVIEW.md. R1 CI và R3 UX/modal đã closed ở checkpoint; giữ nguyên, không làm lại. M3 còn đúng hai nhóm C1/C2. Không tự sang Drive/AI, không tạo nhánh hay sửa Git index/commit/push/reset.
 
-## R1 — CI đáng tin cậy trên dev
+## C1 — Bootstrap thật phải khớp schema entities
 
-Sửa tên suites thành catalog_service_suite.mjs/m1_behavior_suite.mjs và hai suites hiện có. Guard missing files/commands, không để Node version silently bỏ tests. Thêm dev push/PR triggers. Dùng scripts package.json nếu giúp CI/local chung entrypoint. Chạy exact commands ở runtime có thật; phân biệt Node local với CI Node20, không tuyên bố Actions green trước khi remote chạy. Spring JDK17 theo pom; test DB riêng. Không thêm deploy/GPU jobs.
+Base Compose mount database/schema/01_init.sql thiếu favorite_items, còn app prod ddl-auto validate. Chọn canonical bootstrap source rõ, dùng đúng file cho new-volume initialization và runbook. Đồng bộ các bản DDL cần thiết hoặc loại duplication bằng reference/build copy an toàn; không sửa SQL không được Compose dùng rồi gọi đã fix. Database cũ cần additive Favorite migration riêng, không DROP/overwrite data hoặc dùng init script như upgrade volume hiện hữu.
 
-## R2 — Production/default seed và rollback không mất dữ liệu
+Test executable: chạy chính bootstrap SQL rồi Hibernate validate trên DB test, chứng minh đủ entity tables/columns; giữ create-drop tests cũ nhưng không dùng chúng thay validation DDL. Nếu PostgreSQL disposable sẵn dùng instance riêng; nếu không, H2 PG-mode test + PostgreSQL opt-in test/runbook rõ, không bịa Postgres pass. Không cài/start DB live.
 
-Sửa base/prod Compose: không postgres entrypoint demo seed; dev seed opt-in qua override/profile rõ. Env secrets đúng app, không password hardcoded hoặc thiếu APP_JWT_SECRET; sample env không secret được whitelist đúng .gitignore nếu cần. Tách validation render khỏi startup: không boot services vào DB live. Test config/defaults thực và opt-in seed behavior, prod missing env fail rõ trên fixture/test process. Không dùng property tắt thủ công rồi gọi đã chứng minh prod policy.
+Config negative secret test phải load actual prod YAML và có positive-control fixture DB+valid secrets start/validate được, sau đó omit riêng từng secret và assert lỗi đúng key; không assert placeholder chung trong context chưa load config. Compose configurable POSTGRES_USER/POSTGRES_DB phải đồng bộ healthcheck và app connection variables. Mandatory env dùng config preflight fail rõ; env example không secret. Dev override vẫn opt-in, không seed production. Run render validation nếu docker có sẵn, nếu không ghi limitations. Giữ FastAPI/Qwen service/config nguyên vẹn.
 
-Runbook/schema bỏ DROP TABLE khỏi rollback bảo toàn data. Phân biệt bootstrap schema_v1 với upgrade DB hiện hữu; có forward additive migration/compatibility checks và rollback code/config giữ dữ liệu. Kiểm thử bootstrap + validate/upgrade fixture phù hợp, không gọi H2 pass là PostgreSQL production validation. Nếu không có PostgreSQL disposable, ghi đúng evidence gap và chuẩn bị test tự chạy trên DB test được cấu hình tường minh; không dùng credentials/liveDB thật.
+## C2 — Sửa benchmark trước khi kết luận tối ưu
 
-## R3 — Sửa UX được tái hiện, không chỉ thêm aria
+- Cài PerformanceObserver cho largest-contentful-paint/layout-shift trước navigation/render (CDP new-document script hoặc cách tương đương). Không gán FCP vào LCP. Unsupported/no sample => null/unavailable. Có negative/control test phát hiện missing observer hoặc intentionally delayed content/layout shift, để metric không thành0 giả. CLS theo session-window chuẩn; nếu chỉ raw shifts thì ghi raw, không gắn nhãn CLS chuẩn.
+- Cold thật: clear/disable HTTP cache hoặc fresh context trước mỗi cold run, xác minh qua CDP cache flags/networkbytes. Warm: cache enabled cùng route đã warm. Tách raw arrays/summaries cold và warm, tối thiểu3runs mỗi loại/route nếu thời gian cho phép; không gom1cold+2warm thành một median. Tách local/backend cache conditions nếu không reset được, không gọi tất cả là cold.
+- Đối chiếu transferred bytes bằng CDP Network loadingFinished/encodedDataLength có request accounting, ghi cache/304/opaque timing; ResourceTiming encodedBodySize/decodedBodySize riêng. API cross-origin timing không được im lặng tính0 rồi gọi full network footprint. Không đếm trùng redirects/preload/body; ghi methodology.
+- Chờ điều kiện app-ready: đúng route data/error state, requests liên quan complete, font/media conditions và bounded observation window; không chỉ readyState+sleep. Ghi source/buildID/Node/Chrome/viewport/network/CPU/cache policy, budgets và route JS exact bytes thay display làm tròn sát140kB. Local loopback không đại diện mạng người xem; có thể thêm một profile throttle có mô tả nếu tool hỗ trợ nhưng không trộn conditions.
+- Trước/after phải cùng đo và có change thực; nếu vòng này chỉ sửa phép đo thì gọi là corrected baseline, không bịa speedup. Chỉ optimize thêm khi measurement chỉ ra bottleneck cụ thể, tránh dependency lớn. Người dùng sẵn sàng thêm ổ nếu video benchmark sau này cần, chưa mua/cài/mount trong M3.
 
-Player: initial focus vào dialog khi mở, keyboard không lọt nền, Tab/ShiftTab đúng với video controls, Escape/close/restore opener/scroll lock clean. CineBot: restore opener, reduced-motion đổi behavior JS scroll, không gọi AI khi test. AuthModal: giữ open/submit/fail/close lifecycle ổn định, tránh effect dependency gây recapture opener; case reviewer đã thử restore đúng, không rewrite auth vì suy đoán. Có tests lifecycle cho3dialogs, includes close/unmount/pending/failure. Có thể dùng helper dùng chung nếu hợp lý, không dependency lớn.
-
-Mobile375×667 và dưới fold: fix floating trigger đè trailer/controls/toasts, đo boundingboxes chứ không chỉ play vs save; missing selector phải fail. Các controls chính/icon buttons đạt target policy>=44×44 đã đề ra hoặc ghi rõ ngoại lệ có căn cứ, không claim blanket. Giữ xanh lá/contrast. Actual browser assertions cho focus trap/restore, reduce-motion JS, overlap/touch bounds và broken images404. Không sửa AI/chat semantics, session/library state machine hoặc media playback capabilities ngoài UI shell.
-
-## R4 — Performance và browser evidence đúng việc đã làm
-
-Trước optimize thêm, lưu baseline của checkpoint hiện tại: source hashes/build id, Next15.1.2 thực, Node/Chrome, viewport, cache/network/CPU conditions. Đo resource bytes/request count và navigation/render/load timing cho Home/Search/Detail/Profile, cold/warm, tối thiểu3runs mỗi case nếu thời gian cho phép; báo median/range hoặc p95 khi sample đủ, không giả số. LCP/CLS thu bằng observer đúng, INP chưa đo thì ghi unavailable. Chốt budgets rồi sửa điểm nghẽn có measurement; đo after cùng fixture/conditions. Không chỉ xuất bảng First Load JS hoặc tăng cache để che API lỗi. Không tự mua phần cứng hoặc hứa mượt tuyệt đối.
-
-Harness: fixture login nhận usernameOrEmail, test userB qua UI form; logout qua nút thật, không storage-clear fallback. Assert store ownership/methods và UI sau reload. CDP calls timeout hữu hạn; preflight debugger; assets đúng build (không copy-if-absent stale); readiness probe thật; sanitized request/status + expected fault policy. Output ROUND_11 riêng, không overwrite frozen Round10. Fail phải có error evidence, không hardcoded pass. Không run reviewer wrapper chỉ để lấy exit0: diagnostics của nó ghi lỗi hiện tại, cần regression assertions đúng trong suite/harness bạn sở hữu.
+Giữ14browser journey checks đã đạt và structural tests nhưng report phân loại đúng. Không sửa reviewer scripts để lấy pass. Output ROUND_12 riêng, không ghi đè Round11. Không thêm full-stack/AI/storage features.
 
 ## Bàn giao
 
-Ưu tiên sửa code R1/R2/R3 cùng meaningful tests, đồng thời đo R4; nếu chưa đủ evidence thì chốt phần còn lại rõ, không claim M3 done. Khoảng30 phút là checkpoint guide; hoàn tất command/test đang chạy, không kill rồi bịa pass. Không polling/vòng tự động. Bốn frontend suites+new lifecycle/perf checks, tsc/build, Spring DB test riêng và preview regression khi ảnh hưởng. So source/artifact hashes stable trước ready.
-
-ROUND_11_REPORT.md/patch/manifest SHA256 own changed/new/deleted files + screenshots/measurements, git status, commands/exitcodes, prior vs current evidence, mock/browser/backend boundaries, limitations. Snapshot riêng không đè baseline cũ. Status round11/version11/runId mới/milestoneM3 publish cuối sau freeze. Không sửa docs/reviews/control/current prompt của Codex; không appAI/FastAPI/Qwen/GPU/model/liveDB/deploy; không commit/push/reset hoặc đổi OS settings/process người khác. Kết thúc để người dùng gửi Codex review.
+Chạy npm test + meaningful new bootstrap/metric tests, tsc/build khi affected, Spring DB test riêng, browser+corrected performance harness. Commands exitcodes thật, prior evidence riêng. Chốt checkpoint khoảng30phút và hoàn tất command đang chạy; còn gap phải ghi rõ, không tự gọi M3 accepted. ROUND_12_REPORT.md/patch/manifest SHA256 own changed/new/deleted files, raw metrics/screenshots/git status, numstat/reverse check. Freeze source rồi publish status round12/version12/runId mới/milestoneM3/ready_for_review cuối; kết thúc lượt, không polling. Không sửa review/control/current prompt Codex, không liveDB/AI/GPU/model/deploy/OS settings, không kill process người khác.

@@ -40,9 +40,14 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const cinebotRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const isReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    messagesEndRef.current?.scrollIntoView({ behavior: isReduced ? 'auto' : 'smooth' });
   };
 
   useEffect(() => {
@@ -54,6 +59,11 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   // A11y: Escape key, body scroll lock, focus trap, and initial focus
   useEffect(() => {
     if (!isOpen) return;
+
+    // Save previous active element to restore focus upon closing (only if outside dialog)
+    if (document.activeElement && (!cinebotRef.current || !cinebotRef.current.contains(document.activeElement))) {
+      openerRef.current = document.activeElement as HTMLElement | null;
+    }
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -76,6 +86,14 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
+
+        if (!cinebotRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          if (e.shiftKey) last.focus();
+          else first.focus();
+          return;
+        }
+
         if (e.shiftKey) {
           if (document.activeElement === first) {
             e.preventDefault();
@@ -96,6 +114,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       clearTimeout(timer);
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
+      openerRef.current?.focus();
     };
   }, [isOpen, onClose]);
 
@@ -187,17 +206,17 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               onClick={resetChat}
               title="Làm mới"
               aria-label="Làm mới cuộc trò chuyện"
-              className="rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
+              className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
             >
-              <RotateCcw size={15} />
+              <RotateCcw size={16} />
             </button>
             <button
               onClick={onClose}
               title="Đóng"
               aria-label="Đóng CineBot"
-              className="rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
+              className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
         </div>
@@ -399,9 +418,9 @@ export function CineBotFloatingTrigger({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       aria-label="Mở Chatbot CineBot"
-      className="fixed bottom-6 right-6 z-40 flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-md border border-surface-border bg-surface px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-full sm:rounded-md border border-surface-border bg-surface px-3.5 py-2.5 sm:px-4 text-xs font-semibold text-white shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
     >
-      <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
+      <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-brand-sm" />
       <span>Hỏi CineBot</span>
     </button>
   );

@@ -237,3 +237,38 @@
   5. TypeScript `tsc --noEmit` đạt **PASS exit code 0**.
   6. Next.js production build thành công (First Load JS toàn bộ routes < 140 kB).
   7. Freeze mã nguồn, bàn giao READY FOR REVIEW.
+
+---
+
+## Round 11 — Milestone M3: Gom Sửa R1–R4, Chốt UX & Đo Lường Hiệu Năng Thật
+
+- **Started At:** 2026-10-14T11:15:00+07:00
+- **Completed At:** 2026-10-14T11:45:00+07:00
+- **targetRoundId:** 11 | **promptVersion:** 11
+- **Run ID:** `run-round11-20261014-1140`
+- **Reviewed Run ID:** `run-round10-20261014-1015` (Codex Review: CHANGES REQUESTED, findings R1–R4)
+- **Goal:**
+  1. Khắc phục R1 (CI): Sửa đường dẫn suite chính xác trong `.github/workflows/ci.yml` (`catalog_service_suite.mjs`, `m1_behavior_suite.mjs`), bổ sung script `npm test` trong `package.json` chạy cả 5 suites, thêm trigger `dev` (push/PR), không thêm deploy/GPU job.
+  2. Khắc phục R2 (Seed & Config Policy): Xóa SQL demo mounts khỏi service postgres trong `docker-compose.yml`, tạo `docker-compose.dev.yml` cho dev opt-in seeds, tạo `infrastructure/.env.example` và whitelist `!.env.example` trong `.gitignore`, bỏ `DROP TABLE` khỏi rollback trong `schema_v1.sql` và `OPERATIONS_RUNBOOK.md` (forward additive migration + data preservation), cập nhật `SeedAndConfigPolicyTest.java` (4 tests) kiểm tra default YAML và failure khi thiếu secrets bắt buộc.
+  3. Khắc phục R3 (A11y Modals, Touch Targets & Reduced Motion):
+     - `AuthModal.tsx`: Nút đóng đạt $\ge 44 \times 44$px, bảo vệ `openerRef` không bị ghi đè bởi submit/re-render, Tab trap xử lý focus bên ngoài.
+     - `MovieDetail.tsx`: Video player initial focus vào dialog, Tab trap, Escape close, restore focus về nút opener; chuẩn hóa các nút Trailer, Watchlist, Favorite, Ask CineBot đều đạt `min-h-[44px]`.
+     - `CineBot.tsx`: `scrollToBottom` tôn trọng `prefers-reduced-motion` dùng `behavior: 'auto'`, Escape close restore opener, nút header $\ge 44 \times 44$px, `CineBotFloatingTrigger` ở `bottom-4 right-4 sm:bottom-6 sm:right-6`.
+     - Tạo mới `frontend/tests/modal_a11y_suite.mjs` (3/3 tests PASS).
+  4. Khắc phục R4 (Browser Harness & Performance Benchmark):
+     - Thư mục riêng `docs/reports/screenshots/ROUND_11/`, giữ nguyên `ROUND_10/`.
+     - Fixture nhận `usernameOrEmail`, trả lời 401 khi nhận thông tin sai.
+     - User A đăng xuất qua UI menu thật, User B đăng nhập qua UI form thật (dispatch input event + submit, không `localStorage` bypass, không storage-clear fallback).
+     - Step 08 kiểm tra User B data isolation (0 leak từ User A) và kiểm tra persistence sau reload.
+     - Step 14 kiểm tra touch targets $\ge 44$px và xác nhận 0 va chạm giữa trigger CineBot nổi với các controls trên mobile 375x667.
+     - Step 15 thực hiện benchmark 3 lần (cold/warm) trên 4 route (`/`, `/search`, `/movies/...`, `/profile`), xuất `perf_measurements.json`.
+  5. Đóng gói báo cáo `ROUND_11_REPORT.md`, patch `ROUND_11.patch`, manifest `ROUND_11_MANIFEST.json` và cập nhật `M2_M3_STATUS.json` (`state: ready_for_review`).
+- **Completed:**
+  1. Frontend test suites: **57/57 tests PASS** (`npm test` chạy cả 5 suites: Catalog 9, M1 Behavior 25, M2 Journey 8, Search 12, Modal A11y 3).
+  2. Spring Boot backend: **21/21 tests PASS** (`mvnw test`: Auth/Library 8, Catalog 9, SeedAndConfigPolicy 4).
+  3. TypeScript `npx tsc --noEmit` đạt **PASS exit code 0**.
+  4. Next.js production build `npm run build` thành công (First Load JS toàn bộ routes < 140 kB).
+  5. Script preview baseline hoạt hình đạt **3/3 self-tests PASS**.
+  6. Harness `run_browser_walkthrough.cjs` hoàn tất 14/14 bước assertions DOM/network thực tế và sinh thành công `perf_measurements.json` cùng 14 screenshots trong `ROUND_11/`.
+  7. Patch `ROUND_11.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit 0.
+  8. Freeze mã nguồn, bàn giao READY FOR REVIEW.

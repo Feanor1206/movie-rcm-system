@@ -24,8 +24,10 @@ export function AuthModal() {
   useEffect(() => {
     if (!isAuthModalOpen) return;
 
-    // Save previous active element to restore focus upon closing
-    openerRef.current = document.activeElement as HTMLElement | null;
+    // Save previous active element to restore focus upon closing (only if outside modal)
+    if (document.activeElement && (!modalRef.current || !modalRef.current.contains(document.activeElement))) {
+      openerRef.current = document.activeElement as HTMLElement | null;
+    }
 
     // Lock background body scroll
     const originalOverflow = document.body.style.overflow;
@@ -52,6 +54,13 @@ export function AuthModal() {
 
         const firstElement = focusableElements[0];
         const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (!modalRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          if (e.shiftKey) lastElement.focus();
+          else firstElement.focus();
+          return;
+        }
 
         if (e.shiftKey) {
           if (document.activeElement === firstElement) {
@@ -127,10 +136,10 @@ export function AuthModal() {
           type="button"
           onClick={closeAuthModal}
           disabled={isSubmitting}
-          className="absolute right-4 top-4 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+          className="absolute right-3 top-3 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
           aria-label="Đóng popup"
         >
-          <X size={18} />
+          <X size={20} />
         </button>
 
         {/* Brand Header */}

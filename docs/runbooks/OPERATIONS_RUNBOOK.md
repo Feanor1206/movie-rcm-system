@@ -75,20 +75,25 @@ pg_isready -h <DB_HOST> -p 5432 -U <DB_USER>
 psql -h <DB_HOST> -U <DB_USER> -d movie_rcm_db -f docs/runbooks/db/schema_v1.sql
 ```
 
-### 4.3. Quy Trình Rollback An Toàn (Bảo toàn dữ liệu người dùng)
-Nếu cần khôi phục lại phiên bản trước:
-1. **Sao lưu dữ liệu trước rollback:**
-   ```bash
-   pg_dump -h <DB_HOST> -U <DB_USER> -d movie_rcm_db -t users -t watchlist_items -t favorite_items -t movie_ratings > backup_user_data_$(date +%Y%m%d_%H%M%S).sql
-   ```
-2. **Hạ cấp có kiểm soát:** Không drop toàn bộ bảng nếu chỉ cần sửa cột; nếu rollback hoàn toàn phiên bản mới:
-   ```sql
-   -- Chỉ thực hiện khi có bản backup xác nhận
-   DROP TABLE IF EXISTS movie_ratings;
-   DROP TABLE IF EXISTS favorite_items;
-   DROP TABLE IF EXISTS watchlist_items;
-   -- Bảng movies và users giữ lại nếu tương thích ngược
-   ```
+### 4.2. Khởi tạo Cơ sở dữ liệu mới (Bootstrap vs Nâng cấp)
+- **Bootstrap mới (`schema_v1.sql`):** Sử dụng các câu lệnh `CREATE TABLE IF NOT EXISTS` để khởi tạo cấu trúc bảng trên một database PostgreSQL trống hoàn toàn.
+- **Nâng cấp Cơ sở dữ liệu hiện hữu (Additive Migration Policy):** Tuyệt đối không xóa bảng hoặc phá hủy ràng buộc khi nâng cấp. Chỉ áp dụng các thay đổi bổ sung (additive):
+  - Thêm cột mới nullable hoặc có giá trị `DEFAULT`: `ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <col> <type>;`
+  - Thêm chỉ mục mới không khóa bảng: `CREATE INDEX CONCURRENTLY IF NOT EXISTS ...;`
+  - Giữ tương thích ngược hoàn toàn với phiên bản mã nguồn trước đó.
+
+### 4.3. Quy Trình Rollback An Toàn (Bảo Toàn 100% Dữ Liệu Người Dùng)
+- **Quy tắc bất biến:** Tuyệt đối **KHÔNG sử dụng `DROP TABLE` hoặc `TRUNCATE`** để rollback. Hành vi xóa bảng sẽ phá hủy vĩnh viễn dữ liệu tương tác của người dùng (`users`, `watchlist_items`, `favorite_items`, `movie_ratings`).
+- **Quy trình rollback chuẩn:**
+  1. **Rollback ứng dụng / cấu hình:** Chuyển container hoặc process Spring Boot / Next.js về image/commit ổn định trước đó. Nhờ chính sách additive migration, phiên bản code cũ vẫn tương thích và đọc/ghi bình thường trên schema hiện tại.
+  2. **Sao lưu kiểm chứng:**
+     ```bash
+     pg_dump -h <DB_HOST> -U <DB_USER> -d movie_rcm_db > backup_pre_rollback_$(date +%Y%m%d_%H%M%S).sql
+     ```
+  3. **Hạ cấp schema (nếu bắt buộc):** Chỉ thực hiện vô hiệu hóa logic tính năng ở tầng code; không xóa cột database khi đang chạy.
+
+> [!NOTE]
+> **Giới hạn kiểm chứng (Evidence Gap):** Việc kiểm tra schema bootstrap và validation hiện được xác minh qua integration test trên H2 trong Spring Boot test profile. Việc kiểm chứng validation DDL thực tế trên PostgreSQL yêu cầu container disposable riêng; tuyệt đối không kết nối và can thiệp cơ sở dữ liệu production live để thử nghiệm.
 
 ---
 

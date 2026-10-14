@@ -1,13 +1,13 @@
 {
   "protocolVersion": 1,
-  "roundId": 10,
-  "promptVersion": 10,
-  "runId": "run-round10-20261014-1015",
+  "roundId": 11,
+  "promptVersion": 11,
+  "runId": "run-round11-20261014-1140",
   "milestone": "M3",
   "state": "ready_for_review",
-  "startedAt": "2026-10-14T10:15:00+07:00",
+  "startedAt": "2026-10-14T11:15:00+07:00",
   "targetDurationMinutes": 30,
-  "goal": "Triển khai Milestone M3: Mobile/a11y/modal focus/overlap, broken-image fallback, perf baseline & optimization, dev/test/prod config separation & seed policy, CI & runbook",
-  "lastCompletedStep": "Hoàn tất toàn bộ Milestone M3: 14/14 browser walkthrough assertions PASS (screenshots ROUND_10), 54/54 frontend behavioral tests PASS, 19/19 Spring Boot backend tests PASS, 0 tsc errors, Next.js production build PASS, CI & Operations runbook hoàn thiện",
-  "nextStep": "Chờ Codex nghiệm thu Milestone M3 tại docs/reviews/LOOP_ROUND_10_REVIEW.md"
+  "goal": "Gom sửa M3 findings R1–R4: CI đáng tin cậy trên dev, production seed/config policy & data preservation rollback, UX/a11y modals & touch targets, browser walkthrough multi-account UI login & cold/warm performance measurements",
+  "lastCompletedStep": "Hoàn tất toàn bộ R1–R4: 57/57 frontend tests PASS (npm test), 21/21 backend tests PASS (mvnw test), 14/14 browser walkthrough steps PASS + real 3-run perf measurements (/perf_measurements.json, screenshots ROUND_11), 0 tsc errors, Next.js build PASS, reverse patch check PASS",
+  "nextStep": "Chờ Codex nghiệm thu Milestone M3 Vòng 11 tại docs/reviews/LOOP_ROUND_11_REVIEW.md"
 }

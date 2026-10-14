@@ -46,10 +46,11 @@ services:
     container_name: movie_rcm_springboot
     restart: always
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/movie_rcm_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/movie_rcm_db}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-postgres}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - APP_JWT_SECRET=${APP_JWT_SECRET}
     expose:
       - "8080"
     depends_on:
@@ -108,14 +109,12 @@ services:
     container_name: movie_rcm_postgres
     restart: always
     environment:
-      POSTGRES_DB: movie_rcm_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB:-movie_rcm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ../database/schema/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
-      - ../database/seeds/01_seed_movies.sql:/docker-entrypoint-initdb.d/02_seed_movies.sql:ro
-      - ../database/seeds/02_seed_50_users.sql:/docker-entrypoint-initdb.d/03_seed_50_users.sql:ro
     expose:
       - "5432"
     healthcheck:

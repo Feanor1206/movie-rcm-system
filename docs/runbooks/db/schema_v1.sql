@@ -87,10 +87,9 @@ CREATE INDEX IF NOT EXISTS idx_ratings_user ON movie_ratings (user_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_movie ON movie_ratings (movie_id);
 
 -- =========================================================================
--- Rollback Instructions (Safe down-migration)
+-- Rollback & Data Preservation Policy
 -- =========================================================================
--- DROP TABLE IF EXISTS movie_ratings;
--- DROP TABLE IF EXISTS favorite_items;
--- DROP TABLE IF EXISTS watchlist_items;
--- DROP TABLE IF EXISTS movies;
--- DROP TABLE IF EXISTS users;
+-- DO NOT execute DROP TABLE or destructive DDL during rollbacks.
+-- Rollbacks must be performed via application code/configuration rollback.
+-- All tables, schema definitions, and user interaction data (movie_ratings,
+-- favorite_items, watchlist_items, users, movies) must be preserved intact.

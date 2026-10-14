@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "targetRoundId": 11,
-  "promptVersion": 11,
-  "lastReviewedRoundId": 10,
+  "targetRoundId": 12,
+  "promptVersion": 12,
+  "lastReviewedRoundId": 11,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
   "milestone": "M3",
   "reviewMode": "manual",
-  "note": "Round10 M3 request changes R1-R4: CI missing suites/dev trigger; production compose seed and destructive rollback; reproduced modal/mobile/reduced-motion defects; missing actual perf evidence. 54 frontend/19 backend/tsc/build pass. Round11 grouped fixes, work on dev, manual mode; no storage/AI yet."
+  "note": "Round11 source/UI checkpoint accepted:57 tests,21 backend,tsc/build,14 browser steps pass. M3 not accepted: C1 Compose bootstrap missing favorite_items, C2 invalid LCP/CLS and cold-cache methodology. Round12 only these groups, dev/manual; no storage/AI."
 }
