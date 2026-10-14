@@ -2,10 +2,10 @@
   "protocolVersion": 1,
   "command": "work",
   "taskId": "DRIVE-01-F04",
-  "promptVersion": 6,
+  "promptVersion": 7,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
   "taskPromptPath": "docs/prompts/DRIVE_01_F04_GEMINI_PROMPT.md",
   "lastReviewedCheckpoint": "DRIVE-01-F03-CHECKPOINT-01",
   "reviewMode": "manual",
-  "note": "F03 review closes old seek/identity cases; only cleanup queue ownership under saturation/shutdown remains P1. G1 not accepted. Prerequisites/OAuth/folder now ready outside coding; no real mount/test MP4. Six useful scoped agents, manual handoff, automation paused."
+  "note": "User requires internal cross-agent review -> fix -> retest -> re-review with full lifecycle matrix before F04 handoff. Preserve in-flight version6 ownership; new version7 adds mandatory review gate. User-uploaded videoplayback.mp4 verified metadata29209556 bytes in VideoDieppie. G2/G3 pending real mount/playback after G1; installation/OAuth/upload already complete. Manual handoff, automation paused."
 }
