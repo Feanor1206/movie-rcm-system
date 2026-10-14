@@ -16,7 +16,8 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$ro
 
 # 2. Start FastAPI AI Gateway (:8000)
 Write-Host "[2/3] Dang khoi dong Backend AI Gateway (FastAPI :8000)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$rootDir\backend\fastapi'; Write-Host '--- 2. FASTAPI AI GATEWAY (:8000) ---' -ForegroundColor Green; python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+$pyCmd = if (Test-Path "C:\Users\Admin\anaconda3\envs\dippie-qwen\python.exe") { "& 'C:\Users\Admin\anaconda3\envs\dippie-qwen\python.exe'" } else { "python" }
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$rootDir\backend\fastapi'; `$env:SERVING_MODE = 'full'; `$env:USE_FULL_QWEN3_4B_LORA = 'true'; `$env:DEVICE = 'cuda'; `$env:ENABLE_FALLBACK = 'false'; Write-Host '--- 2. FASTAPI AI GATEWAY (:8000) [MODE: FULL QWEN3-4B + LORA] ---' -ForegroundColor Green; $pyCmd -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
 # 3. Start Frontend Next.js (:3000)
 Write-Host "[3/3] Dang khoi dong Frontend Next.js (:3000)..." -ForegroundColor Yellow

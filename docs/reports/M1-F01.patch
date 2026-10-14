@@ -1,0 +1,3449 @@
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java
+index 043e76b..c7ae642 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java
+@@ -3,6 +3,7 @@ package com.dippie.moviercm.controller;
+ import com.dippie.moviercm.dto.ApiResponse;
+ import com.dippie.moviercm.dto.MovieResponse;
+ import com.dippie.moviercm.service.MovieService;
++import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.web.bind.annotation.*;
+ 
+@@ -35,7 +36,12 @@ public class MovieController {
+ 
+     @GetMapping("/{id}")
+     public ResponseEntity<ApiResponse<MovieResponse>> getMovieById(@PathVariable String id) {
+-        MovieResponse movie = movieService.getMovieById(id);
+-        return ResponseEntity.ok(ApiResponse.success(movie));
++        try {
++            MovieResponse movie = movieService.getMovieById(id);
++            return ResponseEntity.ok(ApiResponse.success(movie));
++        } catch (IllegalArgumentException e) {
++            return ResponseEntity.status(HttpStatus.NOT_FOUND)
++                    .body(ApiResponse.error("Movie not found with id: " + id));
++        }
+     }
+ }
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/FavoriteService.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/FavoriteService.java
+index 12acb85..c6d4012 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/service/FavoriteService.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/FavoriteService.java
+@@ -6,6 +6,7 @@ import com.dippie.moviercm.entity.Movie;
+ import com.dippie.moviercm.repository.FavoriteItemRepository;
+ import com.dippie.moviercm.repository.MovieRepository;
+ import com.dippie.moviercm.security.UserDetailsImpl;
++import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -17,10 +18,14 @@ public class FavoriteService {
+ 
+     private final FavoriteItemRepository favoriteRepository;
+     private final MovieRepository movieRepository;
++    private final LibraryPersistenceHelper persistenceHelper;
+ 
+-    public FavoriteService(FavoriteItemRepository favoriteRepository, MovieRepository movieRepository) {
++    public FavoriteService(FavoriteItemRepository favoriteRepository,
++                           MovieRepository movieRepository,
++                           LibraryPersistenceHelper persistenceHelper) {
+         this.favoriteRepository = favoriteRepository;
+         this.movieRepository = movieRepository;
++        this.persistenceHelper = persistenceHelper;
+     }
+ 
+     @Transactional(readOnly = true)
+@@ -28,43 +33,37 @@ public class FavoriteService {
+         return favoriteRepository.findByUserIdOrderByAddedAtDesc(userDetails.getId());
+     }
+ 
+-    @Transactional
+     public FavoriteItem addToFavorites(UserDetailsImpl userDetails, FavoriteRequest request) {
++        // 1. Strict catalog validation (R5)
++        Movie movie = movieRepository.findById(request.getMovieId())
++                .orElseThrow(() -> new IllegalArgumentException("Phim không tồn tại trong danh mục: " + request.getMovieId()));
++
++        // 2. Check if already present for user
+         Optional<FavoriteItem> existing = favoriteRepository.findByUserIdAndMovieId(userDetails.getId(), request.getMovieId());
+         if (existing.isPresent()) {
+             return existing.get();
+         }
+ 
+-        String title = request.getMovieTitle();
+-        String poster = request.getPosterUrl();
+-
+-        Optional<Movie> movieOpt = movieRepository.findById(request.getMovieId());
+-        if (movieOpt.isPresent()) {
+-            Movie movie = movieOpt.get();
+-            if (title == null || title.isBlank()) {
+-                title = movie.getTitle();
+-            }
+-            if (poster == null || poster.isBlank()) {
+-                poster = movie.getPoster();
+-            }
+-        }
+-
+-        if (title == null || title.isBlank()) {
+-            title = request.getMovieId();
+-        }
+-
++        // 3. Build item with canonical metadata from catalog (R5)
+         FavoriteItem item = FavoriteItem.builder()
+                 .userId(userDetails.getId())
+-                .movieId(request.getMovieId())
+-                .movieTitle(title)
+-                .posterUrl(poster)
++                .movieId(movie.getId())
++                .movieTitle(movie.getTitle())
++                .posterUrl(movie.getPoster())
+                 .build();
+ 
+-        return favoriteRepository.save(item);
++        // 4. Save with concurrent idempotency race recovery (R6)
++        try {
++            return persistenceHelper.saveFavoriteItem(item);
++        } catch (DataIntegrityViolationException e) {
++            return favoriteRepository.findByUserIdAndMovieId(userDetails.getId(), request.getMovieId())
++                    .orElse(item);
++        }
+     }
+ 
+     @Transactional
+     public void removeFromFavorites(UserDetailsImpl userDetails, String movieId) {
++        // Allows orphan deletion without requiring catalog entry
+         favoriteRepository.deleteByUserIdAndMovieId(userDetails.getId(), movieId);
+     }
+ }
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/RatingService.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/RatingService.java
+index a5dc2f2..f1dae3f 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/service/RatingService.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/RatingService.java
+@@ -1,21 +1,31 @@
+ package com.dippie.moviercm.service;
+ 
+ import com.dippie.moviercm.dto.RatingRequest;
++import com.dippie.moviercm.entity.Movie;
+ import com.dippie.moviercm.entity.MovieRating;
+ import com.dippie.moviercm.repository.MovieRatingRepository;
++import com.dippie.moviercm.repository.MovieRepository;
+ import com.dippie.moviercm.security.UserDetailsImpl;
++import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.util.List;
++import java.util.Optional;
+ 
+ @Service
+ public class RatingService {
+ 
+     private final MovieRatingRepository ratingRepository;
++    private final MovieRepository movieRepository;
++    private final LibraryPersistenceHelper persistenceHelper;
+ 
+-    public RatingService(MovieRatingRepository ratingRepository) {
++    public RatingService(MovieRatingRepository ratingRepository,
++                         MovieRepository movieRepository,
++                         LibraryPersistenceHelper persistenceHelper) {
+         this.ratingRepository = ratingRepository;
++        this.movieRepository = movieRepository;
++        this.persistenceHelper = persistenceHelper;
+     }
+ 
+     @Transactional(readOnly = true)
+@@ -23,26 +33,41 @@ public class RatingService {
+         return ratingRepository.findByUserIdOrderByUpdatedAtDesc(userDetails.getId());
+     }
+ 
+-    @Transactional
+     public MovieRating rateMovie(UserDetailsImpl userDetails, RatingRequest request) {
+-        MovieRating existing = ratingRepository.findByUserIdAndMovieId(userDetails.getId(), request.getMovieId())
+-                .orElse(null);
+-
+-        if (existing != null) {
+-            existing.setRating(request.getRating());
+-            return ratingRepository.save(existing);
+-        } else {
+-            MovieRating newRating = MovieRating.builder()
+-                    .userId(userDetails.getId())
+-                    .movieId(request.getMovieId())
+-                    .rating(request.getRating())
+-                    .build();
+-            return ratingRepository.save(newRating);
++        // 1. Strict catalog validation (R5)
++        Movie movie = movieRepository.findById(request.getMovieId())
++                .orElseThrow(() -> new IllegalArgumentException("Phim không tồn tại trong danh mục: " + request.getMovieId()));
++
++        // 2. Check if already rated by user -> update
++        Optional<MovieRating> existing = ratingRepository.findByUserIdAndMovieId(userDetails.getId(), request.getMovieId());
++        if (existing.isPresent()) {
++            MovieRating r = existing.get();
++            r.setRating(request.getRating());
++            return ratingRepository.save(r);
++        }
++
++        // 3. New rating: save with concurrent race recovery (R6)
++        MovieRating newRating = MovieRating.builder()
++                .userId(userDetails.getId())
++                .movieId(movie.getId())
++                .rating(request.getRating())
++                .build();
++
++        try {
++            return persistenceHelper.saveMovieRating(newRating);
++        } catch (DataIntegrityViolationException e) {
++            // Concurrent race: another thread created the rating record simultaneously
++            // Policy: update the existing record with this request's rating
++            MovieRating r = ratingRepository.findByUserIdAndMovieId(userDetails.getId(), request.getMovieId())
++                    .orElse(newRating);
++            r.setRating(request.getRating());
++            return ratingRepository.save(r);
+         }
+     }
+ 
+     @Transactional
+     public void deleteRating(UserDetailsImpl userDetails, String movieId) {
++        // Allows orphan deletion without requiring catalog entry
+         ratingRepository.deleteByUserIdAndMovieId(userDetails.getId(), movieId);
+     }
+ }
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/WatchlistService.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/WatchlistService.java
+index 765e249..44421be 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/service/WatchlistService.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/WatchlistService.java
+@@ -6,6 +6,7 @@ import com.dippie.moviercm.entity.WatchlistItem;
+ import com.dippie.moviercm.repository.MovieRepository;
+ import com.dippie.moviercm.repository.WatchlistItemRepository;
+ import com.dippie.moviercm.security.UserDetailsImpl;
++import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+@@ -17,10 +18,14 @@ public class WatchlistService {
+ 
+     private final WatchlistItemRepository watchlistRepository;
+     private final MovieRepository movieRepository;
++    private final LibraryPersistenceHelper persistenceHelper;
+ 
+-    public WatchlistService(WatchlistItemRepository watchlistRepository, MovieRepository movieRepository) {
++    public WatchlistService(WatchlistItemRepository watchlistRepository,
++                            MovieRepository movieRepository,
++                            LibraryPersistenceHelper persistenceHelper) {
+         this.watchlistRepository = watchlistRepository;
+         this.movieRepository = movieRepository;
++        this.persistenceHelper = persistenceHelper;
+     }
+ 
+     @Transactional(readOnly = true)
+@@ -28,43 +33,37 @@ public class WatchlistService {
+         return watchlistRepository.findByUserIdOrderByAddedAtDesc(userDetails.getId());
+     }
+ 
+-    @Transactional
+     public WatchlistItem addToWatchlist(UserDetailsImpl userDetails, WatchlistRequest request) {
++        // 1. Strict catalog validation (R5)
++        Movie movie = movieRepository.findById(request.getMovieId())
++                .orElseThrow(() -> new IllegalArgumentException("Phim không tồn tại trong danh mục: " + request.getMovieId()));
++
++        // 2. Check if already present for user
+         Optional<WatchlistItem> existing = watchlistRepository.findByUserIdAndMovieId(userDetails.getId(), request.getMovieId());
+         if (existing.isPresent()) {
+             return existing.get();
+         }
+ 
+-        String title = request.getMovieTitle();
+-        String poster = request.getPosterUrl();
+-
+-        Optional<Movie> movieOpt = movieRepository.findById(request.getMovieId());
+-        if (movieOpt.isPresent()) {
+-            Movie movie = movieOpt.get();
+-            if (title == null || title.isBlank()) {
+-                title = movie.getTitle();
+-            }
+-            if (poster == null || poster.isBlank()) {
+-                poster = movie.getPoster();
+-            }
+-        }
+-
+-        if (title == null || title.isBlank()) {
+-            title = request.getMovieId();
+-        }
+-
++        // 3. Build item with canonical metadata from catalog (R5)
+         WatchlistItem item = WatchlistItem.builder()
+                 .userId(userDetails.getId())
+-                .movieId(request.getMovieId())
+-                .movieTitle(title)
+-                .posterUrl(poster)
++                .movieId(movie.getId())
++                .movieTitle(movie.getTitle())
++                .posterUrl(movie.getPoster())
+                 .build();
+ 
+-        return watchlistRepository.save(item);
++        // 4. Save with concurrent idempotency race recovery (R6)
++        try {
++            return persistenceHelper.saveWatchlistItem(item);
++        } catch (DataIntegrityViolationException e) {
++            return watchlistRepository.findByUserIdAndMovieId(userDetails.getId(), request.getMovieId())
++                    .orElse(item);
++        }
+     }
+ 
+     @Transactional
+     public void removeFromWatchlist(UserDetailsImpl userDetails, String movieId) {
++        // Allows orphan deletion without requiring catalog entry
+         watchlistRepository.deleteByUserIdAndMovieId(userDetails.getId(), movieId);
+     }
+ }
+diff --git a/backend/springboot/src/test/java/com/dippie/moviercm/AuthAndLibraryIntegrationTest.java b/backend/springboot/src/test/java/com/dippie/moviercm/AuthAndLibraryIntegrationTest.java
+index 0c0112a..e0aeaab 100644
+--- a/backend/springboot/src/test/java/com/dippie/moviercm/AuthAndLibraryIntegrationTest.java
++++ b/backend/springboot/src/test/java/com/dippie/moviercm/AuthAndLibraryIntegrationTest.java
+@@ -1,6 +1,7 @@
+ package com.dippie.moviercm;
+ 
+ import com.dippie.moviercm.dto.*;
++import com.dippie.moviercm.entity.Movie;
+ import com.dippie.moviercm.repository.*;
+ import com.fasterxml.jackson.databind.JsonNode;
+ import com.fasterxml.jackson.databind.ObjectMapper;
+@@ -15,6 +16,9 @@ import org.springframework.test.context.ActiveProfiles;
+ import org.springframework.test.web.servlet.MockMvc;
+ import org.springframework.test.web.servlet.MvcResult;
+ 
++import java.util.concurrent.*;
++import java.util.concurrent.atomic.AtomicInteger;
++
+ import static org.hamcrest.Matchers.*;
+ import static org.junit.jupiter.api.Assertions.*;
+ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+@@ -34,6 +38,9 @@ class AuthAndLibraryIntegrationTest {
+     @Autowired
+     private UserRepository userRepository;
+ 
++    @Autowired
++    private MovieRepository movieRepository;
++
+     @Autowired
+     private WatchlistItemRepository watchlistRepository;
+ 
+@@ -49,6 +56,27 @@ class AuthAndLibraryIntegrationTest {
+         watchlistRepository.deleteAll();
+         ratingRepository.deleteAll();
+         userRepository.deleteAll();
++
++        // Seed canonical catalog movie fixtures (R5)
++        seedCatalogMovie("the-last-orbit", "The Last Orbit", "https://img.jpg/the-last-orbit");
++        seedCatalogMovie("afterlight", "Afterlight", "https://img.jpg/afterlight");
++        seedCatalogMovie("glass-horizon", "Glass Horizon", "https://img.jpg/glass-horizon");
++        seedCatalogMovie("deep-blue", "Deep Blue", "https://img.jpg/deep-blue");
++    }
++
++    private void seedCatalogMovie(String id, String title, String poster) {
++        if (!movieRepository.existsById(id)) {
++            movieRepository.save(Movie.builder()
++                    .id(id)
++                    .title(title)
++                    .poster(poster)
++                    .year(2025)
++                    .genres("Sci-Fi,Drama")
++                    .rating(8.5)
++                    .runtime("2h")
++                    .description("Seeded test fixture")
++                    .build());
++        }
+     }
+ 
+     private String registerAndGetToken(String username, String email, String password, String fullName) throws Exception {
+@@ -79,7 +107,7 @@ class AuthAndLibraryIntegrationTest {
+                 .andExpect(jsonPath("$.data.username").value("testuser"))
+                 .andExpect(jsonPath("$.data.password").doesNotExist()); // No password hash exposed
+ 
+-        // Login with exact password
++        // Login with exact raw password
+         AuthRequest loginReq = new AuthRequest("testuser", rawPassword);
+         mockMvc.perform(post("/api/auth/login")
+                         .contentType(MediaType.APPLICATION_JSON)
+@@ -88,7 +116,7 @@ class AuthAndLibraryIntegrationTest {
+                 .andExpect(jsonPath("$.success").value(true))
+                 .andExpect(jsonPath("$.data.token").isNotEmpty());
+ 
+-        // Login with trimmed password must fail if raw password had spaces
++        // Login with trimmed password must fail
+         AuthRequest badLoginReq = new AuthRequest("testuser", "my secret pass 123");
+         mockMvc.perform(post("/api/auth/login")
+                         .contentType(MediaType.APPLICATION_JSON)
+@@ -116,7 +144,7 @@ class AuthAndLibraryIntegrationTest {
+     }
+ 
+     @Test
+-    @DisplayName("3. Watchlist operations: add, duplicate idempotency, list, and delete")
++    @DisplayName("3. Watchlist operations: canonical metadata overrides forged client title, duplicate idempotency, list, and delete")
+     void testWatchlistFlow() throws Exception {
+         String token = registerAndGetToken("bob", "bob@example.com", "password123", "Bob Jones");
+ 
+@@ -126,16 +154,19 @@ class AuthAndLibraryIntegrationTest {
+                 .andExpect(status().isOk())
+                 .andExpect(jsonPath("$.data", hasSize(0)));
+ 
+-        // Add movie
+-        WatchlistRequest addReq = new WatchlistRequest("the-last-orbit", "The Last Orbit", "https://img.jpg");
++        // Add movie with forged client title and poster
++        WatchlistRequest addReq = new WatchlistRequest("the-last-orbit", "Forged Fake Title", "https://forged.jpg");
+         mockMvc.perform(post("/api/users/watchlist")
+                         .header("Authorization", "Bearer " + token)
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(addReq)))
+                 .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.data.movieId").value("the-last-orbit"));
++                .andExpect(jsonPath("$.data.movieId").value("the-last-orbit"))
++                // Canonical catalog metadata must override forged client metadata (R5)
++                .andExpect(jsonPath("$.data.movieTitle").value("The Last Orbit"))
++                .andExpect(jsonPath("$.data.posterUrl").value(movieRepository.findById("the-last-orbit").get().getPoster()));
+ 
+-        // Duplicate add is idempotent (no duplicate rows)
++        // Duplicate add is idempotent (no duplicate rows, 200 OK)
+         mockMvc.perform(post("/api/users/watchlist")
+                         .header("Authorization", "Bearer " + token)
+                         .contentType(MediaType.APPLICATION_JSON)
+@@ -172,13 +203,14 @@ class AuthAndLibraryIntegrationTest {
+                 .andExpect(jsonPath("$.data", hasSize(0)));
+ 
+         // Add favorite
+-        FavoriteRequest favReq = new FavoriteRequest("afterlight", "Afterlight", "https://img2.jpg");
++        FavoriteRequest favReq = new FavoriteRequest("afterlight", "Forged Afterlight", "https://forged.jpg");
+         mockMvc.perform(post("/api/users/favorites")
+                         .header("Authorization", "Bearer " + token)
+                         .contentType(MediaType.APPLICATION_JSON)
+                         .content(objectMapper.writeValueAsString(favReq)))
+                 .andExpect(status().isOk())
+-                .andExpect(jsonPath("$.data.movieId").value("afterlight"));
++                .andExpect(jsonPath("$.data.movieId").value("afterlight"))
++                .andExpect(jsonPath("$.data.movieTitle").value("Afterlight")); // Canonical metadata
+ 
+         // Duplicate add is idempotent
+         mockMvc.perform(post("/api/users/favorites")
+@@ -233,7 +265,7 @@ class AuthAndLibraryIntegrationTest {
+                 .andExpect(jsonPath("$.data", hasSize(1)))
+                 .andExpect(jsonPath("$.data[0].rating").value(10));
+ 
+-        // Boundary validation: rating 0 must fail
++        // Boundary validation: rating 0 must fail with 400 Bad Request
+         RatingRequest invalidLow = new RatingRequest("glass-horizon", 0);
+         mockMvc.perform(post("/api/users/ratings")
+                         .header("Authorization", "Bearer " + token)
+@@ -241,7 +273,7 @@ class AuthAndLibraryIntegrationTest {
+                         .content(objectMapper.writeValueAsString(invalidLow)))
+                 .andExpect(status().isBadRequest());
+ 
+-        // Boundary validation: rating 11 must fail
++        // Boundary validation: rating 11 must fail with 400 Bad Request
+         RatingRequest invalidHigh = new RatingRequest("glass-horizon", 11);
+         mockMvc.perform(post("/api/users/ratings")
+                         .header("Authorization", "Bearer " + token)
+@@ -266,23 +298,23 @@ class AuthAndLibraryIntegrationTest {
+         String tokenA = registerAndGetToken("user_a", "usera@example.com", "password123", "User A");
+         String tokenB = registerAndGetToken("user_b", "userb@example.com", "password123", "User B");
+ 
+-        // User A adds watchlist, favorite, rating
++        // User A adds watchlist, favorite, rating using real catalog movies
+         mockMvc.perform(post("/api/users/watchlist")
+                         .header("Authorization", "Bearer " + tokenA)
+                         .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new WatchlistRequest("movie-1", "Movie 1", "img1"))))
++                        .content(objectMapper.writeValueAsString(new WatchlistRequest("the-last-orbit", "The Last Orbit", "img1"))))
+                 .andExpect(status().isOk());
+ 
+         mockMvc.perform(post("/api/users/favorites")
+                         .header("Authorization", "Bearer " + tokenA)
+                         .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new FavoriteRequest("movie-2", "Movie 2", "img2"))))
++                        .content(objectMapper.writeValueAsString(new FavoriteRequest("afterlight", "Afterlight", "img2"))))
+                 .andExpect(status().isOk());
+ 
+         mockMvc.perform(post("/api/users/ratings")
+                         .header("Authorization", "Bearer " + tokenA)
+                         .contentType(MediaType.APPLICATION_JSON)
+-                        .content(objectMapper.writeValueAsString(new RatingRequest("movie-3", 9))))
++                        .content(objectMapper.writeValueAsString(new RatingRequest("glass-horizon", 9))))
+                 .andExpect(status().isOk());
+ 
+         // Verify User A has 1 item each
+@@ -301,4 +333,125 @@ class AuthAndLibraryIntegrationTest {
+         mockMvc.perform(get("/api/users/ratings").header("Authorization", "Bearer " + tokenB))
+                 .andExpect(status().isOk()).andExpect(jsonPath("$.data", hasSize(0)));
+     }
++
++    @Test
++    @DisplayName("7. R5 Catalog Validation: non-existent movie IDs are rejected with 400 Bad Request; orphan deletion allowed")
++    void testCatalogValidation() throws Exception {
++        String token = registerAndGetToken("eva", "eva@example.com", "password123", "Eva Green");
++        String badMovieId = "non-existent-movie-999";
++
++        // Watchlist add non-existent -> 400 Bad Request with structured error
++        mockMvc.perform(post("/api/users/watchlist")
++                        .header("Authorization", "Bearer " + token)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(new WatchlistRequest(badMovieId, "Fake", "fake.jpg"))))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false))
++                .andExpect(jsonPath("$.message", containsString("Phim không tồn tại trong danh mục")));
++
++        // Favorites add non-existent -> 400 Bad Request
++        mockMvc.perform(post("/api/users/favorites")
++                        .header("Authorization", "Bearer " + token)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(new FavoriteRequest(badMovieId, "Fake", "fake.jpg"))))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false))
++                .andExpect(jsonPath("$.message", containsString("Phim không tồn tại trong danh mục")));
++
++        // Rating add non-existent -> 400 Bad Request
++        mockMvc.perform(post("/api/users/ratings")
++                        .header("Authorization", "Bearer " + token)
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content(objectMapper.writeValueAsString(new RatingRequest(badMovieId, 7))))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false))
++                .andExpect(jsonPath("$.message", containsString("Phim không tồn tại trong danh mục")));
++
++        // Legacy orphan deletion of non-catalog ID succeeds safely (200 OK)
++        mockMvc.perform(delete("/api/users/watchlist/" + badMovieId)
++                        .header("Authorization", "Bearer " + token))
++                .andExpect(status().isOk());
++        mockMvc.perform(delete("/api/users/favorites/" + badMovieId)
++                        .header("Authorization", "Bearer " + token))
++                .andExpect(status().isOk());
++        mockMvc.perform(delete("/api/users/ratings/" + badMovieId)
++                        .header("Authorization", "Bearer " + token))
++                .andExpect(status().isOk());
++    }
++
++    @Test
++    @DisplayName("8. R6 Concurrent Idempotency: simultaneous writes synchronized by CountDownLatch return 200 OK with single row")
++    void testConcurrentIdempotency() throws Exception {
++        String token = registerAndGetToken("frank", "frank@example.com", "password123", "Frank Miller");
++        ExecutorService executor = Executors.newFixedThreadPool(4);
++
++        try {
++            // Concurrent Watchlist writes
++            CountDownLatch barrier = new CountDownLatch(1);
++            AtomicInteger okResponses = new AtomicInteger(0);
++
++            Callable<Integer> addWatchlistTask = () -> {
++                barrier.await();
++                MvcResult res = mockMvc.perform(post("/api/users/watchlist")
++                                .header("Authorization", "Bearer " + token)
++                                .contentType(MediaType.APPLICATION_JSON)
++                                .content(objectMapper.writeValueAsString(new WatchlistRequest("deep-blue", "Deep Blue", "poster"))))
++                        .andReturn();
++                if (res.getResponse().getStatus() == 200) {
++                    okResponses.incrementAndGet();
++                }
++                return res.getResponse().getStatus();
++            };
++
++            Future<Integer> f1 = executor.submit(addWatchlistTask);
++            Future<Integer> f2 = executor.submit(addWatchlistTask);
++            barrier.countDown(); // Trigger simultaneous execution
++
++            int status1 = f1.get(5, TimeUnit.SECONDS);
++            int status2 = f2.get(5, TimeUnit.SECONDS);
++
++            assertEquals(200, status1);
++            assertEquals(200, status2);
++            assertEquals(2, okResponses.get());
++
++            // Exact count in DB must be 1
++            mockMvc.perform(get("/api/users/watchlist").header("Authorization", "Bearer " + token))
++                    .andExpect(status().isOk())
++                    .andExpect(jsonPath("$.data", hasSize(1)));
++
++            // Concurrent Rating writes
++            CountDownLatch ratingBarrier = new CountDownLatch(1);
++            Callable<Integer> addRatingTask1 = () -> {
++                ratingBarrier.await();
++                return mockMvc.perform(post("/api/users/ratings")
++                                .header("Authorization", "Bearer " + token)
++                                .contentType(MediaType.APPLICATION_JSON)
++                                .content(objectMapper.writeValueAsString(new RatingRequest("deep-blue", 8))))
++                        .andReturn().getResponse().getStatus();
++            };
++            Callable<Integer> addRatingTask2 = () -> {
++                ratingBarrier.await();
++                return mockMvc.perform(post("/api/users/ratings")
++                                .header("Authorization", "Bearer " + token)
++                                .contentType(MediaType.APPLICATION_JSON)
++                                .content(objectMapper.writeValueAsString(new RatingRequest("deep-blue", 9))))
++                        .andReturn().getResponse().getStatus();
++            };
++
++            Future<Integer> rf1 = executor.submit(addRatingTask1);
++            Future<Integer> rf2 = executor.submit(addRatingTask2);
++            ratingBarrier.countDown();
++
++            assertEquals(200, rf1.get(5, TimeUnit.SECONDS));
++            assertEquals(200, rf2.get(5, TimeUnit.SECONDS));
++
++            // Final rating count in DB must be exactly 1 record
++            mockMvc.perform(get("/api/users/ratings").header("Authorization", "Bearer " + token))
++                    .andExpect(status().isOk())
++                    .andExpect(jsonPath("$.data", hasSize(1)));
++
++        } finally {
++            executor.shutdown();
++        }
++    }
+ }
+diff --git a/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md b/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md
+index 28e187e..90da91f 100644
+--- a/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md
++++ b/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md
+@@ -214,5 +214,33 @@ CREATE TABLE IF NOT EXISTS favorite_items (
+ ### 3.2 Backward Compatibility & Zero Data Loss
+ - Existing tables `users`, `movies`, `watchlist_items`, and `movie_ratings` are fully preserved.
+ - Table creation uses `CREATE TABLE IF NOT EXISTS`.
+-- No dropping or recreating of user tables or columns.
+-- Rollback plan: `DROP TABLE IF EXISTS favorite_items;`
++- No dropping or recreating of existing user tables or columns.
++- Rollback plan: Trường hợp cần rollback phiên bản ứng dụng về trước M1, dữ liệu trong bảng `favorite_items` được lưu giữ nguyên vẹn trong DB nhằm bảo toàn lịch sử tương tác của người dùng; code cũ không truy vấn bảng này mà không làm ảnh hưởng tính toàn vẹn hệ thống.
++
++---
++
++## 4. Catalog Validation & Concurrent Idempotency Guarantees (M1-F01)
++
++### 4.1 Catalog Validation & Canonical Metadata (R5)
++1. **Catalog Validation:**
++   - Khi client gọi thêm Watchlist, Yêu thích hoặc Rating, `movieId` bắt buộc phải tồn tại trong danh mục catalog (`MovieRepository`).
++   - Nếu `movieId` không tồn tại, backend từ chối với `HTTP 400 Bad Request` và body có cấu trúc:
++     ```json
++     {
++       "success": false,
++       "message": "Phim không tồn tại trong danh mục: <movieId>",
++       "data": null,
++       "timestamp": "..."
++     }
++     ```
++2. **Canonical Metadata Precedence:**
++   - Tiêu đề (`movieTitle`) và ảnh poster (`posterUrl`) lưu trữ luôn được lấy chuẩn xác từ catalog entity `Movie`, ngăn chặn hoàn toàn việc client gửi metadata giả mạo hoặc sai lệch.
++3. **Orphan Deletion:**
++   - Việc xóa mục khỏi Watchlist, Yêu thích hoặc xóa Rating vẫn cho phép xóa các bản ghi orphan cũ (ID không còn trong catalog) một cách an toàn (trả về 200 OK).
++
++### 4.2 Concurrent Idempotency (R6)
++1. **Concurrent Collision Recovery:**
++   - Khi hai hoặc nhiều requests thêm cùng một phim diễn ra đồng thời (chạm barrier hoặc cùng tick), xung đột ràng buộc UNIQUE được cô lập xử lý an toàn bằng `LibraryPersistenceHelper` (`@Transactional(propagation = Propagation.REQUIRES_NEW)`).
++   - Ngoại lệ `DataIntegrityViolationException` được bắt tại tầng service mà không làm dirty outer transaction, truy vấn lại bản ghi hiện có và phản hồi `200 OK` đồng nhất.
++2. **Concurrent Rating Policy:**
++   - Chấm điểm đồng thời áp dụng chính sách ghi đè hợp lệ (last-write-wins), đảm bảo duy nhất 1 bản ghi rating cho mỗi cặp `(userId, movieId)` và luôn phản hồi `200 OK`.
+diff --git a/frontend/features/movies/components/MovieDetail.tsx b/frontend/features/movies/components/MovieDetail.tsx
+index eab44ed..bb159e2 100644
+--- a/frontend/features/movies/components/MovieDetail.tsx
++++ b/frontend/features/movies/components/MovieDetail.tsx
+@@ -35,6 +35,7 @@ export function MovieDetail({
+     toggleFavorite,
+     getRating,
+     rateMovie,
++    removeRating,
+     isActionPending,
+     openChat,
+   } = useWatchlist();
+@@ -259,9 +260,18 @@ export function MovieDetail({
+               </div>
+ 
+               {currentRating && (
+-                <p className="mt-3 text-xs text-amber-400 flex items-center gap-1 font-medium">
+-                  <Check size={14} /> Bạn đã chấm bộ phim này {currentRating}/10 điểm.
+-                </p>
++                <div className="mt-3 flex items-center justify-between text-xs">
++                  <p className="text-amber-400 flex items-center gap-1 font-medium">
++                    <Check size={14} /> Bạn đã chấm bộ phim này {currentRating}/10 điểm.
++                  </p>
++                  <button
++                    disabled={isRatingPending}
++                    onClick={() => removeRating(movie.id, movie.title)}
++                    className="text-zinc-400 hover:text-red-400 underline transition-colors cursor-pointer disabled:opacity-50"
++                  >
++                    Xóa đánh giá
++                  </button>
++                </div>
+               )}
+             </div>
+ 
+diff --git a/frontend/features/profile/components/ProfileOverview.tsx b/frontend/features/profile/components/ProfileOverview.tsx
+index a14194b..d413bec 100644
+--- a/frontend/features/profile/components/ProfileOverview.tsx
++++ b/frontend/features/profile/components/ProfileOverview.tsx
+@@ -1,6 +1,6 @@
+ 'use client';
+ 
+-import React, { useState } from 'react';
++import React, { useState, useEffect, useMemo, useCallback } from 'react';
+ import Link from 'next/link';
+ import {
+   Bookmark,
+@@ -23,6 +23,14 @@ import type { Movie } from '@/types/movie';
+ 
+ type Tab = 'watchlist' | 'favorites' | 'ratings';
+ 
++type HydrationStatus = 'loading' | 'found' | 'not_found' | 'error';
++type HydratedItem = {
++  movie?: Movie;
++  status: HydrationStatus;
++};
++
++const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
++
+ export function ProfileOverview() {
+   const [activeTab, setActiveTab] = useState<Tab>('watchlist');
+   const {
+@@ -36,22 +44,107 @@ export function ProfileOverview() {
+     isGuestMode,
+     toggleWatchlist,
+     toggleFavorite,
+-    rateMovie,
++    removeRating,
++    isActionPending,
+   } = useWatchlist();
+ 
+   const { user, status, openAuthModal, retryVerify } = useAuth();
+ 
+-  // Map known catalog movies
+-  const movieMap = new Map<string, Movie>();
+-  movies.forEach((m) => movieMap.set(m.id, m));
++  // Map known local catalog movies
++  const movieMap = useMemo(() => {
++    const map = new Map<string, Movie>();
++    movies.forEach((m) => map.set(m.id, m));
++    return map;
++  }, []);
++
++  // Remote catalog hydration for IDs not present in local `movies` fixture
++  const [remoteMovies, setRemoteMovies] = useState<Record<string, HydratedItem>>({});
++
++  const allItemIds = useMemo(() => {
++    const set = new Set<string>();
++    watchlist.forEach((id) => set.add(id));
++    favorites.forEach((id) => set.add(id));
++    Object.keys(ratings).forEach((id) => set.add(id));
++    return Array.from(set);
++  }, [watchlist, favorites, ratings]);
++
++  const fetchRemoteMovie = useCallback(async (id: string) => {
++    setRemoteMovies((prev) => ({ ...prev, [id]: { status: 'loading' } }));
++    try {
++      const res = await fetch(`${SPRINGBOOT_API}/movies/${encodeURIComponent(id)}`);
++      if (res.status === 404) {
++        setRemoteMovies((prev) => ({ ...prev, [id]: { status: 'not_found' } }));
++        return;
++      }
++      if (!res.ok) {
++        setRemoteMovies((prev) => ({ ...prev, [id]: { status: 'error' } }));
++        return;
++      }
++      const json = await res.json();
++      if (json?.success && json?.data) {
++        const d = json.data;
++        const movie: Movie = {
++          id: d.id,
++          title: d.title,
++          year: d.year,
++          rating: d.rating,
++          genres: Array.isArray(d.genres)
++            ? d.genres
++            : typeof d.genres === 'string'
++            ? d.genres.split(',')
++            : [],
++          description: d.description || '',
++          poster: d.poster || '',
++          backdrop: d.backdrop || '',
++          runtime: d.runtime || '',
++          videoUrl: d.videoUrl || '',
++        };
++        setRemoteMovies((prev) => ({ ...prev, [id]: { movie, status: 'found' } }));
++      } else {
++        setRemoteMovies((prev) => ({ ...prev, [id]: { status: 'error' } }));
++      }
++    } catch {
++      setRemoteMovies((prev) => ({ ...prev, [id]: { status: 'error' } }));
++    }
++  }, []);
++
++  useEffect(() => {
++    const missing = allItemIds.filter((id) => !movieMap.has(id) && !remoteMovies[id]);
++    missing.forEach((id) => {
++      fetchRemoteMovie(id);
++    });
++  }, [allItemIds, movieMap, remoteMovies, fetchRemoteMovie]);
+ 
+-  const watchlistItems = watchlist.map((id) => ({ id, movie: movieMap.get(id) }));
+-  const favoriteItems = favorites.map((id) => ({ id, movie: movieMap.get(id) }));
+-  const ratingItems = Object.entries(ratings).map(([id, rating]) => ({
+-    id,
+-    rating,
+-    movie: movieMap.get(id),
+-  }));
++  const resolveMovieItem = useCallback(
++    (id: string): HydratedItem => {
++      const local = movieMap.get(id);
++      if (local) return { movie: local, status: 'found' };
++      const remote = remoteMovies[id];
++      if (remote) return remote;
++      return { status: 'loading' };
++    },
++    [movieMap, remoteMovies]
++  );
++
++  const watchlistItems = useMemo(
++    () => watchlist.map((id) => ({ id, ...resolveMovieItem(id) })),
++    [watchlist, resolveMovieItem]
++  );
++
++  const favoriteItems = useMemo(
++    () => favorites.map((id) => ({ id, ...resolveMovieItem(id) })),
++    [favorites, resolveMovieItem]
++  );
++
++  const ratingItems = useMemo(
++    () =>
++      Object.entries(ratings).map(([id, rating]) => ({
++        id,
++        rating,
++        ...resolveMovieItem(id),
++      })),
++    [ratings, resolveMovieItem]
++  );
+ 
+   // Genre analysis on known movies
+   const genreCounts: Record<string, number> = {};
+@@ -74,14 +167,13 @@ export function ProfileOverview() {
+     return name.slice(0, 2).toUpperCase();
+   };
+ 
+-  const handleRemoveMissingItem = (id: string, tab: Tab) => {
++  const handleRemoveMissingItem = async (id: string, tab: Tab) => {
+     if (tab === 'watchlist') {
+-      toggleWatchlist(id);
++      await toggleWatchlist(id);
+     } else if (tab === 'favorites') {
+-      toggleFavorite(id);
++      await toggleFavorite(id);
+     } else if (tab === 'ratings') {
+-      // Set to 0 / remove rating if applicable, or remove via toggle
+-      toggleWatchlist(id);
++      await removeRating(id);
+     }
+   };
+ 
+@@ -119,266 +211,439 @@ export function ProfileOverview() {
+                 </span>
+                 <span className="text-zinc-500">•</span>
+                 <span className="text-xs text-zinc-400">
+-                  {isGuestMode ? 'Lưu trên thiết bị này' : user?.role || 'ROLE_USER'}
++                  {isGuestMode ? 'Lưu trữ cục bộ trên thiết bị' : user?.email || 'Tài khoản đám mây'}
+                 </span>
+               </div>
+-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+-                {isGuestMode ? 'Khách Khám Phá' : user?.fullName || user?.username}
++              <h1 className="text-xl sm:text-2xl font-bold text-white mt-0.5">
++                {isGuestMode ? 'Khách ghé thăm' : user?.fullName || user?.username}
+               </h1>
+-              <p className="text-xs text-zinc-400">
+-                {isGuestMode
+-                  ? 'Dữ liệu được lưu trữ riêng trên trình duyệt này. Đăng nhập để đồng bộ an toàn.'
+-                  : user?.email || 'Tài khoản hoạt hình cá nhân'}
+-              </p>
+             </div>
+           </div>
+ 
+-          {/* Guest Login Promotion Button or Stats */}
+-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+-            {isGuestMode && (
++          {/* Quick CTA */}
++          <div className="flex items-center gap-3">
++            {isGuestMode ? (
+               <button
+-                onClick={() => openAuthModal('login')}
+-                className="btn-primary text-xs py-2 px-3.5 shadow-brand-sm cursor-pointer"
++                onClick={() => openAuthModal('register')}
++                className="btn-primary text-xs w-full sm:w-auto"
+               >
+-                Đăng nhập để lưu vào đám mây
++                Đăng ký để đồng bộ đám mây
++              </button>
++            ) : (
++              <button onClick={openChat} className="btn-secondary text-xs w-full sm:w-auto">
++                Tư vấn gu phim với CineBot
+               </button>
+             )}
++          </div>
++        </div>
+ 
+-            {/* Stats Bar */}
+-            <div className="grid grid-cols-3 gap-2.5">
+-              <div className="rounded-md border border-surface-border bg-surface-muted px-4 py-2.5 text-center">
+-                <span className="text-lg font-bold text-white block">{watchlist.length}</span>
+-                <span className="text-[10px] uppercase text-zinc-400">Watchlist</span>
+-              </div>
+-              <div className="rounded-md border border-surface-border bg-surface-muted px-4 py-2.5 text-center">
+-                <span className="text-lg font-bold text-brand block">{favorites.length}</span>
+-                <span className="text-[10px] uppercase text-zinc-400">Yêu thích</span>
+-              </div>
+-              <div className="rounded-md border border-surface-border bg-surface-muted px-4 py-2.5 text-center">
+-                <span className="text-lg font-bold text-amber-400 block">
+-                  {Object.keys(ratings).length}
+-                </span>
+-                <span className="text-[10px] uppercase text-zinc-400">Đã chấm</span>
+-              </div>
++        {/* Stats Row */}
++        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 border-t border-surface-border pt-6">
++          <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
++            <div className="flex items-center gap-2 text-zinc-400 text-xs">
++              <Bookmark size={14} className="text-brand" />
++              <span>Watchlist</span>
+             </div>
++            <p className="mt-1 text-lg sm:text-2xl font-bold text-white">{watchlist.length}</p>
+           </div>
+-        </div>
+ 
+-        {/* Top Genre breakdown */}
+-        {topGenres.length > 0 && (
+-          <div className="mt-6 pt-5 border-t border-surface-border">
+-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2.5">
+-              Phân tích gu thể loại ({isGuestMode ? 'Thiết bị này' : 'Tài khoản'}):
+-            </span>
+-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+-              {topGenres.map(([genre, count]) => {
+-                const percentage = Math.min(100, count * 25);
+-                return (
+-                  <div
+-                    key={genre}
+-                    className="rounded-md border border-surface-border bg-surface-muted p-2.5"
+-                  >
+-                    <div className="flex justify-between text-xs mb-1">
+-                      <span className="text-white font-medium">{genre}</span>
+-                      <span className="text-brand font-bold">{percentage}%</span>
+-                    </div>
+-                    <div className="h-1.5 w-full rounded bg-zinc-800 overflow-hidden">
+-                      <div className="h-full bg-brand" style={{ width: `${percentage}%` }} />
+-                    </div>
+-                  </div>
+-                );
+-              })}
++          <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
++            <div className="flex items-center gap-2 text-zinc-400 text-xs">
++              <Heart size={14} className="text-brand" />
++              <span>Yêu thích</span>
+             </div>
++            <p className="mt-1 text-lg sm:text-2xl font-bold text-white">{favorites.length}</p>
+           </div>
+-        )}
+-      </div>
+ 
+-      {/* Tabs */}
+-      <div className="mt-8 flex items-center justify-between border-b border-surface-border pb-3">
+-        <div className="flex items-center gap-2">
+-          {[
+-            { id: 'watchlist', label: 'Danh sách xem', icon: Bookmark, count: watchlist.length },
+-            { id: 'favorites', label: 'Yêu thích', icon: Heart, count: favorites.length },
+-            { id: 'ratings', label: 'Lịch sử đánh giá', icon: Star, count: Object.keys(ratings).length },
+-          ].map((tab) => {
+-            const Icon = tab.icon;
+-            const active = activeTab === tab.id;
+-            return (
+-              <button
+-                key={tab.id}
+-                onClick={() => setActiveTab(tab.id as Tab)}
+-                className={`flex items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer ${
+-                  active
+-                    ? 'bg-zinc-800 text-white font-bold'
+-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+-                }`}
+-              >
+-                <Icon size={14} className={active ? 'text-brand' : ''} />
+-                <span>{tab.label}</span>
+-                <span className="text-[11px] text-zinc-400 font-normal">({tab.count})</span>
+-              </button>
+-            );
+-          })}
+-        </div>
++          <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
++            <div className="flex items-center gap-2 text-zinc-400 text-xs">
++              <Star size={14} className="text-brand" />
++              <span>Đã chấm điểm</span>
++            </div>
++            <p className="mt-1 text-lg sm:text-2xl font-bold text-white">
++              {Object.keys(ratings).length}
++            </p>
++          </div>
+ 
+-        {/* Refresh Library Button */}
+-        <button
+-          onClick={() => refetchLibrary()}
+-          disabled={isLibraryLoading}
+-          aria-label="Tải lại thư viện"
+-          className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+-        >
+-          <RefreshCw size={13} className={isLibraryLoading ? 'animate-spin' : ''} />
+-          <span className="hidden sm:inline">Làm mới</span>
+-        </button>
++          <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
++            <div className="flex items-center gap-2 text-zinc-400 text-xs">
++              <Film size={14} className="text-brand" />
++              <span>Thể loại ưu tiên</span>
++            </div>
++            <p className="mt-1 text-xs sm:text-sm font-semibold text-white truncate">
++              {topGenres.length > 0 ? topGenres.map((g) => g[0]).join(', ') : 'Chưa xác định'}
++            </p>
++          </div>
++        </div>
+       </div>
+ 
+-      {/* Library Content Section */}
+-      <section className="mt-6">
+-        {/* Loading Spinner */}
+-        {isLibraryLoading ? (
+-          <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
+-            <Loader2 size={32} className="animate-spin text-brand mb-3" />
+-            <p className="text-xs">Đang tải dữ liệu thư viện...</p>
+-          </div>
+-        ) : libraryError ? (
+-          /* Error State */
+-          <div className="flex flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/5 p-10 text-center">
+-            <ShieldAlert size={32} className="text-red-400 mb-2" />
+-            <h3 className="text-sm font-bold text-white">{libraryError}</h3>
+-            <p className="text-xs text-zinc-400 mt-1 mb-4">
+-              Không thể đồng bộ danh sách từ máy chủ. Vui lòng kiểm tra kết nối mạng.
+-            </p>
++      {/* Tabs Section */}
++      <section className="mt-8">
++        <div className="flex border-b border-surface-border">
++          <button
++            onClick={() => setActiveTab('watchlist')}
++            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
++              activeTab === 'watchlist'
++                ? 'border-brand text-brand'
++                : 'border-transparent text-zinc-400 hover:text-zinc-200'
++            }`}
++          >
++            <Bookmark size={15} /> Watchlist ({watchlist.length})
++          </button>
++
++          <button
++            onClick={() => setActiveTab('favorites')}
++            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
++              activeTab === 'favorites'
++                ? 'border-brand text-brand'
++                : 'border-transparent text-zinc-400 hover:text-zinc-200'
++            }`}
++          >
++            <Heart size={15} /> Yêu thích ({favorites.length})
++          </button>
++
++          <button
++            onClick={() => setActiveTab('ratings')}
++            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
++              activeTab === 'ratings'
++                ? 'border-brand text-brand'
++                : 'border-transparent text-zinc-400 hover:text-zinc-200'
++            }`}
++          >
++            <Star size={15} /> Đã chấm điểm ({Object.keys(ratings).length})
++          </button>
++        </div>
++
++        {/* Guest Mode notice */}
++        {isGuestMode && (
++          <div className="my-4 flex items-center justify-between rounded-lg border border-surface-border bg-surface-muted px-4 py-3 text-xs text-zinc-400">
++            <span>
++              Dữ liệu danh sách đang lưu trên trình duyệt của thiết bị này. Đăng nhập để bảo lưu và mở khóa gợi ý cá nhân hóa sâu.
++            </span>
+             <button
+-              onClick={() => refetchLibrary()}
+-              className="btn-secondary text-xs flex items-center gap-1.5"
++              onClick={() => openAuthModal('login')}
++              className="font-bold text-brand hover:underline cursor-pointer shrink-0 ml-3"
+             >
+-              <RefreshCw size={13} /> Thử lại
++              Đăng nhập ngay
+             </button>
+           </div>
+-        ) : (
+-          /* Data Grid */
+-          <>
+-            {activeTab === 'watchlist' && (
+-              watchlistItems.length > 0 ? (
+-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6">
+-                  {watchlistItems.map((item) =>
+-                    item.movie ? (
+-                      <MovieCard key={item.id} movie={item.movie} fluid />
+-                    ) : (
+-                      /* Movie not found in catalog */
+-                      <div
+-                        key={item.id}
+-                        className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
+-                      >
+-                        <div>
+-                          <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
+-                            <AlertCircle size={12} /> Không có trong catalog
+-                          </div>
+-                          <p className="font-bold text-white truncate">{item.id}</p>
+-                          <p className="text-[11px] text-zinc-500 mt-1">
+-                            Tác phẩm này có thể đã bị gỡ khỏi danh mục khám phá.
+-                          </p>
++        )}
++
++        {/* Tab Content Panels */}
++        <div className="mt-6">
++          {isLibraryLoading ? (
++            <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
++              <Loader2 className="animate-spin text-brand mb-3" size={28} />
++              <p className="text-xs">Đang tải thư viện cá nhân từ máy chủ...</p>
++            </div>
++          ) : libraryError ? (
++            <div className="flex flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/5 py-16 px-4 text-center">
++              <AlertCircle size={28} className="text-red-400 mb-2" />
++              <p className="text-sm font-bold text-red-300">{libraryError}</p>
++              <p className="text-xs text-zinc-400 mt-1 mb-4">
++                Không thể đồng bộ danh sách từ máy chủ. Vui lòng kiểm tra kết nối mạng.
++              </p>
++              <button
++                onClick={() => refetchLibrary()}
++                className="btn-secondary text-xs flex items-center gap-1.5"
++              >
++                <RefreshCw size={13} /> Thử lại
++              </button>
++            </div>
++          ) : (
++            /* Data Grid */
++            <>
++              {activeTab === 'watchlist' && (
++                watchlistItems.length > 0 ? (
++                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6">
++                    {watchlistItems.map((item) =>
++                      item.status === 'found' && item.movie ? (
++                        <MovieCard key={item.id} movie={item.movie} fluid />
++                      ) : item.status === 'loading' ? (
++                        <div
++                          key={item.id}
++                          className="flex h-56 flex-col items-center justify-center rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
++                        >
++                          <Loader2 size={18} className="animate-spin text-brand mb-2" />
++                          <span className="text-zinc-500 text-[11px]">Đang tải dữ liệu...</span>
+                         </div>
+-                        <button
+-                          onClick={() => handleRemoveMissingItem(item.id, 'watchlist')}
+-                          className="mt-3 flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer"
++                      ) : item.status === 'error' ? (
++                        <div
++                          key={item.id}
++                          className="flex flex-col justify-between rounded-lg border border-amber-900/40 bg-surface-muted p-4 text-xs"
+                         >
+-                          <Trash2 size={12} /> Xóa khỏi danh sách
+-                        </button>
+-                      </div>
+-                    )
+-                  )}
+-                </div>
+-              ) : (
+-                <EmptyState
+-                  title="Danh sách xem đang trống"
+-                  description="Lưu lại các bộ phim bạn muốn xem sau bằng nút Bookmark trên thẻ phim."
+-                  openChat={openChat}
+-                />
+-              )
+-            )}
+-
+-            {activeTab === 'favorites' && (
+-              favoriteItems.length > 0 ? (
+-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6">
+-                  {favoriteItems.map((item) =>
+-                    item.movie ? (
+-                      <MovieCard key={item.id} movie={item.movie} fluid />
+-                    ) : (
+-                      <div
+-                        key={item.id}
+-                        className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
+-                      >
+-                        <div>
+-                          <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
+-                            <AlertCircle size={12} /> Không có trong catalog
++                          <div>
++                            <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
++                              <AlertCircle size={12} /> Lỗi kết nối
++                            </div>
++                            <p className="font-bold text-white truncate">{item.id}</p>
++                            <p className="text-[11px] text-zinc-400 mt-1">
++                              Không thể kết nối máy chủ để tải thông tin phim.
++                            </p>
++                          </div>
++                          <div className="mt-3 flex flex-col gap-1.5">
++                            <button
++                              onClick={() => fetchRemoteMovie(item.id)}
++                              className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
++                            >
++                              <RefreshCw size={12} /> Thử tải lại
++                            </button>
++                            <button
++                              disabled={isActionPending(item.id, 'watchlist')}
++                              onClick={() => handleRemoveMissingItem(item.id, 'watchlist')}
++                              className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
++                            >
++                              {isActionPending(item.id, 'watchlist') ? (
++                                <Loader2 size={12} className="animate-spin" />
++                              ) : (
++                                <Trash2 size={12} />
++                              )}{' '}
++                              Xóa khỏi danh sách
++                            </button>
+                           </div>
+-                          <p className="font-bold text-white truncate">{item.id}</p>
+-                          <p className="text-[11px] text-zinc-500 mt-1">
+-                            Tác phẩm này có thể đã bị gỡ khỏi danh mục khám phá.
+-                          </p>
+                         </div>
+-                        <button
+-                          onClick={() => handleRemoveMissingItem(item.id, 'favorites')}
+-                          className="mt-3 flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer"
++                      ) : (
++                        /* Movie absent from catalog (404) */
++                        <div
++                          key={item.id}
++                          className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
+                         >
+-                          <Trash2 size={12} /> Xóa khỏi yêu thích
+-                        </button>
+-                      </div>
+-                    )
+-                  )}
+-                </div>
+-              ) : (
+-                <EmptyState
+-                  title="Chưa có phim yêu thích"
+-                  description="Nhấn biểu tượng Trái tim trên trang chi tiết phim để đánh dấu những tác phẩm tâm đắc nhất."
+-                  openChat={openChat}
+-                />
+-              )
+-            )}
++                          <div>
++                            <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
++                              <AlertCircle size={12} /> Không có trong catalog (404)
++                            </div>
++                            <p className="font-bold text-white truncate">{item.id}</p>
++                            <p className="text-[11px] text-zinc-500 mt-1">
++                              Tác phẩm này không còn tồn tại trong danh mục phim.
++                            </p>
++                          </div>
++                          <button
++                            disabled={isActionPending(item.id, 'watchlist')}
++                            onClick={() => handleRemoveMissingItem(item.id, 'watchlist')}
++                            className="mt-3 flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
++                          >
++                            {isActionPending(item.id, 'watchlist') ? (
++                              <Loader2 size={12} className="animate-spin" />
++                            ) : (
++                              <Trash2 size={12} />
++                            )}{' '}
++                            Xóa khỏi danh sách
++                          </button>
++                        </div>
++                      )
++                    )}
++                  </div>
++                ) : (
++                  <EmptyState
++                    title="Danh sách xem đang trống"
++                    description="Lưu lại các bộ phim bạn muốn xem sau bằng nút Bookmark trên thẻ phim."
++                    openChat={openChat}
++                  />
++                )
++              )}
+ 
+-            {activeTab === 'ratings' && (
+-              ratingItems.length > 0 ? (
+-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6">
+-                  {ratingItems.map((item) => (
+-                    <div key={item.id} className="relative group">
+-                      {item.movie ? (
+-                        <div>
+-                          <MovieCard movie={item.movie} fluid />
+-                          <div className="mt-1 flex items-center justify-between px-1 text-xs">
+-                            <span className="text-zinc-400 text-[11px]">Điểm của bạn:</span>
+-                            <span className="flex items-center gap-0.5 font-bold text-amber-400">
+-                              <Star size={11} className="fill-amber-400" /> {item.rating}/10
+-                            </span>
++              {activeTab === 'favorites' && (
++                favoriteItems.length > 0 ? (
++                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6">
++                    {favoriteItems.map((item) =>
++                      item.status === 'found' && item.movie ? (
++                        <MovieCard key={item.id} movie={item.movie} fluid />
++                      ) : item.status === 'loading' ? (
++                        <div
++                          key={item.id}
++                          className="flex h-56 flex-col items-center justify-center rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
++                        >
++                          <Loader2 size={18} className="animate-spin text-brand mb-2" />
++                          <span className="text-zinc-500 text-[11px]">Đang tải dữ liệu...</span>
++                        </div>
++                      ) : item.status === 'error' ? (
++                        <div
++                          key={item.id}
++                          className="flex flex-col justify-between rounded-lg border border-amber-900/40 bg-surface-muted p-4 text-xs"
++                        >
++                          <div>
++                            <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
++                              <AlertCircle size={12} /> Lỗi kết nối
++                            </div>
++                            <p className="font-bold text-white truncate">{item.id}</p>
++                            <p className="text-[11px] text-zinc-400 mt-1">
++                              Không thể kết nối máy chủ để tải thông tin phim.
++                            </p>
++                          </div>
++                          <div className="mt-3 flex flex-col gap-1.5">
++                            <button
++                              onClick={() => fetchRemoteMovie(item.id)}
++                              className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
++                            >
++                              <RefreshCw size={12} /> Thử tải lại
++                            </button>
++                            <button
++                              disabled={isActionPending(item.id, 'favorite')}
++                              onClick={() => handleRemoveMissingItem(item.id, 'favorites')}
++                              className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
++                            >
++                              {isActionPending(item.id, 'favorite') ? (
++                                <Loader2 size={12} className="animate-spin" />
++                              ) : (
++                                <Trash2 size={12} />
++                              )}{' '}
++                              Xóa khỏi yêu thích
++                            </button>
+                           </div>
+                         </div>
+                       ) : (
+-                        <div className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs">
++                        /* Movie absent from catalog (404) */
++                        <div
++                          key={item.id}
++                          className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
++                        >
+                           <div>
+                             <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
+-                              <AlertCircle size={12} /> Không có trong catalog
++                              <AlertCircle size={12} /> Không có trong catalog (404)
+                             </div>
+                             <p className="font-bold text-white truncate">{item.id}</p>
+-                            <p className="text-amber-400 font-semibold mt-1">
+-                              Điểm đã chấm: {item.rating}/10 ★
++                            <p className="text-[11px] text-zinc-500 mt-1">
++                              Tác phẩm này không còn tồn tại trong danh mục phim.
+                             </p>
+                           </div>
++                          <button
++                            disabled={isActionPending(item.id, 'favorite')}
++                            onClick={() => handleRemoveMissingItem(item.id, 'favorites')}
++                            className="mt-3 flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
++                          >
++                            {isActionPending(item.id, 'favorite') ? (
++                              <Loader2 size={12} className="animate-spin" />
++                            ) : (
++                              <Trash2 size={12} />
++                            )}{' '}
++                            Xóa khỏi yêu thích
++                          </button>
+                         </div>
+-                      )}
+-                    </div>
+-                  ))}
+-                </div>
+-              ) : (
+-                <EmptyState
+-                  title="Chưa có phim nào được chấm điểm"
+-                  description="Hãy chấm điểm các phim bạn đã xem để CineBot hiểu rõ gu và gợi ý chuẩn xác hơn."
+-                  openChat={openChat}
+-                />
+-              )
+-            )}
+-          </>
+-        )}
++                      )
++                    )}
++                  </div>
++                ) : (
++                  <EmptyState
++                    title="Chưa có phim yêu thích"
++                    description="Nhấn biểu tượng Trái tim trên trang chi tiết phim để đánh dấu những tác phẩm tâm đắc nhất."
++                    openChat={openChat}
++                  />
++                )
++              )}
++
++              {activeTab === 'ratings' && (
++                ratingItems.length > 0 ? (
++                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6">
++                    {ratingItems.map((item) => (
++                      <div key={item.id} className="relative group">
++                        {item.status === 'found' && item.movie ? (
++                          <div>
++                            <MovieCard movie={item.movie} fluid />
++                            <div className="mt-1 flex items-center justify-between px-1 text-xs">
++                              <span className="text-zinc-400 text-[11px]">Điểm của bạn:</span>
++                              <div className="flex items-center gap-2">
++                                <span className="flex items-center gap-0.5 font-bold text-amber-400">
++                                  <Star size={11} className="fill-amber-400" /> {item.rating}/10
++                                </span>
++                                <button
++                                  disabled={isActionPending(item.id, 'rating')}
++                                  onClick={() => handleRemoveMissingItem(item.id, 'ratings')}
++                                  className="text-zinc-500 hover:text-red-400 transition-colors cursor-pointer p-0.5 disabled:opacity-50"
++                                  title="Xóa đánh giá"
++                                  aria-label="Xóa đánh giá"
++                                >
++                                  {isActionPending(item.id, 'rating') ? (
++                                    <Loader2 size={11} className="animate-spin" />
++                                  ) : (
++                                    <Trash2 size={11} />
++                                  )}
++                                </button>
++                              </div>
++                            </div>
++                          </div>
++                        ) : item.status === 'loading' ? (
++                          <div className="flex h-56 flex-col items-center justify-center rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs">
++                            <Loader2 size={18} className="animate-spin text-brand mb-2" />
++                            <span className="text-zinc-500 text-[11px]">Đang tải dữ liệu...</span>
++                          </div>
++                        ) : item.status === 'error' ? (
++                          <div className="flex flex-col justify-between rounded-lg border border-amber-900/40 bg-surface-muted p-4 text-xs">
++                            <div>
++                              <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
++                                <AlertCircle size={12} /> Lỗi kết nối
++                              </div>
++                              <p className="font-bold text-white truncate">{item.id}</p>
++                              <p className="text-amber-400 font-semibold mt-1">
++                                Điểm đã chấm: {item.rating}/10 ★
++                              </p>
++                              <p className="text-[11px] text-zinc-400 mt-1">
++                                Không thể kết nối máy chủ để tải thông tin phim.
++                              </p>
++                            </div>
++                            <div className="mt-3 flex flex-col gap-1.5">
++                              <button
++                                onClick={() => fetchRemoteMovie(item.id)}
++                                className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
++                              >
++                                <RefreshCw size={12} /> Thử tải lại
++                              </button>
++                              <button
++                                disabled={isActionPending(item.id, 'rating')}
++                                onClick={() => handleRemoveMissingItem(item.id, 'ratings')}
++                                className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
++                              >
++                                {isActionPending(item.id, 'rating') ? (
++                                  <Loader2 size={12} className="animate-spin" />
++                                ) : (
++                                  <Trash2 size={12} />
++                                )}{' '}
++                                Xóa điểm đánh giá
++                              </button>
++                            </div>
++                          </div>
++                        ) : (
++                          /* Absent from catalog (404) */
++                          <div className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs">
++                            <div>
++                              <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
++                                <AlertCircle size={12} /> Không có trong catalog (404)
++                              </div>
++                              <p className="font-bold text-white truncate">{item.id}</p>
++                              <p className="text-amber-400 font-semibold mt-1">
++                                Điểm đã chấm: {item.rating}/10 ★
++                              </p>
++                              <p className="text-[11px] text-zinc-500 mt-1">
++                                Tác phẩm này không còn tồn tại trong danh mục phim.
++                              </p>
++                            </div>
++                            <button
++                              disabled={isActionPending(item.id, 'rating')}
++                              onClick={() => handleRemoveMissingItem(item.id, 'ratings')}
++                              className="mt-3 flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
++                            >
++                              {isActionPending(item.id, 'rating') ? (
++                                <Loader2 size={12} className="animate-spin" />
++                              ) : (
++                                <Trash2 size={12} />
++                              )}{' '}
++                              Xóa điểm đánh giá
++                            </button>
++                          </div>
++                        )}
++                      </div>
++                    ))}
++                  </div>
++                ) : (
++                  <EmptyState
++                    title="Chưa có phim nào được chấm điểm"
++                    description="Hãy chấm điểm các phim bạn đã xem để CineBot hiểu rõ gu và gợi ý chuẩn xác hơn."
++                    openChat={openChat}
++                  />
++                )
++              )}
++            </>
++          )}
++        </div>
+       </section>
+     </main>
+   );
+diff --git a/frontend/lib/context/AuthContext.tsx b/frontend/lib/context/AuthContext.tsx
+index 12499bd..59379c0 100644
+--- a/frontend/lib/context/AuthContext.tsx
++++ b/frontend/lib/context/AuthContext.tsx
+@@ -36,6 +36,7 @@ type AuthContextType = {
+   register: (username: string, email: string, password: string, fullName?: string) => Promise<{ success: boolean; message?: string }>;
+   logout: () => void;
+   retryVerify: () => Promise<void>;
++  handleSessionExpired: () => void;
+ };
+ 
+ const AuthContext = createContext<AuthContextType | undefined>(undefined);
+@@ -43,6 +44,45 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
+ const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
+ const REQUEST_TIMEOUT_MS = 8000;
+ 
++function validateAuthPayload(data: any, fallbackToken?: string): { user: AuthUser; token: string } | null {
++  if (!data || typeof data !== 'object') return null;
++
++  const rawToken = typeof data.token === 'string' && data.token.trim().length > 0 ? data.token.trim() : fallbackToken;
++  if (!rawToken || typeof rawToken !== 'string' || rawToken.trim().length === 0) {
++    return null;
++  }
++
++  // ID must be a valid positive integer number
++  let numericId: number | null = null;
++  if (typeof data.id === 'number' && Number.isFinite(data.id) && data.id > 0) {
++    numericId = data.id;
++  } else if (typeof data.id === 'string' && /^\d+$/.test(data.id.trim())) {
++    const parsed = parseInt(data.id.trim(), 10);
++    if (parsed > 0) numericId = parsed;
++  }
++  if (numericId === null) {
++    return null;
++  }
++
++  if (typeof data.username !== 'string' || data.username.trim().length === 0) {
++    return null;
++  }
++
++  if (typeof data.email !== 'string' || !data.email.includes('@')) {
++    return null;
++  }
++
++  const user: AuthUser = {
++    id: numericId,
++    username: data.username.trim(),
++    email: data.email.trim(),
++    fullName: typeof data.fullName === 'string' && data.fullName.trim().length > 0 ? data.fullName.trim() : undefined,
++    role: typeof data.role === 'string' && data.role.trim().length > 0 ? data.role.trim() : 'ROLE_USER',
++  };
++
++  return { user, token: rawToken };
++}
++
+ export function AuthProvider({ children }: { children: ReactNode }) {
+   const [user, setUser] = useState<AuthUser | null>(null);
+   const [token, setToken] = useState<string | null>(null);
+@@ -51,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+ 
+-  // Generation counter to invalidate stale asynchronous responses
++  // Generation counter to invalidate stale asynchronous responses across async boundaries
+   const generationRef = useRef<number>(0);
+   const activeAbortCtrlRef = useRef<AbortController | null>(null);
+ 
+@@ -82,9 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+       abortActiveRequest();
+       const abortCtrl = new AbortController();
+       activeAbortCtrlRef.current = abortCtrl;
+-      const timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
++      let timeoutId: any = null;
+ 
+       try {
++        timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
++
+         const res = await fetch(`${SPRINGBOOT_API}/auth/me`, {
+           headers: {
+             Authorization: `Bearer ${authToken}`,
+@@ -93,53 +135,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+           signal: abortCtrl.signal,
+         });
+ 
+-        clearTimeout(timeoutId);
+-
+-        // Check if generation changed while request was in-flight
++        // 1. Guard check immediately after fetch
+         if (generation !== generationRef.current) {
+           return;
+         }
+ 
+         if (res.ok) {
+-          const json = await res.json();
+-          if (json.success && json.data && json.data.id && json.data.username) {
+-            const verifiedUser: AuthUser = {
+-              id: json.data.id,
+-              username: json.data.username,
+-              email: json.data.email,
+-              fullName: json.data.fullName,
+-              role: json.data.role || 'ROLE_USER',
+-            };
+-            setUser(verifiedUser);
+-            setToken(authToken);
++          let json: any = null;
++          try {
++            json = await res.json();
++          } catch {
++            if (generation !== generationRef.current) return;
++            setStatus('unavailable');
++            setErrorMessage('Phản hồi từ máy chủ không hợp lệ.');
++            return;
++          }
++
++          // 2. Guard check after reading json body
++          if (generation !== generationRef.current) {
++            return;
++          }
++
++          const validated = validateAuthPayload(json?.data, authToken);
++          if (json?.success && validated) {
++            // 3. Guard check immediately before commit
++            if (generation !== generationRef.current) {
++              return;
++            }
++            setUser(validated.user);
++            setToken(validated.token);
+             setStatus('authenticated');
+             setErrorMessage(null);
+-            saveSessionStorage(authToken, verifiedUser);
++            saveSessionStorage(validated.token, validated.user);
++            return;
++          } else {
++            // Malformed data
++            if (generation !== generationRef.current) return;
++            setUser(null);
++            setToken(null);
++            setStatus('guest');
++            setErrorMessage(null);
++            clearSessionStorage();
+             return;
+           }
+         }
+ 
+         if (res.status === 401 || res.status === 403) {
+-          // Token expired or invalid
++          if (generation !== generationRef.current) return;
+           setUser(null);
+           setToken(null);
+           setStatus('guest');
+           setErrorMessage(null);
+           clearSessionStorage();
+         } else {
+-          // 5xx or bad response from server
++          if (generation !== generationRef.current) return;
+           setStatus('unavailable');
+           setErrorMessage('Máy chủ xác thực tạm thời không phản hồi. Vui lòng thử lại.');
+         }
+       } catch (err: unknown) {
+-        clearTimeout(timeoutId);
+         if (generation !== generationRef.current) {
+           return;
+         }
+ 
+-        // Aborted due to user action vs network timeout
+         if (err instanceof DOMException && err.name === 'AbortError') {
+-          // Timeout or explicit abort
+           setStatus('unavailable');
+           setErrorMessage('Kết nối tới máy chủ quá thời gian chờ (timeout).');
+         } else {
+@@ -147,6 +205,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+           setErrorMessage('Không thể kết nối đến máy chủ xác thực.');
+         }
+       } finally {
++        if (timeoutId) {
++          clearTimeout(timeoutId);
++        }
+         if (activeAbortCtrlRef.current === abortCtrl) {
+           activeAbortCtrlRef.current = null;
+         }
+@@ -162,16 +223,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+       savedToken = localStorage.getItem('dippie_auth_token');
+     } catch {}
+ 
+-    if (savedToken) {
++    if (savedToken && typeof savedToken === 'string' && savedToken.trim().length > 0) {
+       generationRef.current += 1;
+       const gen = generationRef.current;
+       setStatus('checking');
+-      verifySession(savedToken, gen);
++      verifySession(savedToken.trim(), gen);
+     } else {
+       setStatus('guest');
+     }
+ 
+     return () => {
++      generationRef.current += 1;
+       abortActiveRequest();
+     };
+   }, [abortActiveRequest, verifySession]);
+@@ -196,6 +258,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+     await verifySession(savedToken, gen);
+   };
+ 
++  const handleSessionExpired = useCallback(() => {
++    abortActiveRequest();
++    generationRef.current += 1;
++    setUser(null);
++    setToken(null);
++    setStatus('guest');
++    setErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
++    clearSessionStorage();
++  }, [abortActiveRequest, clearSessionStorage]);
++
+   const openAuthModal = (mode: 'login' | 'register' = 'login') => {
+     setAuthModalMode(mode);
+     setIsAuthModalOpen(true);
+@@ -226,9 +298,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+ 
+     const abortCtrl = new AbortController();
+     activeAbortCtrlRef.current = abortCtrl;
+-    const timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
++    let timeoutId: any = null;
+ 
+     try {
++      timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
++
+       const res = await fetch(`${SPRINGBOOT_API}/auth/login`, {
+         method: 'POST',
+         headers: {
+@@ -242,9 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+         signal: abortCtrl.signal,
+       });
+ 
+-      clearTimeout(timeoutId);
+-
+-      // Stale response check: if user logged out or changed generation during request
++      // 1. Guard check after fetch
+       if (currentGen !== generationRef.current) {
+         return { success: false, message: 'Thao tác đã bị hủy.' };
+       }
+@@ -253,24 +325,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+       try {
+         json = await res.json();
+       } catch {
++        if (currentGen !== generationRef.current) {
++          return { success: false, message: 'Thao tác đã bị hủy.' };
++        }
+         return { success: false, message: 'Phản hồi từ máy chủ không hợp lệ.' };
+       }
+ 
+-      if (res.ok && json.success && json.data && json.data.token && json.data.id) {
+-        const authData = json.data;
+-        const loggedUser: AuthUser = {
+-          id: authData.id,
+-          username: authData.username,
+-          email: authData.email,
+-          fullName: authData.fullName,
+-          role: authData.role || 'ROLE_USER',
+-        };
+-
+-        setToken(authData.token);
+-        setUser(loggedUser);
++      // 2. Guard check after reading json body
++      if (currentGen !== generationRef.current) {
++        return { success: false, message: 'Thao tác đã bị hủy.' };
++      }
++
++      const validated = validateAuthPayload(json?.data);
++      if (res.ok && json?.success && validated) {
++        // 3. Guard check immediately before commit
++        if (currentGen !== generationRef.current) {
++          return { success: false, message: 'Thao tác đã bị hủy.' };
++        }
++
++        setToken(validated.token);
++        setUser(validated.user);
+         setStatus('authenticated');
+         setErrorMessage(null);
+-        saveSessionStorage(authData.token, loggedUser);
++        saveSessionStorage(validated.token, validated.user);
+         closeAuthModal();
+         return { success: true };
+       } else {
+@@ -282,7 +359,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+         return { success: false, message: errorMsg };
+       }
+     } catch (err: unknown) {
+-      clearTimeout(timeoutId);
+       if (currentGen !== generationRef.current) {
+         return { success: false, message: 'Thao tác đã bị hủy.' };
+       }
+@@ -295,6 +371,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+         message: 'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra lại mạng hoặc dịch vụ.',
+       };
+     } finally {
++      if (timeoutId) {
++        clearTimeout(timeoutId);
++      }
+       if (activeAbortCtrlRef.current === abortCtrl) {
+         activeAbortCtrlRef.current = null;
+       }
+@@ -327,9 +406,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+ 
+     const abortCtrl = new AbortController();
+     activeAbortCtrlRef.current = abortCtrl;
+-    const timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
++    let timeoutId: any = null;
+ 
+     try {
++      timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
++
+       const res = await fetch(`${SPRINGBOOT_API}/auth/register`, {
+         method: 'POST',
+         headers: {
+@@ -345,8 +426,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+         signal: abortCtrl.signal,
+       });
+ 
+-      clearTimeout(timeoutId);
+-
++      // 1. Guard check after fetch
+       if (currentGen !== generationRef.current) {
+         return { success: false, message: 'Thao tác đã bị hủy.' };
+       }
+@@ -355,24 +435,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+       try {
+         json = await res.json();
+       } catch {
++        if (currentGen !== generationRef.current) {
++          return { success: false, message: 'Thao tác đã bị hủy.' };
++        }
+         return { success: false, message: 'Phản hồi từ máy chủ không hợp lệ.' };
+       }
+ 
+-      if (res.ok && json.success && json.data && json.data.token && json.data.id) {
+-        const authData = json.data;
+-        const loggedUser: AuthUser = {
+-          id: authData.id,
+-          username: authData.username,
+-          email: authData.email,
+-          fullName: authData.fullName,
+-          role: authData.role || 'ROLE_USER',
+-        };
+-
+-        setToken(authData.token);
+-        setUser(loggedUser);
++      // 2. Guard check after reading json body
++      if (currentGen !== generationRef.current) {
++        return { success: false, message: 'Thao tác đã bị hủy.' };
++      }
++
++      const validated = validateAuthPayload(json?.data);
++      if (res.ok && json?.success && validated) {
++        // 3. Guard check immediately before commit
++        if (currentGen !== generationRef.current) {
++          return { success: false, message: 'Thao tác đã bị hủy.' };
++        }
++
++        setToken(validated.token);
++        setUser(validated.user);
+         setStatus('authenticated');
+         setErrorMessage(null);
+-        saveSessionStorage(authData.token, loggedUser);
++        saveSessionStorage(validated.token, validated.user);
+         closeAuthModal();
+         return { success: true };
+       } else {
+@@ -380,7 +465,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+         return { success: false, message: errorMsg };
+       }
+     } catch (err: unknown) {
+-      clearTimeout(timeoutId);
+       if (currentGen !== generationRef.current) {
+         return { success: false, message: 'Thao tác đã bị hủy.' };
+       }
+@@ -393,6 +477,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+         message: 'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra kết nối mạng.',
+       };
+     } finally {
++      if (timeoutId) {
++        clearTimeout(timeoutId);
++      }
+       if (activeAbortCtrlRef.current === abortCtrl) {
+         activeAbortCtrlRef.current = null;
+       }
+@@ -401,7 +488,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+ 
+   const logout = useCallback(() => {
+     abortActiveRequest();
+-    generationRef.current += 1; // Invalidate any incoming response
++    generationRef.current += 1; // Invalidate any incoming response across all boundaries
+     setUser(null);
+     setToken(null);
+     setStatus('guest');
+@@ -427,6 +514,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
+         register,
+         logout,
+         retryVerify,
++        handleSessionExpired,
+       }}
+     >
+       {children}
+diff --git a/frontend/lib/context/WatchlistContext.tsx b/frontend/lib/context/WatchlistContext.tsx
+index c019eda..d864eeb 100644
+--- a/frontend/lib/context/WatchlistContext.tsx
++++ b/frontend/lib/context/WatchlistContext.tsx
+@@ -26,6 +26,7 @@ type WatchlistContextType = {
+   toggleWatchlist: (id: string, title?: string, poster?: string) => Promise<boolean>;
+   toggleFavorite: (id: string, title?: string, poster?: string) => Promise<boolean>;
+   rateMovie: (id: string, rating: number, title?: string) => Promise<boolean>;
++  removeRating: (id: string, title?: string) => Promise<boolean>;
+   isWatchlisted: (id: string) => boolean;
+   isFavorite: (id: string) => boolean;
+   getRating: (id: string) => number | undefined;
+@@ -63,25 +64,49 @@ function readGuestStorage(): GuestStorageData {
+     const raw = localStorage.getItem(GUEST_STORAGE_KEY);
+     if (!raw) return { watchlist: [], favorites: [], ratings: {} };
+     const parsed = JSON.parse(raw);
++    const validWatchlist = Array.isArray(parsed.watchlist)
++      ? parsed.watchlist.filter((id: any) => typeof id === 'string' && id.trim().length > 0)
++      : [];
++    const validFavorites = Array.isArray(parsed.favorites)
++      ? parsed.favorites.filter((id: any) => typeof id === 'string' && id.trim().length > 0)
++      : [];
++    const validRatings: Record<string, number> = {};
++    if (typeof parsed.ratings === 'object' && parsed.ratings !== null && !Array.isArray(parsed.ratings)) {
++      Object.entries(parsed.ratings).forEach(([k, v]) => {
++        if (
++          typeof k === 'string' &&
++          k.trim().length > 0 &&
++          typeof v === 'number' &&
++          Number.isFinite(v) &&
++          v >= 1 &&
++          v <= 10
++        ) {
++          validRatings[k] = Math.round(v);
++        }
++      });
++    }
+     return {
+-      watchlist: Array.isArray(parsed.watchlist) ? parsed.watchlist : [],
+-      favorites: Array.isArray(parsed.favorites) ? parsed.favorites : [],
+-      ratings: typeof parsed.ratings === 'object' && parsed.ratings !== null ? parsed.ratings : {},
++      watchlist: validWatchlist,
++      favorites: validFavorites,
++      ratings: validRatings,
+     };
+   } catch {
+     return { watchlist: [], favorites: [], ratings: {} };
+   }
+ }
+ 
+-function writeGuestStorage(data: GuestStorageData) {
+-  if (typeof window === 'undefined') return;
++function writeGuestStorage(data: GuestStorageData): boolean {
++  if (typeof window === 'undefined') return false;
+   try {
+     localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(data));
+-  } catch {}
++    return true;
++  } catch {
++    return false;
++  }
+ }
+ 
+ export function WatchlistProvider({ children }: { children: ReactNode }) {
+-  const { user, token, status, isAuthenticated } = useAuth();
++  const { user, token, status, isAuthenticated, handleSessionExpired } = useAuth();
+ 
+   const [watchlist, setWatchlist] = useState<string[]>([]);
+   const [favorites, setFavorites] = useState<string[]>([]);
+@@ -93,8 +118,11 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+   const [toasts, setToasts] = useState<Toast[]>([]);
+   const [isChatOpen, setIsChatOpen] = useState(false);
+ 
+-  // Generation counter to discard stale network responses from previous user or guest
++  // Synchronous lock to prevent duplicate writes within the same tick or while in-flight
++  const syncPendingKeysRef = useRef<Set<string>>(new Set());
++  // Generation counter to invalidate stale network responses when actor switches
+   const syncGenerationRef = useRef<number>(0);
++  const prevActorRef = useRef<string | null>(null);
+   const activeAbortRef = useRef<AbortController | null>(null);
+ 
+   const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'success') => {
+@@ -120,20 +148,37 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     syncGenerationRef.current += 1;
+     const currentGen = syncGenerationRef.current;
+ 
+-    // Invalidate state immediately upon actor switch
+-    setWatchlist([]);
+-    setFavorites([]);
+-    setRatings({});
+-    setPendingKeys(new Set());
+-    setLibraryError(null);
++    const currentActorKey =
++      isAuthenticated && user
++        ? `user:${user.id}`
++        : status === 'guest'
++        ? 'guest'
++        : `status:${status}`;
++    const isActorChanged = prevActorRef.current !== currentActorKey;
++    prevActorRef.current = currentActorKey;
++
++    if (isActorChanged) {
++      // Invalidate state immediately upon actor switch so user B never sees user A's state
++      setWatchlist([]);
++      setFavorites([]);
++      setRatings({});
++      setPendingKeys(new Set());
++      syncPendingKeysRef.current.clear();
++      setLibraryError(null);
++    }
+ 
+-    // 1. Guest mode or unverified
++    // 1. Guest mode or unverified / checking / unavailable
+     if (!isAuthenticated || !token || !user) {
+       if (status === 'checking') {
+         setIsLibraryLoading(true);
+         return;
+       }
+-      // Load clean guest device library
++      if (status === 'unavailable') {
++        setIsLibraryLoading(false);
++        setLibraryError('Dịch vụ xác thực tạm thời không khả dụng.');
++        return;
++      }
++      // status === 'guest'
+       const guestData = readGuestStorage();
+       if (currentGen === syncGenerationRef.current) {
+         setWatchlist(guestData.watchlist);
+@@ -169,6 +214,13 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         return;
+       }
+ 
++      if (resWatchlist.status === 401 || resFavorites.status === 401 || resRatings.status === 401) {
++        handleSessionExpired();
++        setLibraryError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
++        setIsLibraryLoading(false);
++        return;
++      }
++
+       if (!resWatchlist.ok || !resFavorites.ok || !resRatings.ok) {
+         setLibraryError('Không thể tải toàn bộ thư viện cá nhân từ máy chủ.');
+         setIsLibraryLoading(false);
+@@ -183,24 +235,24 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         return;
+       }
+ 
+-      const nextWatchlist: string[] =
+-        jsonWatchlist.success && Array.isArray(jsonWatchlist.data)
+-          ? jsonWatchlist.data.map((item: any) => item.movieId).filter(Boolean)
+-          : [];
++      const isWatchlistValid = jsonWatchlist?.success === true && Array.isArray(jsonWatchlist?.data);
++      const isFavoritesValid = jsonFavorites?.success === true && Array.isArray(jsonFavorites?.data);
++      const isRatingsValid = jsonRatings?.success === true && Array.isArray(jsonRatings?.data);
+ 
+-      const nextFavorites: string[] =
+-        jsonFavorites.success && Array.isArray(jsonFavorites.data)
+-          ? jsonFavorites.data.map((item: any) => item.movieId).filter(Boolean)
+-          : [];
++      if (!isWatchlistValid || !isFavoritesValid || !isRatingsValid) {
++        setLibraryError('Dữ liệu phản hồi từ máy chủ không hợp lệ.');
++        setIsLibraryLoading(false);
++        return;
++      }
+ 
++      const nextWatchlist: string[] = jsonWatchlist.data.map((item: any) => item.movieId).filter(Boolean);
++      const nextFavorites: string[] = jsonFavorites.data.map((item: any) => item.movieId).filter(Boolean);
+       const nextRatings: Record<string, number> = {};
+-      if (jsonRatings.success && Array.isArray(jsonRatings.data)) {
+-        jsonRatings.data.forEach((r: any) => {
+-          if (r.movieId && typeof r.rating === 'number') {
+-            nextRatings[r.movieId] = r.rating;
+-          }
+-        });
+-      }
++      jsonRatings.data.forEach((r: any) => {
++        if (r.movieId && typeof r.rating === 'number') {
++          nextRatings[r.movieId] = r.rating;
++        }
++      });
+ 
+       // Authoritative replace (NO union with legacy/guest)
+       setWatchlist(nextWatchlist);
+@@ -224,7 +276,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         activeAbortRef.current = null;
+       }
+     }
+-  }, [isAuthenticated, token, user, status]);
++  }, [isAuthenticated, token, user, status, handleSessionExpired]);
+ 
+   useEffect(() => {
+     loadLibraryForCurrentActor();
+@@ -249,15 +301,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     [pendingKeys]
+   );
+ 
+-  const setPending = (key: string, isPending: boolean) => {
+-    setPendingKeys((prev) => {
+-      const next = new Set(prev);
+-      if (isPending) next.add(key);
+-      else next.delete(key);
+-      return next;
+-    });
+-  };
+-
+   // Watchlist Mutation
+   const toggleWatchlist = async (
+     id: string,
+@@ -265,39 +308,75 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     poster?: string
+   ): Promise<boolean> => {
+     const actionKey = `${id}:watchlist`;
+-    if (pendingKeys.has(actionKey)) return false;
++    if (syncPendingKeysRef.current.has(actionKey)) return false;
++    syncPendingKeysRef.current.add(actionKey);
++    setPendingKeys(new Set(syncPendingKeysRef.current));
+ 
+     const alreadyInWatchlist = watchlist.includes(id);
+     const displayTitle = title || id;
+ 
++    // Reject mutations in unverified / intermediate states
++    if (status === 'checking') {
++      showToast('Đang kiểm tra phiên đăng nhập, vui lòng đợi...', 'info');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
++    if (status === 'unavailable') {
++      showToast('Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.', 'error');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
++
+     // 1. Guest Mode
+-    if (!isAuthenticated || !token) {
++    if (status === 'guest' || !isAuthenticated || !token) {
+       const nextWatchlist = alreadyInWatchlist
+         ? watchlist.filter((item) => item !== id)
+         : [...watchlist, id];
+       setWatchlist(nextWatchlist);
+-      writeGuestStorage({
++      const saved = writeGuestStorage({
+         watchlist: nextWatchlist,
+         favorites,
+         ratings,
+       });
+ 
++      if (!saved) {
++        setWatchlist(watchlist);
++        showToast('Không thể lưu vào bộ nhớ thiết bị.', 'error');
++        syncPendingKeysRef.current.delete(actionKey);
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++        return false;
++      }
++
+       if (alreadyInWatchlist) {
+         showToast(`Đã xóa ${displayTitle} khỏi Danh sách xem (trên thiết bị)`, 'info');
+       } else {
+         showToast(`Đã lưu ${displayTitle} vào Danh sách xem (trên thiết bị)`, 'success');
+       }
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
+       return true;
+     }
+ 
+-    // 2. Authenticated Mode (Optimistic Update + Rollback)
+-    const prevWatchlist = [...watchlist];
+-    const nextWatchlist = alreadyInWatchlist
+-      ? watchlist.filter((item) => item !== id)
+-      : [...watchlist, id];
++    // 2. Authenticated Mode (Optimistic targeted update + Actor-guarded rollback)
++    const mutationActorId = user?.id;
++    const mutationGen = syncGenerationRef.current;
++    const isCurrentActor = () => {
++      return (
++        syncGenerationRef.current === mutationGen &&
++        user?.id === mutationActorId &&
++        status === 'authenticated'
++      );
++    };
+ 
+-    setWatchlist(nextWatchlist);
+-    setPending(actionKey, true);
++    // Targeted optimistic update
++    setWatchlist((curr) =>
++      alreadyInWatchlist ? curr.filter((item) => item !== id) : curr.includes(id) ? curr : [...curr, id]
++    );
++
++    const abortCtrl = new AbortController();
++    const timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
+ 
+     try {
+       if (alreadyInWatchlist) {
+@@ -307,9 +386,24 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+             Authorization: `Bearer ${token}`,
+             Accept: 'application/json',
+           },
++          signal: abortCtrl.signal,
+         });
+-        if (!res.ok) throw new Error('Delete failed');
+-        showToast(`Đã xóa ${displayTitle} khỏi Danh sách xem`, 'info');
++        clearTimeout(timeoutId);
++
++        if (res.status === 401) {
++          handleSessionExpired();
++          throw new Error('Phiên đăng nhập đã hết hạn.');
++        }
++        if (res.status === 403) {
++          throw new Error('Bạn không có quyền thực hiện thao tác này.');
++        }
++        if (!res.ok) throw new Error(`Xóa khỏi Danh sách xem thất bại (HTTP ${res.status})`);
++        const json = await res.json();
++        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
++
++        if (isCurrentActor()) {
++          showToast(`Đã xóa ${displayTitle} khỏi Danh sách xem`, 'info');
++        }
+         return true;
+       } else {
+         const res = await fetch(`${SPRINGBOOT_API}/users/watchlist`, {
+@@ -324,18 +418,45 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+             movieTitle: displayTitle,
+             posterUrl: poster || '',
+           }),
++          signal: abortCtrl.signal,
+         });
+-        if (!res.ok) throw new Error('Add failed');
+-        showToast(`Đã lưu ${displayTitle} vào Danh sách xem`, 'success');
++        clearTimeout(timeoutId);
++
++        if (res.status === 401) {
++          handleSessionExpired();
++          throw new Error('Phiên đăng nhập đã hết hạn.');
++        }
++        if (res.status === 403) {
++          throw new Error('Bạn không có quyền thực hiện thao tác này.');
++        }
++        if (!res.ok) throw new Error(`Lưu vào Danh sách xem thất bại (HTTP ${res.status})`);
++        const json = await res.json();
++        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
++
++        if (isCurrentActor()) {
++          showToast(`Đã lưu ${displayTitle} vào Danh sách xem`, 'success');
++        }
+         return true;
+       }
+-    } catch {
+-      // Rollback on failure
+-      setWatchlist(prevWatchlist);
+-      showToast('Không thể cập nhật Danh sách xem. Vui lòng thử lại.', 'error');
++    } catch (err: unknown) {
++      clearTimeout(timeoutId);
++      if (isCurrentActor()) {
++        // Targeted rollback only for this item
++        setWatchlist((curr) =>
++          alreadyInWatchlist ? (curr.includes(id) ? curr : [...curr, id]) : curr.filter((item) => item !== id)
++        );
++        if (err instanceof DOMException && err.name === 'AbortError') {
++          showToast('Thời gian gửi yêu cầu quá hạn. Vui lòng kiểm tra lại trạng thái.', 'error');
++        } else {
++          showToast('Không thể cập nhật Danh sách xem. Vui lòng thử lại.', 'error');
++        }
++      }
+       return false;
+     } finally {
+-      setPending(actionKey, false);
++      syncPendingKeysRef.current.delete(actionKey);
++      if (syncGenerationRef.current === mutationGen) {
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++      }
+     }
+   };
+ 
+@@ -346,39 +467,75 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     poster?: string
+   ): Promise<boolean> => {
+     const actionKey = `${id}:favorite`;
+-    if (pendingKeys.has(actionKey)) return false;
++    if (syncPendingKeysRef.current.has(actionKey)) return false;
++    syncPendingKeysRef.current.add(actionKey);
++    setPendingKeys(new Set(syncPendingKeysRef.current));
+ 
+     const alreadyInFavorites = favorites.includes(id);
+     const displayTitle = title || id;
+ 
++    // Reject mutations in unverified / intermediate states
++    if (status === 'checking') {
++      showToast('Đang kiểm tra phiên đăng nhập, vui lòng đợi...', 'info');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
++    if (status === 'unavailable') {
++      showToast('Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.', 'error');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
++
+     // 1. Guest Mode
+-    if (!isAuthenticated || !token) {
++    if (status === 'guest' || !isAuthenticated || !token) {
+       const nextFavorites = alreadyInFavorites
+         ? favorites.filter((item) => item !== id)
+         : [...favorites, id];
+       setFavorites(nextFavorites);
+-      writeGuestStorage({
++      const saved = writeGuestStorage({
+         watchlist,
+         favorites: nextFavorites,
+         ratings,
+       });
+ 
++      if (!saved) {
++        setFavorites(favorites);
++        showToast('Không thể lưu vào bộ nhớ thiết bị.', 'error');
++        syncPendingKeysRef.current.delete(actionKey);
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++        return false;
++      }
++
+       if (alreadyInFavorites) {
+         showToast(`Đã xóa ${displayTitle} khỏi Yêu thích (trên thiết bị)`, 'info');
+       } else {
+         showToast(`Đã thêm ${displayTitle} vào Yêu thích (trên thiết bị)`, 'success');
+       }
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
+       return true;
+     }
+ 
+-    // 2. Authenticated Mode (Optimistic Update + Rollback)
+-    const prevFavorites = [...favorites];
+-    const nextFavorites = alreadyInFavorites
+-      ? favorites.filter((item) => item !== id)
+-      : [...favorites, id];
++    // 2. Authenticated Mode (Optimistic targeted update + Actor-guarded rollback)
++    const mutationActorId = user?.id;
++    const mutationGen = syncGenerationRef.current;
++    const isCurrentActor = () => {
++      return (
++        syncGenerationRef.current === mutationGen &&
++        user?.id === mutationActorId &&
++        status === 'authenticated'
++      );
++    };
++
++    // Targeted optimistic update
++    setFavorites((curr) =>
++      alreadyInFavorites ? curr.filter((item) => item !== id) : curr.includes(id) ? curr : [...curr, id]
++    );
+ 
+-    setFavorites(nextFavorites);
+-    setPending(actionKey, true);
++    const abortCtrl = new AbortController();
++    const timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
+ 
+     try {
+       if (alreadyInFavorites) {
+@@ -388,9 +545,24 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+             Authorization: `Bearer ${token}`,
+             Accept: 'application/json',
+           },
++          signal: abortCtrl.signal,
+         });
+-        if (!res.ok) throw new Error('Delete favorite failed');
+-        showToast(`Đã xóa ${displayTitle} khỏi Yêu thích`, 'info');
++        clearTimeout(timeoutId);
++
++        if (res.status === 401) {
++          handleSessionExpired();
++          throw new Error('Phiên đăng nhập đã hết hạn.');
++        }
++        if (res.status === 403) {
++          throw new Error('Bạn không có quyền thực hiện thao tác này.');
++        }
++        if (!res.ok) throw new Error(`Xóa khỏi Yêu thích thất bại (HTTP ${res.status})`);
++        const json = await res.json();
++        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
++
++        if (isCurrentActor()) {
++          showToast(`Đã xóa ${displayTitle} khỏi Yêu thích`, 'info');
++        }
+         return true;
+       } else {
+         const res = await fetch(`${SPRINGBOOT_API}/users/favorites`, {
+@@ -405,18 +577,45 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+             movieTitle: displayTitle,
+             posterUrl: poster || '',
+           }),
++          signal: abortCtrl.signal,
+         });
+-        if (!res.ok) throw new Error('Add favorite failed');
+-        showToast(`Đã thêm ${displayTitle} vào Yêu thích`, 'success');
++        clearTimeout(timeoutId);
++
++        if (res.status === 401) {
++          handleSessionExpired();
++          throw new Error('Phiên đăng nhập đã hết hạn.');
++        }
++        if (res.status === 403) {
++          throw new Error('Bạn không có quyền thực hiện thao tác này.');
++        }
++        if (!res.ok) throw new Error(`Lưu vào Yêu thích thất bại (HTTP ${res.status})`);
++        const json = await res.json();
++        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
++
++        if (isCurrentActor()) {
++          showToast(`Đã thêm ${displayTitle} vào Yêu thích`, 'success');
++        }
+         return true;
+       }
+-    } catch {
+-      // Rollback on failure
+-      setFavorites(prevFavorites);
+-      showToast('Không thể cập nhật danh mục Yêu thích. Vui lòng thử lại.', 'error');
++    } catch (err: unknown) {
++      clearTimeout(timeoutId);
++      if (isCurrentActor()) {
++        // Targeted rollback only for this item
++        setFavorites((curr) =>
++          alreadyInFavorites ? (curr.includes(id) ? curr : [...curr, id]) : curr.filter((item) => item !== id)
++        );
++        if (err instanceof DOMException && err.name === 'AbortError') {
++          showToast('Thời gian gửi yêu cầu quá hạn. Vui lòng kiểm tra lại trạng thái.', 'error');
++        } else {
++          showToast('Không thể cập nhật danh mục Yêu thích. Vui lòng thử lại.', 'error');
++        }
++      }
+       return false;
+     } finally {
+-      setPending(actionKey, false);
++      syncPendingKeysRef.current.delete(actionKey);
++      if (syncGenerationRef.current === mutationGen) {
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++      }
+     }
+   };
+ 
+@@ -427,31 +626,68 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     title?: string
+   ): Promise<boolean> => {
+     const actionKey = `${id}:rating`;
+-    if (pendingKeys.has(actionKey)) return false;
++    if (syncPendingKeysRef.current.has(actionKey)) return false;
++    syncPendingKeysRef.current.add(actionKey);
++    setPendingKeys(new Set(syncPendingKeysRef.current));
+ 
+-    // Validate client range
+     const validRating = Math.max(1, Math.min(10, Math.round(rating)));
+     const displayTitle = title || id;
++    const prevRating = ratings[id];
++
++    // Reject mutations in unverified / intermediate states
++    if (status === 'checking') {
++      showToast('Đang kiểm tra phiên đăng nhập, vui lòng đợi...', 'info');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
++    if (status === 'unavailable') {
++      showToast('Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.', 'error');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
+ 
+     // 1. Guest Mode
+-    if (!isAuthenticated || !token) {
++    if (status === 'guest' || !isAuthenticated || !token) {
+       const nextRatings = { ...ratings, [id]: validRating };
+       setRatings(nextRatings);
+-      writeGuestStorage({
++      const saved = writeGuestStorage({
+         watchlist,
+         favorites,
+         ratings: nextRatings,
+       });
++
++      if (!saved) {
++        setRatings(ratings);
++        showToast('Không thể lưu vào bộ nhớ thiết bị.', 'error');
++        syncPendingKeysRef.current.delete(actionKey);
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++        return false;
++      }
++
+       showToast(`Đã chấm ${displayTitle} ${validRating}/10 điểm ★ (trên thiết bị)`, 'success');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
+       return true;
+     }
+ 
+-    // 2. Authenticated Mode (Optimistic Update + Rollback)
+-    const prevRatings = { ...ratings };
+-    const nextRatings = { ...ratings, [id]: validRating };
++    // 2. Authenticated Mode (Optimistic targeted update + Actor-guarded rollback)
++    const mutationActorId = user?.id;
++    const mutationGen = syncGenerationRef.current;
++    const isCurrentActor = () => {
++      return (
++        syncGenerationRef.current === mutationGen &&
++        user?.id === mutationActorId &&
++        status === 'authenticated'
++      );
++    };
++
++    // Optimistic targeted update
++    setRatings((curr) => ({ ...curr, [id]: validRating }));
+ 
+-    setRatings(nextRatings);
+-    setPending(actionKey, true);
++    const abortCtrl = new AbortController();
++    const timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
+ 
+     try {
+       const res = await fetch(`${SPRINGBOOT_API}/users/ratings`, {
+@@ -465,18 +701,168 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           movieId: id,
+           rating: validRating,
+         }),
++        signal: abortCtrl.signal,
+       });
++      clearTimeout(timeoutId);
+ 
+-      if (!res.ok) throw new Error('Rate movie failed');
+-      showToast(`Đã chấm ${displayTitle} ${validRating}/10 điểm ★`, 'success');
++      if (res.status === 401) {
++        handleSessionExpired();
++        throw new Error('Phiên đăng nhập đã hết hạn.');
++      }
++      if (res.status === 403) {
++        throw new Error('Bạn không có quyền thực hiện thao tác này.');
++      }
++      if (!res.ok) throw new Error(`Lưu điểm đánh giá thất bại (HTTP ${res.status})`);
++      const json = await res.json();
++      if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
++
++      if (isCurrentActor()) {
++        showToast(`Đã chấm ${displayTitle} ${validRating}/10 điểm ★`, 'success');
++      }
+       return true;
+-    } catch {
+-      // Rollback on failure
+-      setRatings(prevRatings);
+-      showToast('Không thể lưu điểm đánh giá. Vui lòng thử lại.', 'error');
++    } catch (err: unknown) {
++      clearTimeout(timeoutId);
++      if (isCurrentActor()) {
++        // Targeted rollback only for this item
++        setRatings((curr) => {
++          const next = { ...curr };
++          if (prevRating !== undefined) {
++            next[id] = prevRating;
++          } else {
++            delete next[id];
++          }
++          return next;
++        });
++        if (err instanceof DOMException && err.name === 'AbortError') {
++          showToast('Thời gian gửi yêu cầu quá hạn. Vui lòng kiểm tra lại trạng thái.', 'error');
++        } else {
++          showToast('Không thể lưu điểm đánh giá. Vui lòng thử lại.', 'error');
++        }
++      }
+       return false;
+     } finally {
+-      setPending(actionKey, false);
++      syncPendingKeysRef.current.delete(actionKey);
++      if (syncGenerationRef.current === mutationGen) {
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++      }
++    }
++  };
++
++  // Remove Rating Mutation
++  const removeRating = async (id: string, title?: string): Promise<boolean> => {
++    const actionKey = `${id}:rating`;
++    if (syncPendingKeysRef.current.has(actionKey)) return false;
++    syncPendingKeysRef.current.add(actionKey);
++    setPendingKeys(new Set(syncPendingKeysRef.current));
++
++    const displayTitle = title || id;
++    const prevRating = ratings[id];
++
++    // Reject mutations in unverified / intermediate states
++    if (status === 'checking') {
++      showToast('Đang kiểm tra phiên đăng nhập, vui lòng đợi...', 'info');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
++    if (status === 'unavailable') {
++      showToast('Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.', 'error');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return false;
++    }
++
++    // 1. Guest Mode
++    if (status === 'guest' || !isAuthenticated || !token) {
++      const nextRatings = { ...ratings };
++      delete nextRatings[id];
++      setRatings(nextRatings);
++      const saved = writeGuestStorage({
++        watchlist,
++        favorites,
++        ratings: nextRatings,
++      });
++
++      if (!saved) {
++        setRatings(ratings);
++        showToast('Không thể lưu vào bộ nhớ thiết bị.', 'error');
++        syncPendingKeysRef.current.delete(actionKey);
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++        return false;
++      }
++
++      showToast(`Đã xóa đánh giá của ${displayTitle} (trên thiết bị)`, 'info');
++      syncPendingKeysRef.current.delete(actionKey);
++      setPendingKeys(new Set(syncPendingKeysRef.current));
++      return true;
++    }
++
++    // 2. Authenticated Mode (Optimistic targeted update + Actor-guarded rollback)
++    const mutationActorId = user?.id;
++    const mutationGen = syncGenerationRef.current;
++    const isCurrentActor = () => {
++      return (
++        syncGenerationRef.current === mutationGen &&
++        user?.id === mutationActorId &&
++        status === 'authenticated'
++      );
++    };
++
++    // Optimistic targeted update
++    setRatings((curr) => {
++      const next = { ...curr };
++      delete next[id];
++      return next;
++    });
++
++    const abortCtrl = new AbortController();
++    const timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
++
++    try {
++      const res = await fetch(`${SPRINGBOOT_API}/users/ratings/${encodeURIComponent(id)}`, {
++        method: 'DELETE',
++        headers: {
++          Authorization: `Bearer ${token}`,
++          Accept: 'application/json',
++        },
++        signal: abortCtrl.signal,
++      });
++      clearTimeout(timeoutId);
++
++      if (res.status === 401) {
++        handleSessionExpired();
++        throw new Error('Phiên đăng nhập đã hết hạn.');
++      }
++      if (res.status === 403) {
++        throw new Error('Bạn không có quyền thực hiện thao tác này.');
++      }
++      if (!res.ok) throw new Error(`Xóa đánh giá thất bại (HTTP ${res.status})`);
++      const json = await res.json();
++      if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
++
++      if (isCurrentActor()) {
++        showToast(`Đã xóa đánh giá của ${displayTitle}`, 'info');
++      }
++      return true;
++    } catch (err: unknown) {
++      clearTimeout(timeoutId);
++      if (isCurrentActor()) {
++        // Targeted rollback only for this item
++        if (prevRating !== undefined) {
++          setRatings((curr) => ({ ...curr, [id]: prevRating }));
++        }
++        if (err instanceof DOMException && err.name === 'AbortError') {
++          showToast('Thời gian gửi yêu cầu quá hạn. Vui lòng kiểm tra lại trạng thái.', 'error');
++        } else {
++          showToast(`Không thể xóa đánh giá của ${displayTitle}. Vui lòng thử lại.`, 'error');
++        }
++      }
++      return false;
++    } finally {
++      syncPendingKeysRef.current.delete(actionKey);
++      if (syncGenerationRef.current === mutationGen) {
++        setPendingKeys(new Set(syncPendingKeysRef.current));
++      }
+     }
+   };
+ 
+@@ -497,6 +883,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         toggleWatchlist,
+         toggleFavorite,
+         rateMovie,
++        removeRating,
+         isWatchlisted,
+         isFavorite,
+         getRating,
+@@ -504,7 +891,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         isLibraryLoading,
+         libraryError,
+         refetchLibrary: loadLibraryForCurrentActor,
+-        isGuestMode: !isAuthenticated,
++        isGuestMode: status === 'guest',
+         toasts,
+         showToast,
+         dismissToast,
+diff --git a/frontend/tests/m1_behavior_suite.mjs b/frontend/tests/m1_behavior_suite.mjs
+index 5cc18b8..5d1e049 100644
+--- a/frontend/tests/m1_behavior_suite.mjs
++++ b/frontend/tests/m1_behavior_suite.mjs
+@@ -1,234 +1,459 @@
+ import test from 'node:test';
+ import assert from 'node:assert/strict';
+-
+-// Helper mock localStorage
+-class MockLocalStorage {
+-  constructor() {
+-    this.store = {};
+-  }
+-  getItem(key) {
+-    return Object.prototype.hasOwnProperty.call(this.store, key) ? this.store[key] : null;
+-  }
+-  setItem(key, value) {
+-    this.store[key] = String(value);
+-  }
+-  removeItem(key) {
+-    delete this.store[key];
+-  }
+-  clear() {
+-    this.store = {};
+-  }
+-}
+-
+-// Behavioral Simulation of Auth & Library State Machines as implemented in AuthContext & WatchlistContext
+-
+-test('1. Auth login preserves verbatim raw password with spaces', async () => {
+-  let capturedBody = null;
+-  const mockFetch = async (url, opts) => {
+-    capturedBody = JSON.parse(opts.body);
+-    return {
+-      ok: true,
+-      status: 200,
+-      json: async () => ({
+-        success: true,
+-        data: {
+-          token: 'token_123',
+-          id: 1,
+-          username: 'alex',
+-          email: 'alex@dippie.com',
+-          role: 'ROLE_ADMIN',
++import fs from 'node:fs';
++import path from 'node:path';
++import vm from 'node:vm';
++import { fileURLToPath } from 'node:url';
++import { createRequire } from 'node:module';
++
++const __dirname = path.dirname(fileURLToPath(import.meta.url));
++const root = path.resolve(__dirname, '../..');
++const require = createRequire(import.meta.url);
++const ts = require(path.resolve(__dirname, '../node_modules/typescript'));
++
++const authFile = path.resolve(__dirname, '../lib/context/AuthContext.tsx');
++const libFile = path.resolve(__dirname, '../lib/context/WatchlistContext.tsx');
++
++const turn = () => new Promise((resolve) => setImmediate(resolve));
++const deferred = () => {
++  let resolve, reject;
++  const promise = new Promise((a, b) => {
++    resolve = a;
++    reject = b;
++  });
++  return { promise, resolve, reject };
++};
++const ok = (data) => ({ ok: true, status: 200, json: async () => ({ success: true, data }) });
++
++function makeHarness(file, provider, fetcher, authContextRef) {
++  const slots = [];
++  let index = 0;
++  let effects = [];
++  let changed = false;
++  let value;
++
++  const same = (a, b) => a && b && a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
++
++  const hooks = {
++    createContext: () => ({ Provider: 'Provider' }),
++    useContext: () => null,
++    useState(initial) {
++      const i = index++;
++      if (!slots[i]) slots[i] = { v: typeof initial === 'function' ? initial() : initial };
++      return [
++        slots[i].v,
++        (v) => {
++          slots[i].v = typeof v === 'function' ? v(slots[i].v) : v;
++          changed = true;
+         },
+-      }),
+-    };
++      ];
++    },
++    useRef(initial) {
++      const i = index++;
++      if (!slots[i]) slots[i] = { current: initial };
++      return slots[i];
++    },
++    useCallback(fn, deps) {
++      const i = index++;
++      if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { v: fn, deps };
++      return slots[i].v;
++    },
++    useEffect(fn, deps) {
++      const i = index++;
++      if (!slots[i] || !same(slots[i].deps, deps)) {
++        const prev = slots[i];
++        slots[i] = { deps, cleanup: prev?.cleanup };
++        effects.push(() => {
++          slots[i].cleanup?.();
++          slots[i].cleanup = fn();
++        });
++      }
++    },
++    useMemo(fn, deps) {
++      const i = index++;
++      if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { v: fn(), deps };
++      return slots[i].v;
++    },
++    createElement(type, props, ...children) {
++      return { type, props: { ...props, children } };
++    },
+   };
+ 
+-  const rawPassword = '  mySecret Password 456  ';
+-  const cleanInput = 'alex'.trim();
+-
+-  // Test that raw password is sent verbatim
+-  const res = await mockFetch('http://localhost:8080/api/auth/login', {
+-    method: 'POST',
+-    headers: { 'Content-Type': 'application/json' },
+-    body: JSON.stringify({ usernameOrEmail: cleanInput, password: rawPassword }),
+-  });
+-  const json = await res.json();
+-
+-  assert.equal(capturedBody.password, '  mySecret Password 456  ');
+-  assert.equal(capturedBody.usernameOrEmail, 'alex');
+-  assert.equal(json.data.token, 'token_123');
+-});
++  const storage = new Map();
++  const localStorage = {
++    getItem: (k) => storage.get(k) ?? null,
++    setItem: (k, v) => storage.set(k, String(v)),
++    removeItem: (k) => storage.delete(k),
++    clear: () => storage.clear(),
++  };
+ 
+-test('2. Server error / down does NOT create fake user or fake JWT token', async () => {
+-  const localStorage = new MockLocalStorage();
+-  const mockFetch = async () => {
+-    throw new Error('Failed to fetch: Connection refused');
++  const timers = new Map();
++  let timerId = 0;
++  const module = { exports: {} };
++
++  const rawCode = fs.readFileSync(file, 'utf8');
++  const code = ts.transpileModule(rawCode, {
++    compilerOptions: {
++      module: ts.ModuleKind.CommonJS,
++      jsx: ts.JsxEmit.React,
++      esModuleInterop: true,
++      target: ts.ScriptTarget.ES2020,
++    },
++  }).outputText;
++
++  const context = {
++    module,
++    exports: module.exports,
++    process: { env: {} },
++    console,
++    AbortController,
++    DOMException,
++    fetch: fetcher,
++    window: {},
++    localStorage,
++    setTimeout: (fn, ms) => {
++      const id = ++timerId;
++      timers.set(id, { fn, ms });
++      return id;
++    },
++    clearTimeout: (id) => timers.delete(id),
++    require: (name) => {
++      if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
++      if (name === './AuthContext') return { useAuth: () => authContextRef.current };
++      return {};
++    },
+   };
+ 
+-  let user = null;
+-  let token = null;
+-  let errorMsg = null;
++  vm.runInNewContext(code, context, { filename: file });
++
++  function render() {
++    index = 0;
++    changed = false;
++    const res = module.exports[provider]({ children: null });
++    value = res.props.value;
++    const pending = effects;
++    effects = [];
++    pending.forEach((fn) => fn());
++    return value;
++  }
+ 
+-  try {
+-    await mockFetch('http://localhost:8080/api/auth/login', {
+-      method: 'POST',
+-      body: JSON.stringify({ usernameOrEmail: 'alex', password: 'password123' }),
+-    });
+-  } catch (err) {
+-    errorMsg = 'Không thể kết nối đến máy chủ xác thực.';
+-    // Verifying no token or user created
++  async function settle() {
++    for (let i = 0; i < 8; i++) {
++      await turn();
++      if (changed || i === 0) render();
++    }
++    return value;
+   }
+ 
+-  assert.equal(user, null);
+-  assert.equal(token, null);
+-  assert.equal(localStorage.getItem('dippie_auth_token'), null);
+-  assert.equal(localStorage.getItem('dippie_auth_user'), null);
+-  assert.equal(errorMsg, 'Không thể kết nối đến máy chủ xác thực.');
++  return { render, settle, storage, get value() { return value; }, timers };
++}
++
++const makeActor = (id, overrides = {}) => ({
++  user: { id, username: `user${id}`, email: `user${id}@example.test`, role: 'ROLE_USER' },
++  token: `token${id}`,
++  status: 'authenticated',
++  isAuthenticated: true,
++  handleSessionExpired: () => {},
++  ...overrides,
+ });
+ 
+-test('3. Malformed success payload missing token or id is rejected', async () => {
+-  const mockFetch = async () => ({
+-    ok: true,
+-    status: 200,
+-    json: async () => ({
+-      success: true,
+-      data: {
+-        // missing token and id
+-        username: 'alex',
+-      },
+-    }),
++test('1. Auth login sends verbatim raw password with spaces', async () => {
++  let capturedBody = null;
++  const h = makeHarness(authFile, 'AuthProvider', async (url, opts) => {
++    if (opts?.body) capturedBody = JSON.parse(opts.body);
++    return ok({
++      id: 1,
++      token: 'valid-token',
++      username: 'alice',
++      email: 'alice@example.test',
++      role: 'ROLE_USER',
++    });
+   });
+ 
+-  const res = await mockFetch();
+-  const json = await res.json();
++  h.render();
++  await h.settle();
+ 
+-  const isValidSession = Boolean(json.success && json.data && json.data.token && json.data.id);
+-  assert.equal(isValidSession, false, 'Payload lacking token and id must not create a valid session');
++  const res = await h.value.login('alice', '  raw password with spaces  ');
++  assert.equal(res.success, true);
++  assert.equal(capturedBody.password, '  raw password with spaces  ');
++  assert.equal(capturedBody.usernameOrEmail, 'alice');
+ });
+ 
+-test('4. Session verification (/me): 401 clears stored token and returns to guest', async () => {
+-  const localStorage = new MockLocalStorage();
+-  localStorage.setItem('dippie_auth_token', 'expired_jwt_abc');
+-  localStorage.setItem('dippie_auth_user', JSON.stringify({ id: 1, username: 'alex' }));
+-
+-  const mockFetch = async () => ({
+-    ok: false,
+-    status: 401,
+-    json: async () => ({
+-      success: false,
+-      message: 'Token expired',
+-    }),
+-  });
++test('2. R1 (P1): Logout while response JSON is pending does NOT resurrect session', async () => {
++  const body = deferred();
++  const h = makeHarness(authFile, 'AuthProvider', async () => ({
++    ok: true,
++    status: 200,
++    json: () => body.promise,
++  }));
+ 
+-  let status = 'checking';
+-  let token = localStorage.getItem('dippie_auth_token');
++  h.render();
++  await h.settle();
+ 
+-  const res = await mockFetch();
+-  if (res.status === 401 || res.status === 403) {
+-    localStorage.removeItem('dippie_auth_token');
+-    localStorage.removeItem('dippie_auth_user');
+-    token = null;
+-    status = 'guest';
+-  }
++  const loginPromise = h.value.login('alice', 'secret');
++  await turn();
+ 
+-  assert.equal(status, 'guest');
+-  assert.equal(token, null);
+-  assert.equal(localStorage.getItem('dippie_auth_token'), null);
+-});
++  // User logs out while res.json() is still in-flight
++  h.value.logout();
++  await h.settle();
++  assert.equal(h.value.status, 'guest');
++  assert.equal(h.storage.has('dippie_auth_token'), false);
+ 
+-test('5. Generation guard: late in-flight response after logout is discarded (no resurrection)', async () => {
+-  const localStorage = new MockLocalStorage();
+-  let generation = 1;
+-  let activeUser = null;
++  // Late arrival of JSON body
++  body.resolve({
++    success: true,
++    data: { id: 1, username: 'alice', email: 'alice@example.test', token: 'stale-token' },
++  });
++  await loginPromise;
++  await h.settle();
+ 
+-  // Start login request with generation 1
+-  const requestGen = generation;
++  // Must NOT restore alice or write token to localStorage!
++  assert.equal(h.value.status, 'guest');
++  assert.equal(h.value.user, null);
++  assert.equal(h.storage.has('dippie_auth_token'), false);
++});
+ 
+-  // In the meantime, user clicks logout -> generation bumps to 2
+-  generation += 1;
+-  activeUser = null;
+-  localStorage.removeItem('dippie_auth_token');
++test('3. R1: Runtime validation rejects malformed auth payloads', async () => {
++  // Non-string token, invalid ID, missing email/username
++  const h = makeHarness(authFile, 'AuthProvider', async () =>
++    ok({ id: 'bad-id', token: { unexpected: true } })
++  );
+ 
+-  // Delayed response arrives from generation 1
+-  const delayedResponse = {
+-    token: 'delayed_jwt_123',
+-    id: 1,
+-    username: 'alex',
+-  };
++  h.render();
++  await h.settle();
+ 
+-  if (requestGen === generation) {
+-    activeUser = delayedResponse;
+-    localStorage.setItem('dippie_auth_token', delayedResponse.token);
+-  }
++  const res = await h.value.login('alice', 'password');
++  await h.settle();
+ 
+-  // Generation guard successfully prevented resurrecting old user
+-  assert.equal(activeUser, null);
+-  assert.equal(localStorage.getItem('dippie_auth_token'), null);
++  assert.equal(res.success, false);
++  assert.equal(h.value.status, 'guest');
++  assert.equal(h.value.user, null);
+ });
+ 
+-test('6. Guest initial state is empty: no demo items seeded', () => {
+-  const localStorage = new MockLocalStorage();
++test('4. R2 (P1): Late mutation failure from User A does NOT affect User B', async () => {
++  const write = deferred();
++  const auth = { current: makeActor(1) };
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (opts?.method) return write.promise;
++      return Promise.resolve(
++        ok(url.endsWith('watchlist') ? [{ movieId: auth.current.user.id === 1 ? 'A-private-film' : 'B-film' }] : [])
++      );
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++
++  // User A initiates mutation
++  const mutationA = h.value.toggleWatchlist('A-new-film');
++  await h.settle();
++
++  // Switch actor to User B
++  auth.current = makeActor(2);
++  h.render();
++  await h.settle();
++
++  const bInitial = [...h.value.watchlist];
++  assert.deepEqual(bInitial, ['B-film']);
++
++  // Mutation A fails late
++  write.reject(new Error('A write failed late on network'));
++  await mutationA;
++  await h.settle();
++
++  // User B's watchlist must NOT be corrupted with User A's snapshot!
++  assert.deepEqual(h.value.watchlist, ['B-film']);
++  assert.equal(h.value.toasts.length, 0); // No error toast displayed to User B
++});
+ 
+-  const readGuest = () => {
+-    const raw = localStorage.getItem('dippie_guest_library_v1');
+-    if (!raw) return { watchlist: [], favorites: [], ratings: {} };
+-    return JSON.parse(raw);
+-  };
++test('5. R3: Synchronous pending lock prevents duplicate writes in same tick', async () => {
++  const pending = deferred();
++  const auth = { current: makeActor(1) };
++  let writes = 0;
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (opts?.method) {
++        writes++;
++        return pending.promise;
++      }
++      return Promise.resolve(ok([]));
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++
++  // Two identical calls in the exact same tick
++  const fn = h.value.toggleWatchlist;
++  const a = fn('movie-x');
++  const b = fn('movie-x');
++  await h.settle();
++
++  // Only 1 write must be sent; second call returns false immediately
++  assert.equal(writes, 1);
++  assert.equal(await b, false);
++
++  pending.resolve(ok({}));
++  await a;
++  await h.settle();
++});
+ 
+-  const guestData = readGuest();
+-  assert.deepEqual(guestData.watchlist, []);
+-  assert.deepEqual(guestData.favorites, []);
+-  assert.deepEqual(guestData.ratings, {});
+-  assert.equal(guestData.watchlist.includes('afterlight'), false);
+-  assert.equal(guestData.watchlist.includes('quiet-places'), false);
+-  assert.equal(guestData.favorites.includes('the-last-orbit'), false);
++test('6. R3: Targeted rollback: X failure retains successfully added Y', async () => {
++  const writeX = deferred();
++  const auth = { current: makeActor(1) };
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (!opts?.method) return Promise.resolve(ok([]));
++      const body = JSON.parse(opts.body);
++      if (body.movieId === 'X') return writeX.promise;
++      return Promise.resolve(ok({}));
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++
++  // Add X (in flight)
++  const opX = h.value.toggleWatchlist('X');
++  await h.settle();
++
++  // Add Y (succeeds immediately)
++  const opY = h.value.toggleWatchlist('Y');
++  await h.settle();
++  await opY;
++
++  assert.deepEqual([...h.value.watchlist].sort(), ['X', 'Y']);
++
++  // X fails late
++  writeX.reject(new Error('X failed'));
++  await opX;
++  await h.settle();
++
++  // Y must NOT be lost due to snapshot rollback!
++  assert.deepEqual([...h.value.watchlist], ['Y']);
+ });
+ 
+-test('7. Empty backend library replaces state with empty (no union merge with demo/guest items)', () => {
+-  let inMemoryWatchlist = ['guest_film_1'];
+-  const backendResponse = []; // backend returns empty
++test('7. R4: Unavailable and checking sessions do NOT write to guest storage', async () => {
++  const auth = { current: makeActor(1, { status: 'unavailable', isAuthenticated: false, user: null }) };
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    () => { throw new Error('Unexpected fetch in unavailable state'); },
++    auth
++  );
+ 
+-  // Authoritative replace without union
+-  inMemoryWatchlist = [...backendResponse];
++  h.render();
++  await h.settle();
+ 
+-  assert.deepEqual(inMemoryWatchlist, []);
+-});
++  assert.equal(h.value.isGuestMode, false); // isGuestMode is strictly false when unavailable
+ 
+-test('8. Actor isolation: User A -> Logout -> User B has zero leakage', async () => {
+-  // User A state
+-  let currentActor = 'UserA';
+-  let libraryState = { watchlist: ['filmA'], favorites: ['favA'], ratings: { filmA: 9 } };
++  const res = await h.value.toggleWatchlist('account-click');
++  await h.settle();
+ 
+-  assert.deepEqual(libraryState.watchlist, ['filmA']);
++  assert.equal(res, false);
++  // Guest storage must remain untouched
++  assert.equal(h.storage.has('dippie_guest_library_v1'), false);
++});
+ 
+-  // Logout action: synchronously purges library
+-  currentActor = 'guest';
+-  libraryState = { watchlist: [], favorites: [], ratings: {} };
+-  assert.deepEqual(libraryState.watchlist, []);
+-  assert.deepEqual(libraryState.favorites, []);
++test('8. R4: 401 response on mutation triggers handleSessionExpired', async () => {
++  let expiredCalled = false;
++  const auth = {
++    current: makeActor(1, {
++      handleSessionExpired: () => {
++        expiredCalled = true;
++      },
++    }),
++  };
+ 
+-  // User B logs in: loads only User B data
+-  currentActor = 'UserB';
+-  const backendDataUserB = { watchlist: ['filmB'], favorites: [], ratings: {} };
+-  libraryState = { ...backendDataUserB };
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (opts?.method) return Promise.resolve({ ok: false, status: 401, json: async () => ({}) });
++      return Promise.resolve(ok([]));
++    },
++    auth
++  );
+ 
+-  assert.deepEqual(libraryState.watchlist, ['filmB']);
+-  assert.equal(libraryState.watchlist.includes('filmA'), false, 'User B must never see User A data');
+-});
++  h.render();
++  await h.settle();
+ 
+-test('9. Optimistic update rollbacks on backend write failure', async () => {
+-  let watchlist = ['the-last-orbit'];
+-  const prevWatchlist = [...watchlist];
++  const res = await h.value.toggleWatchlist('movie-1');
++  await h.settle();
+ 
+-  // Optimistic add of new movie
+-  const newMovie = 'spirited-away';
+-  watchlist = [...watchlist, newMovie];
+-  assert.deepEqual(watchlist, ['the-last-orbit', 'spirited-away']);
++  assert.equal(res, false);
++  assert.equal(expiredCalled, true);
++});
+ 
+-  // Simulate network failure on backend POST
+-  const backendFailed = true;
+-  if (backendFailed) {
+-    watchlist = prevWatchlist; // Rollback
+-  }
++test('9. R4: Same-actor refresh failure preserves confirmed items', async () => {
++  let shouldFail = false;
++  const auth = { current: makeActor(1) };
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url) => {
++      if (shouldFail) return Promise.resolve({ ok: false, status: 500 });
++      return Promise.resolve(ok(url.endsWith('watchlist') ? [{ movieId: 'confirmed-film' }] : []));
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++  assert.deepEqual(h.value.watchlist, ['confirmed-film']);
++
++  // Network fails during refresh for same actor
++  shouldFail = true;
++  await h.value.refetchLibrary();
++  await h.settle();
++
++  // Error is shown, but previously confirmed items are NOT wiped out
++  assert.notEqual(h.value.libraryError, null);
++  assert.deepEqual(h.value.watchlist, ['confirmed-film']);
++});
+ 
+-  assert.deepEqual(watchlist, ['the-last-orbit'], 'Watchlist must rollback to original state on failure');
++test('10. R7: removeRating removes rating and sends DELETE request', async () => {
++  let deletedMovieId = null;
++  const auth = { current: makeActor(1) };
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (opts?.method === 'DELETE' && url.includes('/ratings/')) {
++        deletedMovieId = url.split('/').pop();
++        return Promise.resolve(ok({}));
++      }
++      return Promise.resolve(
++        ok(url.endsWith('ratings') ? [{ movieId: 'film-abc', rating: 9 }] : [])
++      );
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++  assert.equal(h.value.ratings['film-abc'], 9);
++
++  const res = await h.value.removeRating('film-abc', 'Film ABC');
++  await h.settle();
++
++  assert.equal(res, true);
++  assert.equal(deletedMovieId, 'film-abc');
++  assert.equal(h.value.ratings['film-abc'], undefined);
++  assert.deepEqual(h.value.watchlist, []); // Watchlist remains untouched!
+ });
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java b/backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java
+new file mode 100644
+index e69de29..0542a4c 100644
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java
+@@ -0,0 +1,27 @@
++package com.dippie.moviercm.config;
++
++import com.dippie.moviercm.dto.ApiResponse;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.MethodArgumentNotValidException;
++import org.springframework.web.bind.annotation.ExceptionHandler;
++import org.springframework.web.bind.annotation.RestControllerAdvice;
++
++@RestControllerAdvice
++public class GlobalExceptionHandler {
++
++    @ExceptionHandler(IllegalArgumentException.class)
++    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
++        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
++                .body(ApiResponse.error(ex.getMessage()));
++    }
++
++    @ExceptionHandler(MethodArgumentNotValidException.class)
++    public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
++        String message = ex.getBindingResult().getFieldError() != null
++                ? ex.getBindingResult().getFieldError().getDefaultMessage()
++                : "Dữ liệu yêu cầu không hợp lệ";
++        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
++                .body(ApiResponse.error(message));
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/LibraryPersistenceHelper.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/LibraryPersistenceHelper.java
+new file mode 100644
+index e69de29..9284c4e 100644
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/LibraryPersistenceHelper.java
+@@ -0,0 +1,47 @@
++package com.dippie.moviercm.service;
++
++import com.dippie.moviercm.entity.FavoriteItem;
++import com.dippie.moviercm.entity.MovieRating;
++import com.dippie.moviercm.entity.WatchlistItem;
++import com.dippie.moviercm.repository.FavoriteItemRepository;
++import com.dippie.moviercm.repository.MovieRatingRepository;
++import com.dippie.moviercm.repository.WatchlistItemRepository;
++import org.springframework.stereotype.Component;
++import org.springframework.transaction.annotation.Propagation;
++import org.springframework.transaction.annotation.Transactional;
++
++/**
++ * Helper bean isolating single-item library persistence in dedicated REQUIRES_NEW transactions.
++ * This guarantees that concurrent insert collisions (triggering DataIntegrityViolationException
++ * due to unique constraints) do not mark the outer calling transaction as rollback-only.
++ */
++@Component
++public class LibraryPersistenceHelper {
++
++    private final WatchlistItemRepository watchlistRepository;
++    private final FavoriteItemRepository favoriteRepository;
++    private final MovieRatingRepository ratingRepository;
++
++    public LibraryPersistenceHelper(WatchlistItemRepository watchlistRepository,
++                                    FavoriteItemRepository favoriteRepository,
++                                    MovieRatingRepository ratingRepository) {
++        this.watchlistRepository = watchlistRepository;
++        this.favoriteRepository = favoriteRepository;
++        this.ratingRepository = ratingRepository;
++    }
++
++    @Transactional(propagation = Propagation.REQUIRES_NEW)
++    public WatchlistItem saveWatchlistItem(WatchlistItem item) {
++        return watchlistRepository.saveAndFlush(item);
++    }
++
++    @Transactional(propagation = Propagation.REQUIRES_NEW)
++    public FavoriteItem saveFavoriteItem(FavoriteItem item) {
++        return favoriteRepository.saveAndFlush(item);
++    }
++
++    @Transactional(propagation = Propagation.REQUIRES_NEW)
++    public MovieRating saveMovieRating(MovieRating item) {
++        return ratingRepository.saveAndFlush(item);
++    }
++}

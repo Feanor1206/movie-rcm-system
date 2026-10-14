@@ -1,0 +1,442 @@
+diff --git a/backend/fastapi/services/qwen_service.py b/backend/fastapi/services/qwen_service.py
+index 6784a6e..0ab5dd5 100644
+--- a/backend/fastapi/services/qwen_service.py
++++ b/backend/fastapi/services/qwen_service.py
+@@ -278,10 +278,14 @@ class QwenRecommendationService:
+         self._inference_semaphore = threading.BoundedSemaphore(self.max_concurrent_inference)
+         self._load_lock = threading.Lock()
+ 
+-        # 6. Đường dẫn artifact
+-        self.configured_base_model_name: Optional[str] = base_model_name or os.getenv("BASE_MODEL_NAME")
+-        self.base_model_name = self.configured_base_model_name or "Qwen/Qwen3-4B"
+-        self._explicit_base_model = bool(base_model_name or os.getenv("BASE_MODEL_NAME"))
++        # 6. Đường dẫn artifact và cấu hình base model
++        self.constructor_base_model: Optional[str] = base_model_name
++        self._has_explicit_constructor_base: bool = (base_model_name is not None)
++        self.configured_env_base: Optional[str] = os.getenv("BASE_MODEL_NAME")
++        self._has_explicit_env_base: bool = bool(self.configured_env_base and self.configured_env_base.strip())
++        self.configured_base_model_name: Optional[str] = self.constructor_base_model or self.configured_env_base
++        self.base_model_name: str = self.configured_base_model_name or "Qwen/Qwen3-4B"
++        self._explicit_base_model: bool = self._has_explicit_constructor_base or self._has_explicit_env_base
+         self.phase23_adapter_dir = phase23_adapter_dir or os.getenv("PHASE23_ADAPTER_DIR", "../../ai/models/qwen3-4b-phase23-lora")
+         self.model_name_or_path = model_name_or_path or os.getenv("MODEL_NAME_OR_PATH", "../../ai/models/qwen-0.6b")
+ 
+@@ -389,33 +393,38 @@ class QwenRecommendationService:
+         except Exception:
+             pass
+ 
+-    def _resolve_gguf_file(self) -> Optional[str]:
+-        """Giải quyết đường dẫn file .gguf cụ thể từ cấu hình hoặc các thư mục chuẩn."""
+-        if self.resolved_gguf_path:
+-            return self.resolved_gguf_path
+-
+-        # Nếu model_name_or_path được cấu hình trực tiếp là file .gguf
+-        if self.model_name_or_path and self.model_name_or_path.lower().endswith(".gguf"):
+-            return str(Path(self.model_name_or_path).as_posix())
+-
+-        # Nếu là thư mục hoặc cần tìm kiếm trong các đường dẫn tiêu chuẩn
++    def _get_gguf_search_candidates(self) -> List[Path]:
++        """Danh sách đường dẫn ứng viên để tìm kiếm file GGUF."""
+         base_dir = Path(__file__).resolve().parent
+-        candidates: List[Path] = [
+-            Path(self.model_name_or_path),
++        candidates: List[Path] = []
++        if self.model_name_or_path:
++            candidates.append(Path(self.model_name_or_path))
++        candidates.extend([
+             Path("/app/models/qwen-0.6b"),
+             base_dir / "../../ai/models/qwen-0.6b",
+             Path("../../ai/models/qwen-0.6b"),
+             Path("../ai/models/qwen-0.6b"),
+             Path("D:/Class/movie-rcm-system/ai/models/qwen-0.6b"),
+             Path("D:/A+ test/ai/models/qwen-0.6b"),
+-        ]
++        ])
++        return candidates
+ 
++    def _resolve_gguf_file(self) -> Optional[str]:
++        """
++        Giải quyết đường dẫn file .gguf cụ thể từ cấu hình hoặc các thư mục chuẩn.
++        Configured explicit file tồn tại có ưu tiên; missing file tiếp tục search candidates.
++        Chỉ trả về đường dẫn file thực tế, không trả directory hoặc non-existent path.
++        """
++        if self.resolved_gguf_path and os.path.isfile(self.resolved_gguf_path):
++            return self.resolved_gguf_path
++
++        candidates = self._get_gguf_search_candidates()
+         for c in candidates:
+             try:
+                 if c.is_file() and c.suffix.lower() == ".gguf":
+                     return str(c.as_posix())
+                 elif c.is_dir():
+-                    found = list(c.glob("*.gguf"))
++                    found = sorted(list(c.glob("*.gguf")))
+                     if found:
+                         return str(found[0].as_posix())
+             except Exception:
+@@ -434,18 +443,37 @@ class QwenRecommendationService:
+         target_device = self._resolve_device(self.device_config)
+ 
+         cfg_file = adapter_path / "adapter_config.json"
+-        base_model_name = self.base_model_name
++        adapter_base: Optional[str] = None
+         if cfg_file.exists():
+             try:
+                 cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
+-                adapter_base = cfg.get("base_model_name_or_path")
+-                if adapter_base:
+-                    env_base = os.getenv("BASE_MODEL_NAME")
+-                    if not env_base or env_base == "Qwen/Qwen3-4B" or not self._explicit_base_model:
+-                        base_model_name = adapter_base
++                raw_adapter_base = cfg.get("base_model_name_or_path")
++                if raw_adapter_base and isinstance(raw_adapter_base, str) and raw_adapter_base.strip():
++                    adapter_base = raw_adapter_base.strip()
+             except Exception:
+                 pass
+ 
++        # Precedence:
++        # 1. Constructor base_model_name explicit
++        # 2. BASE_MODEL_NAME explicit từ environment
++        # 3. Adapter metadata nếu cả hai không khai báo
++        # 4. Default Qwen/Qwen3-4B
++        current_env = os.getenv("BASE_MODEL_NAME")
++        env_explicit = (current_env.strip() if current_env and current_env.strip() else None)
++        if not env_explicit and self._has_explicit_env_base and self.configured_env_base and self.configured_env_base.strip():
++            env_explicit = self.configured_env_base.strip()
++
++        if self._has_explicit_constructor_base and self.constructor_base_model and self.constructor_base_model.strip():
++            base_model_name = self.constructor_base_model.strip()
++        elif env_explicit:
++            base_model_name = env_explicit
++        elif adapter_base:
++            base_model_name = adapter_base
++        else:
++            base_model_name = "Qwen/Qwen3-4B"
++
++        self.base_model_name = base_model_name
++
+         logger.info(f"Đang nạp tokenizer từ: {adapter_path}")
+         self.tokenizer = AutoTokenizer.from_pretrained(str(adapter_path), trust_remote_code=True)
+ 
+@@ -683,7 +711,7 @@ class QwenRecommendationService:
+                 active_base_model = self.active_base_model_name
+             elif gguf_resolved:
+                 active_base_model = os.path.basename(gguf_resolved)
+-            elif self.model_name_or_path.endswith(".gguf"):
++            elif self.model_name_or_path.endswith(".gguf") and os.path.isfile(self.model_name_or_path):
+                 active_base_model = os.path.basename(self.model_name_or_path)
+             else:
+                 active_base_model = "Qwen3-0.6B-Q8_0.gguf"
+diff --git a/backend/fastapi/tests/test_serving.py b/backend/fastapi/tests/test_serving.py
+index d511da7..70efd1d 100644
+--- a/backend/fastapi/tests/test_serving.py
++++ b/backend/fastapi/tests/test_serving.py
+@@ -25,6 +25,7 @@ import threading
+ import time
+ import unittest
+ from pathlib import Path
++from typing import Optional
+ from unittest.mock import patch, MagicMock
+ 
+ # Đảm bảo import được backend/fastapi
+@@ -613,14 +614,16 @@ class TestServingGateway(unittest.TestCase):
+             cfg_file.write_text(json.dumps({"base_model_name_or_path": "Qwen/Qwen2.5-3B-Instruct"}), encoding="utf-8")
+             (tmp_path / "adapter_model.safetensors").write_text("fake_weights", encoding="utf-8")
+ 
+-            # Configured default là Qwen/Qwen3-4B
+-            service = QwenRecommendationService(
+-                serving_mode="full",
+-                device="cuda",
+-                phase23_adapter_dir=str(tmp_path)
+-            )
+-            with patch.object(service, "_resolve_phase23_adapter", return_value=tmp_path):
+-                service.load_model()
++            # Cô lập env khỏi .env máy: không có explicit constructor / env -> adapter metadata được dùng
++            with patch.dict(os.environ, {}, clear=False):
++                os.environ.pop("BASE_MODEL_NAME", None)
++                service = QwenRecommendationService(
++                    serving_mode="full",
++                    device="cuda",
++                    phase23_adapter_dir=str(tmp_path)
++                )
++                with patch.object(service, "_resolve_phase23_adapter", return_value=tmp_path):
++                    service.load_model()
+ 
+             self.assertTrue(service.is_loaded)
+             self.assertTrue(service.phase23_adapter_loaded)
+@@ -639,48 +642,91 @@ class TestServingGateway(unittest.TestCase):
+             self.assertEqual(health["fallbackModelPath"], service.model_name_or_path)
+ 
+     # -------------------------------------------------------------------------
+-    # 20. Light GGUF: giải quyết từ file tường minh và directory sang file cụ thể
++    # 20. Light GGUF: direct filesystem helper regression tests (không mock _resolve_gguf_file)
+     # -------------------------------------------------------------------------
+     def test_20_light_gguf_resolved_from_directory_and_explicit_file(self):
+-        # 20a. Explicit GGUF file
+-        service_file = QwenRecommendationService(
+-            serving_mode="light",
+-            model_name_or_path="custom/path/Qwen3-0.6B-Custom.gguf"
+-        )
+-        with patch.dict("sys.modules", {"llama_cpp": MagicMock()}):
+-            with patch.object(service_file, "_resolve_gguf_file", return_value="custom/path/Qwen3-0.6B-Custom.gguf"):
+-                with patch("os.path.exists", return_value=True):
+-                    service_file.load_model()
+-
+-        self.assertTrue(service_file.is_loaded)
+-        self.assertTrue(service_file.is_gguf)
+-        self.assertEqual(service_file.active_base_model_name, "Qwen3-0.6B-Custom.gguf")
+-        h_file = service_file.get_health_status()
+-        self.assertEqual(h_file["activeBaseModelName"], "Qwen3-0.6B-Custom.gguf")
+-        self.assertIsNone(h_file["activeAdapterPath"])
+-        self.assertEqual(h_file["fallbackModelPath"], "custom/path/Qwen3-0.6B-Custom.gguf")
+-
+-        # 20b. Directory configured - loader giải quyết sang file .gguf cụ thể (không trả tên thư mục)
+-        service_dir = QwenRecommendationService(
+-            serving_mode="light",
+-            model_name_or_path="../../ai/models/qwen-0.6b"
+-        )
+-        with patch.dict("sys.modules", {"llama_cpp": MagicMock()}):
+-            with patch.object(service_dir, "_resolve_gguf_file", return_value="../../ai/models/qwen-0.6b/Qwen3-0.6B-Q8_0.gguf"):
+-                with patch("os.path.exists", return_value=True):
+-                    service_dir.load_model()
++        import tempfile
++        with tempfile.TemporaryDirectory() as tmp_dir_str:
++            tmp_root = Path(tmp_dir_str)
+ 
+-        self.assertTrue(service_dir.is_loaded)
+-        self.assertTrue(service_dir.is_gguf)
+-        self.assertNotEqual(service_dir.active_base_model_name, "qwen-0.6b")
+-        self.assertEqual(service_dir.active_base_model_name, "Qwen3-0.6B-Q8_0.gguf")
++            # 20a. Configured explicit valid file -> resolver trả đúng file đó
++            valid_file = tmp_root / "explicit_model.gguf"
++            valid_file.write_text("dummy gguf content", encoding="utf-8")
+ 
+-        h_dir = service_dir.get_health_status()
+-        self.assertEqual(h_dir["activeBaseModelName"], "Qwen3-0.6B-Q8_0.gguf")
+-        self.assertNotEqual(h_dir["activeBaseModelName"], "qwen-0.6b")
+-        self.assertIsNone(h_dir["activeAdapterPath"])
+-        self.assertIn("Qwen3-0.6B-Q8_0.gguf", h_dir["modelNameOrPath"])
+-        self.assertEqual(h_dir["fallbackModelPath"], "../../ai/models/qwen-0.6b")
++            svc_explicit = QwenRecommendationService(
++                serving_mode="light",
++                model_name_or_path=str(valid_file)
++            )
++            resolved_explicit = svc_explicit._resolve_gguf_file()
++            self.assertIsNotNone(resolved_explicit)
++            self.assertEqual(Path(resolved_explicit).resolve(), valid_file.resolve())
++            self.assertTrue(os.path.isfile(resolved_explicit))
++
++            with patch.dict("sys.modules", {"llama_cpp": MagicMock()}):
++                svc_explicit.load_model()
++            self.assertTrue(svc_explicit.is_loaded)
++            self.assertTrue(svc_explicit.is_gguf)
++            self.assertEqual(svc_explicit.active_base_model_name, "explicit_model.gguf")
++            h_file = svc_explicit.get_health_status()
++            self.assertEqual(h_file["activeBaseModelName"], "explicit_model.gguf")
++            self.assertIsNone(h_file["activeAdapterPath"])
++
++            # 20b. Configured directory chứa GGUF -> resolver trả file cụ thể, không trả tên thư mục
++            model_dir = tmp_root / "model_dir"
++            model_dir.mkdir(parents=True, exist_ok=True)
++            dir_file = model_dir / "Qwen3-0.6B-Q8_0.gguf"
++            dir_file.write_text("dummy gguf in dir", encoding="utf-8")
++
++            svc_dir = QwenRecommendationService(
++                serving_mode="light",
++                model_name_or_path=str(model_dir)
++            )
++            with patch.object(svc_dir, "_get_gguf_search_candidates", return_value=[model_dir]):
++                resolved_dir = svc_dir._resolve_gguf_file()
++            self.assertIsNotNone(resolved_dir)
++            self.assertEqual(Path(resolved_dir).resolve(), dir_file.resolve())
++            self.assertTrue(os.path.isfile(resolved_dir))
++            self.assertNotEqual(Path(resolved_dir).name, "model_dir")
++            self.assertEqual(Path(resolved_dir).name, "Qwen3-0.6B-Q8_0.gguf")
++
++            with patch.dict("sys.modules", {"llama_cpp": MagicMock()}):
++                with patch.object(svc_dir, "_get_gguf_search_candidates", return_value=[model_dir]):
++                    svc_dir.load_model()
++            self.assertTrue(svc_dir.is_loaded)
++            self.assertTrue(svc_dir.is_gguf)
++            self.assertEqual(svc_dir.active_base_model_name, "Qwen3-0.6B-Q8_0.gguf")
++            self.assertNotEqual(svc_dir.active_base_model_name, "model_dir")
++            h_dir = svc_dir.get_health_status()
++            self.assertEqual(h_dir["activeBaseModelName"], "Qwen3-0.6B-Q8_0.gguf")
++
++            # 20c. Configured file missing, standard search candidate valid -> tiếp tục search và chọn valid candidate
++            missing_configured_file = tmp_root / "missing_config.gguf"
++            std_search_dir = tmp_root / "std_search_candidate"
++            std_search_dir.mkdir(parents=True, exist_ok=True)
++            std_file = std_search_dir / "Qwen3-0.6B-Fallback.gguf"
++            std_file.write_text("dummy fallback gguf", encoding="utf-8")
++
++            svc_fallback = QwenRecommendationService(
++                serving_mode="light",
++                model_name_or_path=str(missing_configured_file)
++            )
++            with patch.object(svc_fallback, "_get_gguf_search_candidates", return_value=[missing_configured_file, std_search_dir]):
++                resolved_fallback = svc_fallback._resolve_gguf_file()
++            self.assertIsNotNone(resolved_fallback)
++            self.assertEqual(Path(resolved_fallback).resolve(), std_file.resolve())
++            self.assertTrue(os.path.isfile(resolved_fallback))
++            self.assertNotEqual(Path(resolved_fallback).resolve(), missing_configured_file.resolve())
++
++            # 20d. Không có file ở bất kỳ candidate nào -> resolver trả None
++            empty_candidate_dir = tmp_root / "empty_dir"
++            empty_candidate_dir.mkdir(parents=True, exist_ok=True)
++            svc_none = QwenRecommendationService(
++                serving_mode="light",
++                model_name_or_path=str(missing_configured_file)
++            )
++            with patch.object(svc_none, "_get_gguf_search_candidates", return_value=[missing_configured_file, empty_candidate_dir]):
++                resolved_none = svc_none._resolve_gguf_file()
++            self.assertIsNone(resolved_none)
+ 
+     # -------------------------------------------------------------------------
+     # 21. Normalizer-only: không có active LLM/adapter, legacy field giữ nhãn string
+@@ -756,6 +802,79 @@ class TestServingGateway(unittest.TestCase):
+         self.assertIsNone(h_after_clean["activeAdapterPath"])
+         self.assertEqual(h_after_clean["modelNameOrPath"], "Qwen/Qwen3-4B")
+ 
++    # -------------------------------------------------------------------------
++    # 23. Base model selection precedence matrix (6 scenarios)
++    # -------------------------------------------------------------------------
++    @patch("transformers.AutoTokenizer.from_pretrained")
++    @patch("transformers.AutoModelForCausalLM.from_pretrained")
++    @patch("peft.PeftModel.from_pretrained")
++    @patch("torch.cuda.is_available", return_value=True)
++    def test_23_base_model_selection_precedence_matrix(self, mock_cuda, mock_peft, mock_base, mock_tok):
++        import tempfile
++
++        def create_test_adapter(tmp_path: Path, meta_base: Optional[str]) -> Path:
++            adapter_dir = tmp_path / f"adapter_{meta_base.replace('/', '_') if meta_base else 'none'}"
++            adapter_dir.mkdir(parents=True, exist_ok=True)
++            cfg = {}
++            if meta_base is not None:
++                cfg["base_model_name_or_path"] = meta_base
++            (adapter_dir / "adapter_config.json").write_text(json.dumps(cfg), encoding="utf-8")
++            (adapter_dir / "adapter_model.safetensors").write_text("weights", encoding="utf-8")
++            return adapter_dir
++
++        with tempfile.TemporaryDirectory() as tmp_dir:
++            tmp_root = Path(tmp_dir)
++
++            scenarios = [
++                # 1. Không constructor/env -> adapter metadata được dùng
++                ("1_no_constructor_no_env_uses_adapter_meta", None, None, "Meta/AdapterBase", "Meta/AdapterBase"),
++                # 2. Constructor explicit khác adapter, env absent -> constructor được dùng
++                ("2_constructor_explicit_wins_over_adapter", "Caller/ExplicitBase", None, "Meta/AdapterBase", "Caller/ExplicitBase"),
++                # 3. Env explicit khác adapter, constructor absent -> env được dùng
++                ("3_env_explicit_wins_over_adapter", None, "Env/ExplicitBase", "Meta/AdapterBase", "Env/ExplicitBase"),
++                # 4. Constructor và env đều có -> constructor được dùng
++                ("4_constructor_wins_over_env_and_adapter", "Caller/ExplicitBase", "Env/ExplicitBase", "Meta/AdapterBase", "Caller/ExplicitBase"),
++                # 5. Env explicit đúng chuỗi default nhưng adapter khác -> env vẫn được dùng
++                ("5_env_explicit_default_string_wins_over_adapter", None, "Qwen/Qwen3-4B", "Meta/AdapterBase", "Qwen/Qwen3-4B"),
++                # 6. Không có explicit/metadata -> default được dùng
++                ("6_no_explicit_no_metadata_uses_default", None, None, None, "Qwen/Qwen3-4B"),
++            ]
++
++            for case_id, c_arg, env_val, a_meta, expected in scenarios:
++                with self.subTest(case=case_id):
++                    mock_base.reset_mock()
++                    adapter_dir = create_test_adapter(tmp_root, a_meta)
++
++                    with patch.dict(os.environ, {}, clear=False):
++                        if env_val is not None:
++                            os.environ["BASE_MODEL_NAME"] = env_val
++                        else:
++                            os.environ.pop("BASE_MODEL_NAME", None)
++
++                        kwargs = {
++                            "serving_mode": "full",
++                            "device": "cuda",
++                            "phase23_adapter_dir": str(adapter_dir)
++                        }
++                        if c_arg is not None:
++                            kwargs["base_model_name"] = c_arg
++
++                        svc = QwenRecommendationService(**kwargs)
++                        with patch.object(svc, "_resolve_phase23_adapter", return_value=adapter_dir):
++                            svc.load_model()
++
++                        self.assertTrue(svc.is_loaded)
++                        self.assertTrue(svc.phase23_adapter_loaded)
++                        mock_base.assert_called_once()
++                        called_base = mock_base.call_args[0][0]
++                        self.assertEqual(called_base, expected, f"Scenario {case_id} failed: expected {expected}, got {called_base}")
++                        self.assertEqual(svc.active_base_model_name, expected)
++
++                        health = svc.get_health_status()
++                        self.assertEqual(health["status"], "healthy")
++                        self.assertEqual(health["activeBaseModelName"], expected)
++                        self.assertEqual(health["modelNameOrPath"], expected)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/docs/SERVING_GUIDE.md b/docs/SERVING_GUIDE.md
+index 1e7d7b2..3ee2cb4 100644
+--- a/docs/SERVING_GUIDE.md
++++ b/docs/SERVING_GUIDE.md
+@@ -68,6 +68,26 @@ Hệ thống hỗ trợ 2 chế độ phục vụ suy luận rõ ràng:
+ 
+ ---
+ 
++### 2.1 Thứ Tự Ưu Tiên Xác Định Base Model (Base Model Precedence)
++
++Khi phục vụ ở chế độ Full PEFT LoRA (`SERVING_MODE=full`), base model được loader phân giải theo thứ tự ưu tiên nghiêm ngặt:
++1. **Tham số Constructor `base_model_name` tường minh:** Nếu caller truyền trực tiếp vào constructor `QwenRecommendationService(base_model_name=...)`.
++2. **Biến môi trường `BASE_MODEL_NAME` tường minh:** Nếu được khai báo trong environment/`.env`. Không suy đoán là implicit chỉ vì giá trị trùng với chuỗi mặc định `"Qwen/Qwen3-4B"`.
++3. **Adapter Metadata (`base_model_name_or_path`):** Trích xuất từ file `adapter_config.json` nếu cả constructor và biến môi trường đều không khai báo.
++4. **Mặc định hệ thống:** Fallback về `"Qwen/Qwen3-4B"` nếu không có bất kỳ cấu hình explicit hay metadata nào.
++
++Trạng thái health (`/health`) luôn phản ánh trung thực base model thực tế được loader sử dụng thông qua trường `activeBaseModelName`.
++
++### 2.2 Chính Sách Giải Quyết File GGUF (GGUF Resolution Policy)
++
++Khi phục vụ ở chế độ Light hoặc Fallback GGUF (`SERVING_MODE=light`), file GGUF được giải quyết qua helper `_resolve_gguf_file()`:
++1. **Configured file tường minh:** Nếu `MODEL_NAME_OR_PATH` trỏ tới file `.gguf` cụ thể và file đó **tồn tại thực tế trên đĩa**, file này được ưu tiên sử dụng.
++2. **Configured directory:** Nếu `MODEL_NAME_OR_PATH` là một thư mục, helper tìm kiếm file `*.gguf` bên trong và trả về đường dẫn file cụ thể (không trả tên thư mục).
++3. **Fallback search candidates:** Nếu file cấu hình bị thiếu (missing) hoặc không hợp lệ, hệ thống không fail sớm mà tiếp tục duyệt qua danh sách các candidate chuẩn (`/app/models/qwen-0.6b`, `../../ai/models/qwen-0.6b`, v.v.).
++4. **Normalizer fallback:** Nếu không tìm thấy file `.gguf` hợp lệ ở bất kỳ candidate nào, resolver trả về `None` và kích hoạt chế độ `Phase 23 Deterministic Normalizer`.
++
++---
++
+ ## 3. Cách Chạy Trên Môi Trường Local (Windows)
+ 
+ ### 3.1 Khởi chạy Chế độ Chính (Full Model Qwen3-4B + LoRA)
+@@ -323,7 +343,7 @@ docker compose up -d fastapi
+ 
+ ## 7. Kết Quả Kiểm Thử (Unit Tests & Integration Tests)
+ 
+-### 7.1 Bộ kiểm thử Unit Tests Offline (18 test cases)
++### 7.1 Bộ kiểm thử Unit Tests Offline (23 test cases)
+ Bộ kiểm thử `backend/fastapi/tests/test_serving.py` mock 100% inference và loader, không tải trọng số từ internet và không chiếm giữ GPU:
+ 
+ - **Chạy với pytest (Base Python)**:
+@@ -333,11 +353,11 @@ C:\Users\Admin\anaconda3\python.exe -m pytest tests/test_serving.py -v
+ ```
+ - **Chạy với unittest (Conda env `dippie-qwen`)**:
+ ```powershell
+-$env:HF_HUB_OFFLINE="1"; $env:TRANSFORMERS_OFFLINE="1"
++$env:HF_HUB_OFFLINE="1"; $env:TRANSFORMERS_OFFLINE="1"; $env:RUN_FULL_INTEGRATION="0"
+ C:\Users\Admin\anaconda3\envs\dippie-qwen\python.exe -m unittest tests/test_serving.py
+ ```
+ 
+-Kết quả: **18 passed (100% OK)** bao phủ:
++Kết quả: **23 passed (100% OK)** bao phủ:
+ 1. Artifact tồn tại nhưng model chưa load.
+ 2. Adapter thiếu hoặc không hợp lệ.
+ 3. Full PEFT load thành công.
+@@ -356,6 +376,11 @@ Kết quả: **18 passed (100% OK)** bao phủ:
+ 16. Full mode + fallback false: Output JSON lỗi trả HTTP 502 (không che bằng normalizer).
+ 17. Full mode + fallback false: Output hợp lệ bảo toàn chuẩn hóa tất định (HTTP 200).
+ 18. Health status phân biệt rõ `activeBaseModelName`, `activeAdapterPath`, `fallbackModelPath`.
++19. Base resolution theo adapter metadata khi không có explicit constructor hay env configuration.
++20. GGUF resolver kiểm thử filesystem trực tiếp qua temporary files (explicit file, directory chứa GGUF, missing file fallback standard candidates, và missing all candidates).
++21. Normalizer-only mode: không có active model hay adapter khi thiếu weights.
++22. Unloaded và failed load: không giữ lại stale active identities.
++23. Ma trận ưu tiên xác định base model (6 kịch bản precedence nghiêm ngặt).
+ 
+ ### 7.2 Full-Model GPU Integration Tests
+ File tách biệt: `backend/fastapi/tests/test_serving_integration.py` (chỉ chạy khi kích hoạt chủ động cờ `RUN_FULL_INTEGRATION=1`):

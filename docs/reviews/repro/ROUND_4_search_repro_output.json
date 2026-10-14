@@ -1,0 +1,21 @@
+[
+  {
+    "scenario": "delayed router update B arrives after user typed C",
+    "pushes": [
+      "/search?q=B"
+    ],
+    "before": "C",
+    "after": "B"
+  },
+  {
+    "scenario": "old empty data while new query pending",
+    "showsNoResultsForNew": true,
+    "showsLoading": true
+  },
+  {
+    "scenario": "year and size URL options sent to browseCatalog",
+    "yearMin": null,
+    "yearMax": null,
+    "size": 12
+  }
+]

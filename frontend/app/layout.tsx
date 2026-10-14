@@ -11,15 +11,15 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Dippie — Nền tảng gợi ý & khám phá phim điện ảnh',
+  title: 'Dippie — Khám phá phim hoạt hình & gợi ý thông minh',
   description:
-    'Dippie là nền tảng khám phá phim chuẩn điện ảnh với trợ lý gợi ý phim thông minh CineBot và giao diện tối giản Đen/Đỏ/Trắng.',
-  keywords: ['movies', 'cinema', 'gợi ý phim', 'xem phim', 'film discovery', 'CineBot'],
-  authors: [{ name: 'Dippie Cinema' }],
+    'Dippie là nền tảng khám phá phim hoạt hình nhẹ nhàng, không spoil, hỗ trợ chọn phim nhanh với trợ lý thông minh CineBot và giao diện xanh lá tinh tế.',
+  keywords: ['hoạt hình', 'animation', 'anime', 'gợi ý hoạt hình', 'khám phá phim', 'CineBot'],
+  authors: [{ name: 'Dippie Animation' }],
 };
 
 export const viewport: Viewport = {
-  themeColor: '#000000',
+  themeColor: '#090d0b',
   colorScheme: 'dark',
   width: 'device-width',
   initialScale: 1,
@@ -32,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className={`${inter.variable} dark`}>
-      <body className="min-h-screen bg-black font-sans text-foreground antialiased selection:bg-cinema-red selection:text-white">
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-brand selection:text-white">
         <AuthProvider>
           <WatchlistProvider>{children}</WatchlistProvider>
         </AuthProvider>

@@ -1,0 +1,55 @@
+{
+  "artifact": "PHASE23_FINAL_TEST_GOLD_V1_AUDIT",
+  "gold_source_counts": {
+    "DETERMINISTIC": 304,
+    "HUMAN_REVIEWED_WITH_DETERMINISTIC_SCHEMA_NORMALIZATION": 196
+  },
+  "id_sequence": "TST00001..TST00500 EXACT",
+  "output": {
+    "file": "phase23_test_gold_final_v1.jsonl",
+    "sha256": "66715c4d9b901aaa5231ecb631d0b7da76a729fb46cda14335524dd392ab2e82"
+  },
+  "rows": 500,
+  "sources": {
+    "deterministic_rows": 304,
+    "human_reviewed_rows": 196,
+    "human_reviewed_sha256": "ae28845ac1b8e72838fc0386217b60caa81d035472a51b53ea5dac09e6b618a4",
+    "note": "Uploaded deterministic copy has a transport-level byte hash different from the prior repo-local freeze hash; parsed content passed 304-row, ID, task-distribution, schema, and merged complement audits before use.",
+    "repo_original_deterministic_sha256_from_prior_freeze": "22302b420a43ad73385055328d92a8ab3efb1ba23e403148a95f713cd5d408ff",
+    "uploaded_deterministic_copy_sha256": "89de9531aa5fb330369aa7cc66bd8bc0d272b0290ae8ceda2b9616ccdf39a8f5"
+  },
+  "state": "PASS",
+  "task_counts": {
+    "AMBIGUOUS_REFERENCE": 12,
+    "CONFLICTING_YEAR": 12,
+    "CONVERSATIONAL_PATCH": 65,
+    "DIVERSIFY": 17,
+    "GENRE_EXCLUDE": 27,
+    "GENRE_INCLUDE": 27,
+    "INVALID_COUNT": 10,
+    "MULTI_CONSTRAINT": 50,
+    "NO_OP": 7,
+    "PERSONALIZATION": 17,
+    "QUERY_ONLY": 30,
+    "QUERY_REFERENCE": 30,
+    "REFERENCE_ONLY": 25,
+    "RESULT_COUNT": 18,
+    "UNRESOLVED_REFERENCE": 13,
+    "UNSUPPORTED_FACET": 30,
+    "YEAR_INCLUSIVE_FROM": 23,
+    "YEAR_INCLUSIVE_UNTIL": 18,
+    "YEAR_RANGE": 23,
+    "YEAR_STRICT_AFTER": 23,
+    "YEAR_STRICT_BEFORE": 23
+  },
+  "validation": {
+    "exact_id_sequence": "PASS",
+    "human_semantic_invariants": "196/196 PASS",
+    "json_schema": "500/500 PASS",
+    "patch_keep_absent": "PASS",
+    "patch_remove_null": "PASS",
+    "task_distribution": "PASS",
+    "unique_user_text": "500/500 PASS",
+    "vi_mixed_question_mark_corruption": 0
+  }
+}

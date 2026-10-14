@@ -59,7 +59,11 @@ services:
       - movie_network
 
   # =========================================================================
-  # 4. BACKEND FASTAPI (AI Recommendation & Qwen Pipeline)
+  # 4. BACKEND FASTAPI (AI Recommendation & Qwen Phase 23 Serving Pipeline)
+  # =========================================================================
+  # Chế độ chính (Full Serving): Qwen3-4B + Phase 23 LoRA trên GPU (NF4 4-bit)
+  # Chế độ nhẹ (Light Serving): Đổi SERVING_MODE=light, USE_FULL_QWEN3_4B_LORA=false,
+  #                              DEVICE=cpu, và comment khối deploy GPU reservation.
   # =========================================================================
   fastapi:
     build:
@@ -70,10 +74,27 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8000
-      - MODEL_NAME_OR_PATH=Qwen/Qwen2.5-0.5B-Instruct
-      - DEVICE=cpu
+      - SERVING_MODE=full
+      - USE_FULL_QWEN3_4B_LORA=true
+      - DEVICE=cuda
+      - BASE_MODEL_NAME=Qwen/Qwen3-4B
+      - PHASE23_ADAPTER_DIR=/app/models/qwen3-4b-phase23-lora
+      - MODEL_NAME_OR_PATH=/app/models/qwen-0.6b/Qwen3-0.6B-Q8_0.gguf
+      - ENABLE_FALLBACK=false
+      - STRICT_READINESS=true
+      - MAX_CONCURRENT_INFERENCE=1
+      - MAX_NEW_TOKENS=256
+      - HF_HOME=/root/.cache/huggingface
     volumes:
       - ../ai/models:/app/models:ro
+      - hf_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     expose:
       - "8000"
     networks:
@@ -123,3 +144,4 @@ networks:
 
 volumes:
   pgdata:
+  hf_cache:

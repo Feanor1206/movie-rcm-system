@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "roundId": 7,
+  "promptVersion": 7,
+  "runId": "run-round7-20261014-0852",
+  "milestone": "M2",
+  "state": "ready_for_review",
+  "startedAt": "2026-10-14T08:52:00+07:00",
+  "targetDurationMinutes": 30,
+  "goal": "Sửa chung D1–D3 (tách vòng đời similar khỏi main detail, Hero pending/uncertain intent, Profile metadata TTL/cleanup), bổ sung cross-surface journey regression tests và catalog data handoff/preview",
+  "lastCompletedStep": "Đã hoàn thành toàn bộ nhiệm vụ Vòng 7: sửa D1–D3, 53/53 tests PASS, build/typecheck PASS, preview dry-run PASS, bàn giao patch/manifest/report",
+  "nextStep": "Chờ Codex review Vòng 7"
+}

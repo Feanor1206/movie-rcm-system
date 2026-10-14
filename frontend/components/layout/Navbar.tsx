@@ -40,16 +40,16 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-surface-border bg-background/90 backdrop-blur-md">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Brand Logo & Links */}
         <div className="flex items-center gap-8">
           <Link
             href="/"
-            className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white outline-none focus-visible:ring-2 focus-visible:ring-cinema-red rounded px-1"
+            className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
           >
             <span className="tracking-tighter font-extrabold text-2xl">DIPPIE</span>
-            <span className="h-2 w-2 rounded-full bg-cinema-red" />
+            <span className="h-2 w-2 rounded-full bg-brand" />
           </Link>
 
           {/* Desktop Nav Items */}
@@ -81,7 +81,7 @@ export function Navbar() {
           {/* Chatbot Trigger */}
           <button
             onClick={openChat}
-            className="rounded-md border border-zinc-700 bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-cinema-red hover:text-white cursor-pointer"
+            className="rounded-md border border-surface-border bg-surface-elevated px-3.5 py-1.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-brand hover:text-white cursor-pointer"
           >
             Hỏi CineBot
           </button>
@@ -90,7 +90,7 @@ export function Navbar() {
           <Link
             href="/search"
             aria-label="Tìm kiếm phim"
-            className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer"
+            className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer"
           >
             <Search size={14} />
             <span>Tìm kiếm</span>
@@ -101,9 +101,9 @@ export function Navbar() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer"
               >
-                <div className="grid h-6 w-6 place-items-center rounded bg-cinema-red text-[11px] font-bold text-white">
+                <div className="grid h-6 w-6 place-items-center rounded bg-brand text-[11px] font-bold text-zinc-950 shadow-brand-sm">
                   {getInitials(user.fullName || user.username)}
                 </div>
                 <span className="font-medium max-w-[100px] truncate">
@@ -113,8 +113,8 @@ export function Navbar() {
 
               {/* Dropdown Menu */}
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl animate-fade-in z-50">
-                  <div className="px-2.5 py-2 border-b border-zinc-850">
+                <div className="absolute right-0 mt-2 w-52 rounded-lg border border-surface-border bg-surface-elevated p-2 shadow-2xl animate-fade-in z-50">
+                  <div className="px-2.5 py-2 border-b border-surface-border">
                     <p className="text-xs font-bold text-white truncate">{user.fullName || user.username}</p>
                     <p className="text-[11px] text-zinc-400 truncate">{user.email}</p>
                   </div>
@@ -123,20 +123,20 @@ export function Navbar() {
                     <Link
                       href="/profile"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
+                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-surface-hover hover:text-white transition-colors"
                     >
                       <UserCheck size={14} /> Hồ sơ cá nhân
                     </Link>
                     <Link
                       href="/profile"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
+                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-surface-hover hover:text-white transition-colors"
                     >
                       <Bookmark size={14} /> Watchlist ({watchlist.length})
                     </Link>
                   </div>
 
-                  <div className="mt-1.5 pt-1.5 border-t border-zinc-850">
+                  <div className="mt-1.5 pt-1.5 border-t border-surface-border">
                     <button
                       onClick={() => {
                         setUserDropdownOpen(false);
@@ -153,7 +153,7 @@ export function Navbar() {
           ) : (
             <button
               onClick={() => openAuthModal('login')}
-              className="rounded-md bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-white hover:border-cinema-red hover:bg-cinema-red transition-all cursor-pointer"
+              className="rounded-md bg-surface border border-surface-border px-3 py-1.5 text-xs font-semibold text-zinc-100 hover:border-brand hover:bg-brand hover:text-zinc-950 transition-all cursor-pointer shadow-sm hover:shadow-brand-sm"
             >
               Đăng nhập
             </button>
@@ -165,14 +165,14 @@ export function Navbar() {
           {isAuthenticated ? (
             <Link
               href="/profile"
-              className="grid h-8 w-8 place-items-center rounded bg-cinema-red text-xs font-bold text-white"
+              className="grid h-8 w-8 place-items-center rounded bg-brand text-xs font-bold text-zinc-950 shadow-brand-sm"
             >
               {getInitials(user?.fullName || user?.username)}
             </Link>
           ) : (
             <button
               onClick={() => openAuthModal('login')}
-              className="rounded bg-cinema-red px-2.5 py-1 text-xs font-bold text-white cursor-pointer"
+              className="rounded bg-brand px-2.5 py-1 text-xs font-bold text-zinc-950 hover:bg-brand-hover active:bg-brand-active cursor-pointer shadow-brand-sm"
             >
               Đăng nhập
             </button>
@@ -181,7 +181,7 @@ export function Navbar() {
           <button
             aria-label={open ? 'Đóng menu' : 'Mở menu'}
             onClick={() => setOpen(!open)}
-            className="rounded-md border border-zinc-800 bg-zinc-900 p-2 text-zinc-300 hover:text-white cursor-pointer"
+            className="rounded-md border border-surface-border bg-surface p-2 text-zinc-300 hover:text-white cursor-pointer"
           >
             {open ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -190,7 +190,7 @@ export function Navbar() {
 
       {/* Mobile Drawer */}
       {open && (
-        <div className="border-b border-zinc-800 bg-black px-5 py-5 md:hidden animate-slide-up">
+        <div className="border-b border-surface-border bg-background px-5 py-5 md:hidden animate-slide-up">
           <div className="flex flex-col gap-3">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -200,12 +200,12 @@ export function Navbar() {
                   href={link.href}
                   onClick={() => setOpen(false)}
                   className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium ${
-                    isActive ? 'bg-zinc-900 text-white font-bold' : 'text-zinc-300 hover:bg-zinc-900/60'
+                    isActive ? 'bg-surface-elevated text-white font-bold border border-surface-border' : 'text-zinc-300 hover:bg-surface-hover'
                   }`}
                 >
                   <span>{link.name}</span>
                   {link.count !== undefined && link.count > 0 && (
-                    <span className="text-xs text-zinc-400 font-semibold">
+                    <span className="text-xs text-brand font-semibold">
                       ({link.count})
                     </span>
                   )}
@@ -213,7 +213,7 @@ export function Navbar() {
               );
             })}
 
-            <div className="pt-3 mt-2 border-t border-zinc-800 flex flex-col gap-2">
+            <div className="pt-3 mt-2 border-t border-surface-border flex flex-col gap-2">
               <button
                 onClick={() => {
                   setOpen(false);
@@ -221,14 +221,14 @@ export function Navbar() {
                 }}
                 className="btn-primary w-full justify-center text-xs"
               >
-                Hỏi CineBot gợi ý phim
+                Hỏi CineBot gợi ý hoạt hình
               </button>
               <Link
                 href="/search"
                 onClick={() => setOpen(false)}
                 className="btn-secondary w-full justify-center text-xs"
               >
-                Tìm kiếm phim
+                Tìm kiếm hoạt hình
               </Link>
             </div>
           </div>

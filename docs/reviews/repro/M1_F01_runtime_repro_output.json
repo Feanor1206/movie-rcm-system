@@ -1,0 +1,26 @@
+[
+  {
+    "scenario": "late A 401 after B authenticated",
+    "expiryCalls": 1
+  },
+  {
+    "scenario": "first B render before effect-driven rerender",
+    "watchlist": [
+      "A-private-film"
+    ]
+  },
+  {
+    "scenario": "refresh while same-actor mutation pending",
+    "pending": true,
+    "watchlist": []
+  },
+  {
+    "scenario": "A finally releases B same-item lock",
+    "bWrites": 2
+  },
+  {
+    "scenario": "mutation body pending after headers",
+    "pending": true,
+    "activeTimerMs": []
+  }
+]

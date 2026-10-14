@@ -1,0 +1,197 @@
+﻿id,task_class,language,user_text,query_text,reference_text,reference_status,use_personalization,unsupported_facets_json,diversify,clarification_required,clarification_reason,clarification_question,requested_k,year_min,year_max,human_notes,annotation_status
+TST00070,AMBIGUOUS_REFERENCE,vi,"nay muốn tìm phim giống Rango hoặc Tokyo Godfathers; mình chưa chắc đang nói tới bộ nào, có gì không",,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00104,AMBIGUOUS_REFERENCE,en,need you to find something like The Breadwinner or The Secret of Kells; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00109,AMBIGUOUS_REFERENCE,vi,"đang muốn xem gì đó, tìm phim giống Ernest & Celestine hoặc The Breadwinner; mình chưa chắc đang nói tới bộ nào",,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00123,AMBIGUOUS_REFERENCE,vi,cho mình tìm phim giống Tokyo Godfathers hoặc The Tale of the Princess Kaguya; mình chưa chắc đang nói tới bộ nào nhé,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00186,AMBIGUOUS_REFERENCE,en,I'm in the mood to find something like Rango or Isle of Dogs; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00197,AMBIGUOUS_REFERENCE,en,I'm in the mood to find something like Isle of Dogs or The Secret of Kells; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00205,AMBIGUOUS_REFERENCE,en,looking for something — find something like Rango or The Tale of the Princess Kaguya; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00314,AMBIGUOUS_REFERENCE,en,I'm in the mood to find something like Ernest & Celestine or The Tale of the Princess Kaguya; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00430,AMBIGUOUS_REFERENCE,vi,"đang muốn xem gì đó, tìm phim giống Tokyo Godfathers hoặc The Secret of Kells; mình chưa chắc đang nói tới bộ nào",,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00449,AMBIGUOUS_REFERENCE,mixed,movie request của mình là: find something like The Breadwinner or The Secret of Kells; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00478,AMBIGUOUS_REFERENCE,en,looking for something — find something like Isle of Dogs or Tokyo Godfathers; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00479,AMBIGUOUS_REFERENCE,en,I'm in the mood to find something like The Breadwinner or Tokyo Godfathers; I'm not sure which one I mean,,,AMBIGUOUS_REFERENCE,,[],,TRUE,AMBIGUOUS_REFERENCE,,,,,,PENDING_HUMAN
+TST00009,CONFLICTING_YEAR,en,looking for something — find movies from 2011 and before 1980,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00025,CONFLICTING_YEAR,vi,cho mình tìm phim từ năm 2009 và trước năm 1998 nhé,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00036,CONFLICTING_YEAR,en,looking for something — find movies from 2010 and before 1982,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00071,CONFLICTING_YEAR,vi,kiếm giúp mình kiểu tìm phim từ năm 2009 và trước năm 1980,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00180,CONFLICTING_YEAR,en,need you to find movies from 2012 and before 1981,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00217,CONFLICTING_YEAR,en,I'm in the mood to find movies from 2005 and before 1987,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00225,CONFLICTING_YEAR,mixed,need phim kiểu find movies from 2009 and before 2004,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00318,CONFLICTING_YEAR,en,need you to find movies from 2005 and before 1985,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00345,CONFLICTING_YEAR,en,I'm in the mood to find movies from 2008 and before 1988,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00354,CONFLICTING_YEAR,vi,kiếm giúp mình kiểu tìm phim từ năm 2015 và trước năm 1976,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00428,CONFLICTING_YEAR,en,looking for something — find movies from 2006 and before 2002,,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00488,CONFLICTING_YEAR,vi,"nay muốn tìm phim từ năm 2017 và trước năm 1975, có gì không",,,NO_REFERENCE,,[],,TRUE,CONFLICTING_CONSTRAINTS,,,,,,PENDING_HUMAN
+TST00023,DIVERSIFY,en,looking for something — give me a diverse set of war movies about a dreamlike journey,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00032,DIVERSIFY,en,I'm in the mood to give me a diverse set of action movies about a friendship between unlikely characters,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00056,DIVERSIFY,en,looking for something — give me a diverse set of thriller movies about a friendship between unlikely characters,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00064,DIVERSIFY,vi,"đang muốn xem gì đó, gợi ý một danh sách phim bí ẩn đa dạng về một chuyến phiêu lưu kỳ lạ giàu cảm xúc",,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00136,DIVERSIFY,en,I'm in the mood to give me a diverse set of war movies about a story about memory and identity,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00153,DIVERSIFY,vi,cho mình gợi ý một danh sách phim tài liệu đa dạng về hành trình qua nhiều thế giới nhé,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00166,DIVERSIFY,en,need you to give me a diverse set of animated movies about a journey through a strange city,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00182,DIVERSIFY,en,any chance you can give me a diverse set of action movies about a rivalry that turns into friendship,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00286,DIVERSIFY,en,looking for something — give me a diverse set of drama movies about an unusual school adventure,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00332,DIVERSIFY,vi,cho mình gợi ý một danh sách phim tội phạm đa dạng về hành trình qua nhiều thế giới nhé,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00338,DIVERSIFY,vi,cho mình gợi ý một danh sách phim sci-fi đa dạng về một chuyến phiêu lưu ở trường học nhé,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00347,DIVERSIFY,vi,cho mình gợi ý một danh sách phim viễn tây đa dạng về một chuyến phiêu lưu kỳ lạ giàu cảm xúc nhé,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00440,DIVERSIFY,vi,kiếm giúp mình kiểu gợi ý một danh sách phim hành động đa dạng về một chuyến phiêu lưu kỳ lạ giàu cảm xúc,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00443,DIVERSIFY,vi,kiếm giúp mình kiểu gợi ý một danh sách phim hoạt hình đa dạng về một đứa trẻ khám phá thế giới xa lạ,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00445,DIVERSIFY,en,looking for something — give me a diverse set of action movies about a mysterious disappearing town,,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00447,DIVERSIFY,vi,"đang muốn xem gì đó, gợi ý một danh sách phim bí ẩn đa dạng về câu chuyện về mất mát và hồi phục",,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00455,DIVERSIFY,vi,"đang muốn xem gì đó, gợi ý một danh sách phim film noir đa dạng về một hành trình như trong mơ",,,NO_REFERENCE,,[],TRUE,FALSE,,,,,,,PENDING_HUMAN
+TST00090,INVALID_COUNT,vi,cho mình gợi ý đúng 200 bộ phim không quá dễ đoán nhé,,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00101,INVALID_COUNT,en,I'm in the mood to give me exactly 175 movie suggestions with expressive visuals,,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00121,INVALID_COUNT,vi,"đang muốn xem gì đó, gợi ý đúng 120 bộ phim có cảm giác khám phá rõ",,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00200,INVALID_COUNT,en,looking for something — give me exactly 110 movie suggestions with an unusual premise,,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00227,INVALID_COUNT,vi,"nay muốn gợi ý đúng 250 bộ phim không quá dễ đoán, có gì không",,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00228,INVALID_COUNT,en,need you to give me exactly 200 movie suggestions with strong character development,,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00243,INVALID_COUNT,vi,"nay muốn gợi ý đúng 175 bộ phim có cái kết đáng suy ngẫm, có gì không",,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00291,INVALID_COUNT,vi,"đang muốn xem gì đó, gợi ý đúng 150 bộ phim không quá dễ đoán",,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00322,INVALID_COUNT,vi,kiếm giúp mình kiểu gợi ý đúng 110 bộ phim có ý tưởng lạ,,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00441,INVALID_COUNT,vi,"nay muốn gợi ý đúng 175 bộ phim có câu chuyện gần gũi, có gì không",,,NO_REFERENCE,,[],,TRUE,INVALID_REQUESTED_K,,,,,,PENDING_HUMAN
+TST00041,PERSONALIZATION,en,looking for something — recommend something about a strange mystery involving dreams based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00053,PERSONALIZATION,en,any chance you can recommend something about a friendship between unlikely characters based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00066,PERSONALIZATION,en,any chance you can recommend something about an imaginative journey across worlds based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00085,PERSONALIZATION,vi,cho mình gợi ý phim về câu chuyện trưởng thành nhẹ nhàng dựa trên gu và lịch sử xem của mình nhé,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00087,PERSONALIZATION,vi,kiếm giúp mình kiểu gợi ý phim về một thị trấn bí ẩn nơi mọi người biến mất dựa trên gu và lịch sử xem của mình,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00113,PERSONALIZATION,vi,kiếm giúp mình kiểu gợi ý phim về câu chuyện trưởng thành hơi buồn dựa trên gu và lịch sử xem của mình,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00128,PERSONALIZATION,en,any chance you can recommend something about a journey through a strange city based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00274,PERSONALIZATION,vi,cho mình gợi ý phim về một hành trình như trong mơ dựa trên gu và lịch sử xem của mình nhé,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00284,PERSONALIZATION,en,any chance you can recommend something about a strange mystery involving dreams based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00358,PERSONALIZATION,mixed,movie request của mình là: recommend something about a rivalry that turns into friendship based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00399,PERSONALIZATION,en,I'm in the mood to recommend something about robots learning empathy based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00438,PERSONALIZATION,vi,cho mình gợi ý phim về hai đối thủ dần trở thành bạn dựa trên gu và lịch sử xem của mình nhé,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00454,PERSONALIZATION,en,looking for something — recommend something about a child exploring an unfamiliar world based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00460,PERSONALIZATION,vi,giúp mình cho mình gợi ý phim về hành trình qua nhiều thế giới dựa trên gu và lịch sử xem của mình nhé,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00475,PERSONALIZATION,en,I'm in the mood to recommend something about a story about grief and recovery based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00482,PERSONALIZATION,vi,kiếm giúp mình kiểu gợi ý phim về câu chuyện đi tìm người bạn mất tích dựa trên gu và lịch sử xem của mình,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00487,PERSONALIZATION,en,looking for something — recommend something about a magical journey with emotional stakes based on my taste and viewing history,,,NO_REFERENCE,TRUE,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00004,QUERY_ONLY,vi,"nay muốn tìm phim về một nhân vật bắt đầu lại cuộc sống có câu chuyện gần gũi, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00013,QUERY_ONLY,vi,"đang muốn xem gì đó, tìm phim về một chuyến phiêu lưu ở trường học không quá dễ đoán",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00024,QUERY_ONLY,en,need you to find a movie about a tale about protecting nature with memorable worldbuilding,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00028,QUERY_ONLY,en,I'm in the mood to find a movie about an unusual school adventure with a slow but rewarding build,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00047,QUERY_ONLY,vi,"nay muốn tìm phim về bí ẩn kỳ lạ liên quan đến giấc mơ có câu chuyện gần gũi, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00074,QUERY_ONLY,en,any chance you can find a movie about a story about memory and identity with an unusual premise,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00079,QUERY_ONLY,vi,"đang muốn xem gì đó, tìm phim về hai đối thủ dần trở thành bạn có thế giới được xây dựng thú vị",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00099,QUERY_ONLY,en,need you to find a movie about a child exploring an unfamiliar world that is not too predictable,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00116,QUERY_ONLY,en,any chance you can find a movie about an unusual school adventure with a thoughtful ending,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00132,QUERY_ONLY,vi,"đang muốn xem gì đó, tìm phim về một đứa trẻ khám phá thế giới xa lạ có hình ảnh giàu biểu cảm",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00156,QUERY_ONLY,vi,cho mình tìm phim về câu chuyện về mất mát và hồi phục có câu chuyện gần gũi nhé,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00158,QUERY_ONLY,en,need you to find a movie about a tale about protecting nature with a strong sense of discovery,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00195,QUERY_ONLY,en,looking for something — find a movie about a quiet coming-of-age story with an intimate story,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00215,QUERY_ONLY,en,I'm in the mood to find a movie about a dreamlike journey that feels emotionally grounded,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00220,QUERY_ONLY,vi,"nay muốn tìm phim về một gia đình hàn gắn mối quan hệ nhịp chậm nhưng đáng xem, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00223,QUERY_ONLY,en,looking for something — find a movie about a friendship between unlikely characters that is not too predictable,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00224,QUERY_ONLY,en,any chance you can find a movie about a character starting over with a thoughtful ending,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00234,QUERY_ONLY,vi,"đang muốn xem gì đó, tìm phim về một đứa trẻ khám phá thế giới xa lạ không quá dễ đoán",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00252,QUERY_ONLY,en,looking for something — find a movie about a tale about protecting nature with an intimate story,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00283,QUERY_ONLY,vi,cho mình tìm phim về một nhân vật bắt đầu lại cuộc sống không quá dễ đoán nhé,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00296,QUERY_ONLY,vi,kiếm giúp mình kiểu tìm phim về hành trình qua nhiều thế giới nhịp chậm nhưng đáng xem,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00320,QUERY_ONLY,vi,"nay muốn tìm phim về câu chuyện về mất mát và hồi phục có cảm xúc chân thật, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00321,QUERY_ONLY,mixed,need phim kiểu find a movie about a tale about protecting nature with a slow but rewarding build,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00366,QUERY_ONLY,vi,"nay muốn tìm phim về hai đối thủ dần trở thành bạn có phát triển nhân vật tốt, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00377,QUERY_ONLY,vi,"nay muốn tìm phim về câu chuyện về mất mát và hồi phục có thế giới được xây dựng thú vị, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00419,QUERY_ONLY,en,I'm in the mood to find a movie about a dreamlike journey with strong character development,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00422,QUERY_ONLY,en,I'm in the mood to find a movie about a tale about protecting nature with a slow but rewarding build,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00435,QUERY_ONLY,vi,"nay muốn tìm phim về hành trình qua nhiều thế giới có phát triển nhân vật tốt, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00477,QUERY_ONLY,vi,"nay muốn tìm phim về câu chuyện trưởng thành nhẹ nhàng có phát triển nhân vật tốt, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00484,QUERY_ONLY,en,looking for something — find a movie about a story about grief and recovery with an intimate story,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00002,QUERY_REFERENCE,vi,"nay muốn tìm phim giống Isle of Dogs, nhưng có hình ảnh giàu biểu cảm, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00006,QUERY_REFERENCE,vi,"kiếm giúp mình kiểu tìm phim giống Rango, nhưng có cảm xúc chân thật",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00016,QUERY_REFERENCE,vi,"kiếm giúp mình kiểu tìm phim giống The Tale of the Princess Kaguya, nhưng có phát triển nhân vật tốt",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00035,QUERY_REFERENCE,en,"any chance you can find something like Millennium Actress, but with an unusual premise",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00037,QUERY_REFERENCE,vi,"nay muốn tìm phim giống Ernest & Celestine, nhưng có thế giới được xây dựng thú vị, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00096,QUERY_REFERENCE,vi,"kiếm giúp mình kiểu tìm phim giống Tokyo Godfathers, nhưng không quá dễ đoán",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00119,QUERY_REFERENCE,vi,"kiếm giúp mình kiểu tìm phim giống Isle of Dogs, nhưng có cái kết đáng suy ngẫm",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00130,QUERY_REFERENCE,vi,"đang muốn xem gì đó, tìm phim giống Tokyo Godfathers, nhưng có ý tưởng lạ",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00202,QUERY_REFERENCE,mixed,"movie request của mình là: find something like Millennium Actress, but with an intimate story",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00233,QUERY_REFERENCE,mixed,"need phim kiểu find something like Ernest & Celestine, but with a thoughtful ending",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00245,QUERY_REFERENCE,vi,"nay muốn tìm phim giống The Secret of Kells, nhưng có ý tưởng lạ, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00246,QUERY_REFERENCE,en,"any chance you can find something like Ernest & Celestine, but with a strong sense of discovery",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00259,QUERY_REFERENCE,vi,"nay muốn tìm phim giống The Tale of the Princess Kaguya, nhưng không quá dễ đoán, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00269,QUERY_REFERENCE,vi,"kiếm giúp mình kiểu tìm phim giống The Secret of Kells, nhưng nhịp chậm nhưng đáng xem",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00272,QUERY_REFERENCE,en,"I'm in the mood to find something like Tokyo Godfathers, but with expressive visuals",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00311,QUERY_REFERENCE,vi,"nay muốn tìm phim giống The Secret of Kells, nhưng có phát triển nhân vật tốt, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00312,QUERY_REFERENCE,vi,"nay muốn tìm phim giống Tokyo Godfathers, nhưng có ý tưởng lạ, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00319,QUERY_REFERENCE,en,"I'm in the mood to find something like Ernest & Celestine, but with memorable worldbuilding",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00340,QUERY_REFERENCE,vi,"kiếm giúp mình kiểu tìm phim giống The Secret of Kells, nhưng có phát triển nhân vật tốt",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00367,QUERY_REFERENCE,en,"I'm in the mood to find something like Ernest & Celestine, but with expressive visuals",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00385,QUERY_REFERENCE,en,"looking for something — find something like Millennium Actress, but with an unusual premise",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00396,QUERY_REFERENCE,vi,"cho mình tìm phim giống The Tale of the Princess Kaguya, nhưng có phát triển nhân vật tốt nhé",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00417,QUERY_REFERENCE,vi,"nay muốn tìm phim giống Tokyo Godfathers, nhưng có cảm xúc chân thật, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00418,QUERY_REFERENCE,vi,"nay muốn tìm phim giống Ernest & Celestine, nhưng có cảm giác khám phá rõ, có gì không",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00420,QUERY_REFERENCE,en,"need you to find something like Rango, but with memorable worldbuilding",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00439,QUERY_REFERENCE,en,"looking for something — find something like The Tale of the Princess Kaguya, but with expressive visuals",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00452,QUERY_REFERENCE,mixed,"cho mình recommendation: find something like Millennium Actress, but that is not too predictable",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00467,QUERY_REFERENCE,vi,"đang muốn xem gì đó, tìm phim giống Isle of Dogs, nhưng không quá dễ đoán",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00483,QUERY_REFERENCE,en,"looking for something — find something like Ernest & Celestine, but with an unusual premise",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00492,QUERY_REFERENCE,en,"I'm in the mood to find something like The Secret of Kells, but that feels emotionally grounded",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00044,REFERENCE_ONLY,en,I'm in the mood to find something like Ernest & Celestine,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00062,REFERENCE_ONLY,en,any chance you can find something like The Tale of the Princess Kaguya,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00097,REFERENCE_ONLY,mixed,need phim kiểu find something like Rango,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00125,REFERENCE_ONLY,en,need you to find something like Tokyo Godfathers,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00127,REFERENCE_ONLY,en,looking for something — find something like Tokyo Godfathers,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00150,REFERENCE_ONLY,en,looking for something — find something like The Tale of the Princess Kaguya,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00175,REFERENCE_ONLY,en,looking for something — find something like Rango,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00183,REFERENCE_ONLY,en,need you to find something like The Secret of Kells,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00185,REFERENCE_ONLY,en,need you to find something like Millennium Actress,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00216,REFERENCE_ONLY,en,any chance you can find something like Ernest & Celestine,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00242,REFERENCE_ONLY,vi,"đang muốn xem gì đó, tìm phim giống Rango",,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00244,REFERENCE_ONLY,en,any chance you can find something like Tokyo Godfathers,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00261,REFERENCE_ONLY,en,looking for something — find something like Millennium Actress,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00281,REFERENCE_ONLY,en,please looking for something — find something like The Breadwinner,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00282,REFERENCE_ONLY,vi,kiếm giúp mình kiểu tìm phim giống The Secret of Kells,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00294,REFERENCE_ONLY,en,please any chance you can find something like Rango,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00327,REFERENCE_ONLY,en,please need you to find something like Tokyo Godfathers,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00341,REFERENCE_ONLY,en,any chance you can find something like Isle of Dogs,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00357,REFERENCE_ONLY,en,I'm in the mood to find something like Isle of Dogs,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00387,REFERENCE_ONLY,vi,cho mình tìm phim giống Isle of Dogs nhé,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00446,REFERENCE_ONLY,vi,kiếm giúp mình kiểu tìm phim giống Millennium Actress,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00458,REFERENCE_ONLY,en,looking for something — find something like Isle of Dogs,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00466,REFERENCE_ONLY,mixed,movie request của mình là: find something like The Tale of the Princess Kaguya,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00485,REFERENCE_ONLY,en,any chance you can find something like Millennium Actress,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00497,REFERENCE_ONLY,en,please I'm in the mood to find something like Millennium Actress,,,CLEAR_REFERENCE_TEXT,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00055,UNRESOLVED_REFERENCE,vi,kiếm giúp mình kiểu tìm phim tương tự cái tựa mình nhắc trước đó,,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00059,UNRESOLVED_REFERENCE,vi,cho mình gợi ý phim giống bộ mình nói ban nãy nhé,,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00107,UNRESOLVED_REFERENCE,mixed,movie request của mình là: find something similar to that title from before,,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00124,UNRESOLVED_REFERENCE,vi,kiếm giúp mình kiểu tìm bộ phim hoạt hình mình vừa nhắc lúc trước,,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00167,UNRESOLVED_REFERENCE,vi,"nay muốn gợi ý phim giống bộ mình nói ban nãy, có gì không",,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00236,UNRESOLVED_REFERENCE,vi,"giúp mình đang muốn xem gì đó, tìm bộ phim hoạt hình mình vừa nhắc lúc trước",,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00239,UNRESOLVED_REFERENCE,vi,kiếm giúp mình kiểu cho mình phim giống bộ hoạt hình lúc nãy ấy,,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00275,UNRESOLVED_REFERENCE,vi,kiếm giúp mình kiểu gợi ý phim giống bộ mình nói ban nãy,,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00337,UNRESOLVED_REFERENCE,vi,"giúp mình nay muốn tìm bộ phim hoạt hình mình vừa nhắc lúc trước, có gì không",,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00342,UNRESOLVED_REFERENCE,vi,"nay muốn tìm bộ phim hoạt hình mình vừa nhắc lúc trước, có gì không",,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00350,UNRESOLVED_REFERENCE,en,any chance you can find something similar to that title from before,,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00378,UNRESOLVED_REFERENCE,vi,"đang muốn xem gì đó, tìm phim tương tự cái tựa mình nhắc trước đó",,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00465,UNRESOLVED_REFERENCE,vi,"đang muốn xem gì đó, gợi ý phim giống bộ mình nói ban nãy",,,UNRESOLVED_REFERENCE,,[],,TRUE,UNRESOLVED_REFERENCE,,,,,,PENDING_HUMAN
+TST00046,UNSUPPORTED_FACET,en,I'm in the mood to find animation from Science SARU,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00054,UNSUPPORTED_FACET,en,I'm in the mood to find animation from Belgium,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00086,UNSUPPORTED_FACET,en,please any chance you can find something somber with an intimate story,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00093,UNSUPPORTED_FACET,en,looking for something — find something haunting with an intimate story,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00098,UNSUPPORTED_FACET,vi,cho mình tìm phim có cảm giác haunting có thế giới được xây dựng thú vị nhé,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00100,UNSUPPORTED_FACET,vi,"đang muốn xem gì đó, tìm phim hoạt hình của Tomm Moore",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00131,UNSUPPORTED_FACET,vi,"giúp mình đang muốn xem gì đó, tìm phim hoạt hình từ Canada",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00160,UNSUPPORTED_FACET,vi,"nay muốn tìm phim hoạt hình từ Canada, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00170,UNSUPPORTED_FACET,vi,kiếm giúp mình kiểu tìm phim hoạt hình của Tomm Moore,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00179,UNSUPPORTED_FACET,en,need you to find animation from Canada,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00190,UNSUPPORTED_FACET,vi,"nay muốn tìm phim hoạt hình của Studio Ponoc, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00209,UNSUPPORTED_FACET,vi,kiếm giúp mình kiểu tìm phim hoạt hình từ Belgium,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00254,UNSUPPORTED_FACET,vi,kiếm giúp mình kiểu tìm phim có cảm giác somber có câu chuyện gần gũi,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00255,UNSUPPORTED_FACET,en,looking for something — find animation from Canada,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00273,UNSUPPORTED_FACET,mixed,cho mình recommendation: find something strange and playful with an unusual premise,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00289,UNSUPPORTED_FACET,en,any chance you can find something quietly emotional with an intimate story,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00306,UNSUPPORTED_FACET,en,any chance you can find animation from Belgium,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00307,UNSUPPORTED_FACET,en,looking for something — find something strange and playful with strong character development,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00316,UNSUPPORTED_FACET,en,looking for something — find animation from Science SARU,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00346,UNSUPPORTED_FACET,mixed,cho mình recommendation: find something haunting with an intimate story,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00348,UNSUPPORTED_FACET,mixed,movie request của mình là: find animation by Nora Twomey,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00363,UNSUPPORTED_FACET,en,please I'm in the mood to find animation from Belgium,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00374,UNSUPPORTED_FACET,vi,cho mình tìm phim hoạt hình của Science SARU nhé,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00375,UNSUPPORTED_FACET,en,any chance you can find animation by Tomm Moore,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00393,UNSUPPORTED_FACET,vi,cho mình tìm phim có cảm giác quietly emotional có cảm giác khám phá rõ nhé,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00427,UNSUPPORTED_FACET,vi,giúp mình cho mình tìm phim có cảm giác strange and playful có phát triển nhân vật tốt nhé,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00453,UNSUPPORTED_FACET,vi,"giúp mình đang muốn xem gì đó, tìm phim hoạt hình của Studio Ponoc",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00464,UNSUPPORTED_FACET,vi,"giúp mình nay muốn tìm phim hoạt hình từ Canada, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00469,UNSUPPORTED_FACET,vi,"nay muốn tìm phim hoạt hình của Science SARU, có gì không",,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN
+TST00489,UNSUPPORTED_FACET,en,looking for something — find something quietly emotional with a thoughtful ending,,,NO_REFERENCE,,[],,FALSE,,,,,,,PENDING_HUMAN

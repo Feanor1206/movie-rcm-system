@@ -36,7 +36,10 @@ public class MovieResponse {
     public static MovieResponse fromEntity(Movie movie) {
         List<String> genreList = Collections.emptyList();
         if (movie.getGenres() != null && !movie.getGenres().trim().isEmpty()) {
-            genreList = Arrays.asList(movie.getGenres().split(","));
+            genreList = java.util.Arrays.stream(movie.getGenres().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(java.util.stream.Collectors.toList());
         }
 
         return builder()

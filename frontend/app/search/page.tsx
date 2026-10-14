@@ -10,8 +10,8 @@ export default function SearchPage() {
       <Suspense
         fallback={
           <div className="page-shell min-h-[75vh] py-16 flex items-center justify-center">
-            <div className="font-mono text-sm text-cinema-400 animate-pulse">
-              Loading Film Archive...
+            <div className="font-mono text-sm text-brand animate-pulse">
+              Đang tải kho phim hoạt hình...
             </div>
           </div>
         }

@@ -35,4 +35,12 @@ public class RatingController {
         MovieRating rating = ratingService.rateMovie(userDetails, request);
         return ResponseEntity.ok(ApiResponse.success("Movie rating saved successfully", rating));
     }
+
+    @DeleteMapping("/{movieId}")
+    public ResponseEntity<ApiResponse<Void>> deleteRating(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable String movieId) {
+        ratingService.deleteRating(userDetails, movieId);
+        return ResponseEntity.ok(ApiResponse.success("Movie rating removed successfully", null));
+    }
 }

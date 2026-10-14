@@ -18,13 +18,13 @@ app:
     allowed-origins: "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
 
 ---
-# Development Profile (H2 In-Memory Database - Auto-create tables & 50 users)
+# Development Profile (H2 Persistent File Database - Lưu vĩnh viễn trên ổ cứng)
 spring:
   config:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:h2:mem:moviercm_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
+    url: jdbc:h2:file:./data/moviercm_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
     driver-class-name: org.h2.Driver
     username: sa
     password: 
@@ -35,7 +35,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     show-sql: false
 
 ---
