@@ -1,13 +1,13 @@
 {
   "protocolVersion": 1,
-  "roundId": 7,
-  "promptVersion": 7,
-  "runId": "run-round7-20261014-0852",
+  "roundId": 9,
+  "promptVersion": 9,
+  "runId": "run-round9-20261014-0950",
   "milestone": "M2",
   "state": "ready_for_review",
-  "startedAt": "2026-10-14T08:52:00+07:00",
+  "startedAt": "2026-10-14T09:50:00+07:00",
   "targetDurationMinutes": 30,
-  "goal": "Sửa chung D1–D3 (tách vòng đời similar khỏi main detail, Hero pending/uncertain intent, Profile metadata TTL/cleanup), bổ sung cross-surface journey regression tests và catalog data handoff/preview",
-  "lastCompletedStep": "Đã hoàn thành toàn bộ nhiệm vụ Vòng 7: sửa D1–D3, 53/53 tests PASS, build/typecheck PASS, preview dry-run PASS, bàn giao patch/manifest/report",
-  "nextStep": "Chờ Codex review Vòng 7"
+  "goal": "Sửa browser walkthrough harness (B1-B3): đảm bảo static assets standalone, authenticated fixture session, assertions DOM/network thật, synthetic ID ngoài local fixture, và negative self-check",
+  "lastCompletedStep": "Đã hoàn thành toàn bộ mục tiêu Vòng 9: sửa B1-B3, negative self-check PASS, browser walkthrough 14/14 steps PASS với DOM assertions thật, 14 ảnh độc lập tại screenshots/ROUND_9/, 54/54 tests PASS, tsc PASS, patch reverse check PASS",
+  "nextStep": "Chờ Codex nghiệm thu Milestone M2 qua bàn giao của người dùng"
 }

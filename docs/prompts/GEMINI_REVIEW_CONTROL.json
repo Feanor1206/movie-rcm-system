@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "targetRoundId": 8,
-  "promptVersion": 8,
-  "lastReviewedRoundId": 7,
+  "targetRoundId": 10,
+  "promptVersion": 10,
+  "lastReviewedRoundId": 9,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
-  "milestone": "M2",
+  "milestone": "M3",
   "reviewMode": "manual",
-  "note": "Round 7 source checkpoint accepted: D1-D3 fixed, 53 tests/typecheck/build/preview pass. Full M2 awaits UI journey and browser evidence. Round 8 verification only, manual mode; automation remains off."
+  "note": "M2 ACCEPTED per LOOP_ROUND_9_REVIEW.md: 54 tests/tsc, browser14 steps and negative checks independently pass; authenticated requests, assets and Profile rating DOM verified. Round10 begins M3 UX/performance/config/CI/runbook, manual mode; automation remains off."
 }

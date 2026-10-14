@@ -211,13 +211,13 @@ Endpoint chuẩn cho trải nghiệm duyệt danh mục, tìm kiếm và phân t
    - **No-Overwrite Conflict Policy (Chống ghi đè xung đột):** Nếu một ID candidate đã tồn tại trong hệ thống nhưng có metadata khác biệt (khác title, year, rating, genres), công cụ sẽ báo `CONFLICT` và **từ chối ghi đè**, yêu cầu can thiệp thủ công từ quản trị viên.
 
 4. **Công cụ Dry-Run Preview & Runbook:**
-   - Script thực thi an toàn (không tác động DB live):
+   - Script thực thi an toàn, đối chiếu candidate fixture với mảng baseline in-memory hardcoded trong script (không truy vấn live catalog, không phải importer, không ghi DB):
      ```bash
-     # Chạy preview / dry-run đối chiếu candidate fixture với catalog hiện tại:
+     # Chạy preview / dry-run đối chiếu candidate fixture với hardcoded baseline:
      node scripts/preview_animation_catalog.cjs
 
      # Chạy bộ kiểm thử tự động của công cụ dry-run (ADD, SKIP, CONFLICT):
      node scripts/preview_animation_catalog.cjs --test
      ```
-   - Tuyệt đối không tự động nạp vào cơ sở dữ liệu live khi chưa qua cổng nghiệm thu M2.
+   - **Giới hạn phạm vi (M2 Scope Boundary):** Công cụ đóng vai trò phân tích và kiểm chứng quy tắc nạp dữ liệu (data onboarding rules). Tuyệt đối không tự động nạp hoặc import vào cơ sở dữ liệu live khi chưa qua cổng nghiệm thu M2.
 
