@@ -1,0 +1,135 @@
+{
+  "protocolVersion": 1,
+  "roundId": 13,
+  "promptVersion": 13,
+  "runId": "run-round13-20261014-1325",
+  "createdAt": "2026-10-14T06:39:40.128Z",
+  "ownChangedFiles": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "modified",
+      "sha256": "aa4620ec6bd338bd4686c8d88e30bd2c0a9e4f2483bc632b5c5abb73a4a47a27",
+      "sizeBytes": 1607
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/SeedAndConfigPolicyTest.java",
+      "status": "modified",
+      "sha256": "dd0a0b2c54d890daa04f0aa6b27715ed0bd402da9fbf94f8e41cb8ca5d0770b8",
+      "sizeBytes": 19947
+    },
+    {
+      "path": "scripts/compute_build_bytes.cjs",
+      "status": "added",
+      "sha256": "e605a10734bafc82890426ff0b53a0112386f8b44042c3205783eac439a7e0a7",
+      "sizeBytes": 12551
+    },
+    {
+      "path": "scripts/run_browser_walkthrough.cjs",
+      "status": "modified",
+      "sha256": "61e819646f627b7c76d58a9414528b6b04848a3043996728f9fc0f049e88b3dc",
+      "sizeBytes": 83183
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/01_home_guest_desktop.png",
+      "status": "added",
+      "sha256": "849161e1e6a7eaad6d94d9bbbec45f803baff703539e8a13ce7bc38688f32d66",
+      "sizeBytes": 229498
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/02_auth_modal_desktop.png",
+      "status": "added",
+      "sha256": "eca3834b8ffd7b180404e4403df5cec0eef05c31d9f1bd5f48e00f2f876357f9",
+      "sizeBytes": 142663
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/03_login_user_a_desktop.png",
+      "status": "added",
+      "sha256": "d6b9e6d87bddb51ec045cef6ff184557b27c9c2632aaf5fde6d9db3194265e67",
+      "sizeBytes": 238699
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/04_detail_saved_rated_user_a.png",
+      "status": "added",
+      "sha256": "cd8b67d51b251327dd86f0b5b0449f79fd79ca7c78023a6c6e41d80697d35ca3",
+      "sizeBytes": 175244
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/05_profile_user_a_desktop.png",
+      "status": "added",
+      "sha256": "533376da4d560b6c49b4dd3f78756b52949552eb9ddbf3f5d0f0cd3e88376c82",
+      "sizeBytes": 56828
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/06_hero_uncertain_retry_desktop.png",
+      "status": "added",
+      "sha256": "23d9bdb6e0ce7b01d65d1ea3f6efdab57844fe583a43d99bef842ee7eb115752",
+      "sizeBytes": 239869
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/07_logout_switch_user_b.png",
+      "status": "added",
+      "sha256": "f49652cd210c5057e64c4dc0d4b18b5d368778e1f86a2d01d76cbe11749fc0d1",
+      "sizeBytes": 250266
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/08_user_b_isolation_profile.png",
+      "status": "added",
+      "sha256": "bf6353ec76d556aaa3973b52b53a4989ae5360a94b3e782fe80016a11d77f088",
+      "sizeBytes": 62195
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/09_search_deep_link_back_desktop.png",
+      "status": "added",
+      "sha256": "00b22e20ec9950a849c774bef312e942f002a94ee60ac6b1ef5dbb9cd11a3164",
+      "sizeBytes": 62322
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/10_image_404_fallback_desktop.png",
+      "status": "added",
+      "sha256": "22e74032a4d947dcb3102042ed14dbaf17fe258721559b1a248f010faea87279",
+      "sizeBytes": 131104
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/11_detail_404_desktop.png",
+      "status": "added",
+      "sha256": "0703b4abbb3e30e30a3c571545938992c8fe688096a14f81593d27ad94b663fb",
+      "sizeBytes": 60698
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/12_catalog_error_retry_desktop.png",
+      "status": "added",
+      "sha256": "4b376fe5e48ee4fa554f578bd60974a200ece0e4a41ab3619f39a429a0ff00da",
+      "sizeBytes": 72625
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/13_home_mobile.png",
+      "status": "added",
+      "sha256": "fa49069b70d513a0bdbb158261825bd81cf84324186ccd0c3c80334331893fbf",
+      "sizeBytes": 92039
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/14_detail_mobile.png",
+      "status": "added",
+      "sha256": "d94102f9b3d57285234c9b6453962576f256bc6f782ca721b3b166064217cf2d",
+      "sizeBytes": 86430
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/perf_measurements.json",
+      "status": "added",
+      "sha256": "7cdd3dc1eaf2933e4711bd84e985db3b5794c428e139008a7d9ad4dd7d4c1192",
+      "sizeBytes": 44840
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_13/walkthrough_evidence.json",
+      "status": "added",
+      "sha256": "2461d014b0ef3f333361b6b376421b5a1c99b4624798f9a0d2d91c6c44fb0058",
+      "sizeBytes": 5919
+    },
+    {
+      "path": "docs/reports/ROUND_13.patch",
+      "status": "added",
+      "sha256": "82d65ff09bdd4431420e0fb953545091eb6d51397a6454fa71a67ee41ace19fa",
+      "sizeBytes": 32236
+    }
+  ]
+}

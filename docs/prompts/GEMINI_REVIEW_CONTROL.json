@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
-  "command": "work",
+  "command": "stop",
   "targetRoundId": 13,
   "promptVersion": 13,
-  "lastReviewedRoundId": 12,
+  "lastReviewedRoundId": 13,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
   "milestone": "M3",
   "reviewMode": "manual",
-  "note": "Round12 bootstrap and corrected observer/cold-warm checkpoint reviewed. M3 not accepted: D1 exact CI command fails due mixed prod/test profiles; D2 JS budget table hardcoded. Round13 only these two verification fixes, dev/manual; no storage/AI."
+  "note": "M2 accepted Round9; M3 accepted Round13. D1 exact CI and bare backend tests25/25, D2 dynamic JS guard/self-tests pass,57 frontend tests,tsc/build,14browser steps passed independently. Manual loop complete; no polling or round14. Storage/playback backlog separate, no AI/Drive installation authorized by this control."
 }

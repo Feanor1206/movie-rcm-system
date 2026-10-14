@@ -1,0 +1,192 @@
+Reviewer output directory: C:\Users\Admin\AppData\Local\Temp\codex-round13-browser-eEACxG
+🚀 Starting M3 Browser Walkthrough Runner (Round 10)...
+✔ Fixture Backend Server listening on http://127.0.0.1:8080
+✔ Next.js Standalone Server listening on http://127.0.0.1:3005
+Connecting to CDP target 47AFEDC8B48B5971FB4B5386716CA91A (page, about:blank)
+
+--- 1. DESKTOP WALKTHROUGH (Viewport: 1280x800) ---
+
+[Step 01] Verifying Home in Guest Mode (exploration without login)...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+HTML AFTER 2s: <html lang="vi" class="__variable_d8ebd1 dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/_next/static/css/b4e4c11e34c40a72.css" data-precedence="next"><link rel="preload" as="script" fetchpriority="low" href="/_next/static/chunks/webpack-2ee30d475211ef4f.js"><script src="/_next/static/chunks/4bd1b696-d4b1a870fb970c7d.js" async=""></script><script src="/_next/static/chunks/517-88faace358fd8f85.js" async=""></script><script src="/_next/static/chunks/main-app-2a5faa94ccf42abd.js" async=""></script><script src="/_next/static/chunks/173-efe2b9a8c5d2c7dd.js" async=""></script><script src="/_next/static/chunks/423-3948d1c6bab2ddaa.js" async=""></script><script src="/_next/static/chunks/71-e4c4db73dd45cf00.js" asyn
+  📸 Saved screenshot: 01_home_guest_desktop.png (298.8 KB)
+[Step 02] Opening AuthModal and verifying dialog accessibility...
+  📸 Saved screenshot: 02_auth_modal_desktop.png (221.7 KB)
+[Step 02b] Testing AuthModal invalid submission, touch target size, and opener restoration...
+[Step 03] Submitting login form as user_a...
+  📸 Saved screenshot: 03_login_user_a_desktop.png (310.8 KB)
+[Step 04] Navigating to synthetic movie, adding to Watchlist, and rating 9 stars...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[Step 04a] Auditing Video Player modal lifecycle (initial focus, Tab trap, Esc, opener restore)...
+[Step 04b] Auditing CineBot reduced motion JS policy and opener restore...
+  📸 Saved screenshot: 04_detail_saved_rated_user_a.png (226.4 KB)
+[Step 05] Verifying User A Profile with Watchlist and Ratings tab score 9...
+  📸 Saved screenshot: 05_profile_user_a_desktop.png (74.0 KB)
+[Step 06] Verifying Hero uncertain ADD badge and retry flow...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+  📸 Saved screenshot: 06_hero_uncertain_retry_desktop.png (312.3 KB)
+[Step 07] Logging out User A via UI and logging in as User B via UI form...
+  📸 Saved screenshot: 07_logout_switch_user_b.png (323.8 KB)
+[Step 08] Verifying User B Profile has zero data leaked from User A...
+[Step 08] Verifying User B session persistence and store state after page reload...
+  📸 Saved screenshot: 08_user_b_isolation_profile.png (81.0 KB)
+[Step 09] Verifying Search deep link and browser history.back()...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+  📸 Saved screenshot: 09_search_deep_link_back_desktop.png (81.1 KB)
+[Step 10] Verifying Broken Image 404 fallback on MovieDetail...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-backdrop.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+  📸 Saved screenshot: 10_image_404_fallback_desktop.png (170.7 KB)
+[Step 11] Verifying 404 state on missing canonical movie...
+  📸 Saved screenshot: 11_detail_404_desktop.png (79.0 KB)
+[Step 12] Verifying Catalog HTTP 500 error banner and retry UI...
+  📸 Saved screenshot: 12_catalog_error_retry_desktop.png (94.6 KB)
+
+--- 2. MOBILE WALKTHROUGH (Viewport: 375x667) ---
+
+[Step 13] Verifying Mobile Home (375x667)...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+  📸 Saved screenshot: 13_home_mobile.png (119.8 KB)
+[Step 14] Verifying Mobile Movie Detail (375x667)...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+  📸 Saved screenshot: 14_detail_mobile.png (112.5 KB)
+
+--- 3. PERFORMANCE BENCHMARK (Desktop 1280x800, Separate Cold & Warm Runs) ---
+
+[Budget] Dynamically measuring exact JavaScript First Load bundle bytes from build manifest...
+  ✔ [Budget Check] Home    : 139231 B (135.97 KiB) <= 143360 B (140 KiB) [10 chunks]
+  ✔ [Budget Check] Search  : 138015 B (134.78 KiB) <= 143360 B (140 KiB) [10 chunks]
+  ✔ [Budget Check] Detail  : 140419 B (137.13 KiB) <= 143360 B (140 KiB) [10 chunks]
+  ✔ [Budget Check] Profile : 139137 B (135.88 KiB) <= 143360 B (140 KiB) [10 chunks]
+[Perf] Benchmarking Home (/): 3 Cold Runs + 3 Warm Runs...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+  -> Home COLD Median: DCL=35ms, Load=99ms, WireBytes=330434, LCP=176, CLS=0.014
+  -> Home WARM Median: DCL=23ms, Load=50ms, WireBytes=16918, CacheHits=0, LCP=116, CLS=0.014
+[Perf] Benchmarking Search (/search?q=quantum): 3 Cold Runs + 3 Warm Runs...
+  -> Search COLD Median: DCL=39ms, Load=79ms, WireBytes=320357, LCP=100, CLS=0.069
+  -> Search WARM Median: DCL=19ms, Load=33ms, WireBytes=7784, CacheHits=0, LCP=80, CLS=0.073
+[Perf] Benchmarking Detail (/movies/m2-synthetic-anim-001): 3 Cold Runs + 3 Warm Runs...
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+[next-stderr]:  ⨯ upstream image response failed for http://127.0.0.1:8080/images/broken-poster.png 404
+
+  -> Detail COLD Median: DCL=54ms, Load=83ms, WireBytes=332677, LCP=148, CLS=0
+  -> Detail WARM Median: DCL=29ms, Load=31ms, WireBytes=16953, CacheHits=0, LCP=88, CLS=0
+[Perf] Benchmarking Profile (/profile): 3 Cold Runs + 3 Warm Runs...
+  -> Profile COLD Median: DCL=43ms, Load=94ms, WireBytes=319965, LCP=144, CLS=0.008
+  -> Profile WARM Median: DCL=16ms, Load=33ms, WireBytes=6542, CacheHits=0, LCP=96, CLS=0.007
+
+✔ Saved performance measurements to C:\Users\Admin\AppData\Local\Temp\codex-round13-browser-eEACxG\perf_measurements.json
+
+✔ Saved structured evidence table to C:\Users\Admin\AppData\Local\Temp\codex-round13-browser-eEACxG\walkthrough_evidence.json
+
+================================================================
+   M3 WALKTHROUGH VERIFICATION TABLE (ALL 14 STEPS PASSED)      
+================================================================
+
+[01_home_guest_desktop] PASS: true
+  Actor:    guest
+  Expected: Home loads in guest mode with "Đăng nhập" action and synthetic hero movie
+  Actual:   Rendered guest navbar with "Đăng nhập" and hero "The Quantum Garden"
+
+[02_auth_modal_desktop] PASS: true
+  Actor:    guest
+  Expected: Clicking "Đăng nhập" opens accessible AuthModal with role="dialog", aria-modal="true", and focused first input
+  Actual:   Dialog verified with aria-modal="true" and focused input field
+
+[03_login_user_a_desktop] PASS: true
+  Actor:    user_a
+  Expected: AuthModal submits credentials, closes cleanly, and displays authenticated user "user_a" in navbar
+  Actual:   Navbar displays "user_a", AuthModal dismissed, session established
+
+[04_detail_saved_rated_user_a] PASS: true
+  Actor:    user_a
+  Expected: User A saves synthetic movie to Watchlist and submits rating score 9
+  Actual:   Fixture User A recorded watchlist=m2-synthetic-anim-001 and rating=9
+
+[05_profile_user_a_desktop] PASS: true
+  Actor:    user_a
+  Expected: User A Profile verifies Watchlist card and Ratings tab with score 9/10
+  Actual:   Watchlist and Ratings tabs confirmed with "The Quantum Garden" and score 9/10
+
+[06_hero_uncertain_retry_desktop] PASS: true
+  Actor:    user_a
+  Expected: Hero uncertain state displays amber badge and "Thử lưu lại"; retry click confirms to "Đã lưu Watchlist"
+  Actual:   Uncertain badge verified and retry confirmation succeeded
+
+[07_logout_switch_user_b] PASS: true
+  Actor:    user_b
+  Expected: User A logs out cleanly via UI dropdown; User B logs in via AuthModal UI form without localStorage hacks
+  Actual:   Navbar displays "user_b", clean UI session transition and token update confirmed
+
+[08_user_b_isolation_profile] PASS: true
+  Actor:    user_b
+  Expected: User B profile renders completely empty library; zero data leaked from User A; session persists after reload
+  Actual:   Verified User B profile has 0 items, does not contain "The Quantum Garden", and persists user_b session across reload
+
+[09_search_deep_link_back_desktop] PASS: true
+  Actor:    user_b
+  Expected: history.back() returns to search page with input draft and results intact
+  Actual:   Verified URL /search?q=quantum, input draft "quantum", and search results
+
+[10_image_404_fallback_desktop] PASS: true
+  Actor:    user_b
+  Expected: Movie with broken/404 image URL cleanly falls back to title placeholder without breaking layout
+  Actual:   Rendered "The Lost Lantern" placeholder fallback upon 404 image error
+
+[11_detail_404_desktop] PASS: true
+  Actor:    user_b
+  Expected: Non-existent movie ID triggers clean 404 error with home link
+  Actual:   Rendered "Không tìm thấy phim hoạt hình" with home action
+
+[12_catalog_error_retry_desktop] PASS: true
+  Actor:    user_b
+  Expected: Backend failure renders error banner with retry button
+  Actual:   Rendered error state with "Thử kết nối lại" retry action
+
+[13_home_mobile] PASS: true
+  Actor:    user_b
+  Expected: Mobile responsive Home renders stacked hero with touch targets (375x667)
+  Actual:   Verified viewport width 375 and mobile hero banner
+
+[14_detail_mobile] PASS: true
+  Actor:    user_b
+  Expected: Mobile detail displays vertically stacked poster, trailer player action (>=44px), CineBot trigger (>=44px), and ZERO button collisions
+  Actual:   Verified touch targets (trailer: 44px, save: 44px, trigger: 44px) and 0 collisions on 375px viewport
+
+🎉 All 14 walkthrough steps + performance benchmark asserted and captured in C:\Users\Admin\AppData\Local\Temp\codex-round13-browser-eEACxG

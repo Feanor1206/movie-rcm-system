@@ -31,6 +31,8 @@ jobs:
         run: node ../scripts/preview_animation_catalog.cjs --test
       - name: Production Next.js Build
         run: npm run build
+      - name: Verify Route JS Budgets (<=140 KiB)
+        run: node ../scripts/compute_build_bytes.cjs
 
   backend-check:
     name: Spring Boot Tests & Policy

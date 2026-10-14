@@ -305,3 +305,37 @@
   5. Full browser walkthrough & benchmark: **14/14 steps PASS**, 14 screenshots trong `ROUND_12/`, cold/warm benchmark hoàn tất.
   6. Patch `ROUND_12.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit code 0.
   7. Freeze mã nguồn, bàn giao READY FOR REVIEW.
+---
+
+## Round 13 — Khép Milestone M3: Cô Lập Profile CI & Đo Lường Dynamic Build Bytes
+
+- **Started At:** 2026-10-14T13:25:00+07:00
+- **Completed At:** 2026-10-14T13:50:00+07:00
+- **targetRoundId:** 13 | **promptVersion:** 13
+- **Run ID:** `run-round13-20261014-1325`
+- **Reviewed Run ID:** `run-round12-20261014-1245` (Codex Review: CHANGES REQUESTED, defects D1 & D2)
+- **Goal:**
+  1. Khắc phục D1 (Cô lập Prod Controls & Làm Xanh Lệnh CI):
+     - Xử lý xung đột profile khi chạy lệnh CI `mvnw.cmd test -Dspring.profiles.active=test`.
+     - Cập nhật `SeedAndConfigPolicyTest.java`: triển khai `createIsolatedProdEnvironment` tạo bản sao `systemProperties` không chứa `spring.profiles.active`, loại bỏ `SPRING_PROFILES_ACTIVE` khỏi `systemEnvironment`, thiết lập `setActiveProfiles("prod")`, và gắn `MapPropertySource` ưu tiên cao nhất (`addFirst`) cho properties cấu hình của từng test DB H2 riêng biệt.
+     - Khẳng định các positive controls đạt active profile `["prod"]` duy nhất, `app.seed.enabled: false`, `spring.sql.init.mode: never`, `ddl-auto: validate`.
+     - Khẳng định các negative controls bắt chính xác placeholder `APP_JWT_SECRET` và `SPRING_DATASOURCE_PASSWORD`.
+     - Làm rõ quan hệ FK trong prose: `favorite_items` có FK user cascade, không có FK movie.
+     - Chạy cả 2 lệnh `mvnw.cmd test -Dspring.profiles.active=test` và `mvnw.cmd test` đạt 25/25 PASS exit 0.
+  2. Khắc phục D2 (Đo lường Dynamic First Load JS Budget):
+     - Xây dựng module `scripts/compute_build_bytes.cjs` đọc trực tiếp `app-build-manifest.json`, `BUILD_ID`, và file chunk vật lý trên đĩa. Deduplicate chunk giữa `/layout` và từng route (`/`, `/search`, `/movies/[id]`, `/profile`).
+     - Đo raw bytes, gzip bytes (`zlib.gzipSync`), và SHA-256 hash. Enforce ngân sách 140 KiB (143,360 bytes), thoát mã non-zero nếu vượt budget hoặc thiếu manifest/file.
+     - Triển khai bộ tự kiểm tra `--negative-test` gồm 5 tests (bắt đúng thiếu manifest, thiếu route, thiếu chunk, vượt budget với tiny budget 50 bytes, và đo đạc build thật).
+     - Tích hợp vào `scripts/run_browser_walkthrough.cjs` thay thế hoàn toàn bảng constants cũ.
+     - Bổ sung bước kiểm tra guard tự động `Verify Route JS Budgets (<=140 KiB)` vào `.github/workflows/ci.yml`.
+     - Đo đạc thực tế: Home 135.97 KiB, Search 134.78 KiB, Detail 137.13 KiB, Profile 135.88 KiB (đều $\le 140$ KiB).
+  3. Bàn giao: Chạy toàn bộ test suites (`npm test`, `mvnw test`, `tsc --noEmit`, `npm run build`, browser walkthrough), xuất bằng chứng riêng tại `docs/reports/screenshots/ROUND_13/`, tạo `ROUND_13.patch` (reverse check PASS exit 0), `ROUND_13_MANIFEST.json` (21 files có SHA256), `ROUND_13_REPORT.md`, cập nhật `M2_M3_STATUS.json` (`state: ready_for_review`).
+- **Completed:**
+  1. Backend Spring Boot: **25/25 tests PASS** trên cả 2 lệnh Maven (`mvnw.cmd test "-Dspring.profiles.active=test"` và bare `mvnw.cmd test`).
+  2. Frontend test suites: **57/57 tests PASS** (`npm test`).
+  3. Dynamic build bytes self-test: **5/5 tests PASS** (`node scripts/compute_build_bytes.cjs --negative-test`).
+  4. TypeScript `npx tsc --noEmit`: **0 errors (PASS exit code 0)**.
+  5. Next.js production build `npm run build`: **PASS exit code 0**.
+  6. Browser walkthrough & benchmark: **14/14 steps PASS**, 14 screenshots tại `ROUND_13/`, cold/warm benchmarks hoàn tất.
+  7. Patch `ROUND_13.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit code 0.
+  8. Freeze mã nguồn, bàn giao READY FOR REVIEW.

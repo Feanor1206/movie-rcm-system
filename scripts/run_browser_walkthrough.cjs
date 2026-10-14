@@ -22,11 +22,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
+const { computeBuildBytes, runBuildBytesSelfTest } = require('./compute_build_bytes.cjs');
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const STANDALONE_SERVER = path.resolve(__dirname, '../frontend/.next/standalone/server.js');
 const FIXTURE_PATH = path.resolve(__dirname, '../docs/fixtures/animation_catalog_fixture.json');
-const SCREENSHOTS_DIR = path.resolve(__dirname, '../docs/reports/screenshots/ROUND_12');
+const SCREENSHOTS_DIR = path.resolve(__dirname, '../docs/reports/screenshots/ROUND_13');
 const LOCAL_MOVIES_PATH = path.resolve(__dirname, '../frontend/lib/data/movies.ts');
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
@@ -888,10 +889,14 @@ async function main() {
       `);
       assert.ok(shiftResult.rawShifts > 0 || shiftResult.cls > 0, 'Intentionally triggered layout shift must be recorded by observer');
 
+      // 4. Dynamic Build Bytes calculation & negative self-test
+      runBuildBytesSelfTest();
+
       console.log('🎉 Negative test execution completed successfully with exit code 0.');
       console.log(`   - Missing selector throw: PASS`);
       console.log(`   - PerformanceObserver active: PASS`);
       console.log(`   - Layout-shift sensitivity detection: PASS (${shiftResult.cls})`);
+      console.log(`   - Dynamic build bytes & negative budget detection: PASS`);
       return;
     }
 
@@ -1658,12 +1663,17 @@ async function main() {
     console.log('\n--- 3. PERFORMANCE BENCHMARK (Desktop 1280x800, Separate Cold & Warm Runs) ---\n');
     await browser.setViewport(1280, 800, false);
 
+    console.log('[Budget] Dynamically measuring exact JavaScript First Load bundle bytes from build manifest...');
+    const buildBytesAudit = computeBuildBytes({ throwOnOverBudget: true, throwOnMissing: true });
     const ROUTE_EXACT_JS_BYTES = {
-      Home: { route: '/', rawBytes: 490624, gzipBytes: 138925, budgetBytes: 143360, underBudget: true },
-      Search: { route: '/search', rawBytes: 482201, gzipBytes: 137709, budgetBytes: 143360, underBudget: true },
-      Detail: { route: '/movies/[id]', rawBytes: 495115, gzipBytes: 140113, budgetBytes: 143360, underBudget: true },
-      Profile: { route: '/profile', rawBytes: 499237, gzipBytes: 138831, budgetBytes: 143360, underBudget: true },
+      Home: buildBytesAudit.routes['/'],
+      Search: buildBytesAudit.routes['/search'],
+      Detail: buildBytesAudit.routes['/movies/[id]'],
+      Profile: buildBytesAudit.routes['/profile'],
     };
+    for (const [rName, rData] of Object.entries(ROUTE_EXACT_JS_BYTES)) {
+      console.log(`  ✔ [Budget Check] ${rName.padEnd(8)}: ${rData.gzipBytes} B (${rData.kib} KiB) <= ${rData.budgetBytes} B (${rData.budgetKiB} KiB) [${rData.filesCount} chunks]`);
+    }
 
     const routesToBenchmark = [
       {
@@ -1702,7 +1712,12 @@ async function main() {
         clsMethodology: 'Standard Session Window aggregation (max session window with 1s gap and 5s duration limit) + raw shift totals.',
         networkAccounting: 'CDP Network.loadingFinished encodedDataLength (wire bytes) and cache/304 status tracking.',
       },
-      exactFirstLoadJsBytes: ROUTE_EXACT_JS_BYTES,
+      exactFirstLoadJsBytes: {
+        buildId: buildBytesAudit.buildId,
+        methodology: buildBytesAudit.methodology,
+        budgetBytes: buildBytesAudit.budgetBytes,
+        routes: ROUTE_EXACT_JS_BYTES,
+      },
       routes: {},
     };
 

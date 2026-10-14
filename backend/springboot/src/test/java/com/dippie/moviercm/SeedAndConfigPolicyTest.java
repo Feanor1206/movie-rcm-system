@@ -10,7 +10,12 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.MutablePropertySources;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.PathResource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.test.context.ActiveProfiles;
@@ -23,6 +28,9 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,6 +87,51 @@ public class SeedAndConfigPolicyTest {
                 "spring.sql.init.mode must default to never in test profile");
     }
 
+    private ConfigurableEnvironment createIsolatedProdEnvironment(Map<String, Object> customProperties) {
+        StandardEnvironment env = new StandardEnvironment() {
+            @Override
+            protected void customizePropertySources(MutablePropertySources propertySources) {
+                // Remove spring.profiles.active from system properties to isolate from CI -D arguments
+                Properties sysProps = new Properties();
+                sysProps.putAll(System.getProperties());
+                sysProps.remove("spring.profiles.active");
+                propertySources.addLast(new MapPropertySource(
+                        SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME,
+                        (Map) sysProps
+                ));
+
+                // Remove SPRING_PROFILES_ACTIVE from system environment
+                Map<String, Object> sysEnv = new HashMap<>(System.getenv());
+                sysEnv.remove("SPRING_PROFILES_ACTIVE");
+                sysEnv.remove("spring.profiles.active");
+                propertySources.addLast(new SystemEnvironmentPropertySource(
+                        SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                        sysEnv
+                ));
+            }
+        };
+
+        // Explicitly set active profiles to ONLY "prod"
+        env.setActiveProfiles("prod");
+
+        Map<String, Object> props = new HashMap<>();
+        props.put("spring.profiles.active", "prod");
+        if (customProperties != null) {
+            props.putAll(customProperties);
+        }
+
+        env.getPropertySources().addFirst(new MapPropertySource("isolatedProdCustomProperties", props));
+
+        return env;
+    }
+
+    private SpringApplicationBuilder createIsolatedProdBuilder(ConfigurableEnvironment env) {
+        return new SpringApplicationBuilder(MovieRcmApplication.class)
+                .environment(env)
+                .profiles("prod")
+                .web(WebApplicationType.NONE);
+    }
+
     @Test
     @DisplayName("Positive Control: Prod profile loads actual YAML, starts and validates when valid secrets and schema exist")
     void testProdProfileStartsSuccessfullyWithValidSecretsAndSchema() {
@@ -87,26 +140,29 @@ public class SeedAndConfigPolicyTest {
 
         executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
 
+        Map<String, Object> props = new HashMap<>();
+        props.put("SPRING_DATASOURCE_URL", jdbcUrl);
+        props.put("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "org.h2.Driver");
+        props.put("SPRING_DATASOURCE_USERNAME", "sa");
+        props.put("spring.jpa.properties.hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+        props.put("SPRING_DATASOURCE_PASSWORD", "valid_prod_fixture_password");
+        props.put("APP_JWT_SECRET", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
+
+        ConfigurableEnvironment env = createIsolatedProdEnvironment(props);
         ConfigurableApplicationContext ctx = null;
         try {
-            ctx = new SpringApplicationBuilder(MovieRcmApplication.class)
-                    .profiles("prod")
-                    .web(WebApplicationType.NONE)
-                    .properties(
-                            "spring.profiles.active=prod",
-                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
-                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
-                            "SPRING_DATASOURCE_USERNAME=sa",
-                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password",
-                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
-                    )
-                    .run();
+            ctx = createIsolatedProdBuilder(env).run("--spring.profiles.active=prod");
 
             assertNotNull(ctx);
             assertTrue(ctx.isRunning());
-            assertEquals("false", ctx.getEnvironment().getProperty("app.seed.enabled"));
-            assertEquals("never", ctx.getEnvironment().getProperty("spring.sql.init.mode"));
+            assertArrayEquals(new String[]{"prod"}, ctx.getEnvironment().getActiveProfiles(),
+                    "Active profiles must contain exactly and only 'prod'");
+            assertEquals("false", ctx.getEnvironment().getProperty("app.seed.enabled"),
+                    "Production policy must have app.seed.enabled=false");
+            assertEquals("never", ctx.getEnvironment().getProperty("spring.sql.init.mode"),
+                    "Production policy must have spring.sql.init.mode=never");
+            assertEquals("validate", ctx.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto"),
+                    "Production policy must enforce ddl-auto=validate");
             assertNotNull(ctx.getBean(UserRepository.class));
             assertNotNull(ctx.getBean(FavoriteItemRepository.class));
         } finally {
@@ -124,20 +180,18 @@ public class SeedAndConfigPolicyTest {
 
         executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
 
+        Map<String, Object> props = new HashMap<>();
+        props.put("SPRING_DATASOURCE_URL", jdbcUrl);
+        props.put("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "org.h2.Driver");
+        props.put("SPRING_DATASOURCE_USERNAME", "sa");
+        props.put("spring.jpa.properties.hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+        props.put("SPRING_DATASOURCE_PASSWORD", "valid_prod_fixture_password");
+        // Intentionally omitting APP_JWT_SECRET
+
+        ConfigurableEnvironment env = createIsolatedProdEnvironment(props);
+
         Exception exception = assertThrows(Exception.class, () -> {
-            new SpringApplicationBuilder(MovieRcmApplication.class)
-                    .profiles("prod")
-                    .web(WebApplicationType.NONE)
-                    .properties(
-                            "spring.profiles.active=prod",
-                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
-                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
-                            "SPRING_DATASOURCE_USERNAME=sa",
-                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password"
-                            // Intentionally omitting APP_JWT_SECRET
-                    )
-                    .run();
+            createIsolatedProdBuilder(env).run("--spring.profiles.active=prod");
         });
 
         // Verify the failure chain contains the unresolvable placeholder error
@@ -153,20 +207,18 @@ public class SeedAndConfigPolicyTest {
 
         executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
 
+        Map<String, Object> props = new HashMap<>();
+        props.put("SPRING_DATASOURCE_URL", jdbcUrl);
+        props.put("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "org.h2.Driver");
+        props.put("SPRING_DATASOURCE_USERNAME", "sa");
+        props.put("spring.jpa.properties.hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+        props.put("APP_JWT_SECRET", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
+        // Intentionally omitting SPRING_DATASOURCE_PASSWORD
+
+        ConfigurableEnvironment env = createIsolatedProdEnvironment(props);
+
         Exception exception = assertThrows(Exception.class, () -> {
-            new SpringApplicationBuilder(MovieRcmApplication.class)
-                    .profiles("prod")
-                    .web(WebApplicationType.NONE)
-                    .properties(
-                            "spring.profiles.active=prod",
-                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
-                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
-                            "SPRING_DATASOURCE_USERNAME=sa",
-                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
-                            // Intentionally omitting SPRING_DATASOURCE_PASSWORD
-                    )
-                    .run();
+            createIsolatedProdBuilder(env).run("--spring.profiles.active=prod");
         });
 
         // Verify the failure chain contains the unresolvable placeholder error
@@ -208,25 +260,25 @@ public class SeedAndConfigPolicyTest {
         }
 
         // Verify Hibernate ddl-auto=validate succeeds without schema mismatch errors
+        Map<String, Object> props = new HashMap<>();
+        props.put("SPRING_DATASOURCE_URL", jdbcUrl);
+        props.put("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "org.h2.Driver");
+        props.put("SPRING_DATASOURCE_USERNAME", "sa");
+        props.put("spring.jpa.properties.hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+        props.put("SPRING_DATASOURCE_PASSWORD", "valid_prod_fixture_password");
+        props.put("APP_JWT_SECRET", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
+        props.put("spring.jpa.hibernate.ddl-auto", "validate");
+
+        ConfigurableEnvironment env = createIsolatedProdEnvironment(props);
         ConfigurableApplicationContext ctx = null;
         try {
-            ctx = new SpringApplicationBuilder(MovieRcmApplication.class)
-                    .profiles("prod")
-                    .web(WebApplicationType.NONE)
-                    .properties(
-                            "spring.profiles.active=prod",
-                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
-                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
-                            "SPRING_DATASOURCE_USERNAME=sa",
-                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password",
-                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
-                            "spring.jpa.hibernate.ddl-auto=validate"
-                    )
-                    .run();
+            ctx = createIsolatedProdBuilder(env).run("--spring.profiles.active=prod");
 
             assertNotNull(ctx);
             assertTrue(ctx.isRunning());
+            assertArrayEquals(new String[]{"prod"}, ctx.getEnvironment().getActiveProfiles(),
+                    "Active profiles must contain exactly and only 'prod'");
+            assertEquals("validate", ctx.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto"));
             assertNotNull(ctx.getBean(FavoriteItemRepository.class));
         } finally {
             if (ctx != null) {
@@ -290,25 +342,25 @@ public class SeedAndConfigPolicyTest {
         }
 
         // 5. Assert Hibernate ddl-auto=validate succeeds on the upgraded database
+        Map<String, Object> props = new HashMap<>();
+        props.put("SPRING_DATASOURCE_URL", jdbcUrl);
+        props.put("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "org.h2.Driver");
+        props.put("SPRING_DATASOURCE_USERNAME", "sa");
+        props.put("spring.jpa.properties.hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+        props.put("SPRING_DATASOURCE_PASSWORD", "valid_prod_fixture_password");
+        props.put("APP_JWT_SECRET", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
+        props.put("spring.jpa.hibernate.ddl-auto", "validate");
+
+        ConfigurableEnvironment env = createIsolatedProdEnvironment(props);
         ConfigurableApplicationContext ctx = null;
         try {
-            ctx = new SpringApplicationBuilder(MovieRcmApplication.class)
-                    .profiles("prod")
-                    .web(WebApplicationType.NONE)
-                    .properties(
-                            "spring.profiles.active=prod",
-                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
-                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
-                            "SPRING_DATASOURCE_USERNAME=sa",
-                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password",
-                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
-                            "spring.jpa.hibernate.ddl-auto=validate"
-                    )
-                    .run();
+            ctx = createIsolatedProdBuilder(env).run("--spring.profiles.active=prod");
 
             assertNotNull(ctx);
             assertTrue(ctx.isRunning());
+            assertArrayEquals(new String[]{"prod"}, ctx.getEnvironment().getActiveProfiles(),
+                    "Active profiles must contain exactly and only 'prod'");
+            assertEquals("validate", ctx.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto"));
             assertNotNull(ctx.getBean(FavoriteItemRepository.class));
         } finally {
             if (ctx != null) {
