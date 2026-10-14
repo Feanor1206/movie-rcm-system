@@ -8,21 +8,25 @@ spring:
     active: dev
   sql:
     init:
-      mode: always
+      mode: never
 
 app:
+  seed:
+    enabled: false
   jwt:
-    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     expiration-ms: 86400000 # 24 hours (1 day)
   cors:
     allowed-origins: "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
 
 ---
-# Development Profile (H2 Persistent File Database - Lưu vĩnh viễn trên ổ cứng)
+# Development Profile (H2 Persistent File Database)
 spring:
   config:
     activate:
       on-profile: dev
+  sql:
+    init:
+      mode: always
   datasource:
     url: jdbc:h2:file:./data/moviercm_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
     driver-class-name: org.h2.Driver
@@ -38,19 +42,34 @@ spring:
       ddl-auto: update
     show-sql: false
 
+app:
+  seed:
+    enabled: true
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+
 ---
 # Production Profile (PostgreSQL Database)
 spring:
   config:
     activate:
       on-profile: prod
+  sql:
+    init:
+      mode: never
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/movie_rcm_db}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
+
+app:
+  seed:
+    enabled: false
+  jwt:
+    secret: ${APP_JWT_SECRET}

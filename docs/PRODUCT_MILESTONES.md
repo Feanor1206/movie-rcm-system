@@ -34,6 +34,10 @@ Tách dev/test/prod config và seed policy; demo accounts/interactions không t�
 
 Gate: walkthrough guest → khám phá → đăng nhập → lưu/đánh giá → reload → logout; account switch; slow/down backend; viewport mobile/desktop; checks CI/local; bằng chứng đo trước/sau và runbook. Prompt chi tiết chốt sau M2.
 
+## Bổ sung: Google Drive storage và playback trên Windows
+
+Theo yêu cầu ngày 14/10/2026, bổ sung thiết kế dùng Google Drive mount trên Windows để lưu/phát video hoạt hình tại `docs/DRIVE_MEDIA_STORAGE_DESIGN.md`. Đang ở trạng thái design/backlog, không mở rộng vòng M3 đang triển khai. Sau nghiệm thu M3, giao prompt riêng cho Windows mount spike → asset mapping/HTTP Range → player thật và capacity tests; chốt thứ tự so với milestone AI khi giao việc. Chưa cài đặt, OAuth, mount, import DB live hoặc triển khai storage trong lượt thiết kế.
+
 ## Sau ba milestone
 
 Codex kiểm tra lại nền sản phẩm rồi mới giao milestone AI/FastAPI riêng. Qwen đã fine-tune; không giao huấn luyện lại như prerequisite. Chất lượng AI sẽ được nghiệm thu bằng dữ liệu và đánh giá thực, không bằng UI labels hoặc predictions hard-code.

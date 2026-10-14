@@ -333,6 +333,9 @@ function renderMovieDetail(movie, similarMovies = [], watchlistContext = {}) {
       if (!slots[idx]) slots[idx] = { current: initial };
       return slots[idx];
     },
+    useEffect(fn, deps) {
+      // No-op in node harness
+    },
     createElement(type, props, ...children) {
       const flat = children.length === 1 ? children[0] : children.length > 1 ? children : undefined;
       return { type, props: { ...props, ...(flat !== undefined ? { children: flat } : {}) } };

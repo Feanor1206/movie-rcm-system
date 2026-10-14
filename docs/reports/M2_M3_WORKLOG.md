@@ -205,3 +205,35 @@
   7. Patch `ROUND_9.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit 0.
   8. Freeze mã nguồn, bàn giao READY FOR REVIEW.
 
+---
+
+## Round 10 — Milestone M3: UX Tiếp Cận, Tối Ưu Mạng/Ảnh và Vận Hành Chuẩn Hóa
+
+- **Started At:** 2026-10-14T10:15:00+07:00
+- **Completed At:** 2026-10-14T10:55:00+07:00
+- **targetRoundId:** 10 | **promptVersion:** 10
+- **Run ID:** `run-round10-20261014-1015`
+- **Reviewed Run ID:** `run-round9-20261014-0950` (Codex Review: ACCEPTED, M2 hoàn tất)
+- **Goal:**
+  1. Khả năng tiếp cận & Mobile: Hoàn thiện dialog focus lifecycle (initial focus, Tab focus trap, Escape close, body scroll lock, focus restore về opener) cho `AuthModal`, player overlay trong `MovieDetail`, và `CineBot` shell; đảm bảo kích thước touch target >= 44x44px; đảm bảo `@media (prefers-reduced-motion: reduce)` bao phủ transitions, animations và scroll behavior.
+  2. Fallback ảnh lỗi & tối ưu: Xử lý `onError` tải ảnh 404/broken trên `MovieCard`, `EditorialHero`, `MovieDetail` hiển thị placeholder sạch kèm tên phim không biến dạng layout; cấu hình Next image remotePatterns cho host ảnh hợp lệ; đo lường kích thước bundle và ngân sách tải trang.
+  3. Tách biệt môi trường dev/test/prod & seed policy:
+     - Gắn `@ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true", matchIfMissing = false)` cho `DataInitializer.java`.
+     - Cập nhật `application.yml`: prod và top-level tắt hoàn toàn seed (`app.seed.enabled: false`), tắt SQL init (`sql.init.mode: never`), yêu cầu `ddl-auto: validate` và strict env vars không có secret fallback; dev opt-in seed và `ddl-auto: update`.
+     - Cập nhật `application-test.yml`: `app.seed.enabled: false`, `sql.init.mode: never`.
+     - Bổ sung `SeedAndConfigPolicyTest.java` kiểm chứng `DataInitializer` bean không tồn tại và không có demo user tự động tạo khi tắt seed.
+     - Xuất bản DDL chuẩn hóa `docs/runbooks/db/schema_v1.sql`.
+  4. CI & Operations Runbook:
+     - Cập nhật `.github/workflows/ci.yml` kích hoạt trên branch `chore/taicautruc`, bổ sung Spring Boot test suite với profile test riêng, typecheck, 4 bộ frontend behavioral suites, baseline animation preview test, và Next.js build.
+     - Tạo tài liệu vận hành chi tiết `docs/runbooks/OPERATIONS_RUNBOOK.md` bao quát biến môi trường, chính sách seed, quy trình nâng cấp/rollback database và kiểm tra sức khỏe hệ thống.
+  5. Walkthrough Browser & Bằng chứng thực tế:
+     - Chạy harness `scripts/run_browser_walkthrough.cjs` tự động hóa qua CDP với 14 bước kiểm thử: guest -> login User A -> save/rate -> reload profile -> uncertain retry -> logout -> login User B (cách ly hoàn toàn dữ liệu, 0 leak) -> search deep link & back -> image 404 fallback -> movie 404 -> mobile 375x667.
+     - Lưu 14 ảnh chụp màn hình độc lập tại `docs/reports/screenshots/ROUND_10/` kèm log cấu trúc `walkthrough_evidence.json`.
+- **Completed:**
+  1. Toàn bộ 14/14 bước browser walkthrough đạt **PASS exit 0**.
+  2. Bổ sung suite `SeedAndConfigPolicyTest.java`, toàn bộ **19/19 backend Spring Boot tests PASS**.
+  3. Toàn bộ 4 frontend suites đạt **54/54 PASS** (8 M2 journey, 12 search experience, 9 catalog service, 25 M1 resilience).
+  4. Script preview baseline đạt **3/3 self-tests PASS**.
+  5. TypeScript `tsc --noEmit` đạt **PASS exit code 0**.
+  6. Next.js production build thành công (First Load JS toàn bộ routes < 140 kB).
+  7. Freeze mã nguồn, bàn giao READY FOR REVIEW.

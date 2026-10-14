@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Bookmark, Check, Loader2, Star, RefreshCw, Film } from 'lucide-react';
@@ -20,6 +20,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
     isActionUnconfirmed,
     getActionIntent,
   } = useWatchlist();
+  const [posterError, setPosterError] = useState(false);
 
   const inWatchlist = isWatchlisted(movie.id);
   const isPending = isActionPending(movie.id, 'watchlist');
@@ -42,7 +43,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
       : 'Chưa xác nhận xóa • Nhấn để thử xóa lại'
     : undefined;
 
-  const hasPoster = Boolean(movie.poster && movie.poster.trim());
+  const hasPoster = Boolean(movie.poster && movie.poster.trim() && !posterError);
 
   return (
     <div
@@ -58,6 +59,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
               src={movie.poster}
               alt={movie.title}
               fill
+              onError={() => setPosterError(true)}
               sizes={
                 fluid
                   ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw'

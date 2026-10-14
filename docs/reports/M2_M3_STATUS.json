@@ -1,13 +1,13 @@
 {
   "protocolVersion": 1,
-  "roundId": 9,
-  "promptVersion": 9,
-  "runId": "run-round9-20261014-0950",
-  "milestone": "M2",
+  "roundId": 10,
+  "promptVersion": 10,
+  "runId": "run-round10-20261014-1015",
+  "milestone": "M3",
   "state": "ready_for_review",
-  "startedAt": "2026-10-14T09:50:00+07:00",
+  "startedAt": "2026-10-14T10:15:00+07:00",
   "targetDurationMinutes": 30,
-  "goal": "Sửa browser walkthrough harness (B1-B3): đảm bảo static assets standalone, authenticated fixture session, assertions DOM/network thật, synthetic ID ngoài local fixture, và negative self-check",
-  "lastCompletedStep": "Đã hoàn thành toàn bộ mục tiêu Vòng 9: sửa B1-B3, negative self-check PASS, browser walkthrough 14/14 steps PASS với DOM assertions thật, 14 ảnh độc lập tại screenshots/ROUND_9/, 54/54 tests PASS, tsc PASS, patch reverse check PASS",
-  "nextStep": "Chờ Codex nghiệm thu Milestone M2 qua bàn giao của người dùng"
+  "goal": "Triển khai Milestone M3: Mobile/a11y/modal focus/overlap, broken-image fallback, perf baseline & optimization, dev/test/prod config separation & seed policy, CI & runbook",
+  "lastCompletedStep": "Hoàn tất toàn bộ Milestone M3: 14/14 browser walkthrough assertions PASS (screenshots ROUND_10), 54/54 frontend behavioral tests PASS, 19/19 Spring Boot backend tests PASS, 0 tsc errors, Next.js production build PASS, CI & Operations runbook hoàn thiện",
+  "nextStep": "Chờ Codex nghiệm thu Milestone M3 tại docs/reviews/LOOP_ROUND_10_REVIEW.md"
 }
