@@ -1,0 +1,452 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/C:/Users/Admin/.m2/wrapper/dists/apache-maven-3.9.6-bin/3311e1d4/apache-maven-3.9.6/lib/jansi-2.4.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper (file:/C:/Users/Admin/.m2/wrapper/dists/apache-maven-3.9.6-bin/3311e1d4/apache-maven-3.9.6/lib/guava-32.0.1-jre.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.dippie:moviercm-backend >---------------------
+[INFO] Building moviercm-backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ moviercm-backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ moviercm-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ moviercm-backend ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ moviercm-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ moviercm-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.dippie.moviercm.AuthAndLibraryIntegrationTest
+00:52:53.461 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.dippie.moviercm.AuthAndLibraryIntegrationTest]: AuthAndLibraryIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:52:53.611 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.AuthAndLibraryIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-15T00:52:54.128+07:00  INFO 20748 --- [moviercm-backend] [           main] c.d.m.AuthAndLibraryIntegrationTest      : Starting AuthAndLibraryIntegrationTest using Java 25.0.3 with PID 20748 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-15T00:52:54.129+07:00  INFO 20748 --- [moviercm-backend] [           main] c.d.m.AuthAndLibraryIntegrationTest      : The following 1 profile is active: "test"
+2026-10-15T00:52:54.967+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-15T00:52:55.053+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 77 ms. Found 6 JPA repository interfaces.
+2026-10-15T00:52:55.793+07:00  INFO 20748 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-15T00:52:55.885+07:00  INFO 20748 --- [moviercm-backend] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.2.Final
+2026-10-15T00:52:55.930+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-15T00:52:56.443+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-15T00:52:56.480+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-15T00:52:56.714+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:m1_test_db user=SA
+2026-10-15T00:52:56.716+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-15T00:52:58.236+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-15T00:52:58.323+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:52:58.942+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-10-15T00:52:59.758+07:00  INFO 20748 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-15T00:52:59.759+07:00  WARN 20748 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-15T00:52:59.969+07:00  WARN 20748 --- [moviercm-backend] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.apache.tomcat.jni.Library in an unnamed module (file:/C:/Users/Admin/.m2/repository/org/apache/tomcat/embed/tomcat-embed-core/10.1.28/tomcat-embed-core-10.1.28.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-10-15T00:53:01.099+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-15T00:53:01.099+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-15T00:53:01.101+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-10-15T00:53:01.142+07:00  INFO 20748 --- [moviercm-backend] [           main] c.d.m.AuthAndLibraryIntegrationTest      : Started AuthAndLibraryIntegrationTest in 7.389 seconds (process running for 8.767)
+WARNING: A Java agent has been loaded dynamically (C:\Users\Admin\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.19\byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-10-15T00:53:03.114+07:00 ERROR 20748 --- [moviercm-backend] [           main] c.d.moviercm.security.AuthEntryPointJwt  : Lỗi xác thực không hợp lệ: Bad credentials
+2026-10-15T00:53:03.470+07:00  WARN 20748 --- [moviercm-backend] [pool-2-thread-1] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 23505, SQLState: 23505
+2026-10-15T00:53:03.471+07:00 ERROR 20748 --- [moviercm-backend] [pool-2-thread-1] o.h.engine.jdbc.spi.SqlExceptionHelper   : Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_8 ON PUBLIC.WATCHLIST_ITEMS(USER_ID NULLS FIRST, MOVIE_ID NULLS FIRST) VALUES ( /* key:2 */ CAST(2 AS BIGINT), 'deep-blue')"; SQL statement:
+insert into watchlist_items (added_at,movie_id,movie_title,poster_url,user_id,id) values (?,?,?,?,?,default) [23505-224]
+2026-10-15T00:53:03.545+07:00  WARN 20748 --- [moviercm-backend] [pool-2-thread-3] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 23505, SQLState: 23505
+2026-10-15T00:53:03.545+07:00 ERROR 20748 --- [moviercm-backend] [pool-2-thread-3] o.h.engine.jdbc.spi.SqlExceptionHelper   : Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_5 ON PUBLIC.FAVORITE_ITEMS(USER_ID NULLS FIRST, MOVIE_ID NULLS FIRST) VALUES ( /* key:2 */ CAST(2 AS BIGINT), 'deep-blue')"; SQL statement:
+insert into favorite_items (added_at,movie_id,movie_title,poster_url,user_id,id) values (?,?,?,?,?,default) [23505-224]
+2026-10-15T00:53:03.611+07:00  WARN 20748 --- [moviercm-backend] [pool-2-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 23505, SQLState: 23505
+2026-10-15T00:53:03.611+07:00 ERROR 20748 --- [moviercm-backend] [pool-2-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.MOVIE_RATINGS(USER_ID NULLS FIRST, MOVIE_ID NULLS FIRST) VALUES ( /* key:2 */ CAST(2 AS BIGINT), 'deep-blue')"; SQL statement:
+insert into movie_ratings (created_at,movie_id,rating,updated_at,user_id,id) values (?,?,?,?,?,default) [23505-224]
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.38 s -- in com.dippie.moviercm.AuthAndLibraryIntegrationTest
+[INFO] Running com.dippie.moviercm.CatalogIntegrationTest
+2026-10-15T00:53:05.664+07:00  INFO 20748 --- [moviercm-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.dippie.moviercm.CatalogIntegrationTest]: CatalogIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-15T00:53:05.670+07:00  INFO 20748 --- [moviercm-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.CatalogIntegrationTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.703 s -- in com.dippie.moviercm.CatalogIntegrationTest
+[INFO] Running com.dippie.moviercm.MediaStreamingIntegrationTest
+2026-10-15T00:53:06.371+07:00  INFO 20748 --- [moviercm-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.dippie.moviercm.MediaStreamingIntegrationTest]: MediaStreamingIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-15T00:53:06.375+07:00  INFO 20748 --- [moviercm-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.MediaStreamingIntegrationTest
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.647 s -- in com.dippie.moviercm.MediaStreamingIntegrationTest
+[INFO] Running com.dippie.moviercm.SeedAndConfigPolicyTest
+2026-10-15T00:53:07.020+07:00  INFO 20748 --- [moviercm-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.dippie.moviercm.SeedAndConfigPolicyTest]: SeedAndConfigPolicyTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-15T00:53:07.022+07:00  INFO 20748 --- [moviercm-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.SeedAndConfigPolicyTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-15T00:53:07.072+07:00  INFO 20748 --- [moviercm-backend] [           main] c.d.moviercm.SeedAndConfigPolicyTest     : Starting SeedAndConfigPolicyTest using Java 25.0.3 with PID 20748 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-15T00:53:07.072+07:00  INFO 20748 --- [moviercm-backend] [           main] c.d.moviercm.SeedAndConfigPolicyTest     : The following 1 profile is active: "test"
+2026-10-15T00:53:07.343+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-15T00:53:07.371+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 27 ms. Found 6 JPA repository interfaces.
+2026-10-15T00:53:07.494+07:00  INFO 20748 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-15T00:53:07.497+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-15T00:53:07.512+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-15T00:53:07.513+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-10-15T00:53:07.514+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection conn10: url=jdbc:h2:mem:m1_test_db user=SA
+2026-10-15T00:53:07.515+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-10-15T00:53:07.686+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-15T00:53:07.698+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:53:07.828+07:00  INFO 20748 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-15T00:53:07.828+07:00  WARN 20748 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-15T00:53:07.913+07:00  WARN 20748 --- [moviercm-backend] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-10-15T00:53:08.179+07:00  INFO 20748 --- [moviercm-backend] [           main] c.d.moviercm.SeedAndConfigPolicyTest     : Started SeedAndConfigPolicyTest in 1.153 seconds (process running for 15.804)
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-15T00:53:08.274+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Starting ForkedBooter v3.2.5 using Java 25.0.3 with PID 20748 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-15T00:53:08.274+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : The following 1 profile is active: "prod"
+2026-10-15T00:53:08.514+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-15T00:53:08.534+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 19 ms. Found 6 JPA repository interfaces.
+2026-10-15T00:53:08.573+07:00  WARN 20748 --- [moviercm-backend] [           main] s.c.a.AnnotationConfigApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: java.lang.IllegalArgumentException: Could not resolve placeholder 'APP_JWT_SECRET' in value "${APP_JWT_SECRET}"
+2026-10-15T00:53:08.584+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-15T00:53:08.610+07:00 ERROR 20748 --- [moviercm-backend] [           main] o.s.boot.SpringApplication               : Application run failed
+
+java.lang.IllegalArgumentException: Could not resolve placeholder 'APP_JWT_SECRET' in value "${APP_JWT_SECRET}"
+	at org.springframework.util.PropertyPlaceholderHelper.parseStringValue(PropertyPlaceholderHelper.java:180) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.util.PropertyPlaceholderHelper.replacePlaceholders(PropertyPlaceholderHelper.java:126) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractPropertyResolver.doResolvePlaceholders(AbstractPropertyResolver.java:239) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractPropertyResolver.resolveRequiredPlaceholders(AbstractPropertyResolver.java:210) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractPropertyResolver.resolveNestedPlaceholders(AbstractPropertyResolver.java:230) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.PropertySourcesPropertyResolver.getProperty(PropertySourcesPropertyResolver.java:88) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.PropertySourcesPropertyResolver.getProperty(PropertySourcesPropertyResolver.java:62) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractEnvironment.getProperty(AbstractEnvironment.java:552) ~[spring-core-6.1.12.jar:6.1.12]
+	at com.dippie.moviercm.config.ProductionConfigPreflight.postProcessBeanFactory(ProductionConfigPreflight.java:38) ~[classes/:na]
+	at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(PostProcessorRegistrationDelegate.java:363) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(PostProcessorRegistrationDelegate.java:204) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.context.support.AbstractApplicationContext.invokeBeanFactoryPostProcessors(AbstractApplicationContext.java:789) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:607) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754) ~[spring-boot-3.3.3.jar:3.3.3]
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456) ~[spring-boot-3.3.3.jar:3.3.3]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:335) ~[spring-boot-3.3.3.jar:3.3.3]
+	at org.springframework.boot.builder.SpringApplicationBuilder.run(SpringApplicationBuilder.java:149) ~[spring-boot-3.3.3.jar:3.3.3]
+	at com.dippie.moviercm.SeedAndConfigPolicyTest.lambda$testProdProfileFailsWhenJwtSecretMissing$0(SeedAndConfigPolicyTest.java:194) ~[test-classes/:na]
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53) ~[junit-jupiter-api-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35) ~[junit-jupiter-api-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115) ~[junit-jupiter-api-5.10.3.jar:5.10.3]
+	at com.dippie.moviercm.SeedAndConfigPolicyTest.testProdProfileFailsWhenJwtSecretMissing(SeedAndConfigPolicyTest.java:193) ~[test-classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:728) ~[junit-platform-commons-1.10.3.jar:1.10.3]
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:218) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:214) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:139) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385) ~[surefire-booter-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162) ~[surefire-booter-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507) ~[surefire-booter-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495) ~[surefire-booter-3.2.5.jar:3.2.5]
+
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-15T00:53:08.753+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Starting ForkedBooter v3.2.5 using Java 25.0.3 with PID 20748 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-15T00:53:08.753+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : The following 1 profile is active: "prod"
+2026-10-15T00:53:08.956+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-15T00:53:08.978+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 21 ms. Found 6 JPA repository interfaces.
+2026-10-15T00:53:09.045+07:00  INFO 20748 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-15T00:53:09.047+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-15T00:53:09.057+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-15T00:53:09.058+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Starting...
+2026-10-15T00:53:09.059+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-3 - Added connection conn23: url=jdbc:h2:mem:bootstrap_canon_3b0fd189-e209-4ae2-9c63-08badfa861a8 user=SA
+2026-10-15T00:53:09.059+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Start completed.
+2026-10-15T00:53:09.062+07:00  WARN 20748 --- [moviercm-backend] [           main] org.hibernate.orm.deprecation            : HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-10-15T00:53:09.217+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-15T00:53:09.239+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:53:09.349+07:00  INFO 20748 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-15T00:53:09.349+07:00  WARN 20748 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-15T00:53:09.532+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Started ForkedBooter in 0.809 seconds (process running for 17.156)
+2026-10-15T00:53:09.539+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:53:09.541+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown initiated...
+2026-10-15T00:53:09.545+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown completed.
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-15T00:53:09.646+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Starting ForkedBooter v3.2.5 using Java 25.0.3 with PID 20748 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-15T00:53:09.646+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : The following 1 profile is active: "prod"
+2026-10-15T00:53:09.791+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-15T00:53:09.813+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 21 ms. Found 6 JPA repository interfaces.
+2026-10-15T00:53:09.881+07:00  INFO 20748 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-15T00:53:09.884+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-15T00:53:09.894+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-15T00:53:09.895+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Starting...
+2026-10-15T00:53:09.897+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-4 - Added connection conn38: url=jdbc:h2:mem:migration_test_8bed2a72-02ba-4375-b530-992761a84584 user=SA
+2026-10-15T00:53:09.897+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Start completed.
+2026-10-15T00:53:09.898+07:00  WARN 20748 --- [moviercm-backend] [           main] org.hibernate.orm.deprecation            : HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-10-15T00:53:10.049+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-15T00:53:10.052+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:53:10.135+07:00  INFO 20748 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-15T00:53:10.136+07:00  WARN 20748 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-15T00:53:10.266+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Started ForkedBooter in 0.646 seconds (process running for 17.89)
+2026-10-15T00:53:10.268+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:53:10.268+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Shutdown initiated...
+2026-10-15T00:53:10.283+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Shutdown completed.
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-15T00:53:10.328+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Starting ForkedBooter v3.2.5 using Java 25.0.3 with PID 20748 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-15T00:53:10.328+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : The following 1 profile is active: "prod"
+2026-10-15T00:53:10.456+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-15T00:53:10.472+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 15 ms. Found 6 JPA repository interfaces.
+2026-10-15T00:53:10.491+07:00  WARN 20748 --- [moviercm-backend] [           main] s.c.a.AnnotationConfigApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: java.lang.IllegalArgumentException: Could not resolve placeholder 'SPRING_DATASOURCE_PASSWORD' in value "${SPRING_DATASOURCE_PASSWORD}"
+2026-10-15T00:53:10.492+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-15T00:53:10.492+07:00 ERROR 20748 --- [moviercm-backend] [           main] o.s.boot.SpringApplication               : Application run failed
+
+java.lang.IllegalArgumentException: Could not resolve placeholder 'SPRING_DATASOURCE_PASSWORD' in value "${SPRING_DATASOURCE_PASSWORD}"
+	at org.springframework.util.PropertyPlaceholderHelper.parseStringValue(PropertyPlaceholderHelper.java:180) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.util.PropertyPlaceholderHelper.replacePlaceholders(PropertyPlaceholderHelper.java:126) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractPropertyResolver.doResolvePlaceholders(AbstractPropertyResolver.java:239) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractPropertyResolver.resolveRequiredPlaceholders(AbstractPropertyResolver.java:210) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractPropertyResolver.resolveNestedPlaceholders(AbstractPropertyResolver.java:230) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.PropertySourcesPropertyResolver.getProperty(PropertySourcesPropertyResolver.java:88) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.PropertySourcesPropertyResolver.getProperty(PropertySourcesPropertyResolver.java:62) ~[spring-core-6.1.12.jar:6.1.12]
+	at org.springframework.core.env.AbstractEnvironment.getProperty(AbstractEnvironment.java:552) ~[spring-core-6.1.12.jar:6.1.12]
+	at com.dippie.moviercm.config.ProductionConfigPreflight.postProcessBeanFactory(ProductionConfigPreflight.java:43) ~[classes/:na]
+	at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(PostProcessorRegistrationDelegate.java:363) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.context.support.PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(PostProcessorRegistrationDelegate.java:204) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.context.support.AbstractApplicationContext.invokeBeanFactoryPostProcessors(AbstractApplicationContext.java:789) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:607) ~[spring-context-6.1.12.jar:6.1.12]
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754) ~[spring-boot-3.3.3.jar:3.3.3]
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456) ~[spring-boot-3.3.3.jar:3.3.3]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:335) ~[spring-boot-3.3.3.jar:3.3.3]
+	at org.springframework.boot.builder.SpringApplicationBuilder.run(SpringApplicationBuilder.java:149) ~[spring-boot-3.3.3.jar:3.3.3]
+	at com.dippie.moviercm.SeedAndConfigPolicyTest.lambda$testProdProfileFailsWhenDatasourcePasswordMissing$0(SeedAndConfigPolicyTest.java:221) ~[test-classes/:na]
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:53) ~[junit-jupiter-api-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35) ~[junit-jupiter-api-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3115) ~[junit-jupiter-api-5.10.3.jar:5.10.3]
+	at com.dippie.moviercm.SeedAndConfigPolicyTest.testProdProfileFailsWhenDatasourcePasswordMissing(SeedAndConfigPolicyTest.java:220) ~[test-classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:728) ~[junit-platform-commons-1.10.3.jar:1.10.3]
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$7(TestMethodTestDescriptor.java:218) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:214) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:139) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:69) ~[junit-jupiter-engine-5.10.3.jar:5.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:151) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604) ~[na:na]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54) ~[junit-platform-engine-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47) ~[junit-platform-launcher-1.10.3.jar:1.10.3]
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122) ~[surefire-junit-platform-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385) ~[surefire-booter-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162) ~[surefire-booter-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507) ~[surefire-booter-3.2.5.jar:3.2.5]
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495) ~[surefire-booter-3.2.5.jar:3.2.5]
+
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-15T00:53:10.535+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Starting ForkedBooter v3.2.5 using Java 25.0.3 with PID 20748 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-15T00:53:10.535+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : The following 1 profile is active: "prod"
+2026-10-15T00:53:10.688+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-15T00:53:10.710+07:00  INFO 20748 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 20 ms. Found 6 JPA repository interfaces.
+2026-10-15T00:53:10.759+07:00  INFO 20748 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-15T00:53:10.762+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-15T00:53:10.779+07:00  INFO 20748 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-15T00:53:10.780+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-5 - Starting...
+2026-10-15T00:53:10.782+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-5 - Added connection conn50: url=jdbc:h2:mem:prod_positive_8a55c9ac-f372-4f9c-baa8-19f154144084 user=SA
+2026-10-15T00:53:10.782+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-5 - Start completed.
+2026-10-15T00:53:10.782+07:00  WARN 20748 --- [moviercm-backend] [           main] org.hibernate.orm.deprecation            : HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-10-15T00:53:10.915+07:00  INFO 20748 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-15T00:53:10.918+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:53:11.002+07:00  INFO 20748 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-15T00:53:11.002+07:00  WARN 20748 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-15T00:53:11.140+07:00  INFO 20748 --- [moviercm-backend] [           main] o.a.maven.surefire.booter.ForkedBooter   : Started ForkedBooter in 0.627 seconds (process running for 18.764)
+2026-10-15T00:53:11.142+07:00  INFO 20748 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-10-15T00:53:11.144+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-5 - Shutdown initiated...
+2026-10-15T00:53:11.168+07:00  INFO 20748 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-5 - Shutdown completed.
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.154 s -- in com.dippie.moviercm.SeedAndConfigPolicyTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 43, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  22.428 s
+[INFO] Finished at: 2026-10-15T00:53:11+07:00
+[INFO] ------------------------------------------------------------------------

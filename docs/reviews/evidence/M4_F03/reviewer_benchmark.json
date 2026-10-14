@@ -1,0 +1,312 @@
+{
+  "benchmarkMetadata": {
+    "timestamp": "2026-10-14T17:53:36.591Z",
+    "milestone": "M4-F03",
+    "environment": "Local Spring Boot Isolated HTTP Server (port 54427) + Next.js Standalone (port 3100) + Chrome CDP",
+    "runtime": {
+      "node": "v26.1.0",
+      "java": "Java 25 (compiled with --release 17)",
+      "os": "Windows_NT 10.0.26200 x64"
+    },
+    "syntheticAsset": {
+      "path": "D:\\Class\\movie-rcm-system\\backend\\springboot\\target\\test-media\\synthetic\\walkthrough_feature.mp4",
+      "totalBytes": 303333,
+      "format": "video/mp4 (H.264 / AAC faststart, 20s)"
+    },
+    "storageAdapter": "LocalMediaStorageAdapter (Read-Only, no directory creation, no parent fallbacks)",
+    "admissionPolicy": {
+      "defaultMaxConcurrentStreams": 10,
+      "overloadStatusCode": 429,
+      "overloadHeaders": {
+        "Retry-After": "5",
+        "Cache-Control": "no-store, no-cache, must-revalidate"
+      }
+    }
+  },
+  "browserWalkthrough": {
+    "desktop": {
+      "descriptorFaultRecovery": {
+        "faultStatusCode": 503,
+        "alertRoleObserved": true,
+        "retryButtonSelector": "button[data-testid=\"descriptor-retry-btn\"]",
+        "recoveredFeatureButtonSelector": "button[data-testid=\"play-feature-btn\"]",
+        "screenshot": "docs/reports/screenshots/M4_F03/00_desktop_descriptor_failure.png"
+      },
+      "initialPlayTime": 1.04,
+      "seekTime": 15.39,
+      "recoveredTime": 15.57,
+      "controlsInteracted": [
+        "button[data-testid=\"descriptor-retry-btn\"]",
+        "button[data-testid=\"play-feature-btn\"]",
+        "button[data-testid=\"video-play-pause-btn\"]",
+        "input[data-testid=\"video-timeline\"]",
+        "button[data-testid=\"video-retry-btn\"]"
+      ],
+      "screenshots": [
+        "docs/reports/screenshots/M4_F03/00_desktop_descriptor_failure.png",
+        "docs/reports/screenshots/M4_F03/01_desktop_playback_playing.png",
+        "docs/reports/screenshots/M4_F03/02_desktop_seek_near_end.png",
+        "docs/reports/screenshots/M4_F03/03_desktop_retry_recovery.png"
+      ]
+    },
+    "mobile375px": {
+      "viewport": "375x667",
+      "touchTargetPolicyMinPx": 44,
+      "controlsAudited": [
+        {
+          "name": "close_button",
+          "selector": "button[aria-label=\"Đóng trình phát\"]",
+          "ariaLabel": "Đóng trình phát",
+          "testId": "",
+          "width": 44,
+          "height": 44,
+          "left": 298,
+          "right": 342,
+          "top": 153,
+          "bottom": 197,
+          "visible": true
+        },
+        {
+          "name": "play_pause_button",
+          "selector": "button[data-testid=\"video-play-pause-btn\"]",
+          "ariaLabel": "Phát video",
+          "testId": "video-play-pause-btn",
+          "width": 44,
+          "height": 44,
+          "left": 29,
+          "right": 73,
+          "top": 470,
+          "bottom": 514,
+          "visible": true
+        },
+        {
+          "name": "volume_button",
+          "selector": "button[data-testid=\"video-volume-btn\"]",
+          "ariaLabel": "Tắt âm thanh",
+          "testId": "video-volume-btn",
+          "width": 44,
+          "height": 44,
+          "left": 89,
+          "right": 133,
+          "top": 470,
+          "bottom": 514,
+          "visible": true
+        },
+        {
+          "name": "fullscreen_button",
+          "selector": "button[data-testid=\"video-fullscreen-btn\"]",
+          "ariaLabel": "Toàn màn hình",
+          "testId": "video-fullscreen-btn",
+          "width": 44,
+          "height": 44,
+          "left": 302,
+          "right": 346,
+          "top": 470,
+          "bottom": 514,
+          "visible": true
+        },
+        {
+          "name": "timeline_scrubber",
+          "selector": "input[data-testid=\"video-timeline\"]",
+          "ariaLabel": "Thanh tua video",
+          "testId": "video-timeline",
+          "width": 219,
+          "height": 44,
+          "left": 127,
+          "right": 346,
+          "top": 414,
+          "bottom": 458,
+          "visible": true
+        }
+      ],
+      "collisionsDetected": [],
+      "touchTargetsCompliant": true,
+      "screenshot": "docs/reports/screenshots/M4_F03/04_mobile_playback_375px.png"
+    },
+    "browserPlaybackPerformance": {
+      "startupToFirstFrameLatency": {
+        "method": "requestVideoFrameCallback",
+        "latencyMs": 152
+      },
+      "seekToFrameLatency": {
+        "runsMs": [
+          30,
+          50,
+          24
+        ],
+        "stats": {
+          "min": 24,
+          "avg": 34.67,
+          "p95": 50,
+          "max": 50,
+          "count": 3
+        },
+        "unit": "ms"
+      },
+      "playbackStallsObserved": {
+        "stalledEvents": 0,
+        "waitingEvents": 4
+      },
+      "clientMemoryUsage": "unavailable (requires OS-level memory profiler; not estimated)"
+    }
+  },
+  "springBootHttpBenchmark": {
+    "springBootHttpChunkTtfbInitial64KiB": {
+      "description": "HTTP TTFB of initial 64 KiB Range chunk from Spring Boot server (does not represent browser video decode startup)",
+      "runs": [
+        10.4,
+        8.71,
+        8.66
+      ],
+      "stats": {
+        "min": 8.66,
+        "avg": 9.26,
+        "p95": 10.4,
+        "max": 10.4,
+        "count": 3
+      },
+      "unit": "ms"
+    },
+    "springBootHttpChunkTtfbMidSeek": {
+      "description": "HTTP TTFB of mid-file Range chunk (bytes=150000-215535)",
+      "runs": [
+        11.86,
+        9.62,
+        8.33
+      ],
+      "stats": {
+        "min": 8.33,
+        "avg": 9.94,
+        "p95": 11.86,
+        "max": 11.86,
+        "count": 3
+      },
+      "unit": "ms"
+    },
+    "springBootHttpChunkTtfbEndSeek": {
+      "description": "HTTP TTFB of end-file Range chunk (bytes=250000-)",
+      "runs": [
+        8.84,
+        7.94,
+        7.39
+      ],
+      "stats": {
+        "min": 7.39,
+        "avg": 8.06,
+        "p95": 8.84,
+        "max": 8.84,
+        "count": 3
+      },
+      "unit": "ms"
+    },
+    "singleStreamHttpDownloadThroughput": {
+      "description": "Full asset (296 KiB) HTTP Range download throughput on local loopback TCP",
+      "runs": [
+        32.69,
+        18.8,
+        23.09
+      ],
+      "stats": {
+        "min": 18.8,
+        "avg": 24.86,
+        "p95": 32.69,
+        "max": 32.69,
+        "count": 3
+      },
+      "unit": "MB/s"
+    },
+    "concurrency3HttpStreamBatchTransfer": {
+      "description": "3 concurrent HTTP Range stream downloads on loopback TCP (evaluates server batch IO transfer, not 3 concurrent human viewers)",
+      "runs": [
+        {
+          "batchDurationMs": 16.35,
+          "aggregateMBs": 53.06,
+          "avgStreamTTFB": 12.21
+        },
+        {
+          "batchDurationMs": 11.59,
+          "aggregateMBs": 74.91,
+          "avgStreamTTFB": 8.26
+        },
+        {
+          "batchDurationMs": 12.34,
+          "aggregateMBs": 70.35,
+          "avgStreamTTFB": 8.57
+        }
+      ],
+      "aggregateThroughputStats": {
+        "min": 53.06,
+        "avg": 66.11,
+        "p95": 74.91,
+        "max": 74.91,
+        "count": 3
+      },
+      "avgStreamTtfbStats": {
+        "min": 8.26,
+        "avg": 9.68,
+        "p95": 12.21,
+        "max": 12.21,
+        "count": 3
+      },
+      "unit": "MB/s aggregate, ms TTFB"
+    },
+    "clientDisconnectAndPermitCleanup": {
+      "baselineActiveStreams": 0,
+      "activeStreamsWhileStreaming": 1,
+      "activeStreamsAfterDisconnect": 0,
+      "permitCleanupObserved": true,
+      "overload429Verified": true,
+      "serverHealthAfterDisconnect": "UP (200 OK)"
+    },
+    "monitoredDirectoryDiskSnapshot": {
+      "monitoredDirectory": "backend/springboot/target/test-media",
+      "beforeFiles": [
+        {
+          "path": "synthetic/feature_test.mp4",
+          "sizeBytes": 137961,
+          "sha256": "4937606abe951b1c7c3f97cb0a0bacc2adb8ee8ed0efa56d0115fdf6873d80d9"
+        },
+        {
+          "path": "synthetic/trailer_test.mp4",
+          "sizeBytes": 45095,
+          "sha256": "56c4ad574057a4184b9930bde1d552baaa6f26ffad3e8a1f0c72c4909677f3e7"
+        },
+        {
+          "path": "synthetic/walkthrough_feature.mp4",
+          "sizeBytes": 303333,
+          "sha256": "121eda278647dc6f48210bf0f2ca54299770d02d7022b80a94309cc440ba8389"
+        }
+      ],
+      "afterFiles": [
+        {
+          "path": "synthetic/feature_test.mp4",
+          "sizeBytes": 137961,
+          "sha256": "4937606abe951b1c7c3f97cb0a0bacc2adb8ee8ed0efa56d0115fdf6873d80d9"
+        },
+        {
+          "path": "synthetic/trailer_test.mp4",
+          "sizeBytes": 45095,
+          "sha256": "56c4ad574057a4184b9930bde1d552baaa6f26ffad3e8a1f0c72c4909677f3e7"
+        },
+        {
+          "path": "synthetic/walkthrough_feature.mp4",
+          "sizeBytes": 303333,
+          "sha256": "121eda278647dc6f48210bf0f2ca54299770d02d7022b80a94309cc440ba8389"
+        }
+      ],
+      "mutationsDetected": 0,
+      "readOnlyPreserved": true,
+      "scopeLimitation": "Filesystem mutation verification strictly scoped to backend test-media root. OS-wide disk writes are not tracked without kernel-level filesystem auditing."
+    }
+  },
+  "observationsAndHonestLimitations": [
+    "Descriptor failure (HTTP 503) cleanly renders [role=\"alert\"] and [data-testid=\"descriptor-retry-btn\"], preventing false absence of movie catalog data.",
+    "Clicking descriptor retry button recovers descriptor without full page reload and activates the \"Xem phim\" feature button.",
+    "Local loopback TCP socket latency is typically under 10ms for warm connections; actual network streaming across WAN will be dominated by RTT, packet loss, and client bandwidth.",
+    "Spring Boot 64 KiB bounded buffer streams data iteratively to prevent heap spikes during large concurrent reads.",
+    "Stream concurrency is bounded to 10 permits by default (configurable via app.media.max-concurrent-streams); requests exceeding the limit receive HTTP 429 with Retry-After: 5.",
+    "Browser seek latency measures time to seeked / video frame render, distinct from raw HTTP chunk TTFB.",
+    "Active stream permits are tracked via AtomicInteger in MediaStreamService and verified to return to 0 upon client disconnection.",
+    "Google Drive streaming remains in BLOCKED_EXTERNAL_INPUT status as rclone / Google Drive mounting requires external user credentials."
+  ]
+}

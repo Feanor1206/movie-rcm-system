@@ -1,11 +1,10 @@
 {
   "protocolVersion": 1,
-  "command": "reviewing",
-  "taskId": "M4-F02",
-  "promptVersion": 2,
+  "command": "stop",
+  "taskId": "M4-F03",
+  "promptVersion": 3,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
-  "lastReviewedCheckpoint": "M4-F02-CHECKPOINT-01",
+  "lastReviewedCheckpoint": "M4-F03-CHECKPOINT-01",
   "reviewMode": "manual",
-  "note": "F02 review complete, source/evidence checkpoint accepted except T1 descriptor timeout/malformed/mismatch terminal state. F03 multi-agent prompt prepared; no application edits by Codex. Publish work after checkpoint push.",
-  "reviewingCheckpoint": "M4-F02-CHECKPOINT-01"
+  "note": "M4 local ACCEPTED 2026-10-15; see docs/reviews/M4_F03_REVIEW.md. Drive remains BLOCKED_EXTERNAL_INPUT / NOT_IMPLEMENTED. No F04 assignment. Automation remains paused; manual handoff."
 }

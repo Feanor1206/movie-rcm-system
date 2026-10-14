@@ -34,6 +34,36 @@ export function resolveStreamUrl(streamUrl: string): string {
   return `${baseHost}${cleanPath}`;
 }
 
+function getDOMExceptionClass(): typeof DOMException {
+  if (typeof DOMException !== 'undefined') {
+    return DOMException;
+  }
+  if (typeof globalThis !== 'undefined' && (globalThis as any).DOMException) {
+    return (globalThis as any).DOMException;
+  }
+  try {
+    const ac = new AbortController();
+    ac.abort();
+    if (ac.signal.reason?.constructor) {
+      return ac.signal.reason.constructor as typeof DOMException;
+    }
+  } catch {
+    // fallback
+  }
+  return Error as any;
+}
+
+function createDOMException(message: string, name: string): DOMException {
+  const Ctor = getDOMExceptionClass();
+  try {
+    return new Ctor(message, name);
+  } catch {
+    const err = new Error(message) as any;
+    err.name = name;
+    return err;
+  }
+}
+
 /**
  * Fetches the media descriptor for a given movie.
  * Supports public access, handles both direct payloads and wrapped ApiResponse payloads.
@@ -43,58 +73,148 @@ export async function getMediaDescriptor(
   options?: { timeoutMs?: number; signal?: AbortSignal }
 ): Promise<MediaDescriptor> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  let isTimeout = false;
+  let isExternalAbort = false;
+
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let removeExternalListener: (() => void) | null = null;
-  if (options?.signal) {
-    if (options.signal.aborted) {
-      controller.abort();
-    } else {
-      const onAbort = () => controller.abort();
-      options.signal.addEventListener('abort', onAbort, { once: true });
-      removeExternalListener = () => options.signal?.removeEventListener('abort', onAbort);
-    }
-  }
 
   try {
-    const url = `${SPRINGBOOT_API}/movies/${encodeURIComponent(movieId)}/media-descriptor`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-      signal: controller.signal,
+    if (options?.signal?.aborted) {
+      isExternalAbort = true;
+      throw createDOMException('The operation was aborted.', 'AbortError');
+    }
+
+    const controller = new AbortController();
+
+    if (options?.signal) {
+      const onAbort = () => {
+        if (!isTimeout) {
+          isExternalAbort = true;
+        }
+        controller.abort();
+      };
+      options.signal.addEventListener('abort', onAbort, { once: true });
+      removeExternalListener = () => {
+        options.signal?.removeEventListener('abort', onAbort);
+      };
+    }
+
+    timeoutId = setTimeout(() => {
+      if (!options?.signal?.aborted) {
+        isTimeout = true;
+        controller.abort();
+      }
+    }, timeoutMs);
+
+    const abortPromise = new Promise<never>((_, reject) => {
+      if (controller.signal.aborted) {
+        reject(controller.signal.reason || new Error('The operation was aborted.'));
+      } else {
+        controller.signal.addEventListener(
+          'abort',
+          () => reject(controller.signal.reason || new Error('The operation was aborted.')),
+          { once: true }
+        );
+      }
     });
+
+    const url = `${SPRINGBOOT_API}/movies/${encodeURIComponent(movieId)}/media-descriptor`;
+    const response = await Promise.race([
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      }),
+      abortPromise,
+    ]);
 
     if (!response.ok) {
       throw new Error(`Lỗi tải mô tả media (${response.status})`);
     }
 
     const json = await response.json();
-    const data = json && typeof json === 'object' && 'data' in json ? json.data : json;
+    if (!json || typeof json !== 'object' || Array.isArray(json)) {
+      throw new Error('Dữ liệu mô tả media không hợp lệ');
+    }
+
+    const data =
+      json.data && typeof json.data === 'object' && !Array.isArray(json.data)
+        ? json.data
+        : json;
+
+    if (typeof data.movieId !== 'string' || data.movieId.trim() === '' || data.movieId !== movieId) {
+      throw new Error('Dữ liệu mô tả media không khớp mã phim');
+    }
+
+    if (typeof data.hasFeature !== 'boolean' || typeof data.hasTrailer !== 'boolean') {
+      throw new Error('Thiếu hoặc sai trường hasFeature/hasTrailer');
+    }
+
+    if (data.hasFeature) {
+      if (
+        !data.feature ||
+        typeof data.feature !== 'object' ||
+        Array.isArray(data.feature) ||
+        data.feature.kind !== 'feature' ||
+        typeof data.feature.streamUrl !== 'string' ||
+        data.feature.streamUrl.trim() === ''
+      ) {
+        throw new Error('Dữ liệu feature không hợp lệ');
+      }
+    }
+
+    if (data.hasTrailer) {
+      if (
+        !data.trailer ||
+        typeof data.trailer !== 'object' ||
+        Array.isArray(data.trailer) ||
+        data.trailer.kind !== 'trailer' ||
+        typeof data.trailer.streamUrl !== 'string' ||
+        data.trailer.streamUrl.trim() === ''
+      ) {
+        throw new Error('Dữ liệu trailer không hợp lệ');
+      }
+    }
 
     return {
-      movieId: data.movieId || movieId,
-      hasFeature: Boolean(data.hasFeature),
-      hasTrailer: Boolean(data.hasTrailer),
-      feature: data.feature
+      movieId: data.movieId,
+      hasFeature: data.hasFeature,
+      hasTrailer: data.hasTrailer,
+      feature: data.hasFeature && data.feature
         ? {
             ...data.feature,
             streamUrl: resolveStreamUrl(data.feature.streamUrl),
           }
         : null,
-      trailer: data.trailer
+      trailer: data.hasTrailer && data.trailer
         ? {
             ...data.trailer,
             streamUrl: resolveStreamUrl(data.trailer.streamUrl),
           }
         : null,
     };
+  } catch (err: any) {
+    if (isExternalAbort || options?.signal?.aborted) {
+      throw createDOMException('The operation was aborted.', 'AbortError');
+    }
+    if (isTimeout) {
+      const timeoutErr = createDOMException('Hết thời gian tải mô tả media', 'TimeoutError');
+      (timeoutErr as any).isTimeout = true;
+      throw timeoutErr;
+    }
+    throw err;
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
     if (removeExternalListener) {
       removeExternalListener();
+      removeExternalListener = null;
     }
   }
 }

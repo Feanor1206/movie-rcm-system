@@ -1,0 +1,2 @@
+{"mode":"internal-timeout","error":"TimeoutError","elapsedMs":115,"expected":"TimeoutError"}
+{"mode":"external-abort","error":"AbortError","elapsedMs":48,"expected":"AbortError"}

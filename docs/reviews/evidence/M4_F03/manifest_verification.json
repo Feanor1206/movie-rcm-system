@@ -1,0 +1,82 @@
+[
+  {
+    "path": "backend/springboot/src/test/java/com/dippie/moviercm/M4WalkthroughServer.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/M4_F03.patch",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/M4_F03_REPORT.md",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/M4_F03_STATUS.json",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/m4_f03_benchmark_results.json",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/screenshots/M4_F03/00_desktop_descriptor_failure.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/screenshots/M4_F03/01_desktop_playback_playing.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/screenshots/M4_F03/02_desktop_seek_near_end.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/screenshots/M4_F03/03_desktop_retry_recovery.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/screenshots/M4_F03/04_mobile_playback_375px.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "frontend/features/movies/components/MovieDetail.tsx",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "frontend/lib/services/mediaService.ts",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "frontend/package.json",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "frontend/tests/media_descriptor_boundary_suite.mjs",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "frontend/tests/media_playback_suite.mjs",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/run_m4_media_walkthrough.cjs",
+    "hashMatch": true,
+    "sizeMatch": true
+  }
+]

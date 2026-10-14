@@ -26,6 +26,7 @@ function loadMediaService(mockFetch) {
     fetch: mockFetch || globalThis.fetch,
     process: { env: { NEXT_PUBLIC_SPRINGBOOT_API_URL: 'http://test-server/api' } },
     AbortController: globalThis.AbortController,
+    DOMException: globalThis.DOMException,
     setTimeout,
     clearTimeout,
     encodeURIComponent,
@@ -156,6 +157,7 @@ function createMovieDetailHarness(options = {}) {
     setTimeout,
     clearTimeout,
     AbortController: globalThis.AbortController,
+    DOMException: globalThis.DOMException,
     console,
     require(moduleName) {
       if (moduleName === 'react') return { __esModule: true, default: hooks, ...hooks };
@@ -739,6 +741,199 @@ test('13. Component Execution: 503 descriptor error displays role="alert" and re
 
   const featureBtnRecovered = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
   assert.ok(featureBtnRecovered, 'Feature button must appear after successful retry recovery');
+
+  harness.unmount();
+});
+
+test('14. Component Execution: Timeout descriptor displays role="alert" and descriptor-retry-btn, preserving independent trailer preview', async () => {
+  const getMediaDescriptor = async () => {
+    const err = new DOMException('Hết thời gian tải mô tả media', 'TimeoutError');
+    err.isTimeout = true;
+    throw err;
+  };
+
+  const harness = createMovieDetailHarness({ getMediaDescriptor });
+  const movie = {
+    id: 'm-timeout',
+    title: 'Timeout Movie',
+    genres: ['Animation'],
+    year: 2026,
+    rating: 8.5,
+    videoUrl: 'https://example.com/trailer.mp4',
+  };
+
+  harness.render(movie);
+  await new Promise((r) => setImmediate(r));
+  harness.render(movie);
+
+  const tree = harness.getTree();
+  const alert = walk(tree, (n) => n.props?.role === 'alert');
+  assert.ok(alert, 'Alert banner must be displayed on descriptor timeout');
+
+  const retryBtn = walk(tree, (n) => n.props?.['data-testid'] === 'descriptor-retry-btn');
+  assert.ok(retryBtn, 'Retry button must be visible on timeout');
+
+  const featureBtn = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
+  assert.equal(featureBtn, null, 'Feature button must NOT appear on timeout');
+
+  // Independent trailer preview remains available
+  const trailerBtn = walk(tree, (n) => n.props?.['data-testid'] === 'play-trailer-btn');
+  assert.ok(trailerBtn, 'Trailer preview button must remain available when movie has videoUrl');
+
+  harness.unmount();
+});
+
+test('15. Component Execution: Malformed descriptor payload (empty {} or wrong movieId) displays role="alert" and retry button', async () => {
+  // Case 1: Empty object rejected by validation or returning invalid descriptor
+  const harness1 = createMovieDetailHarness({
+    getMediaDescriptor: async () => {
+      throw new Error('Dữ liệu mô tả media không khớp mã phim');
+    },
+  });
+  const movie = { id: 'm-malformed', title: 'Malformed Movie', genres: ['Animation'], year: 2026, rating: 8 };
+
+  harness1.render(movie);
+  await new Promise((r) => setImmediate(r));
+  harness1.render(movie);
+
+  let tree = harness1.getTree();
+  let alert = walk(tree, (n) => n.props?.role === 'alert');
+  assert.ok(alert, 'Alert banner must be displayed for malformed empty payload');
+  let retryBtn = walk(tree, (n) => n.props?.['data-testid'] === 'descriptor-retry-btn');
+  assert.ok(retryBtn, 'Retry button must be visible for malformed empty payload');
+  harness1.unmount();
+
+  // Case 2: Wrong movieId returned
+  const harness2 = createMovieDetailHarness({
+    getMediaDescriptor: async () => ({
+      movieId: 'completely-different-movie-id',
+      hasFeature: false,
+      hasTrailer: false,
+    }),
+  });
+  harness2.render(movie);
+  await new Promise((r) => setImmediate(r));
+  harness2.render(movie);
+
+  tree = harness2.getTree();
+  alert = walk(tree, (n) => n.props?.role === 'alert');
+  assert.ok(alert, 'Alert banner must be displayed when movieId does not match');
+  retryBtn = walk(tree, (n) => n.props?.['data-testid'] === 'descriptor-retry-btn');
+  assert.ok(retryBtn, 'Retry button must be visible when movieId does not match');
+  harness2.unmount();
+});
+
+test('16. Component Execution: Route swap A -> B aborts in-flight request for A without causing error on B or stale overwrite', async () => {
+  let rejectA;
+  let resolveB;
+
+  const getMediaDescriptor = (id, options) => {
+    if (id === 'movie-A') {
+      return new Promise((_resolve, reject) => {
+        rejectA = reject;
+        if (options?.signal) {
+          options.signal.addEventListener('abort', () => {
+            const err = new DOMException('The operation was aborted.', 'AbortError');
+            reject(err);
+          });
+        }
+      });
+    }
+    return new Promise((resolve) => {
+      resolveB = resolve;
+    });
+  };
+
+  const harness = createMovieDetailHarness({ getMediaDescriptor });
+
+  // 1. Render movie A - fetch is initiated and stays in flight
+  harness.render('movie-A');
+
+  // 2. Quickly navigate to movie B before A resolves (route swap)
+  harness.render('movie-B');
+
+  // Trigger A's rejection (simulating A aborting or network failure for A)
+  if (rejectA) {
+    try {
+      rejectA(new DOMException('The operation was aborted.', 'AbortError'));
+    } catch {}
+  }
+  await new Promise((r) => setImmediate(r));
+  harness.render('movie-B');
+
+  // Verify B has NO alert banner caused by A's abort
+  let tree = harness.getTree();
+  let alert = walk(tree, (n) => n.props?.role === 'alert');
+  assert.equal(alert, null, 'Route swap must silently abort A; B must NOT display error alert');
+
+  // 3. Now B resolves successfully
+  resolveB({
+    movieId: 'movie-B',
+    hasFeature: true,
+    hasTrailer: false,
+    feature: { streamUrl: 'https://fixture.invalid/feature-movie-B.mp4' },
+  });
+  await new Promise((r) => setImmediate(r));
+  harness.render('movie-B');
+
+  tree = harness.getTree();
+  alert = walk(tree, (n) => n.props?.role === 'alert');
+  assert.equal(alert, null, 'B must not show error after successful resolution');
+
+  const featureBtn = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
+  assert.ok(featureBtn, 'B feature button must be rendered');
+
+  harness.unmount();
+});
+
+test('17. Component Execution: Retry recovery after descriptor failure restores feature playback button', async () => {
+  let attempt = 0;
+  const getMediaDescriptor = async (id) => {
+    attempt++;
+    if (attempt === 1) {
+      const err = new DOMException('Hết thời gian tải mô tả media', 'TimeoutError');
+      err.isTimeout = true;
+      throw err;
+    }
+    return {
+      movieId: id,
+      hasFeature: true,
+      hasTrailer: false,
+      feature: { streamUrl: `https://fixture.invalid/feature-${id}.mp4` },
+    };
+  };
+
+  const harness = createMovieDetailHarness({ getMediaDescriptor });
+  const movie = { id: 'm-recover', title: 'Recovery Movie', genres: ['Action'], year: 2026, rating: 9 };
+
+  // First attempt fails with timeout
+  harness.render(movie);
+  await new Promise((r) => setImmediate(r));
+  harness.render(movie);
+
+  let tree = harness.getTree();
+  let alert = walk(tree, (n) => n.props?.role === 'alert');
+  assert.ok(alert, 'Alert must be visible on initial timeout');
+  let retryBtn = walk(tree, (n) => n.props?.['data-testid'] === 'descriptor-retry-btn');
+  assert.ok(retryBtn, 'Retry button must be visible');
+  assert.equal(attempt, 1);
+
+  // Click retry
+  retryBtn.props.onClick();
+  await new Promise((r) => setImmediate(r));
+  harness.render(movie);
+  await new Promise((r) => setImmediate(r));
+  harness.render(movie);
+
+  // Second attempt succeeds
+  tree = harness.getTree();
+  assert.equal(attempt, 2, 'Retry must trigger new descriptor fetch');
+
+  alert = walk(tree, (n) => n.props?.role === 'alert');
+  assert.equal(alert, null, 'Alert must disappear after recovery');
+
+  const featureBtn = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
+  assert.ok(featureBtn, 'Feature button must appear after recovery');
 
   harness.unmount();
 });

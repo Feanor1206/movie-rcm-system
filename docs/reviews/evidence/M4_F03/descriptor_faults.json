@@ -1,0 +1,23 @@
+[
+  {
+    "fault": "timeout",
+    "errorAndRetry": true,
+    "featureAbsentOnFailure": true,
+    "recoveredByUiRetry": true,
+    "failureElapsedMs": 6202
+  },
+  {
+    "fault": "malformed",
+    "errorAndRetry": true,
+    "featureAbsentOnFailure": true,
+    "recoveredByUiRetry": true,
+    "failureElapsedMs": 542
+  },
+  {
+    "fault": "mismatch",
+    "errorAndRetry": true,
+    "featureAbsentOnFailure": true,
+    "recoveredByUiRetry": true,
+    "failureElapsedMs": 543
+  }
+]

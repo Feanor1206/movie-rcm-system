@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test tests/catalog_service_suite.mjs tests/m1_behavior_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs tests/modal_a11y_suite.mjs tests/media_playback_suite.mjs",
+    "test": "node --test tests/catalog_service_suite.mjs tests/m1_behavior_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs tests/modal_a11y_suite.mjs tests/media_playback_suite.mjs tests/media_descriptor_boundary_suite.mjs",
     "uipro": "python ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py"
   },
   "dependencies": {

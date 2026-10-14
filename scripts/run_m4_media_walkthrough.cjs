@@ -11,8 +11,8 @@
  *   - F3: Real browser controls (play/pause, timeline scrubber), >=44px mobile touch targets,
  *         before/after disk snapshots, truthful latency labeling
  *
- * Screenshots saved to: docs/reports/screenshots/M4_F02/
- * Benchmark output saved to: docs/reports/m4_f02_benchmark_results.json
+ * Screenshots saved to: docs/reports/screenshots/M4_F03/
+ * Benchmark output saved to: docs/reports/m4_f03_benchmark_results.json
  */
 
 const http = require('node:http');
@@ -30,8 +30,8 @@ const JAVA_PATH = 'C:\\Program Files\\Java\\jdk-25.0.3\\bin\\java.exe';
 const STANDALONE_DIR = path.resolve(PROJECT_ROOT, 'frontend/.next/standalone');
 const STANDALONE_SERVER = path.resolve(STANDALONE_DIR, 'server.js');
 const MEDIA_FILE = path.resolve(PROJECT_ROOT, 'backend/springboot/target/test-media/synthetic/walkthrough_feature.mp4');
-const SCREENSHOTS_DIR = path.resolve(PROJECT_ROOT, 'docs/reports/screenshots/M4_F02');
-const BENCHMARK_OUT = path.resolve(PROJECT_ROOT, 'docs/reports/m4_f02_benchmark_results.json');
+const SCREENSHOTS_DIR = path.resolve(PROJECT_ROOT, 'docs/reports/screenshots/M4_F03');
+const BENCHMARK_OUT = path.resolve(PROJECT_ROOT, 'docs/reports/m4_f03_benchmark_results.json');
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
@@ -260,6 +260,13 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
   let idCounter = 1;
   const pendingRequests = new Map();
   const interceptedRequests = [];
+  let cdpDescriptorFaultActive = false;
+  let cdpDescriptorFaultStatus = 503;
+
+  function setCdpDescriptorFault(active, status = 503) {
+    cdpDescriptorFaultActive = Boolean(active);
+    cdpDescriptorFaultStatus = status;
+  }
 
   ws.addEventListener('message', async (event) => {
     const raw = typeof event.data === 'string' ? event.data : event.data.toString();
@@ -278,6 +285,33 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
       const { requestId, request } = msg.params;
       const originalUrl = request.url;
       let targetUrl = originalUrl;
+
+      // Simulated descriptor fault handler if active
+      if (cdpDescriptorFaultActive && originalUrl.includes('/media-descriptor')) {
+        console.log(`[CDP Fetch Fault Injection] Returning simulated ${cdpDescriptorFaultStatus} for ${originalUrl}`);
+        try {
+          ws.send(JSON.stringify({
+            id: idCounter++,
+            method: 'Fetch.fulfillRequest',
+            params: {
+              requestId,
+              responseCode: cdpDescriptorFaultStatus,
+              responseHeaders: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Access-Control-Allow-Origin', value: '*' },
+              ],
+              body: Buffer.from(JSON.stringify({
+                status: cdpDescriptorFaultStatus,
+                error: 'Service Unavailable',
+                message: 'Simulated descriptor failure for M4 browser walkthrough',
+              })).toString('base64'),
+            }
+          }));
+        } catch (err) {
+          console.error('Error fulfilling simulated descriptor fault via CDP:', err.message);
+        }
+        return;
+      }
 
       if (originalUrl.includes('localhost:8080') || originalUrl.includes('127.0.0.1:8080')) {
         targetUrl = originalUrl.replace(/(localhost|127\.0\.0\.1):8080/, `127.0.0.1:${springBootPort}`);
@@ -439,6 +473,7 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
     captureScreenshot,
     dispatchKey,
     interceptedRequests,
+    setCdpDescriptorFault,
   };
 }
 
@@ -558,7 +593,27 @@ async function main() {
 
     // 3. Launch Chrome with CDP
     chromeSession = await launchChromeWithCDP(springPort, cdpPort);
-    const { evaluate, waitForCondition, setViewport, navigate, captureScreenshot, dispatchKey, interceptedRequests } = chromeSession;
+    const { evaluate, waitForCondition, setViewport, navigate, captureScreenshot, dispatchKey, interceptedRequests, setCdpDescriptorFault } = chromeSession;
+
+    async function armDescriptorFault(status = 503) {
+      console.log(`Arming descriptor fault simulation (HTTP ${status})...`);
+      try {
+        await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/descriptor-fault/arm?status=${status}`, { method: 'POST' });
+      } catch (err) {
+        console.warn('Backend descriptor-fault/arm failed, relying on CDP fault injection:', err.message);
+      }
+      setCdpDescriptorFault(true, status);
+    }
+
+    async function disarmDescriptorFault() {
+      console.log('Disarming descriptor fault simulation...');
+      try {
+        await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/descriptor-fault/disarm`, { method: 'POST' });
+      } catch (err) {
+        console.warn('Backend descriptor-fault/disarm failed:', err.message);
+      }
+      setCdpDescriptorFault(false);
+    }
 
     // ------------------------------------------------------------------------
     // Part A: Browser Playback Assertions & Screenshot Capture
@@ -567,7 +622,12 @@ async function main() {
     await setViewport(1280, 800, false);
 
     const movieUrl = `http://127.0.0.1:${nextPort}/movies/m4-walkthrough-movie`;
-    console.log(`Navigating to ${movieUrl}...`);
+
+    // A0. Arm descriptor fault (HTTP 503) to verify truth-in-advertising and recovery
+    console.log('\n[Walkthrough Step A0] Testing Descriptor Failure & Retry Recovery...');
+    await armDescriptorFault(503);
+
+    console.log(`Navigating to ${movieUrl} with descriptor fault active...`);
     await navigate(movieUrl);
 
     // A1. Verify movie title rendered
@@ -578,22 +638,79 @@ async function main() {
     );
     console.log('✔ Movie title rendered on page');
 
+    // A1b. Verify descriptor error state: [role="alert"] and [data-testid="descriptor-retry-btn"]
+    console.log('Verifying descriptor failure alert and retry button are visible...');
+    await waitForCondition(
+      `(() => {
+        const alert = document.querySelector('[role="alert"]');
+        return alert && alert.innerText.trim().length > 0;
+      })()`,
+      'Descriptor error alert with [role="alert"] visible on page',
+      10000
+    );
+    const observedAlertText = await evaluate(`document.querySelector('[role="alert"]')?.innerText || ''`);
+    console.log(`Observed descriptor alert text: "${observedAlertText.replace(/\s+/g, ' ').trim()}"`);
+
+    await waitForCondition(
+      `(() => {
+        const btn = document.querySelector('button[data-testid="descriptor-retry-btn"]');
+        return btn && !btn.disabled && btn.innerText.includes('Thử lại');
+      })()`,
+      'Descriptor retry button [data-testid="descriptor-retry-btn"] visible and enabled',
+      6000
+    );
+
+    // Verify "Xem phim" feature button is NOT present while descriptor is in error state
+    const featureBtnPresentDuringFault = await evaluate(`(() => {
+      const btn = document.querySelector('button[data-testid="watch-feature-btn"]') ||
+                  document.querySelector('button[data-testid="play-feature-btn"]') ||
+                  document.querySelector('button[aria-label="Xem phim"]') ||
+                  Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Xem phim'));
+      return Boolean(btn);
+    })()`);
+    assert.equal(featureBtnPresentDuringFault, false, 'Feature "Xem phim" button must NOT be rendered when descriptor failed');
+    console.log('✔ Descriptor error verified: [role="alert"] visible, [data-testid="descriptor-retry-btn"] active, "Xem phim" button safely absent');
+
+    // Capture Screenshot 0: Descriptor Failure State
+    await captureScreenshot('00_desktop_descriptor_failure.png');
+
+    // A1c. Disarm descriptor fault and interactively click [data-testid="descriptor-retry-btn"]
+    console.log('Disarming fault and clicking [data-testid="descriptor-retry-btn"] to recover descriptor...');
+    await disarmDescriptorFault();
+
+    await evaluate(`(() => {
+      const btn = document.querySelector('button[data-testid="descriptor-retry-btn"]');
+      if (btn) btn.click();
+    })()`);
+
+    // Wait for [role="alert"] to be dismissed
+    await waitForCondition(
+      `document.querySelector('[role="alert"]') === null`,
+      'Descriptor error alert dismissed after retry',
+      8000
+    );
+    console.log('✔ Descriptor error alert dismissed');
+
     // A2. Verify "Xem phim" feature button is rendered and enabled
     await waitForCondition(
       `(() => {
-        const btn = document.querySelector('button[aria-label="Xem phim"]') ||
+        const btn = document.querySelector('button[data-testid="watch-feature-btn"]') ||
+                    document.querySelector('button[data-testid="play-feature-btn"]') ||
+                    document.querySelector('button[aria-label="Xem phim"]') ||
                     Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Xem phim'));
         return btn && !btn.disabled;
       })()`,
-      'Feature "Xem phim" button visible and enabled',
-      6000
+      'Feature "Xem phim" button visible and enabled after descriptor retry',
+      8000
     );
-    console.log('✔ Feature "Xem phim" button active');
+    console.log('✔ Feature "Xem phim" button active after descriptor retry recovery');
 
     // A3. Open player modal by clicking "Xem phim"
     console.log('Clicking "Xem phim" to initiate playback modal...');
     await evaluate(`(() => {
-      const btn = document.querySelector('button[aria-label="Xem phim"]') ||
+      const btn = document.querySelector('button[data-testid="watch-feature-btn"]') ||
+                  document.querySelector('button[data-testid="play-feature-btn"]') ||
+                  document.querySelector('button[aria-label="Xem phim"]') ||
                   Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Xem phim'));
       btn.click();
     })()`);
@@ -884,8 +1001,8 @@ async function main() {
     console.log('Testing Modal close and focus restoration via Escape key...');
     await dispatchKey('Escape', 'Escape', 27);
     await waitForCondition(`document.querySelector('video') === null`, 'Modal closed', 4000);
-    const activeBtnText = await evaluate(`document.activeElement?.innerText || document.activeElement?.getAttribute('aria-label') || ''`);
-    assert(activeBtnText.includes('Xem phim'), 'Opener "Xem phim" button must receive focus after modal closes');
+    const activeBtnText = await evaluate(`document.activeElement?.innerText || document.activeElement?.getAttribute('aria-label') || document.activeElement?.getAttribute('data-testid') || ''`);
+    assert(activeBtnText.includes('Xem phim') || activeBtnText.includes('play-feature-btn') || activeBtnText.includes('watch-feature-btn'), 'Opener "Xem phim" button must receive focus after modal closes');
     console.log('✔ Modal closed and focus properly restored to opener button');
 
     // ------------------------------------------------------------------------
@@ -896,7 +1013,9 @@ async function main() {
 
     console.log('Re-opening video player on mobile viewport...');
     await evaluate(`(() => {
-      const btn = document.querySelector('button[aria-label="Xem phim"]') ||
+      const btn = document.querySelector('button[data-testid="watch-feature-btn"]') ||
+                  document.querySelector('button[data-testid="play-feature-btn"]') ||
+                  document.querySelector('button[aria-label="Xem phim"]') ||
                   Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Xem phim'));
       btn.click();
     })()`);
@@ -1177,7 +1296,7 @@ async function main() {
     const finalReport = {
       benchmarkMetadata: {
         timestamp: new Date().toISOString(),
-        milestone: 'M4-F02',
+        milestone: 'M4-F03',
         environment: `Local Spring Boot Isolated HTTP Server (port ${springPort}) + Next.js Standalone (port ${nextPort}) + Chrome CDP`,
         runtime: {
           node: process.version,
@@ -1201,18 +1320,28 @@ async function main() {
       },
       browserWalkthrough: {
         desktop: {
+          descriptorFaultRecovery: {
+            faultStatusCode: 503,
+            alertRoleObserved: true,
+            retryButtonSelector: 'button[data-testid="descriptor-retry-btn"]',
+            recoveredFeatureButtonSelector: 'button[data-testid="play-feature-btn"]',
+            screenshot: 'docs/reports/screenshots/M4_F03/00_desktop_descriptor_failure.png',
+          },
           initialPlayTime: Number(initialPlayTime.toFixed(2)),
           seekTime: Number(seekTime.toFixed(2)),
           recoveredTime: Number(recoveredTime.toFixed(2)),
           controlsInteracted: [
+            'button[data-testid="descriptor-retry-btn"]',
+            'button[data-testid="play-feature-btn"]',
             'button[data-testid="video-play-pause-btn"]',
             'input[data-testid="video-timeline"]',
             'button[data-testid="video-retry-btn"]',
           ],
           screenshots: [
-            'docs/reports/screenshots/M4_F02/01_desktop_playback_playing.png',
-            'docs/reports/screenshots/M4_F02/02_desktop_seek_near_end.png',
-            'docs/reports/screenshots/M4_F02/03_desktop_retry_recovery.png',
+            'docs/reports/screenshots/M4_F03/00_desktop_descriptor_failure.png',
+            'docs/reports/screenshots/M4_F03/01_desktop_playback_playing.png',
+            'docs/reports/screenshots/M4_F03/02_desktop_seek_near_end.png',
+            'docs/reports/screenshots/M4_F03/03_desktop_retry_recovery.png',
           ],
         },
         mobile375px: {
@@ -1221,7 +1350,7 @@ async function main() {
           controlsAudited: mobileAudit.controls,
           collisionsDetected: mobileAudit.collisions,
           touchTargetsCompliant: true,
-          screenshot: 'docs/reports/screenshots/M4_F02/04_mobile_playback_375px.png',
+          screenshot: 'docs/reports/screenshots/M4_F03/04_mobile_playback_375px.png',
         },
         browserPlaybackPerformance: {
           startupToFirstFrameLatency: {
@@ -1287,6 +1416,8 @@ async function main() {
         },
       },
       observationsAndHonestLimitations: [
+        'Descriptor failure (HTTP 503) cleanly renders [role="alert"] and [data-testid="descriptor-retry-btn"], preventing false absence of movie catalog data.',
+        'Clicking descriptor retry button recovers descriptor without full page reload and activates the "Xem phim" feature button.',
         'Local loopback TCP socket latency is typically under 10ms for warm connections; actual network streaming across WAN will be dominated by RTT, packet loss, and client bandwidth.',
         'Spring Boot 64 KiB bounded buffer streams data iteratively to prevent heap spikes during large concurrent reads.',
         'Stream concurrency is bounded to 10 permits by default (configurable via app.media.max-concurrent-streams); requests exceeding the limit receive HTTP 429 with Retry-After: 5.',

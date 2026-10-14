@@ -1,0 +1,58 @@
+{
+  "milestone": "M4",
+  "taskId": "M4-F03",
+  "runId": "M4-F03-CHECKPOINT-01",
+  "promptVersion": 3,
+  "status": "ready_for_review",
+  "timestamp": "2026-10-15T00:50:00+07:00",
+  "reviewTarget": "Codex",
+  "sourceFrozen": true,
+  "summary": "Full resolution of finding T1 (Descriptor terminal failures: timeout, malformed payload, wrong movieId). Implemented via three parallel agents with dedicated file ownership. Internal timeout (TimeoutError) differentiated from external abort (AbortError), strict schema validation on HTTP 200 payload, terminal error state transitions in MovieDetail with role='alert' and data-testid='descriptor-retry-btn', independent trailer preview fallback, dynamic route JS budget preserved (143,264 B <= 143,360 B), and end-to-end browser walkthrough fault injection & recovery verified.",
+  "findingsResolved": [
+    "T1_DESCRIPTOR_TERMINAL_FAILURES_TIMEOUT_MALFORMED_MISMATCH"
+  ],
+  "multiAgentExecution": {
+    "agentA_clientBoundary": {
+      "conversationId": "1c80818c-ad01-41bb-be56-49fbb304317e",
+      "filesOwned": [
+        "frontend/lib/services/mediaService.ts",
+        "frontend/tests/media_descriptor_boundary_suite.mjs"
+      ],
+      "tests": "9/9 PASS"
+    },
+    "agentB_componentLifecycle": {
+      "conversationId": "ccd6d779-76f1-4be6-8d83-aad2c3933f12",
+      "filesOwned": [
+        "frontend/features/movies/components/MovieDetail.tsx",
+        "frontend/tests/media_playback_suite.mjs"
+      ],
+      "tests": "17/17 PASS",
+      "bundleBudget": "143,264 B <= 143,360 B (PASS)"
+    },
+    "agentC_browserVerification": {
+      "conversationId": "2f7f5172-6b87-4fe9-bb1d-5cfd9ab64875",
+      "filesOwned": [
+        "scripts/run_m4_media_walkthrough.cjs",
+        "backend/springboot/src/test/java/com/dippie/moviercm/M4WalkthroughServer.java"
+      ],
+      "walkthrough": "EXIT 0",
+      "screenshotsCaptured": 5
+    }
+  },
+  "verificationResults": {
+    "backendMavenTest": "43/43 PASS",
+    "backendActiveProfileTest": "43/43 PASS",
+    "frontendNode26Test": "83/83 PASS",
+    "frontendNode20Test": "83/83 PASS",
+    "typeScriptCheck": "0 errors",
+    "dynamicBundleBudget": "143,264 B <= 143,360 B (PASS)",
+    "descriptorTimeoutRepro": "3/3 PASS (Exit 0)",
+    "descriptorFailureRepro": "2/2 PASS (Exit 0)",
+    "browserWalkthrough": "PASS (Exit 0)",
+    "springBootHttpBenchmark": "PASS (Exit 0)",
+    "patchReverseCheck": "VERIFIED CLEAN"
+  },
+  "blockedExternalInput": {
+    "googleDriveStreaming": "BLOCKED_EXTERNAL_INPUT / NOT_IMPLEMENTED (requires external user credentials / rclone mount)"
+  }
+}

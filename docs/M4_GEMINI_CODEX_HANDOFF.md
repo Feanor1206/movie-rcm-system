@@ -1,5 +1,9 @@
 # M4 — Theo dõi và giao prompt tiếp
 
+## Trạng thái cuối — 2026-10-15
+
+M4 local ACCEPTED tại M4-F03-CHECKPOINT-01; xem docs/reviews/M4_F03_REVIEW.md. Control=stop, không giao F04. Automation vẫn PAUSED. Drive BLOCKED_EXTERNAL_INPUT / NOT_IMPLEMENTED là gate riêng. Vòng lặp bên dưới là lịch sử, không phải lệnh tiếp tục/polling.
+
 Người dùng yêu cầu bật theo dõi lại ngày14/10/2026. Codex automation theo-d-i-gemini-m2-m3 được cập nhật thành Review Gemini M4 và giao prompt tiếp, mỗi10phút. Không mở lại M2/M3 đã accepted.
 
 Codex sở hữu docs/prompts/M4_REVIEW_CONTROL.json và GEMINI_CURRENT_TASK.md. Gemini sở hữu reports/status/artifacts M4. Original M4 ready_for_review đã được review tại ecf8839, không phải handoff mới. Status cũ hoặc file build timestamp không đủ kết luận hoàn tất.

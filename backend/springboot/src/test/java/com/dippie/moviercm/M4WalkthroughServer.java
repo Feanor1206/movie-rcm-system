@@ -21,18 +21,33 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Isolated Spring Boot test server for real HTTP Range media walkthrough and benchmark.
  * Runs on dynamic loopback port with in-memory H2 database and temporary media root.
  */
 public class M4WalkthroughServer {
+
+    private static final AtomicBoolean descriptorFaultActive = new AtomicBoolean(false);
+    private static final AtomicInteger descriptorFaultStatus = new AtomicInteger(503);
 
     public static void main(String[] args) throws Exception {
         String mediaRoot = System.getProperty("walkthrough.media.root");
@@ -139,6 +154,32 @@ public class M4WalkthroughServer {
                     .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
             return http.build();
         }
+
+        @Bean
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        public FilterRegistrationBean<Filter> descriptorFaultFilter() {
+            FilterRegistrationBean<Filter> registration = new FilterRegistrationBean<>();
+            registration.setFilter(new Filter() {
+                @Override
+                public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+                        throws IOException, ServletException {
+                    HttpServletRequest req = (HttpServletRequest) request;
+                    HttpServletResponse res = (HttpServletResponse) response;
+                    if (descriptorFaultActive.get() && req.getRequestURI().contains("/media-descriptor")) {
+                        int status = descriptorFaultStatus.get();
+                        res.setStatus(status);
+                        res.setContentType("application/json");
+                        res.setCharacterEncoding("UTF-8");
+                        res.getWriter().write("{\"status\":" + status + ",\"error\":\"Simulated Descriptor Fault for M4 Walkthrough\"}");
+                        return;
+                    }
+                    chain.doFilter(request, response);
+                }
+            });
+            registration.addUrlPatterns("/api/movies/*");
+            registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+            return registration;
+        }
     }
 
     @RestController
@@ -179,6 +220,28 @@ public class M4WalkthroughServer {
             MediaStreamService.setTestStreamGate(null);
             if (gate != null) gate.countDown();
             return ResponseEntity.ok(Map.of("gateReleased", true));
+        }
+
+        @PostMapping("/descriptor-fault/arm")
+        public ResponseEntity<Map<String, Object>> armDescriptorFault(
+                @RequestParam(name = "status", defaultValue = "503") int status) {
+            descriptorFaultStatus.set(status);
+            descriptorFaultActive.set(true);
+            return ResponseEntity.ok(Map.of("descriptorFaultArmed", true, "statusCode", status));
+        }
+
+        @PostMapping("/descriptor-fault/disarm")
+        public ResponseEntity<Map<String, Object>> disarmDescriptorFault() {
+            descriptorFaultActive.set(false);
+            return ResponseEntity.ok(Map.of("descriptorFaultArmed", false));
+        }
+
+        @GetMapping("/descriptor-fault/status")
+        public ResponseEntity<Map<String, Object>> getDescriptorFaultStatus() {
+            return ResponseEntity.ok(Map.of(
+                    "descriptorFaultArmed", descriptorFaultActive.get(),
+                    "statusCode", descriptorFaultStatus.get()
+            ));
         }
     }
 }
