@@ -30,4 +30,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(message));
     }
+
+    @ExceptionHandler(com.dippie.moviercm.exception.MediaNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMediaNotFound(com.dippie.moviercm.exception.MediaNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(com.dippie.moviercm.exception.MediaUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMediaUnavailable(com.dippie.moviercm.exception.MediaUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(com.dippie.moviercm.exception.SecurityPathTraversalException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePathTraversal(com.dippie.moviercm.exception.SecurityPathTraversalException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(com.dippie.moviercm.exception.InvalidMediaRangeException.class)
+    public ResponseEntity<Void> handleInvalidRange(com.dippie.moviercm.exception.InvalidMediaRangeException ex) {
+        return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                .header(org.springframework.http.HttpHeaders.CONTENT_RANGE, "bytes */" + ex.getTotalBytes())
+                .build();
+    }
 }
+

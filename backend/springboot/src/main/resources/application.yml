@@ -17,6 +17,8 @@ app:
     expiration-ms: 86400000 # 24 hours (1 day)
   cors:
     allowed-origins: "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
+  media:
+    root: ${APP_MEDIA_ROOT:./media}
 
 ---
 # Development Profile (H2 Persistent File Database)

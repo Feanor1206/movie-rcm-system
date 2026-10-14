@@ -1,0 +1,32 @@
+TAP version 13
+# node:internal/modules/esm/get_format:189
+#   throw new ERR_UNKNOWN_FILE_EXTENSION(ext, filepath);
+#         ^
+# TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts" for D:\\Class\\movie-rcm-system\\frontend\\lib\\services\\mediaService.ts
+#     at Object.getFileProtocolModuleFormat [as file:] (node:internal/modules/esm/get_format:189:9)
+#     at defaultGetFormat (node:internal/modules/esm/get_format:232:36)
+#     at defaultLoad (node:internal/modules/esm/load:145:22)
+#     at async ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:543:45) {
+#   code: 'ERR_UNKNOWN_FILE_EXTENSION'
+# }
+# Node.js v20.20.2
+# Subtest: D:\\Class\\movie-rcm-system\\frontend\\tests\\media_playback_suite.mjs
+not ok 1 - D:\\Class\\movie-rcm-system\\frontend\\tests\\media_playback_suite.mjs
+  ---
+  duration_ms: 97.645
+  location: 'D:\\Class\\movie-rcm-system\\frontend\\tests\\media_playback_suite.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 103.2783

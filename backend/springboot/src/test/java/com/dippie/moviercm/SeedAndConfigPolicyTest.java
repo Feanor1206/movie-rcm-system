@@ -309,20 +309,26 @@ public class SeedAndConfigPolicyTest {
             }
         }
 
-        // 2. Assert favorite_items does NOT exist prior to migration
+        // 2. Assert favorite_items and media_assets do NOT exist prior to migration
         try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
             try (Statement stmt = conn.createStatement()) {
                 assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT count(*) FROM favorite_items"));
+                assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT count(*) FROM media_assets"));
             }
         }
 
-        // 3. Execute additive migration: database/migrations/02_add_favorite_items.sql
+        // 3. Execute additive migrations: 02_add_favorite_items.sql and 03_add_media_assets.sql
         executeSqlFile(jdbcUrl, "../../database/migrations/02_add_favorite_items.sql");
+        executeSqlFile(jdbcUrl, "../../database/migrations/03_add_media_assets.sql");
 
-        // 4. Assert favorite_items exists and prior data is 100% intact
+        // 4. Assert favorite_items & media_assets exist and prior data is 100% intact
         try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
             try (Statement stmt = conn.createStatement()) {
                 ResultSet rs = stmt.executeQuery("SELECT count(*) FROM favorite_items");
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+
+                rs = stmt.executeQuery("SELECT count(*) FROM media_assets");
                 assertTrue(rs.next());
                 assertEquals(0, rs.getInt(1));
 
@@ -362,6 +368,8 @@ public class SeedAndConfigPolicyTest {
                     "Active profiles must contain exactly and only 'prod'");
             assertEquals("validate", ctx.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto"));
             assertNotNull(ctx.getBean(FavoriteItemRepository.class));
+            assertNotNull(ctx.getBean(com.dippie.moviercm.repository.MediaAssetRepository.class));
+
         } finally {
             if (ctx != null) {
                 ctx.close();

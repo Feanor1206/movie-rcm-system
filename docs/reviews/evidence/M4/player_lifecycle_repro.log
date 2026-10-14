@@ -1,0 +1,3 @@
+REPRO movie=B pendingDescriptor featureButtonFromAStillVisible=true
+REPRO movie=B videoSrc=https://fixture.invalid/feature-A.mp4
+REPRO playerStillOpen=true openerFocusCallsDuringMetadata=1

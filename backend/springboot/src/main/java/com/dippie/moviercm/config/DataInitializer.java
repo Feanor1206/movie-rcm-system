@@ -29,17 +29,20 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final WatchlistItemRepository watchlistRepository;
     private final MovieRatingRepository ratingRepository;
+    private final com.dippie.moviercm.repository.MediaAssetRepository mediaAssetRepository;
     private final PasswordEncoder passwordEncoder;
 
     public DataInitializer(MovieRepository movieRepository,
                            UserRepository userRepository,
                            WatchlistItemRepository watchlistRepository,
                            MovieRatingRepository ratingRepository,
+                           com.dippie.moviercm.repository.MediaAssetRepository mediaAssetRepository,
                            PasswordEncoder passwordEncoder) {
         this.movieRepository = movieRepository;
         this.userRepository = userRepository;
         this.watchlistRepository = watchlistRepository;
         this.ratingRepository = ratingRepository;
+        this.mediaAssetRepository = mediaAssetRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -47,6 +50,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         seedMovies();
         seed50Users();
+        seedMediaAssets();
     }
 
     private void seedMovies() {
@@ -230,4 +234,56 @@ public class DataInitializer implements CommandLineRunner {
             }
         }
     }
+
+    private void seedMediaAssets() {
+        if (mediaAssetRepository.count() == 0) {
+            logger.info("Chưa có media assets trong CSDL. Đang tự động nạp assets mẫu cho Milestone M4...");
+
+            List<com.dippie.moviercm.entity.MediaAsset> assets = List.of(
+                    new com.dippie.moviercm.entity.MediaAsset(
+                            "ast-orbit-feat",
+                            "the-last-orbit",
+                            "feature",
+                            "local",
+                            "synthetic/feature_test.mp4",
+                            "v1",
+                            "video/mp4",
+                            137961L,
+                            10.0,
+                            true,
+                            true
+                    ),
+                    new com.dippie.moviercm.entity.MediaAsset(
+                            "ast-orbit-trl",
+                            "the-last-orbit",
+                            "trailer",
+                            "local",
+                            "synthetic/trailer_test.mp4",
+                            "v1",
+                            "video/mp4",
+                            45095L,
+                            3.0,
+                            true,
+                            true
+                    ),
+                    new com.dippie.moviercm.entity.MediaAsset(
+                            "ast-afterlight-trl",
+                            "afterlight",
+                            "trailer",
+                            "local",
+                            "synthetic/trailer_test.mp4",
+                            "v1",
+                            "video/mp4",
+                            45095L,
+                            3.0,
+                            true,
+                            true
+                    )
+            );
+
+            mediaAssetRepository.saveAll(assets);
+            logger.info("Đã nạp thành công {} media assets mẫu (The Last Orbit feature/trailer, Afterlight trailer).", assets.size());
+        }
+    }
 }
+

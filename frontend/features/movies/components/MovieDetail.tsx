@@ -19,10 +19,13 @@ import {
   RefreshCw,
   AlertCircle,
   Film,
+  Pause,
 } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
+import { getMediaDescriptor, MediaDescriptor } from '@/lib/services/mediaService';
 import { MovieSection } from './MovieSection';
+
 
 export function MovieDetail({
   movie,
@@ -49,16 +52,140 @@ export function MovieDetail({
   const [isPlaying, setIsPlaying] = useState(false);
   const [posterError, setPosterError] = useState(false);
   const [backdropError, setBackdropError] = useState(false);
+  const [descriptor, setDescriptor] = useState<MediaDescriptor | null>(null);
+  const [activeMediaKind, setActiveMediaKind] = useState<'feature' | 'trailer'>('trailer');
+  const [activeMediaUrl, setActiveMediaUrl] = useState<string>('');
+  const [playerState, setPlayerState] = useState<'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'error'>('idle');
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
+  const [volume, setVolume] = useState<number>(1);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [retryTime, setRetryTime] = useState<number>(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoModalRef = useRef<HTMLDivElement>(null);
   const playButtonRef = useRef<HTMLButtonElement>(null);
   const playerOpenerRef = useRef<HTMLElement | null>(null);
 
-  // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration
+  // Fetch descriptor for movie
+  useEffect(() => {
+    let mounted = true;
+    getMediaDescriptor(movie.id)
+      .then((desc) => {
+        if (mounted) {
+          setDescriptor(desc);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setDescriptor({
+            movieId: movie.id,
+            hasFeature: false,
+            hasTrailer: Boolean(movie.videoUrl && movie.videoUrl.trim()),
+            feature: null,
+            trailer: movie.videoUrl && movie.videoUrl.trim()
+              ? {
+                  assetId: `legacy-${movie.id}`,
+                  kind: 'trailer',
+                  streamUrl: movie.videoUrl,
+                  mimeType: 'video/mp4',
+                  byteLength: 0,
+                  isPublic: true,
+                  version: 'legacy',
+                }
+              : null,
+          });
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [movie.id, movie.videoUrl]);
+
+  const formatTime = (secs: number) => {
+    if (isNaN(secs) || secs < 0) return '00:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const startPlayback = (kind: 'feature' | 'trailer', opener?: HTMLElement | null) => {
+    if (opener) {
+      playerOpenerRef.current = opener;
+    }
+    setActiveMediaKind(kind);
+    const targetUrl =
+      kind === 'feature'
+        ? descriptor?.feature?.streamUrl || ''
+        : descriptor?.trailer?.streamUrl || movie.videoUrl || '';
+    setActiveMediaUrl(targetUrl);
+    setPlayerState('buffering');
+    setPlaybackError(null);
+    setCurrentTime(0);
+    setRetryTime(0);
+    setIsPlaying(true);
+  };
+
+  const handleRetry = () => {
+    setPlaybackError(null);
+    setPlayerState('buffering');
+    if (videoRef.current) {
+      videoRef.current.load();
+      if (retryTime > 0) {
+        videoRef.current.currentTime = retryTime;
+      }
+      videoRef.current.play().catch(() => setPlayerState('error'));
+    }
+  };
+
+  const togglePlayPause = () => {
+    if (!videoRef.current) return;
+    if (videoRef.current.paused) {
+      videoRef.current.play().catch(() => setPlayerState('error'));
+      setPlayerState('playing');
+    } else {
+      videoRef.current.pause();
+      setPlayerState('paused');
+    }
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    videoRef.current.muted = nextMuted;
+  };
+
+  const toggleFullscreen = () => {
+    if (!videoModalRef.current) return;
+    if (!document.fullscreenElement) {
+      videoModalRef.current.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const seekBy = (seconds: number) => {
+    if (!videoRef.current) return;
+    const target = Math.min(Math.max(0, videoRef.current.currentTime + seconds), duration || 100);
+    videoRef.current.currentTime = target;
+    setCurrentTime(target);
+  };
+
+  const adjustVolume = (delta: number) => {
+    if (!videoRef.current) return;
+    const newVol = Math.min(Math.max(0, volume + delta), 1);
+    setVolume(newVol);
+    setIsMuted(newVol === 0);
+    videoRef.current.volume = newVol;
+    videoRef.current.muted = newVol === 0;
+  };
+
+  // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration, shortcuts
   useEffect(() => {
     if (!isPlaying) return;
 
-    // Save active element as opener if outside modal
     if (document.activeElement && (!videoModalRef.current || !videoModalRef.current.contains(document.activeElement))) {
       playerOpenerRef.current = document.activeElement as HTMLElement | null;
     }
@@ -66,7 +193,6 @@ export function MovieDetail({
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Auto-focus first focusable element inside modal (initial focus)
     const timer = setTimeout(() => {
       if (videoModalRef.current) {
         const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
@@ -78,11 +204,54 @@ export function MovieDetail({
       }
     }, 40);
 
-    // Trap focus inside modal & listen for Escape
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         setIsPlaying(false);
+        return;
+      }
+
+      // Keyboard shortcuts when playing
+      if (e.key === ' ' || e.code === 'Space') {
+        // Prevent page scroll when space is pressed inside player
+        e.preventDefault();
+        togglePlayPause();
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        seekBy(-5);
+        return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        seekBy(5);
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        adjustVolume(0.1);
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        adjustVolume(-0.1);
+        return;
+      }
+
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        toggleMute();
+        return;
+      }
+
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        toggleFullscreen();
         return;
       }
 
@@ -123,7 +292,8 @@ export function MovieDetail({
       window.removeEventListener('keydown', handleKeyDown);
       (playerOpenerRef.current || playButtonRef.current)?.focus();
     };
-  }, [isPlaying]);
+  }, [isPlaying, isMuted, volume, duration]);
+
 
   const inWatchlist = isWatchlisted(movie.id);
   const favorite = isFavorite(movie.id);
@@ -148,7 +318,7 @@ export function MovieDetail({
   return (
     <main className="min-h-screen bg-background">
       {/* Video Player Modal / Player Overlay */}
-      {isPlaying && hasVideo && (
+      {isPlaying && (
         <div
           ref={videoModalRef}
           role="dialog"
@@ -156,40 +326,192 @@ export function MovieDetail({
           aria-labelledby="video-player-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 animate-fade-in"
         >
-          <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-surface-border bg-surface shadow-2xl">
+          <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-surface-border bg-surface shadow-2xl flex flex-col">
             {/* Player Header Bar */}
             <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
+              <div className="flex items-center gap-2 truncate">
+                <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-brand-sm shrink-0" />
                 <h3 id="video-player-title" className="text-sm font-bold text-white truncate">
                   {movie.title}
                 </h3>
-                <span className="text-xs text-zinc-400">• Bản xem trước</span>
+                <span className="text-xs text-zinc-400 shrink-0">
+                  • {activeMediaKind === 'feature' ? 'Bản phim chính' : 'Trailer / Giới thiệu'}
+                </span>
               </div>
               <button
                 onClick={() => setIsPlaying(false)}
-                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer shrink-0"
                 aria-label="Đóng trình phát"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Video Container */}
-            <div className="relative aspect-video w-full bg-black">
+            {/* Video Container with Overlays */}
+            <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
               <video
                 ref={videoRef}
-                src={videoSource}
-                controls
+                src={activeMediaUrl}
                 autoPlay
-                className="h-full w-full object-contain"
+                playsInline
+                preload="metadata"
+                onLoadedMetadata={() => {
+                  if (videoRef.current) {
+                    setDuration(videoRef.current.duration || 0);
+                    if (retryTime > 0) {
+                      videoRef.current.currentTime = retryTime;
+                    }
+                  }
+                }}
+                onTimeUpdate={() => {
+                  if (videoRef.current) {
+                    setCurrentTime(videoRef.current.currentTime);
+                  }
+                }}
+                onWaiting={() => setPlayerState('buffering')}
+                onPlaying={() => setPlayerState('playing')}
+                onPause={() => {
+                  if (playerState !== 'buffering' && playerState !== 'error') {
+                    setPlayerState('paused');
+                  }
+                }}
+                onEnded={() => setPlayerState('paused')}
+                onError={() => {
+                  setPlayerState('error');
+                  if (videoRef.current) {
+                    setRetryTime(videoRef.current.currentTime);
+                  }
+                  setPlaybackError('Không thể nạp luồng phát video hoặc kết nối mạng bị gián đoạn.');
+                }}
+                className="h-full w-full object-contain cursor-pointer"
+                onClick={togglePlayPause}
               >
                 Trình duyệt của bạn không hỗ trợ thẻ video HTML5.
               </video>
+
+              {/* Buffering Indicator */}
+              {playerState === 'buffering' && (
+                <div
+                  data-testid="video-buffering"
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-xs pointer-events-none"
+                >
+                  <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-black/75 border border-emerald-500/30">
+                    <Loader2 size={36} className="animate-spin text-brand" />
+                    <span className="text-xs font-semibold text-emerald-400">Đang đệm luồng phát...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Overlay with Retry */}
+              {playerState === 'error' && (
+                <div
+                  data-testid="video-error-overlay"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 p-6 text-center z-20"
+                >
+                  <AlertCircle size={44} className="text-amber-400 mb-3" />
+                  <h4 className="text-sm font-bold text-white mb-1">Gián đoạn luồng phát video</h4>
+                  <p className="text-xs text-zinc-300 max-w-md mb-4 leading-relaxed">
+                    {playbackError || 'Không thể đọc luồng HTTP Range từ máy chủ.'}
+                  </p>
+                  <button
+                    data-testid="video-retry-btn"
+                    onClick={handleRetry}
+                    className="btn-primary min-h-[44px] min-w-[44px] px-5 py-2.5 text-xs sm:text-sm font-bold shadow-brand-sm inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <RefreshCw size={16} /> Thử lại ({formatTime(retryTime)})
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Custom Control Bar with HTTP Range Timeline */}
+            <div className="flex flex-col gap-2 border-t border-surface-border bg-surface-muted/95 p-3 sm:px-4">
+              {/* Timeline Scrubber */}
+              <div className="flex items-center gap-3">
+                <span data-testid="video-time-display" className="text-xs font-mono text-zinc-300 shrink-0 min-w-[80px]">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                <input
+                  data-testid="video-timeline"
+                  type="range"
+                  min={0}
+                  max={duration || 100}
+                  step="0.1"
+                  value={currentTime}
+                  onChange={(e) => {
+                    const newTime = parseFloat(e.target.value);
+                    setCurrentTime(newTime);
+                    if (videoRef.current) {
+                      videoRef.current.currentTime = newTime;
+                    }
+                  }}
+                  aria-label="Thanh tua video"
+                  className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-zinc-700 accent-emerald-500 min-h-[44px]"
+                />
+              </div>
+
+              {/* Player Control Buttons */}
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    data-testid="video-play-pause-btn"
+                    onClick={togglePlayPause}
+                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-brand text-zinc-950 font-bold hover:bg-brand-hover transition cursor-pointer"
+                    aria-label={playerState === 'playing' ? 'Tạm dừng video' : 'Phát video'}
+                  >
+                    {playerState === 'playing' ? (
+                      <Pause size={18} className="fill-current" />
+                    ) : (
+                      <Play size={18} className="fill-current" />
+                    )}
+                  </button>
+
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <button
+                      data-testid="video-volume-btn"
+                      onClick={toggleMute}
+                      className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                      aria-label={isMuted || volume === 0 ? 'Bật âm thanh' : 'Tắt âm thanh'}
+                    >
+                      {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={isMuted ? 0 : volume}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        setVolume(v);
+                        setIsMuted(v === 0);
+                        if (videoRef.current) {
+                          videoRef.current.volume = v;
+                          videoRef.current.muted = v === 0;
+                        }
+                      }}
+                      aria-label="Thanh âm lượng"
+                      className="w-16 sm:w-20 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 min-h-[44px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    data-testid="video-fullscreen-btn"
+                    onClick={toggleFullscreen}
+                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                    aria-label="Toàn màn hình"
+                  >
+                    <Maximize2 size={18} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
+
 
       {/* Hero Backdrop */}
       <section className="relative overflow-hidden border-b border-surface-border bg-background">
@@ -281,19 +603,41 @@ export function MovieDetail({
 
               {/* Action Buttons */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                {hasVideo && (
+                {descriptor?.hasFeature ? (
+                  <>
+                    <button
+                      ref={playButtonRef}
+                      data-testid="play-feature-btn"
+                      onClick={(e) => startPlayback('feature', e.currentTarget)}
+                      className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Play size={16} className="fill-current" />
+                      Xem phim
+                    </button>
+
+                    {(descriptor?.hasTrailer || hasVideo) && (
+                      <button
+                        data-testid="play-trailer-btn"
+                        onClick={(e) => startPlayback('trailer', e.currentTarget)}
+                        className="btn-secondary min-h-[44px] px-3 py-2 text-xs sm:px-4 sm:text-sm font-semibold text-zinc-300 hover:text-white inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Film size={15} />
+                        Xem trailer
+                      </button>
+                    )}
+                  </>
+                ) : (descriptor?.hasTrailer || hasVideo) ? (
                   <button
                     ref={playButtonRef}
-                    onClick={(e) => {
-                      playerOpenerRef.current = e.currentTarget;
-                      setIsPlaying(true);
-                    }}
-                    className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5"
+                    data-testid="play-trailer-btn"
+                    onClick={(e) => startPlayback('trailer', e.currentTarget)}
+                    className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Play size={16} className="fill-current" />
                     Xem trailer / giới thiệu
                   </button>
-                )}
+                ) : null}
+
 
                 <button
                   disabled={isWatchlistPending}
