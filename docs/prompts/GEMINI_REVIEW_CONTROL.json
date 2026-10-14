@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "targetRoundId": 10,
-  "promptVersion": 10,
-  "lastReviewedRoundId": 9,
+  "targetRoundId": 11,
+  "promptVersion": 11,
+  "lastReviewedRoundId": 10,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
   "milestone": "M3",
   "reviewMode": "manual",
-  "note": "M2 ACCEPTED per LOOP_ROUND_9_REVIEW.md: 54 tests/tsc, browser14 steps and negative checks independently pass; authenticated requests, assets and Profile rating DOM verified. Round10 begins M3 UX/performance/config/CI/runbook, manual mode; automation remains off."
+  "note": "Round10 M3 request changes R1-R4: CI missing suites/dev trigger; production compose seed and destructive rollback; reproduced modal/mobile/reduced-motion defects; missing actual perf evidence. 54 frontend/19 backend/tsc/build pass. Round11 grouped fixes, work on dev, manual mode; no storage/AI yet."
 }

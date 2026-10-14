@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Check, Play, Star, RefreshCw, Loader2 } from 'lucide-react';
@@ -16,6 +16,7 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
     isActionUnconfirmed,
     getActionIntent,
   } = useWatchlist();
+  const [backdropError, setBackdropError] = useState(false);
   if (!movie) return null;
 
   const inWatchlist = isWatchlisted(movie.id);
@@ -33,16 +34,19 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
     ? 'Xóa khỏi Watchlist'
     : 'Thêm vào Watchlist';
 
+  const hasBackdrop = Boolean(movie.backdrop && movie.backdrop.trim() && !backdropError);
+
   return (
     <section className="relative min-h-[420px] sm:min-h-[500px] lg:min-h-[560px] flex items-center overflow-hidden border-b border-surface-border bg-background">
       {/* 1. Backdrop Image Layer - z-0 with vivid visibility */}
       <div className="absolute inset-0 z-0 h-full w-full">
-        {movie.backdrop && movie.backdrop.trim() ? (
+        {hasBackdrop ? (
           <Image
             priority
-            src={movie.backdrop}
+            src={movie.backdrop as string}
             alt={movie.title}
             fill
+            onError={() => setBackdropError(true)}
             sizes="100vw"
             className="object-cover object-center sm:object-right opacity-70 sm:opacity-85"
           />

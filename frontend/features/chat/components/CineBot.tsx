@@ -38,6 +38,8 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const cinebotRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,6 +50,54 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       scrollToBottom();
     }
   }, [messages, isOpen]);
+
+  // A11y: Escape key, body scroll lock, focus trap, and initial focus
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && cinebotRef.current) {
+        const focusable = cinebotRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
@@ -110,13 +160,21 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-end p-0 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in pointer-events-auto">
+    <div
+      ref={cinebotRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cinebot-dialog-title"
+      className="fixed inset-0 z-50 flex items-end justify-end p-0 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in pointer-events-auto"
+    >
       <div className="flex h-full w-full flex-col overflow-hidden bg-surface border-0 sm:border sm:border-surface-border sm:rounded-xl sm:h-[620px] sm:w-[440px] sm:shadow-2xl">
         {/* Chatbot Header */}
         <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-white">CineBot</h2>
+              <h2 id="cinebot-dialog-title" className="text-sm font-bold text-white">
+                CineBot
+              </h2>
               <span className="rounded bg-brand/15 border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand font-semibold">
                 Trợ lý Dippie
               </span>
@@ -128,6 +186,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             <button
               onClick={resetChat}
               title="Làm mới"
+              aria-label="Làm mới cuộc trò chuyện"
               className="rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
             >
               <RotateCcw size={15} />
@@ -135,6 +194,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             <button
               onClick={onClose}
               title="Đóng"
+              aria-label="Đóng CineBot"
               className="rounded p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
             >
               <X size={18} />
@@ -308,6 +368,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
         <div className="border-t border-surface-border bg-surface-muted p-3">
           <div className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-2 focus-within:border-brand">
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -331,14 +392,14 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 }
 
 /**
- * Floating Trigger Button for CineBot (Clean rectangular design, no oversized pills or ping dots)
+ * Floating Trigger Button for CineBot (Clean rectangular design, accessible 44px touch target)
  */
 export function CineBotFloatingTrigger({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       aria-label="Mở Chatbot CineBot"
-      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-md border border-surface-border bg-surface px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
+      className="fixed bottom-6 right-6 z-40 flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-md border border-surface-border bg-surface px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
     >
       <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
       <span>Hỏi CineBot</span>

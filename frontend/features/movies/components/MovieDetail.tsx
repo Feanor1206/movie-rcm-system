@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -47,7 +47,56 @@ export function MovieDetail({
   } = useWatchlist();
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [posterError, setPosterError] = useState(false);
+  const [backdropError, setBackdropError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoModalRef = useRef<HTMLDivElement>(null);
+  const playButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    // Trap focus inside modal & listen for Escape
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsPlaying(false);
+        return;
+      }
+
+      if (e.key === 'Tab' && videoModalRef.current) {
+        const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), video, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      playButtonRef.current?.focus();
+    };
+  }, [isPlaying]);
 
   const inWatchlist = isWatchlisted(movie.id);
   const favorite = isFavorite(movie.id);
@@ -73,13 +122,21 @@ export function MovieDetail({
     <main className="min-h-screen bg-background">
       {/* Video Player Modal / Player Overlay */}
       {isPlaying && hasVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 animate-fade-in">
+        <div
+          ref={videoModalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="video-player-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 animate-fade-in"
+        >
           <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-surface-border bg-surface shadow-2xl">
             {/* Player Header Bar */}
             <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
-                <h3 className="text-sm font-bold text-white truncate">{movie.title}</h3>
+                <h3 id="video-player-title" className="text-sm font-bold text-white truncate">
+                  {movie.title}
+                </h3>
                 <span className="text-xs text-zinc-400">• Bản xem trước</span>
               </div>
               <button
@@ -111,12 +168,13 @@ export function MovieDetail({
       <section className="relative overflow-hidden border-b border-surface-border bg-background">
         {/* Backdrop Image Layer */}
         <div className="absolute inset-0 z-0 h-full w-full">
-          {movie.backdrop && movie.backdrop.trim() ? (
+          {movie.backdrop && movie.backdrop.trim() && !backdropError ? (
             <Image
               src={movie.backdrop}
               alt={movie.title}
               fill
               priority
+              onError={() => setBackdropError(true)}
               className="object-cover opacity-75 sm:opacity-85"
             />
           ) : (
@@ -139,16 +197,17 @@ export function MovieDetail({
             {/* Poster */}
             <div className="relative shrink-0">
               <div className="relative aspect-[2/3] w-44 overflow-hidden rounded-lg border border-surface-border bg-surface shadow-2xl sm:w-56">
-                {movie.poster && movie.poster.trim() ? (
+                {movie.poster && movie.poster.trim() && !posterError ? (
                   <Image
                     src={movie.poster}
                     alt={movie.title}
                     fill
+                    onError={() => setPosterError(true)}
                     sizes="(max-width: 640px) 176px, 224px"
                     className="object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center p-4 text-center bg-zinc-900 text-zinc-500">
+                  <div data-testid="movie-poster-placeholder" className="flex h-full w-full flex-col items-center justify-center p-4 text-center bg-zinc-900 text-zinc-500">
                     <Film size={36} className="mb-2 text-zinc-600" />
                     <span className="text-xs font-medium leading-tight text-zinc-400">
                       {movie.title}
@@ -197,6 +256,7 @@ export function MovieDetail({
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 {hasVideo && (
                   <button
+                    ref={playButtonRef}
                     onClick={() => setIsPlaying(true)}
                     className="btn-primary px-6 py-2.5 text-sm font-bold shadow-brand-sm"
                   >

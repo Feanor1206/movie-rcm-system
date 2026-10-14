@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Lock, User, Mail, Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
@@ -15,6 +15,67 @@ export function AuthModal() {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const modalRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const firstInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Manage body scroll lock, focus trapping, Escape key, and focus restore (M3 A11y)
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+
+    // Save previous active element to restore focus upon closing
+    openerRef.current = document.activeElement as HTMLElement | null;
+
+    // Lock background body scroll
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    // Auto-focus first input field after animation frame
+    const timer = setTimeout(() => {
+      firstInputRef.current?.focus();
+    }, 50);
+
+    // Trap focus inside modal and handle Escape key
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        e.preventDefault();
+        closeAuthModal();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      openerRef.current?.focus();
+    };
+  }, [isAuthModalOpen, isSubmitting, closeAuthModal]);
 
   if (!isAuthModalOpen) return null;
 
@@ -54,13 +115,11 @@ export function AuthModal() {
 
   return (
     <div
+      ref={modalRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !isSubmitting) closeAuthModal();
-      }}
     >
       <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-surface-border bg-surface p-6 sm:p-8 shadow-2xl">
         {/* Close Button */}
@@ -137,6 +196,7 @@ export function AuthModal() {
               <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
                 <User size={15} className="text-zinc-500 mr-2 shrink-0" />
                 <input
+                  ref={!isLogin ? firstInputRef : undefined}
                   type="text"
                   disabled={isSubmitting}
                   value={fullName}
@@ -155,6 +215,7 @@ export function AuthModal() {
             <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
               <User size={15} className="text-zinc-500 mr-2 shrink-0" />
               <input
+                ref={isLogin ? firstInputRef : undefined}
                 type="text"
                 required
                 disabled={isSubmitting}
