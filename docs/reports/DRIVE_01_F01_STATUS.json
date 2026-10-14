@@ -1,0 +1,132 @@
+{
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F01",
+  "runId": "DRIVE-01-F01-CHECKPOINT-01",
+  "promptVersion": 3,
+  "reviewedCheckpoint": "DRIVE-01-CHECKPOINT-01",
+  "status": "ready_for_review",
+  "timestamp": "2026-10-15T02:35:00+07:00",
+  "reviewTarget": "Codex",
+  "sourceFrozen": true,
+  "baselineCommit": "5b5c501",
+  "currentHead": "dev",
+  "summary": "Full resolution of findings D1-D6 from DRIVE_01_REVIEW.md across backend Drive IO bounded policy, Windows toolkit identity verification, native argument preservation, bounded mount readiness, fixture snapshot comparisons, and canonical reparse containment. Verified by automated suites (101 Maven, 83 frontend, 62 PowerShell, 9 mapping) and browser walkthrough exit 0.",
+  "gateResults": {
+    "G1_IMPLEMENTATION": "PASS",
+    "G2_MOUNTED_DRIVE": "BLOCKED_EXTERNAL_INPUT",
+    "G3_BROWSER_DRIVE": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "findingResolutions": {
+    "D1_boundedDriveIo": {
+      "finding": "Unbounded blocking IO on Drive operations; shared bulkhead starving local streams; cancel(true) unable to interrupt kernel WinFsp IO; host path leakage in errors.",
+      "resolution": "Implemented DriveIoExecutor with finite configurable deadlines (metadata 3s, read 5s, max 10 workers). Decoupled local permits (10) from Drive permits (5). Tracked actual physical worker occupancy across timeout cancellations to fast-reject with 503 when pool is saturated. Implemented DriveCircuitBreaker (5 failures, 10s cooldown). Sanitized error messages to remove driveMountPath.",
+      "tests": "DriveIoDeadlineTest (6/6 PASS), DriveIoProviderIsolationTest (3/3 PASS), DriveFaultIsolationTest (10/10 PASS)"
+    },
+    "D2_processIdentity": {
+      "finding": "stop_drive.ps1 and status_drive.ps1 had loose 5-second start-time window, unnormalized executable matching, incomplete state schema, and risk of terminating unrelated processes or deleting state on mismatch.",
+      "resolution": "Full state schema (pid, processName, executablePath, startTime, sessionId, mountPoint, remoteTarget, arguments, status). Normalized executable paths via [System.IO.Path]::GetFullPath(). Enforced strict start-time tolerance (< 500ms) with ISO 8601 UTC preservation. Added session ID verification. Fail-closed policy preserves state file on verification failure without killing target process.",
+      "tests": "test_drive_security_seams.ps1 (20/20 PASS), test_drive_tooling.ps1 (14/14 PASS)"
+    },
+    "D3_nativeArgvPreservation": {
+      "finding": "mount_drive.ps1 flattened ArgumentList array into space-separated string, word-splitting complex arguments (e.g. remotes or config paths with spaces).",
+      "resolution": "Implemented Format-NativeArgument following standard Windows CRT / CommandLineToArgvW escaping rules. Added quotes and doubled backslashes preceding quotes for native child processes.",
+      "tests": "test_drive_toolkit_comprehensive.ps1 TC-D3-01 & TC-D3-02 PASS; reviewer repro DRIVE_01_mount_execute.ps1 (RemoteArgPreserved=True, ConfigArgPreserved=True)"
+    },
+    "D4_boundedMountReadiness": {
+      "finding": "mount_drive.ps1 falsely reported MOUNTED immediately without checking if the drive was ready, readable, or belonged to this process; unmounted targets falsely claimed MOUNTED.",
+      "resolution": "Added bounded readiness polling loop (ReadinessTimeoutSeconds=15, ReadinessIntervalMs=250) that actively probes filesystem accessibility and child process liveness before transitioning state from STARTING to MOUNTED. Premature crash reports FAILED with exit code; timeout reports TIMEOUT and terminates child.",
+      "tests": "test_drive_toolkit_comprehensive.ps1 TC-D4-01 & TC-D4-02 PASS; reviewer repro DRIVE_01_mount_execute.ps1 (Status=TIMEOUT, Success=False)"
+    },
+    "D5_walkthroughSnapshotsAndClaims": {
+      "finding": "run_drive_media_walkthrough.cjs failed on fresh mount root due to before/after file count mismatch; snapshot validation only checked count; documentation contained overreaching claims.",
+      "resolution": "Initialized test fixture before capturing baseline snapshot. Implemented deep snapshot comparison (relativePath, sizeBytes, sha256) with negative corruption verification. Walkthrough exits 0 on both fresh and existing roots. Updated GOOGLE_DRIVE_WINDOWS_RUNBOOK.md, DRIVE_PERFORMANCE_PLAN.md, and DRIVE_STORAGE_CONTRACT.md removing overreaching performance claims.",
+      "tests": "scripts/run_drive_media_walkthrough.cjs (Exit 0); walkthrough_results.json and 5 screenshots in docs/reports/drive/DRIVE_01_F01/"
+    },
+    "D6_canonicalReparseContainment": {
+      "finding": "preview_drive_media_mapping.cjs string prefix check allowed directory traversal via Windows junctions/symlinks; accepted NTFS Alternate Data Streams (:).",
+      "resolution": "Enforced canonical real-path containment using fs.realpathSync. Validated that real target path resides strictly within the real root mount path. Strictly rejected colons (:) in paths to block NTFS Alternate Data Streams and NT device namespace paths.",
+      "tests": "scripts/drive_mapping_suite.cjs (9/9 PASS); reviewer repro DRIVE_01_mapping_boundary.cjs (outsideRootReportedVerified=false, adsPathAccepted=false)"
+    }
+  },
+  "multiAgentOwnership": {
+    "agentA_productionDriveIo": {
+      "role": "Production Drive IO Engineer",
+      "filesOwned": [
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaStreamController.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveCircuitBreaker.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java",
+        "backend/springboot/src/main/resources/application.yml"
+      ]
+    },
+    "agentB_processIdentity": {
+      "role": "Process Identity Engineer",
+      "filesOwned": [
+        "scripts/drive/stop_drive.ps1",
+        "scripts/drive/status_drive.ps1"
+      ]
+    },
+    "agentC_nativeLauncher": {
+      "role": "Native Launcher & Readiness Engineer",
+      "filesOwned": [
+        "scripts/drive/mount_drive.ps1",
+        "scripts/drive/preflight_drive.ps1"
+      ]
+    },
+    "agentD_backendFaultVerification": {
+      "role": "Backend Fault Verification Engineer",
+      "filesOwned": [
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveIoDeadlineTest.java",
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveIoProviderIsolationTest.java",
+        "docs/reports/drive/DRIVE_01_F01/agent-d/test_results.log"
+      ]
+    },
+    "agentE_toolkitAndMappingVerification": {
+      "role": "Windows Toolkit & Mapping Verification Engineer",
+      "filesOwned": [
+        "scripts/drive-tests/test_drive_toolkit_comprehensive.ps1",
+        "scripts/drive-tests/test_drive_security_seams.ps1",
+        "scripts/preview_drive_media_mapping.cjs",
+        "scripts/drive_mapping_suite.cjs",
+        "docs/reports/drive/DRIVE_01_F01/agent-e/toolkit_test_evidence.json"
+      ]
+    },
+    "agentF_browserEvidenceAndDocs": {
+      "role": "Browser Evidence & Documentation Engineer",
+      "filesOwned": [
+        "scripts/run_drive_media_walkthrough.cjs",
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveWalkthroughServer.java",
+        "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+        "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md",
+        "docs/contracts/DRIVE_STORAGE_CONTRACT.md",
+        "docs/reports/drive/DRIVE_01_F01/walkthrough_results.json",
+        "docs/reports/drive/DRIVE_01_F01/screenshots/"
+      ]
+    }
+  },
+  "verificationResults": {
+    "backendMavenSuite": "101/101 PASS (Exit 0)",
+    "frontendTestSuite": "83/83 PASS (Exit 0)",
+    "dynamicBundleBudget": "143,264 B <= 143,360 B (PASS)",
+    "driveToolingTests": "14/14 PASS (Exit 0)",
+    "driveToolkitComprehensive": "28/28 PASS (Exit 0)",
+    "driveToolkitSecuritySeams": "20/20 PASS (Exit 0)",
+    "driveMappingSuite": "9/9 PASS (Exit 0)",
+    "reviewerReproMountExecute": "RemoteArgPreserved=True, ConfigArgPreserved=True, Status=TIMEOUT (Exit 0)",
+    "reviewerReproMappingBoundary": "outsideRootReportedVerified=false, adsPathAccepted=false (Exit 0)",
+    "browserWalkthrough": "PASS (Exit 0)",
+    "patchReverseCheck": "VERIFIED_CLEAN (Exit 0)"
+  },
+  "blockedExternalInput": {
+    "G2_MOUNTED_DRIVE": {
+      "reason": "Requires user interactive OAuth authentication via rclone config (drive.readonly), WinFsp driver installation, and selection of remote folder.",
+      "actionRequiredFromUser": "Follow setup guide in docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md and run scripts/drive/mount_drive.ps1 with -Execute."
+    },
+    "G3_BROWSER_DRIVE": {
+      "reason": "Requires an active live Google Drive mount (depends on G2).",
+      "actionRequiredFromUser": "Once G2 is established, execute walkthrough against live mount as documented in docs/runbooks/DRIVE_PERFORMANCE_PLAN.md."
+    }
+  }
+}

@@ -1,0 +1,40 @@
+================================================================================
+ AGENT E: SECURITY SEAMS & PID SAFETY VERIFICATION (DRIVE-01)
+ Target Toolkit : D:\Class\movie-rcm-system\scripts\drive
+ Target Evidence: C:\Users\Admin\AppData\Local\Temp\codex-drive-f01-seams5.json
+================================================================================
+
+--- [SUITE 1] Secret Hygiene: Zero Credential Exposure ---
+  [PASS] TC-SEC-01 : preflight_drive raw stdout does not leak tokens or credentials (1338.9 ms)
+  [PASS] TC-SEC-02 : preflight_drive parsed JSON object graph contains zero secret properties (55.1 ms)
+  [PASS] TC-SEC-03 : mount_drive -WhatIf plan contains zero tokens or secrets (817.7 ms)
+  [PASS] TC-SEC-04 : mount_drive -AsJson JSON string output contains zero tokens or secrets (654.9 ms)
+  [PASS] TC-SEC-05 : Missing config path handled gracefully without exception stack dumps (605 ms)
+
+--- [SUITE 2] PID Reuse Safety & Process Identity Verification ---
+  [PASS] TC-PID-01 : stop_drive refuses to kill active process on ProcessName mismatch (Status: PID_REUSE_REJECTED) (68.5 ms)
+  [PASS] TC-PID-02 : stop_drive inspects actual active process name, ignoring spoofed state processName (15.4 ms)
+  [PASS] TC-PID-03 : stop_drive rejects termination of processes with identity or start time mismatch (36.9 ms)
+  [PASS] TC-PID-04 : status_drive reports DEGRADED and alerts on PID reuse (52.8 ms)
+  [PASS] TC-PID-05 : stop_drive cleans up stale state file for dead PID (Status: ALREADY_STOPPED) (32.8 ms)
+  [PASS] TC-PID-06 : status_drive reports NOT_MOUNTED for state file with dead PID (31 ms)
+  [PASS] TC-PID-07 : stop_drive returns NOT_FOUND when state file does not exist (9.1 ms)
+  [PASS] TC-PID-08 : stop_drive fails closed on empty or invalid state file (Status: VERIFICATION_FAILED, state preserved) (30.1 ms)
+  [PASS] TC-PID-09 : stop_drive is idempotent across repeated invocations (41.7 ms)
+
+--- [SUITE 3] Strict Process Identity & Fail-Closed Verification (Finding D2) ---
+  [PASS] TC-D2-01 : stop_drive refuses to kill process when ExecutablePath differs (Status: IDENTITY_MISMATCH) (59.2 ms)
+  [PASS] TC-D2-02 : stop_drive refuses to kill process when StartTime delta >= 500ms (Status: IDENTITY_MISMATCH) (43.5 ms)
+  [PASS] TC-D2-03 : stop_drive fails closed when state file lacks startTime (Status: VERIFICATION_FAILED) (12.2 ms)
+  [PASS] TC-D2-04 : stop_drive fails closed when state lacks executablePath (Status: VERIFICATION_FAILED) (22.4 ms)
+  [PASS] TC-D2-05 : stop_drive refuses to kill process when SessionId differs (Status: IDENTITY_MISMATCH) (26.7 ms)
+  [PASS] TC-D2-06 : stop_drive terminates strictly verified process and removes state file (Status: STOPPED) (47.9 ms)
+
+================================================================================
+ SECURITY SEAMS & PID SAFETY VERIFICATION SUMMARY
+ Total Tests : 20
+ Passed      : 20
+ Failed      : 0
+ Duration    : 4.29 seconds
+================================================================================
+Evidence JSON successfully updated at: C:\Users\Admin\AppData\Local\Temp\codex-drive-f01-seams5.json

@@ -28,9 +28,15 @@ public class MediaStreamService {
     private final LocalMediaStorageAdapter localStorageAdapter;
     private final DriveMediaStorageAdapter driveStorageAdapter;
 
+    // Local stream bulkhead permits
     private final AtomicInteger activeStreamCount = new AtomicInteger(0);
     private final AtomicLong totalRejectedCount = new AtomicLong(0);
     private volatile int maxConcurrentStreams;
+
+    // Drive stream bulkhead permits (strictly isolated from local)
+    private final AtomicInteger activeDriveStreamCount = new AtomicInteger(0);
+    private final AtomicLong totalDriveRejectedCount = new AtomicLong(0);
+    private volatile int maxConcurrentDriveStreams;
 
     private static volatile java.util.concurrent.CountDownLatch testStreamGate = null;
 
@@ -58,20 +64,32 @@ public class MediaStreamService {
                               MediaAssetRepository mediaAssetRepository,
                               LocalMediaStorageAdapter localStorageAdapter,
                               DriveMediaStorageAdapter driveStorageAdapter,
-                              @Value("${app.media.max-concurrent-streams:10}") int maxConcurrentStreams) {
+                              @Value("${app.media.max-concurrent-streams:10}") int maxConcurrentStreams,
+                              @Value("${app.media.max-concurrent-drive-streams:5}") int maxConcurrentDriveStreams) {
         this.movieRepository = movieRepository;
         this.mediaAssetRepository = mediaAssetRepository;
         this.localStorageAdapter = localStorageAdapter;
         this.driveStorageAdapter = driveStorageAdapter;
         this.maxConcurrentStreams = maxConcurrentStreams > 0 ? maxConcurrentStreams : 10;
+        this.maxConcurrentDriveStreams = maxConcurrentDriveStreams > 0 ? maxConcurrentDriveStreams : 5;
+    }
+
+    public MediaStreamService(MovieRepository movieRepository,
+                              MediaAssetRepository mediaAssetRepository,
+                              LocalMediaStorageAdapter localStorageAdapter,
+                              DriveMediaStorageAdapter driveStorageAdapter,
+                              int maxConcurrentStreams) {
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, maxConcurrentStreams, 5);
     }
 
     public MediaStreamService(MovieRepository movieRepository,
                               MediaAssetRepository mediaAssetRepository,
                               LocalMediaStorageAdapter localStorageAdapter,
                               DriveMediaStorageAdapter driveStorageAdapter) {
-        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, 10);
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, 10, 5);
     }
+
+    // --- Bulkhead Permit Management: Local ---
 
     public boolean acquireStreamPermit() {
         int current = activeStreamCount.incrementAndGet();
@@ -102,6 +120,76 @@ public class MediaStreamService {
     public void setMaxConcurrentStreams(int maxConcurrentStreams) {
         this.maxConcurrentStreams = maxConcurrentStreams > 0 ? maxConcurrentStreams : 10;
     }
+
+    // --- Bulkhead Permit Management: Drive ---
+
+    public boolean acquireDriveStreamPermit() {
+        int current = activeDriveStreamCount.incrementAndGet();
+        if (current > maxConcurrentDriveStreams) {
+            activeDriveStreamCount.decrementAndGet();
+            totalDriveRejectedCount.incrementAndGet();
+            return false;
+        }
+        return true;
+    }
+
+    public void releaseDriveStreamPermit() {
+        activeDriveStreamCount.updateAndGet(c -> Math.max(0, c - 1));
+    }
+
+    public int getDriveActiveStreamCount() {
+        return activeDriveStreamCount.get();
+    }
+
+    public int getActiveDriveStreamCount() {
+        return activeDriveStreamCount.get();
+    }
+
+    public long getTotalDriveRejectedCount() {
+        return totalDriveRejectedCount.get();
+    }
+
+    public int getMaxConcurrentDriveStreams() {
+        return maxConcurrentDriveStreams;
+    }
+
+    public void setMaxConcurrentDriveStreams(int maxConcurrentDriveStreams) {
+        this.maxConcurrentDriveStreams = maxConcurrentDriveStreams > 0 ? maxConcurrentDriveStreams : 5;
+    }
+
+    // --- Unified Bulkhead Dispatch ---
+
+    public boolean acquireStreamPermit(MediaAsset asset) {
+        if (asset != null && "drive".equalsIgnoreCase(asset.getStorageProvider())) {
+            return acquireDriveStreamPermit();
+        }
+        return acquireStreamPermit();
+    }
+
+    public boolean acquireStreamPermit(String provider) {
+        if ("drive".equalsIgnoreCase(provider)) {
+            return acquireDriveStreamPermit();
+        }
+        return acquireStreamPermit();
+    }
+
+    public void releaseStreamPermit(MediaAsset asset) {
+        if (asset != null && "drive".equalsIgnoreCase(asset.getStorageProvider())) {
+            releaseDriveStreamPermit();
+        } else {
+            releaseStreamPermit();
+        }
+    }
+
+    public void releaseStreamPermit(String provider) {
+        if ("drive".equalsIgnoreCase(provider)) {
+            releaseDriveStreamPermit();
+        } else {
+            releaseStreamPermit();
+        }
+    }
+
+    // --- Descriptor & Asset Operations ---
 
     public MediaDescriptorResponse getMediaDescriptor(String movieId) {
         Movie movie = movieRepository.findById(movieId)

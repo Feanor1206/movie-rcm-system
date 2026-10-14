@@ -5,10 +5,19 @@ import com.dippie.moviercm.entity.Movie;
 import com.dippie.moviercm.repository.MediaAssetRepository;
 import com.dippie.moviercm.repository.MovieRepository;
 import com.dippie.moviercm.service.DriveMediaStorageAdapter;
+import com.dippie.moviercm.service.MediaStreamService;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.BufferedReader;
@@ -44,18 +53,23 @@ public class DriveWalkthroughServer {
         Files.createDirectories(driveMountPath.resolve("movies/m4-drive-movie/v1"));
         mountActive.set(true);
 
-        // Copy synthetic test video into Drive mount
+        // Copy synthetic test video into Drive mount only if not already present
         Path syntheticSource = Paths.get("target/test-media/synthetic/walkthrough_feature.mp4").toAbsolutePath().normalize();
+        Path mediaFallback = Paths.get("../../media/synthetic/walkthrough_feature.mp4").toAbsolutePath().normalize();
         Path driveVideoTarget = driveMountPath.resolve("movies/m4-drive-movie/v1/feature.mp4");
 
-        if (Files.exists(syntheticSource)) {
-            Files.copy(syntheticSource, driveVideoTarget, StandardCopyOption.REPLACE_EXISTING);
-        } else {
-            byte[] dummyData = new byte[350000];
-            for (int i = 0; i < dummyData.length; i++) {
-                dummyData[i] = (byte) ((i * 31 + 7) % 128);
+        if (!Files.exists(driveVideoTarget)) {
+            if (Files.exists(syntheticSource)) {
+                Files.copy(syntheticSource, driveVideoTarget, StandardCopyOption.REPLACE_EXISTING);
+            } else if (Files.exists(mediaFallback)) {
+                Files.copy(mediaFallback, driveVideoTarget, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                byte[] dummyData = new byte[350000];
+                for (int i = 0; i < dummyData.length; i++) {
+                    dummyData[i] = (byte) ((i * 31 + 7) % 128);
+                }
+                Files.write(driveVideoTarget, dummyData);
             }
-            Files.write(driveVideoTarget, dummyData);
         }
 
         long fileLength = Files.size(driveVideoTarget);
@@ -68,7 +82,7 @@ public class DriveWalkthroughServer {
                 DriveDiagnosticsController.class
         )
                 .run(
-                        "--spring.profiles.active=test",
+                        "--spring.profiles.active=test,drive-walkthrough",
                         "--server.address=127.0.0.1",
                         "--server.port=0",
                         "--spring.datasource.url=jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER",
@@ -197,12 +211,13 @@ public class DriveWalkthroughServer {
         }
     }
 
+    @Configuration
+    @Profile("drive-walkthrough")
     public static class DriveWalkthroughSecurityConfig {
-        @org.springframework.context.annotation.Bean("driveWalkthroughSecurityFilterChain")
-        @org.springframework.core.annotation.Order(org.springframework.core.Ordered.HIGHEST_PRECEDENCE)
-        public org.springframework.security.web.SecurityFilterChain driveWalkthroughFilterChain(
-                org.springframework.security.config.annotation.web.builders.HttpSecurity http) throws Exception {
-            http.securityMatcher(org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher("/api/test/**"))
+        @Bean("driveWalkthroughSecurityFilterChain")
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        public SecurityFilterChain driveWalkthroughFilterChain(HttpSecurity http) throws Exception {
+            http.securityMatcher(AntPathRequestMatcher.antMatcher("/api/test/**"))
                     .csrf(csrf -> csrf.disable())
                     .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
             return http.build();
@@ -211,11 +226,14 @@ public class DriveWalkthroughServer {
 
     @RestController
     @RequestMapping("/api/test/drive")
+    @Profile("drive-walkthrough")
     public static class DriveDiagnosticsController {
         private final DriveMediaStorageAdapter driveStorageAdapter;
+        private final MediaStreamService mediaStreamService;
 
-        public DriveDiagnosticsController(DriveMediaStorageAdapter driveStorageAdapter) {
+        public DriveDiagnosticsController(DriveMediaStorageAdapter driveStorageAdapter, MediaStreamService mediaStreamService) {
             this.driveStorageAdapter = driveStorageAdapter;
+            this.mediaStreamService = mediaStreamService;
         }
 
         @PostMapping("/unmount")
@@ -271,6 +289,40 @@ public class DriveWalkthroughServer {
                     "mountPathExists", Files.exists(driveMountPath),
                     "adapterAvailable", driveStorageAdapter.isAvailable()
             ));
+        }
+
+        @GetMapping("/metrics")
+        public ResponseEntity<Map<String, Object>> getMetrics() {
+            int active = mediaStreamService.getActiveDriveStreamCount() + mediaStreamService.getActiveStreamCount();
+            return ResponseEntity.ok(Map.of(
+                    "activeStreams", active,
+                    "activeDriveStreams", mediaStreamService.getActiveDriveStreamCount(),
+                    "maxConcurrentStreams", mediaStreamService.getMaxConcurrentDriveStreams(),
+                    "totalRejectedCount", mediaStreamService.getTotalDriveRejectedCount()
+            ));
+        }
+
+        @PostMapping("/max-concurrent-streams")
+        public ResponseEntity<Map<String, Object>> setMaxConcurrent(@RequestParam("limit") int limit) {
+            mediaStreamService.setMaxConcurrentDriveStreams(limit);
+            mediaStreamService.setMaxConcurrentStreams(limit);
+            return ResponseEntity.ok(Map.of(
+                    "maxConcurrentStreams", mediaStreamService.getMaxConcurrentDriveStreams()
+            ));
+        }
+
+        @PostMapping("/gate/arm")
+        public ResponseEntity<Map<String, Object>> armGate() {
+            MediaStreamService.setTestStreamGate(new java.util.concurrent.CountDownLatch(1));
+            return ResponseEntity.ok(Map.of("gateArmed", true));
+        }
+
+        @PostMapping("/gate/release")
+        public ResponseEntity<Map<String, Object>> releaseGate() {
+            java.util.concurrent.CountDownLatch gate = MediaStreamService.getTestStreamGate();
+            MediaStreamService.setTestStreamGate(null);
+            if (gate != null) gate.countDown();
+            return ResponseEntity.ok(Map.of("gateReleased", true));
         }
     }
 }

@@ -50,6 +50,12 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$LogFile,
 
+    [Parameter(Mandatory = $false)]
+    [int]$ReadinessTimeoutSeconds = $(if ($env:DRIVE_MOUNT_READINESS_TIMEOUT) { [int]$env:DRIVE_MOUNT_READINESS_TIMEOUT } else { 15 }),
+
+    [Parameter(Mandatory = $false)]
+    [int]$ReadinessIntervalMs = 250,
+
     [switch]$WhatIf,
     [switch]$Execute,
     [switch]$AsJson
@@ -57,6 +63,62 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+function Format-NativeArgument {
+    param([string]$Arg)
+    if ([string]::IsNullOrEmpty($Arg)) { return '""' }
+    if ($Arg -notmatch '[\s"\t\v\n]') { return $Arg }
+    $escaped = [regex]::Replace($Arg, '(\\*)(")', { param($m) ($m.Groups[1].Value * 2) + '\"' })
+    $escaped = [regex]::Replace($escaped, '(\\+)$', { param($m) ($m.Groups[1].Value * 2) })
+    return '"' + $escaped + '"'
+}
+
+function Test-MountReadiness {
+    param(
+        [string]$Target
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Target)) {
+        return $false
+    }
+
+    try {
+        if ($Target -match "^[A-Za-z]:?\\?$") {
+            # Drive letter target (e.g. "M:" or "M:\")
+            $letter = $Target.Substring(0, 1).ToUpper()
+            $driveRoot = "$($letter):\"
+
+            $drives = [System.IO.DriveInfo]::GetDrives()
+            $matched = $drives | Where-Object { $_.Name.StartsWith($driveRoot, [System.StringComparison]::OrdinalIgnoreCase) }
+            if (-not $matched -or -not $matched.IsReady) {
+                return $false
+            }
+
+            if (-not (Test-Path -LiteralPath $driveRoot -ErrorAction SilentlyContinue)) {
+                return $false
+            }
+
+            $null = [System.IO.Directory]::GetFileSystemEntries($driveRoot)
+            return $true
+        } else {
+            # Directory target path
+            if (-not (Test-Path -LiteralPath $Target -PathType Container -ErrorAction SilentlyContinue)) {
+                return $false
+            }
+
+            # WinFsp directory mounts on Windows are NTFS reparse points
+            $item = Get-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue
+            if (-not $item -or -not ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                return $false
+            }
+
+            $null = [System.IO.Directory]::GetFileSystemEntries($Target)
+            return $true
+        }
+    } catch {
+        return $false
+    }
+}
 
 # Resolve state file location
 if (-not $StateFile) {
@@ -128,15 +190,16 @@ if ($isDryRun) {
         $rcloneCmd = $RclonePath
     }
 
-    $argPreview = @("mount", $remoteTarget, $MountPoint) + $baselineFlags
+    $rawArgPreview = @("mount", $remoteTarget, $MountPoint) + $baselineFlags
     if ($ConfigPath) {
-        $argPreview += @("--config", $ConfigPath)
+        $rawArgPreview += @("--config", $ConfigPath)
     }
     if ($LogFile) {
-        $argPreview += @("--log-file", $LogFile, "--log-level", "INFO")
+        $rawArgPreview += @("--log-file", $LogFile, "--log-level", "INFO")
     }
 
-    $expectedCommand = "$rcloneCmd " + ($argPreview -join " ")
+    $formattedArgPreview = @($rawArgPreview | ForEach-Object { Format-NativeArgument $_ })
+    $expectedCommand = "$rcloneCmd " + ($formattedArgPreview -join " ")
 
     $plan = [PSCustomObject]@{
         Timestamp           = [DateTime]::UtcNow.ToString("o")
@@ -194,7 +257,19 @@ if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
         if ($existingState -and $existingState.pid) {
             $existingProc = Get-Process -Id $existingState.pid -ErrorAction SilentlyContinue
             if ($existingProc -and ($existingProc.ProcessName -ieq "rclone")) {
-                throw "A previous rclone mount process (PID $($existingState.pid)) is currently running for mount point '$($existingState.mountPoint)'. Use stop_drive.ps1 before remounting."
+                $startTimeMatch = $true
+                if ($existingState.PSObject.Properties['startTime'] -and $existingState.startTime) {
+                    try {
+                        $expectedStart = [DateTimeOffset]::Parse([string]$existingState.startTime)
+                        $actualStart = [DateTimeOffset]::new($existingProc.StartTime)
+                        if ([math]::Abs(($actualStart - $expectedStart).TotalSeconds) -gt 2) {
+                            $startTimeMatch = $false
+                        }
+                    } catch {}
+                }
+                if ($startTimeMatch) {
+                    throw "A previous rclone mount process (PID $($existingState.pid)) is currently running for mount point '$($existingState.mountPoint)'. Use stop_drive.ps1 before remounting."
+                }
             }
         }
     } catch [System.Management.Automation.ItemNotFoundException] {
@@ -203,7 +278,7 @@ if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
 }
 
 # 3. Assemble arguments for rclone mount
-$mountArgs = @(
+$rawMountArgs = @(
     "mount",
     $remoteTarget,
     $MountPoint,
@@ -219,44 +294,145 @@ $mountArgs = @(
 )
 
 if ($ConfigPath) {
-    $mountArgs += @("--config", $ConfigPath)
+    $rawMountArgs += @("--config", $ConfigPath)
 }
 if ($LogFile) {
-    $mountArgs += @("--log-file", $LogFile, "--log-level", "INFO")
+    $rawMountArgs += @("--log-file", $LogFile, "--log-level", "INFO")
 }
 
+$formattedMountArgs = @($rawMountArgs | ForEach-Object { Format-NativeArgument $_ })
+
 # 4. Launch hidden background rclone process
-$proc = Start-Process -FilePath $rcloneExe -ArgumentList $mountArgs -WindowStyle Hidden -PassThru
+$proc = Start-Process -FilePath $rcloneExe -ArgumentList $formattedMountArgs -WindowStyle Hidden -PassThru
 
 if (-not $proc) {
     throw "Failed to start rclone process."
 }
 
-# Short stabilization check (1 second) to detect immediate startup crash
-Start-Sleep -Seconds 1
-if ($proc.HasExited) {
-    throw "Rclone process exited immediately with exit code $($proc.ExitCode). Check config and logs for details."
-}
-
-# 5. Save process state to JSON
+# 5. Save process state to JSON immediately with STARTING status
 $currentProc = Get-Process -Id $PID
+$startTimeIso = try { $proc.StartTime.ToString("o") } catch { [DateTime]::UtcNow.ToString("o") }
+$procName = try { $proc.ProcessName } catch { "rclone" }
+if (-not $procName) { $procName = "rclone" }
+
 $stateRecord = [PSCustomObject]@{
     pid            = $proc.Id
-    processName    = $proc.ProcessName
-    startTime      = $proc.StartTime.ToString("o")
+    processName    = $procName
+    startTime      = $startTimeIso
     executablePath = $rcloneExe
     mountPoint     = $MountPoint
     remoteTarget   = $remoteTarget
+    arguments      = $rawMountArgs
     flags          = $baselineFlags
-    commandLine    = "$rcloneExe " + ($mountArgs -join " ")
+    commandLine    = "$rcloneExe " + ($formattedMountArgs -join " ")
     stateFile      = $StateFile
     logFile        = $LogFile
     sessionId      = $currentProc.SessionId
     user           = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
     createdAt      = [DateTime]::UtcNow.ToString("o")
-    status         = "RUNNING"
+    status         = "STARTING"
 }
 
+$stateDir = [System.IO.Path]::GetDirectoryName($StateFile)
+if ($stateDir -and -not (Test-Path -LiteralPath $stateDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+}
+$stateRecord | ConvertTo-Json -Depth 6 | Set-Content -Path $StateFile -Encoding UTF8
+
+# 6. Bounded readiness verification loop
+$isReady = $false
+$elapsedMs = 0
+$timeoutMs = $ReadinessTimeoutSeconds * 1000
+
+while ($elapsedMs -lt $timeoutMs) {
+    # Check if process exited early
+    $hasExited = $false
+    try {
+        $hasExited = $proc.HasExited
+    } catch {
+        $liveProc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+        $hasExited = ($liveProc -eq $null -or $liveProc.HasExited)
+    }
+
+    if ($hasExited) {
+        $exitCode = try { $proc.ExitCode } catch { -1 }
+        $stateRecord.status = "FAILED"
+        $stateRecord | ConvertTo-Json -Depth 6 | Set-Content -Path $StateFile -Encoding UTF8
+
+        $result = [PSCustomObject]@{
+            Success      = $false
+            Status       = "FAILED"
+            PID          = $proc.Id
+            ExitCode     = $exitCode
+            MountPoint   = $MountPoint
+            RemoteTarget = $remoteTarget
+            StateFile    = $StateFile
+            Message      = "Rclone mount process exited prematurely with exit code $exitCode."
+        }
+
+        if ($AsJson) {
+            $result | ConvertTo-Json -Depth 5
+        } else {
+            $result
+        }
+        return
+    }
+
+    if (Test-MountReadiness -Target $MountPoint) {
+        $isReady = $true
+        break
+    }
+
+    Start-Sleep -Milliseconds $ReadinessIntervalMs
+    $elapsedMs += $ReadinessIntervalMs
+}
+
+# 7. Evaluate readiness outcome
+if (-not $isReady) {
+    # Timeout reached without mount becoming readable. Clean up only verified owned child process.
+    $liveProc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+    if ($liveProc -and -not $liveProc.HasExited) {
+        $isOwned = $false
+        try {
+            if ($liveProc.ProcessName -ieq $procName) {
+                $liveStart = $liveProc.StartTime
+                $expectedStart = $proc.StartTime
+                if ([math]::Abs(($liveStart - $expectedStart).TotalSeconds) -le 2) {
+                    $isOwned = $true
+                }
+            }
+        } catch {}
+
+        if ($isOwned) {
+            try {
+                Stop-Process -Id $liveProc.Id -Force -ErrorAction SilentlyContinue
+            } catch {}
+        }
+    }
+
+    $stateRecord.status = "TIMEOUT"
+    $stateRecord | ConvertTo-Json -Depth 6 | Set-Content -Path $StateFile -Encoding UTF8
+
+    $result = [PSCustomObject]@{
+        Success      = $false
+        Status       = "TIMEOUT"
+        PID          = $proc.Id
+        MountPoint   = $MountPoint
+        RemoteTarget = $remoteTarget
+        StateFile    = $StateFile
+        Message      = "Rclone mount timed out after $($ReadinessTimeoutSeconds)s waiting for mount point '$MountPoint' to become ready and readable."
+    }
+
+    if ($AsJson) {
+        $result | ConvertTo-Json -Depth 5
+    } else {
+        $result
+    }
+    return
+}
+
+# 8. Succeeded and verified ready
+$stateRecord.status = "MOUNTED"
 $stateRecord | ConvertTo-Json -Depth 6 | Set-Content -Path $StateFile -Encoding UTF8
 
 $result = [PSCustomObject]@{
@@ -266,7 +442,7 @@ $result = [PSCustomObject]@{
     MountPoint   = $MountPoint
     RemoteTarget = $remoteTarget
     StateFile    = $StateFile
-    Message      = "Rclone mount started successfully in background with PID $($proc.Id)."
+    Message      = "Rclone mount started successfully in background with PID $($proc.Id) and verified ready."
 }
 
 if ($AsJson) {

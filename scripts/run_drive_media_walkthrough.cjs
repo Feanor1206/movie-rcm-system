@@ -15,8 +15,8 @@
  *   - Step 5: Mobile 375px inspection: audit 5 touch controls (>= 44x44px target) with 0 layout collisions.
  *   - Step 6: Safe process cleanup in finally block -> save benchmark JSON and screenshots.
  *
- * Screenshots saved to: docs/reports/drive/DRIVE_01/screenshots/
- * Benchmark output saved to: docs/reports/drive/DRIVE_01/walkthrough_results.json
+ * Screenshots saved to: docs/reports/drive/DRIVE_01_F01/screenshots/
+ * Benchmark output saved to: docs/reports/drive/DRIVE_01_F01/walkthrough_results.json
  */
 
 const http = require('node:http');
@@ -35,11 +35,43 @@ const STANDALONE_DIR = path.resolve(PROJECT_ROOT, 'frontend/.next/standalone');
 const STANDALONE_SERVER = path.resolve(STANDALONE_DIR, 'server.js');
 const DRIVE_MOUNT_DIR = path.resolve(PROJECT_ROOT, 'backend/springboot/target/test-drive-mount');
 const MEDIA_FILE = path.resolve(DRIVE_MOUNT_DIR, 'movies/m4-drive-movie/v1/feature.mp4');
-const EVIDENCE_DIR = path.resolve(PROJECT_ROOT, 'docs/reports/drive/DRIVE_01');
+const EVIDENCE_DIR = path.resolve(PROJECT_ROOT, 'docs/reports/drive/DRIVE_01_F01');
 const SCREENSHOTS_DIR = path.resolve(EVIDENCE_DIR, 'screenshots');
 const BENCHMARK_OUT = path.resolve(EVIDENCE_DIR, 'walkthrough_results.json');
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+
+function ensureDriveMountFixture() {
+  const movieDir = path.resolve(DRIVE_MOUNT_DIR, 'movies/m4-drive-movie/v1');
+  fs.mkdirSync(movieDir, { recursive: true });
+
+  if (!fs.existsSync(MEDIA_FILE)) {
+    const candidateSources = [
+      path.resolve(PROJECT_ROOT, 'backend/springboot/target/test-media/synthetic/walkthrough_feature.mp4'),
+      path.resolve(PROJECT_ROOT, 'media/synthetic/walkthrough_feature.mp4'),
+      path.resolve(PROJECT_ROOT, 'media/synthetic/feature_test.mp4'),
+    ];
+
+    let copied = false;
+    for (const src of candidateSources) {
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, MEDIA_FILE);
+        copied = true;
+        console.log(`Initialized Drive mount fixture from ${src} -> ${MEDIA_FILE}`);
+        break;
+      }
+    }
+
+    if (!copied) {
+      const dummy = Buffer.alloc(350000);
+      for (let i = 0; i < dummy.length; i++) {
+        dummy[i] = (i * 31 + 7) % 128;
+      }
+      fs.writeFileSync(MEDIA_FILE, dummy);
+      console.log(`Generated synthetic Drive mount fixture at ${MEDIA_FILE}`);
+    }
+  }
+}
 
 function snapshotDirectory(dirPath) {
   const entries = [];
@@ -64,6 +96,98 @@ function snapshotDirectory(dirPath) {
   }
   scan(dirPath);
   return entries.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+}
+
+/**
+ * Compares two directory snapshots for exact parity:
+ * file count, relative paths, byte sizes, and SHA-256 digests.
+ *
+ * @param {Array<{ relativePath: string, sizeBytes: number, sha256: string }>} beforeSnapshot
+ * @param {Array<{ relativePath: string, sizeBytes: number, sha256: string }>} afterSnapshot
+ * @returns {{ match: boolean, differences: string[] }}
+ */
+function compareSnapshots(beforeSnapshot, afterSnapshot) {
+  const differences = [];
+  if (beforeSnapshot.length !== afterSnapshot.length) {
+    differences.push(`File count mismatch: before had ${beforeSnapshot.length} files, after has ${afterSnapshot.length} files`);
+  }
+
+  const beforeMap = new Map(beforeSnapshot.map(e => [e.relativePath, e]));
+  const afterMap = new Map(afterSnapshot.map(e => [e.relativePath, e]));
+
+  for (const [relPath, beforeEntry] of beforeMap.entries()) {
+    const afterEntry = afterMap.get(relPath);
+    if (!afterEntry) {
+      differences.push(`File missing in after snapshot: ${relPath}`);
+      continue;
+    }
+    if (beforeEntry.sizeBytes !== afterEntry.sizeBytes) {
+      differences.push(`File size mutated for ${relPath}: expected ${beforeEntry.sizeBytes} bytes, found ${afterEntry.sizeBytes} bytes`);
+    }
+    if (beforeEntry.sha256 !== afterEntry.sha256) {
+      differences.push(`File SHA-256 checksum mismatch for ${relPath}: expected ${beforeEntry.sha256}, got ${afterEntry.sha256}`);
+    }
+  }
+
+  for (const relPath of afterMap.keys()) {
+    if (!beforeMap.has(relPath)) {
+      differences.push(`Unexpected new file found in after snapshot: ${relPath}`);
+    }
+  }
+
+  return {
+    match: differences.length === 0,
+    differences,
+  };
+}
+
+function assertSnapshotsEqual(beforeSnapshot, afterSnapshot, contextMsg = 'Drive mount directory snapshot') {
+  const comparison = compareSnapshots(beforeSnapshot, afterSnapshot);
+  if (!comparison.match) {
+    throw new Error(`${contextMsg} comparison failed:\n${comparison.differences.map(d => `  - ${d}`).join('\n')}`);
+  }
+}
+
+/**
+ * Negative test: verifies that compareSnapshots detects and rejects a 1-byte file mutation
+ * even when the file count remains identical.
+ */
+function runSnapshotNegativeTest() {
+  console.log('Running negative test: verifying snapshot detection of a 1-byte mutation on disk...');
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'drive-negative-snapshot-'));
+  try {
+    const testFile = path.join(tempDir, 'sample_test_video.bin');
+    const originalBytes = Buffer.alloc(100, 0x5a);
+    fs.writeFileSync(testFile, originalBytes);
+
+    const snapBefore = snapshotDirectory(tempDir);
+    assert.equal(snapBefore.length, 1, 'Baseline must track 1 file');
+
+    // Mutate exactly 1 byte in place (flip 0x5a -> 0x5b at index 50)
+    const mutatedBytes = Buffer.from(originalBytes);
+    mutatedBytes[50] = 0x5b;
+    fs.writeFileSync(testFile, mutatedBytes);
+
+    const snapAfter = snapshotDirectory(tempDir);
+    assert.equal(snapAfter.length, 1, 'File count must remain 1');
+    assert.equal(snapAfter[0].sizeBytes, snapBefore[0].sizeBytes, 'File size must remain identical');
+
+    const comp = compareSnapshots(snapBefore, snapAfter);
+    assert.equal(comp.match, false, 'compareSnapshots MUST detect 1-byte mutation');
+    assert(comp.differences.some(d => d.includes('checksum mismatch')), 'Must flag SHA-256 checksum mismatch');
+
+    let threw = false;
+    try {
+      assertSnapshotsEqual(snapBefore, snapAfter);
+    } catch (err) {
+      threw = true;
+      assert(err.message.includes('checksum mismatch'), 'Error message must specify checksum mismatch');
+    }
+    assert.equal(threw, true, 'assertSnapshotsEqual MUST throw on 1-byte mutation');
+    console.log(`✔ Negative test passed: 1-byte mutation successfully detected and rejected ("${comp.differences[0]}")`);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 function checkPortAvailable(port, host = '127.0.0.1') {
@@ -526,6 +650,12 @@ async function main() {
   let springPort = null;
   let nextPort = null;
   let cdpPort = null;
+
+  // Run negative test on snapshotting algorithm & filesystem detection
+  runSnapshotNegativeTest();
+
+  // Ensure Drive mount media fixture exists BEFORE taking initial snapshot
+  ensureDriveMountFixture();
 
   const diskBeforeSnapshot = snapshotDirectory(DRIVE_MOUNT_DIR);
   console.log(`Initial disk snapshot: ${diskBeforeSnapshot.length} files tracked in ${DRIVE_MOUNT_DIR}`);
@@ -1103,12 +1233,12 @@ async function main() {
 
     // 5. Observable Stream Permit Cleanup & Overload 429
     console.log('\n[Benchmark 5/5] Testing Stream Permit Cleanup & Overload HTTP 429...');
-    const metricsBaseline = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
+    const metricsBaseline = await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/metrics`);
     const baselineData = JSON.parse(metricsBaseline.body.toString());
     assert.equal(baselineData.activeStreams, 0, 'Baseline active stream count must be 0');
 
     // Hold 1 stream active via test gate
-    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/gate/arm`, { method: 'POST' });
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/gate/arm`, { method: 'POST' });
     let activeWhileStreaming = -1;
     let overload429Verified = false;
 
@@ -1120,7 +1250,7 @@ async function main() {
 
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 100));
-      const m = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
+      const m = await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/metrics`);
       const data = JSON.parse(m.body.toString());
       if (data.activeStreams >= 1) {
         activeWhileStreaming = data.activeStreams;
@@ -1130,7 +1260,7 @@ async function main() {
     assert(activeWhileStreaming >= 1, 'Active stream counter must reflect active connection');
 
     // Squeeze limit to 1 -> request 2 must get 429
-    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/max-concurrent-streams?limit=1`, { method: 'POST' });
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/max-concurrent-streams?limit=1`, { method: 'POST' });
     const res2 = await requestHttp(streamUrl, { headers: { Range: 'bytes=0-65535' } });
     if (res2.statusCode === 429) {
       assert.equal(res2.headers['retry-after'], '5', 'HTTP 429 must include Retry-After: 5');
@@ -1141,13 +1271,13 @@ async function main() {
     console.log('✔ Overload HTTP 429 verified with Retry-After: 5 and Cache-Control: no-store');
 
     // Release gate and restore concurrency limit
-    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/gate/release`, { method: 'POST' });
-    await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/max-concurrent-streams?limit=10`, { method: 'POST' });
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/gate/release`, { method: 'POST' });
+    await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/max-concurrent-streams?limit=10`, { method: 'POST' });
 
     let activeAfterDisconnect = -1;
     for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 100));
-      const m = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
+      const m = await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/metrics`);
       const data = JSON.parse(m.body.toString());
       if (data.activeStreams === 0) {
         activeAfterDisconnect = 0;
@@ -1157,16 +1287,17 @@ async function main() {
     assert.equal(activeAfterDisconnect, 0, 'Active stream count must return to 0 after disconnect');
     console.log('✔ Active stream counter returned to 0 after stream close');
 
-    // 6. Monitored Directory Disk Snapshot
+    // 6. Monitored Directory Disk Snapshot: Full Parity (Paths, Exact Byte Sizes, and SHA-256)
     const diskAfterSnapshot = snapshotDirectory(DRIVE_MOUNT_DIR);
     console.log(`Final disk snapshot: ${diskAfterSnapshot.length} files tracked in ${DRIVE_MOUNT_DIR}`);
-    assert.equal(diskBeforeSnapshot.length, diskAfterSnapshot.length, 'No files created or deleted in Drive mount directory during test');
+    assertSnapshotsEqual(diskBeforeSnapshot, diskAfterSnapshot, 'Drive mount directory disk snapshot');
+    console.log('✔ Drive mount directory snapshot verified: 100% path, byte size, and SHA-256 parity');
 
     // Assemble comprehensive benchmark report
     const finalReport = {
       benchmarkVersion: '1.0',
       timestamp: new Date().toISOString(),
-      task: 'DRIVE-01',
+      task: 'DRIVE-01-F01',
       gate: 'G1_IMPLEMENTATION',
       testProfile: 'provider=drive Windows Mount Playback & Streaming Verification',
       testbed: {
@@ -1199,7 +1330,7 @@ async function main() {
             alertText: alertText.replace(/\s+/g, ' ').trim(),
             retryButtonSelector: 'button[data-testid="descriptor-retry-btn"]',
             recoveredFeatureButtonSelector: 'button[data-testid="play-feature-btn"]',
-            screenshot: 'docs/reports/drive/DRIVE_01/screenshots/00_desktop_drive_unmounted_alert.png',
+            screenshot: 'docs/reports/drive/DRIVE_01_F01/screenshots/00_desktop_drive_unmounted_alert.png',
           },
           initialPlayTime: Number(initialPlayTime.toFixed(2)),
           seekTime: Number(seekTime.toFixed(2)),
@@ -1212,10 +1343,10 @@ async function main() {
             'button[data-testid="video-retry-btn"]',
           ],
           screenshots: [
-            'docs/reports/drive/DRIVE_01/screenshots/00_desktop_drive_unmounted_alert.png',
-            'docs/reports/drive/DRIVE_01/screenshots/01_desktop_drive_playback_playing.png',
-            'docs/reports/drive/DRIVE_01/screenshots/02_desktop_drive_seek_near_end.png',
-            'docs/reports/drive/DRIVE_01/screenshots/03_desktop_drive_retry_recovery.png',
+            'docs/reports/drive/DRIVE_01_F01/screenshots/00_desktop_drive_unmounted_alert.png',
+            'docs/reports/drive/DRIVE_01_F01/screenshots/01_desktop_drive_playback_playing.png',
+            'docs/reports/drive/DRIVE_01_F01/screenshots/02_desktop_drive_seek_near_end.png',
+            'docs/reports/drive/DRIVE_01_F01/screenshots/03_desktop_drive_retry_recovery.png',
           ],
         },
         mobile375px: {
@@ -1224,7 +1355,7 @@ async function main() {
           controlsAudited: mobileAudit.controls,
           collisionsDetected: mobileAudit.collisions,
           touchTargetsCompliant: true,
-          screenshot: 'docs/reports/drive/DRIVE_01/screenshots/04_mobile_drive_playback_375px.png',
+          screenshot: 'docs/reports/drive/DRIVE_01_F01/screenshots/04_mobile_drive_playback_375px.png',
         },
         browserPlaybackPerformance: {
           startupToFirstFrameLatency: {

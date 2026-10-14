@@ -1,12 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "taskId": "DRIVE-01-F01",
-  "promptVersion": 3,
+  "taskId": "DRIVE-01-F02",
+  "promptVersion": 4,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
-  "taskPromptPath": "docs/prompts/DRIVE_01_F01_GEMINI_PROMPT.md",
-  "lastReviewedCheckpoint": "DRIVE-01-CHECKPOINT-01",
-  "baselineCommit": "7c825b6",
+  "taskPromptPath": "docs/prompts/DRIVE_01_F02_GEMINI_PROMPT.md",
+  "lastReviewedCheckpoint": "DRIVE-01-F01-CHECKPOINT-01",
   "reviewMode": "manual",
-  "note": "Manual review requests changes for D1-D6. G1 not accepted, G2/G3 external blocked. Six scoped Gemini agents in follow-up prompt; automation remains paused. Checkpoint Git push is not acceptance or deployment."
+  "note": "F01 independently reviewed: G1 requests changes only F1-F3. Six scoped agents; preserve passing D3-D6 fixes. G2/G3 external blocked. Manual handoff, automation paused. Use actual current HEAD as source baseline; file publication does not start Gemini."
 }

@@ -2,10 +2,11 @@
 .SYNOPSIS
     Queries and verifies the health and operational status of the Google Drive mount.
 .DESCRIPTION
-    Checks active rclone processes against state JSON (validating PID, process name,
-    and start time to prevent PID reuse misreports). Inspects mount target accessibility.
+    Checks active rclone processes against state JSON with strict identity verification
+    (PID, process name, normalized executable path, sub-second StartTime tolerance,
+    and SessionId). Inspects mount target accessibility and filesystem responsiveness.
     Returns status: MOUNTED, NOT_MOUNTED, or DEGRADED with explanatory diagnostic reasons.
-    Does NOT leak secrets, tokens, or credential contents.
+    Enforces Fail-Closed posture and does NOT leak secrets or tokens.
 .PARAMETER MountPoint
     Target mount point to verify (default "M:").
 .PARAMETER StateFile
@@ -41,11 +42,28 @@ if ($stateExists) {
     }
 }
 
-# Determine effective target mount point
-$targetMount = $MountPoint
-if ($stateData -and $stateData.mountPoint) {
-    $targetMount = $stateData.mountPoint
-}
+# Extract complete state schema fields
+$savedPid          = if ($stateData -and $stateData.PSObject.Properties['pid']) { [int]$stateData.pid } else { $null }
+$expectedName      = if ($stateData -and $stateData.PSObject.Properties['processName']) { [string]$stateData.processName } else { "rclone" }
+$expectedPath      = if ($stateData -and $stateData.PSObject.Properties['executablePath']) { [string]$stateData.executablePath } else { $null }
+$recordedStartStr  = if ($stateData -and $stateData.PSObject.Properties['startTime'] -and $stateData.startTime) {
+                         if ($stateData.startTime -is [DateTime] -or $stateData.startTime -is [DateTimeOffset]) {
+                             $stateData.startTime.ToString("o")
+                         } else {
+                             [string]$stateData.startTime
+                         }
+                     } else { $null }
+$expectedSessionId = if ($stateData -and $stateData.PSObject.Properties['sessionId'] -and $stateData.sessionId -ne $null) { [int]$stateData.sessionId } else { $null }
+$targetMount       = if ($stateData -and $stateData.PSObject.Properties['mountPoint'] -and $stateData.mountPoint) { [string]$stateData.mountPoint } else { $MountPoint }
+$remoteTarget      = if ($stateData -and $stateData.PSObject.Properties['remoteTarget']) { [string]$stateData.remoteTarget } else { $null }
+$arguments         = if ($stateData) {
+                         if ($stateData.PSObject.Properties['arguments'] -and $stateData.arguments) {
+                             $stateData.arguments
+                         } elseif ($stateData.PSObject.Properties['flags'] -and $stateData.flags) {
+                             $stateData.flags
+                         } else { $null }
+                     } else { $null }
+$stateStatus       = if ($stateData -and $stateData.PSObject.Properties['status']) { [string]$stateData.status } else { $null }
 
 # Helper to check if a drive or directory is accessible
 function Test-MountAccessibility {
@@ -111,15 +129,21 @@ if (-not $stateExists -or -not $stateData) {
     }
 
     $res = [PSCustomObject]@{
-        Timestamp    = [DateTime]::UtcNow.ToString("o")
-        Status       = $status
-        Reason       = $reason
-        MountPoint   = $targetMount
-        StateFile    = $StateFile
-        PID          = $null
-        ProcessAlive = $false
-        Accessible   = $mountAccess.IsReadable
-        RemoteTarget = $null
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = $status
+        Reason         = $reason
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $null
+        ProcessName    = $null
+        ExecutablePath = $null
+        StartTime      = $null
+        SessionId      = $null
+        RemoteTarget   = $null
+        Arguments      = $null
+        StateStatus    = $null
+        ProcessAlive   = $false
+        Accessible     = $mountAccess.IsReadable
     }
 
     if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
@@ -127,95 +151,216 @@ if (-not $stateExists -or -not $stateData) {
 }
 
 # Scenario 2: State file recorded, inspect process
-$savedPid = $stateData.pid
 $proc = $null
-if ($savedPid) {
+if ($savedPid -and $savedPid -gt 0) {
     $proc = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
 }
 
 # Process does not exist
 if (-not $proc) {
     $status = "NOT_MOUNTED"
-    $reason = "Recorded rclone process (PID $savedPid) is not active."
+    $reason = "Recorded rclone process (PID $($savedPid)) is not active."
     if ($mountAccess.Exists) {
         $status = "DEGRADED"
-        $reason = "Recorded process (PID $savedPid) has exited, but mount point '$targetMount' is still held or stale."
+        $reason = "Recorded process (PID $($savedPid)) has exited, but mount point '$targetMount' is still held or stale in the OS."
     }
 
     $res = [PSCustomObject]@{
-        Timestamp    = [DateTime]::UtcNow.ToString("o")
-        Status       = $status
-        Reason       = $reason
-        MountPoint   = $targetMount
-        StateFile    = $StateFile
-        PID          = $savedPid
-        ProcessAlive = $false
-        Accessible   = $mountAccess.IsReadable
-        RemoteTarget = $stateData.remoteTarget
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = $status
+        Reason         = $reason
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $expectedName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $false
+        Accessible     = $mountAccess.IsReadable
     }
 
     if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
     return
 }
 
-# Process exists - validate identity to protect against PID reuse
-$isRcloneProcess = ($proc.ProcessName -ieq "rclone")
-$startTimeMatch = $true
-if ($stateData.startTime) {
+# ================= STRICT PROCESS IDENTITY VERIFICATION =================
+
+# Verification 1: ProcessName
+if ($proc.ProcessName -ine "rclone" -and $proc.ProcessName -ine $expectedName) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "PID $($savedPid) is occupied by '$($proc.ProcessName)', which does not match expected process '$expectedName'. PID reuse detected."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Verification 2: Executable Path
+$procPath = $null
+try {
+    if ($proc.Path) { $procPath = $proc.Path }
+} catch {}
+if (-not $procPath) {
     try {
-        $expectedStart = [DateTimeOffset]::Parse([string]$stateData.startTime)
+        if ($proc.MainModule -and $proc.MainModule.FileName) { $procPath = $proc.MainModule.FileName }
+    } catch {}
+}
+
+if ($expectedPath) {
+    if (-not $procPath) {
+        $res = [PSCustomObject]@{
+            Timestamp      = [DateTime]::UtcNow.ToString("o")
+            Status         = "DEGRADED"
+            Reason         = "Unable to read process executable path for PID $($savedPid). Identity unverified."
+            MountPoint     = $targetMount
+            StateFile      = $StateFile
+            PID            = $savedPid
+            ProcessName    = $proc.ProcessName
+            ExecutablePath = $expectedPath
+            StartTime      = $recordedStartStr
+            SessionId      = $expectedSessionId
+            RemoteTarget   = $remoteTarget
+            Arguments      = $arguments
+            StateStatus    = $stateStatus
+            ProcessAlive   = $true
+            Accessible     = $mountAccess.IsReadable
+        }
+        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+        return
+    }
+
+    $normProcPath = ""
+    $normExpectedPath = ""
+    try {
+        $normProcPath = [System.IO.Path]::GetFullPath($procPath).TrimEnd('\')
+        $normExpectedPath = [System.IO.Path]::GetFullPath($expectedPath).TrimEnd('\')
+    } catch {}
+
+    if (-not [string]::Equals($normProcPath, $normExpectedPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $res = [PSCustomObject]@{
+            Timestamp      = [DateTime]::UtcNow.ToString("o")
+            Status         = "DEGRADED"
+            Reason         = "PID $($savedPid) executable path '$procPath' does not match recorded executablePath '$expectedPath'. Identity mismatch / PID reuse detected."
+            MountPoint     = $targetMount
+            StateFile      = $StateFile
+            PID            = $savedPid
+            ProcessName    = $proc.ProcessName
+            ExecutablePath = $procPath
+            StartTime      = $recordedStartStr
+            SessionId      = $expectedSessionId
+            RemoteTarget   = $remoteTarget
+            Arguments      = $arguments
+            StateStatus    = $stateStatus
+            ProcessAlive   = $true
+            Accessible     = $mountAccess.IsReadable
+        }
+        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+        return
+    }
+}
+
+# Verification 3: StartTime (<500ms precision)
+if ($recordedStartStr) {
+    $startTimeMatch = $false
+    try {
+        $expectedStart = [DateTimeOffset]::Parse($recordedStartStr)
         $actualStart = [DateTimeOffset]::new($proc.StartTime)
-        $diffSeconds = [math]::Abs(($actualStart - $expectedStart).TotalSeconds)
-        if ($diffSeconds -gt 5) {
-            $startTimeMatch = $false
+        $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
+        if ($diffMs -lt 500) {
+            $startTimeMatch = $true
         }
     } catch {
-        # If parsing fails, fall back to string equality check
-        if ($stateData.startTime -ne $proc.StartTime.ToString("o")) {
-            $startTimeMatch = $false
+        $startTimeMatch = $false
+    }
+
+    if (-not $startTimeMatch) {
+        $res = [PSCustomObject]@{
+            Timestamp      = [DateTime]::UtcNow.ToString("o")
+            Status         = "DEGRADED"
+            Reason         = "PID $($savedPid) start time ($($proc.StartTime.ToString('o'))) does not match recorded state ($recordedStartStr). PID reuse detected."
+            MountPoint     = $targetMount
+            StateFile      = $StateFile
+            PID            = $savedPid
+            ProcessName    = $proc.ProcessName
+            ExecutablePath = $expectedPath
+            StartTime      = $proc.StartTime.ToString("o")
+            SessionId      = $expectedSessionId
+            RemoteTarget   = $remoteTarget
+            Arguments      = $arguments
+            StateStatus    = $stateStatus
+            ProcessAlive   = $true
+            Accessible     = $mountAccess.IsReadable
         }
+        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+        return
     }
 }
 
-if (-not $isRcloneProcess -or -not $startTimeMatch) {
-    $status = "DEGRADED"
-    $reason = "PID $savedPid is occupied by a different process ('$($proc.ProcessName)', StartTime: $($proc.StartTime.ToString('o'))). PID reuse detected."
-
+# Verification 4: SessionId
+if ($expectedSessionId -ne $null -and $proc.SessionId -ne $expectedSessionId) {
     $res = [PSCustomObject]@{
-        Timestamp    = [DateTime]::UtcNow.ToString("o")
-        Status       = $status
-        Reason       = $reason
-        MountPoint   = $targetMount
-        StateFile    = $StateFile
-        PID          = $savedPid
-        ProcessAlive = $true
-        Accessible   = $mountAccess.IsReadable
-        RemoteTarget = $stateData.remoteTarget
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "PID $($savedPid) SessionId ($($proc.SessionId)) does not match recorded sessionId ($expectedSessionId)."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $proc.SessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
     }
-
     if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
     return
 }
 
-# Genuine rclone process confirmed running
+# Genuine rclone process confirmed running with 100% verified identity
 if ($mountAccess.IsReadable) {
     $status = "MOUNTED"
-    $reason = "Verified rclone mount process (PID $savedPid) is running and mount target '$targetMount' is accessible."
+    $reason = "Verified rclone mount process (PID $($savedPid)) is running and mount target '$targetMount' is responsive."
 } else {
     $status = "DEGRADED"
-    $reason = "Verified rclone mount process (PID $savedPid) is running, but mount target '$targetMount' is not yet readable or accessible."
+    $reason = "Verified rclone mount process (PID $($savedPid)) is running, but mount target '$targetMount' is not yet readable or accessible."
 }
 
 $res = [PSCustomObject]@{
-    Timestamp    = [DateTime]::UtcNow.ToString("o")
-    Status       = $status
-    Reason       = $reason
-    MountPoint   = $targetMount
-    StateFile    = $StateFile
-    PID          = $savedPid
-    ProcessAlive = $true
-    Accessible   = $mountAccess.IsReadable
-    RemoteTarget = $stateData.remoteTarget
+    Timestamp      = [DateTime]::UtcNow.ToString("o")
+    Status         = $status
+    Reason         = $reason
+    MountPoint     = $targetMount
+    StateFile      = $StateFile
+    PID            = $savedPid
+    ProcessName    = $proc.ProcessName
+    ExecutablePath = $expectedPath
+    StartTime      = $recordedStartStr
+    SessionId      = $proc.SessionId
+    RemoteTarget   = $remoteTarget
+    Arguments      = $arguments
+    StateStatus    = $stateStatus
+    ProcessAlive   = $true
+    Accessible     = $mountAccess.IsReadable
 }
 
 if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }

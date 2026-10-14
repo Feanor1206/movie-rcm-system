@@ -1,0 +1,344 @@
+At D:\Class\movie-rcm-system\scripts\drive-tests\test_drive_toolkit_comprehensive.ps1:144 char:47
++ ...  "ã‚¹ã‚¿ã‚¸ã‚ªã‚¸ãƒ–ãƒª/æ˜ ç”»/ã¨ãªã‚Šã®ãƒˆãƒˆãƒ­ (1988) [BD-Rip]"
++                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unexpected token '»/ã¨ãªã‚Šã®ãƒˆãƒˆãƒ­ (1988) [BD-Rip]"
+    $plan2 = & $mountPath -WhatIf -Remote $remoteNoColon -RemoteSubpath $cjkSubpath -MountPoint "M:"
+    $t2Sw.Stop()
+    $expectedTarget2 = "$remoteNoColon`:$cjkSubpath"
+    $hasColonNormalized = ($plan2.RemoteTarget -eq $expectedTarget2)
+    $cmdMatches = ($plan2.ExpectedCommand -match [regex]::Escape($expectedTarget2))
+    $p2Passed = ($hasColonNormalized -and $cmdMatches)
+    $msg = if (-not $p2Passed) { "Failed to append colon properly or lost CJK characters" } else { "" }
+    Register-TestResult -TestId "TC-PARAM-02" -Category "Parameters" `
+        -Name "Remote without trailing colon and CJK Unicode subpath" `
+        -Description "Validates automatic colon appending when omitted and preservation of CJK characters" `
+        -Passed $p2Passed -FailureMessage $msg `
+        -Expected $expectedTarget2 -Actual $plan2.RemoteTarget -DurationMs $t2Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t2Sw.Stop()
+    Register-TestResult -TestId "TC-PARAM-02" -Category "Parameters" `
+        -Name "Remote without trailing colon and CJK Unicode subpath" `
+        -Description "Validates automatic colon appending when omitted and preservation of CJK characters" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t2Sw.Elapsed.TotalMilliseconds
+}
+# Test 1.3: Empty Remote defaults to cinema-gdrive: and empty RemoteSubpath
+$t3Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $plan3 = & $mountPath -WhatIf -Remote "" -RemoteSubpath "" -MountPoint "M:"
+    $t3Sw.Stop()
+    $expectedTarget3 = "cinema-gdrive:"
+    $targetIsClean = ($plan3.RemoteTarget -eq $expectedTarget3)
+    $noDoubleColons = (-not ($plan3.RemoteTarget -match "::"))
+    $p3Passed = ($targetIsClean -and $noDoubleColons)
+    $msg = if (-not $p3Passed) { "Empty remote or empty subpath resulted in malformed target: $($plan3.RemoteTarget)" 
+} else { "" }
+    Register-TestResult -TestId "TC-PARAM-03" -Category "Parameters" `
+        -Name "Empty Remote fallback and empty RemoteSubpath clean handling" `
+        -Description "Validates fallback to cinema-gdrive: without double colon or syntax errors when subpath is 
+empty" `
+        -Passed $p3Passed -FailureMessage $msg `
+        -Expected $expectedTarget3 -Actual $plan3.RemoteTarget -DurationMs $t3Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t3Sw.Stop()
+    Register-TestResult -TestId "TC-PARAM-03" -Category "Parameters" `
+        -Name "Empty Remote fallback and empty RemoteSubpath clean handling" `
+        -Description "Validates fallback to cinema-gdrive: without double colon or syntax errors when subpath is 
+empty" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t3Sw.Elapsed.TotalMilliseconds
+}
+# Test 1.4: ConfigPath with spaces, unicode and symbols
+$t4Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $complexConfigPath = "C:\Users\Admin\ÄÆ°á»ng Dáº«n Cáº¥u HÃ¬nh (Rclone)\rclone test [safe].conf"
+    $plan4 = & $mountPath -WhatIf -ConfigPath $complexConfigPath -MountPoint "M:"
+    $t4Sw.Stop()
+    $configReported = ($plan4.ConfigProvided -eq $true)
+    $cmdHasConfigArg = ($plan4.ExpectedCommand -match "--config\s+")
+    $cmdContainsPath = ($plan4.ExpectedCommand -match [regex]::Escape($complexConfigPath))
+    $p4Passed = ($configReported -and $cmdHasConfigArg -and $cmdContainsPath)
+    $msg = if (-not $p4Passed) { "Config path with spaces/unicode not properly passed into command preview" } else { 
+"" }
+    Register-TestResult -TestId "TC-PARAM-04" -Category "Parameters" `
+        -Name "ConfigPath with spaces, unicode, and symbols in ExpectedCommand" `
+        -Description "Validates proper inclusion of complex config path with spaces and unicode diacritics in expected 
+command" `
+        -Passed $p4Passed -FailureMessage $msg `
+        -Expected "Contains $complexConfigPath" -Actual $plan4.ExpectedCommand -DurationMs 
+$t4Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t4Sw.Stop()
+    Register-TestResult -TestId "TC-PARAM-04" -Category "Parameters" `
+        -Name "ConfigPath with spaces, unicode, and symbols in ExpectedCommand" `
+        -Description "Validates proper inclusion of complex config path with spaces and unicode diacritics in expected 
+command" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t4Sw.Elapsed.TotalMilliseconds
+}
+# Test 1.5: MountPoint drive letter variations (case insensitivity and slash variations)
+$t5Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $planLower = & $mountPath -WhatIf -MountPoint "m:"
+    $planSlash = & $mountPath -WhatIf -MountPoint "M:\"
+    $t5Sw.Stop()
+    $p5Passed = ($planLower.MountPoint -eq "m:") -and ($planSlash.MountPoint -eq "M:\")
+    Register-TestResult -TestId "TC-PARAM-05" -Category "Parameters" `
+        -Name "MountPoint accepts lowercase and trailing backslash drive letters" `
+        -Description "Validates drive letter formatting robustness for lowercase and trailing backslash" `
+        -Passed $p5Passed -FailureMessage "" `
+        -Expected "m: and M:\" -Actual "$($planLower.MountPoint) and $($planSlash.MountPoint)" `
+        -DurationMs $t5Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t5Sw.Stop()
+    Register-TestResult -TestId "TC-PARAM-05" -Category "Parameters" `
+        -Name "MountPoint accepts lowercase and trailing backslash drive letters" `
+        -Description "Validates drive letter formatting robustness for lowercase and trailing backslash" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t5Sw.Elapsed.TotalMilliseconds
+}
+# ==============================================================================
+# SUITE 2: Dry-Run Mode & State Non-Persistence Verification
+# ==============================================================================
+Write-Host "`n--- [SUITE 2] Dry-Run Mode & State Non-Persistence ---" -ForegroundColor Yellow
+# Test 2.1: Default invocation without -Execute is Dry-Run
+$t6Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $defaultPlan = & $mountPath
+    $t6Sw.Stop()
+    $isDry = ($defaultPlan.Mode -eq "DRY_RUN") -and ($defaultPlan.IsExecute -eq $false)
+    Register-TestResult -TestId "TC-DRY-01" -Category "DryRun" `
+        -Name "Default invocation without -Execute defaults to Dry-Run" `
+        -Description "Confirms that invoking mount_drive without parameters produces a safe dry-run plan" `
+        -Passed $isDry -FailureMessage "Mode is '$($defaultPlan.Mode)', IsExecute is '$($defaultPlan.IsExecute)'" `
+        -Expected "Mode=DRY_RUN, IsExecute=False" -Actual "Mode=$($defaultPlan.Mode), 
+IsExecute=$($defaultPlan.IsExecute)" `
+        -DurationMs $t6Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t6Sw.Stop()
+    Register-TestResult -TestId "TC-DRY-01" -Category "DryRun" `
+        -Name "Default invocation without -Execute defaults to Dry-Run" `
+        -Description "Confirms that invoking mount_drive without parameters produces a safe dry-run plan" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t6Sw.Elapsed.TotalMilliseconds
+}
+# Test 2.2: Explicit -WhatIf sets Dry-Run mode
+$t7Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $whatIfPlan = & $mountPath -WhatIf -Remote "cinema-gdrive:"
+    $t7Sw.Stop()
+    $isWhatIf = ($whatIfPlan.Mode -eq "DRY_RUN") -and ($whatIfPlan.IsExecute -eq $false)
+    Register-TestResult -TestId "TC-DRY-02" -Category "DryRun" `
+        -Name "Explicit -WhatIf switch produces Dry-Run plan" `
+        -Description "Confirms explicit -WhatIf switch produces DRY_RUN plan" `
+        -Passed $isWhatIf -FailureMessage "Mode is '$($whatIfPlan.Mode)', IsExecute is '$($whatIfPlan.IsExecute)'" `
+        -Expected "Mode=DRY_RUN, IsExecute=False" -Actual "Mode=$($whatIfPlan.Mode), 
+IsExecute=$($whatIfPlan.IsExecute)" `
+        -DurationMs $t7Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t7Sw.Stop()
+    Register-TestResult -TestId "TC-DRY-02" -Category "DryRun" `
+        -Name "Explicit -WhatIf switch produces Dry-Run plan" `
+        -Description "Confirms explicit -WhatIf switch produces DRY_RUN plan" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t7Sw.Elapsed.TotalMilliseconds
+}
+# Test 2.3: -WhatIf takes precedence over -Execute
+$t8Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $conflictPlan = & $mountPath -WhatIf -Execute -Remote "cinema-gdrive:"
+    $t8Sw.Stop()
+    $whatIfDominates = ($conflictPlan.Mode -eq "DRY_RUN") -and ($conflictPlan.IsExecute -eq $false)
+    Register-TestResult -TestId "TC-DRY-03" -Category "DryRun" `
+        -Name "-WhatIf overrides -Execute to guarantee dry-run safety" `
+        -Description "Validates that passing both -WhatIf and -Execute safely resolves to dry-run" `
+        -Passed $whatIfDominates -FailureMessage "Mode was $($conflictPlan.Mode)" `
+        -Expected "Mode=DRY_RUN" -Actual $conflictPlan.Mode -DurationMs $t8Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t8Sw.Stop()
+    Register-TestResult -TestId "TC-DRY-03" -Category "DryRun" `
+        -Name "-WhatIf overrides -Execute to guarantee dry-run safety" `
+        -Description "Validates that passing both -WhatIf and -Execute safely resolves to dry-run" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t8Sw.Elapsed.TotalMilliseconds
+}
+# Test 2.4: Zero processes spawned during Dry-Run
+$t9Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $rcloneProcsBefore = @(Get-Process -Name "rclone" -ErrorAction SilentlyContinue)
+    $null = & $mountPath -WhatIf -Remote "cinema-gdrive:" -RemoteSubpath "DippieMedia"
+    $rcloneProcsAfter = @(Get-Process -Name "rclone" -ErrorAction SilentlyContinue)
+    $t9Sw.Stop()
+    $noNewProcesses = ($rcloneProcsAfter.Count -eq $rcloneProcsBefore.Count)
+    Register-TestResult -TestId "TC-DRY-04" -Category "DryRun" `
+        -Name "Dry-Run launches zero processes" `
+        -Description "Confirms no background rclone process is spawned during dry-run evaluation" `
+        -Passed $noNewProcesses -FailureMessage "Process count changed: Before=$($rcloneProcsBefore.Count), 
+After=$($rcloneProcsAfter.Count)" `
+        -Expected "Zero new processes" -Actual "$($rcloneProcsAfter.Count - $rcloneProcsBefore.Count) new processes" `
+        -DurationMs $t9Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t9Sw.Stop()
+    Register-TestResult -TestId "TC-DRY-04" -Category "DryRun" `
+        -Name "Dry-Run launches zero processes" `
+        -Description "Confirms no background rclone process is spawned during dry-run evaluation" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t9Sw.Elapsed.TotalMilliseconds
+}
+# Test 2.5: Zero state files written to disk during Dry-Run
+$t10Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $testStateFile = Join-Path ([System.IO.Path]::GetTempPath()) 
+"test-dryrun-state-$([Guid]::NewGuid().ToString('N')).json"
+    $planDry = & $mountPath -WhatIf -StateFile $testStateFile -Remote "cinema-gdrive:"
+    $t10Sw.Stop()
+    $fileCreated = Test-Path -Path $testStateFile -PathType Leaf
+    if ($fileCreated) {
+        Remove-Item -Path $testStateFile -Force -ErrorAction SilentlyContinue
+    }
+    $stateNotPersisted = (-not $fileCreated)
+    Register-TestResult -TestId "TC-DRY-05" -Category "DryRun" `
+        -Name "Dry-Run does not create or persist state file on disk" `
+        -Description "Confirms that target StateFile path is untouched when operating in dry-run mode" `
+        -Passed $stateNotPersisted -FailureMessage "State file was created at $testStateFile" `
+        -Expected "State file should NOT exist" -Actual "Exists: $fileCreated" `
+        -DurationMs $t10Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t10Sw.Stop()
+    Register-TestResult -TestId "TC-DRY-05" -Category "DryRun" `
+        -Name "Dry-Run does not create or persist state file on disk" `
+        -Description "Confirms that target StateFile path is untouched when operating in dry-run mode" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t10Sw.Elapsed.TotalMilliseconds
+}
+# Test 2.6: -AsJson switch produces valid JSON schema in Dry-Run
+$t11Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $jsonOutput = & $mountPath -WhatIf -AsJson -Remote "cinema-gdrive:"
+    $t11Sw.Stop()
+    $parsedJson = $null
+    $jsonValid = $false
+    try {
+        $parsedJson = $jsonOutput | ConvertFrom-Json
+        $jsonValid = ($parsedJson -ne $null) -and ($parsedJson.Mode -eq "DRY_RUN")
+    } catch {
+        $jsonValid = $false
+    }
+    Register-TestResult -TestId "TC-DRY-06" -Category "DryRun" `
+        -Name "-AsJson switch outputs valid parsable JSON object" `
+        -Description "Verifies strict JSON output formatting for automation pipelines" `
+        -Passed $jsonValid -FailureMessage "Failed to parse JSON string or Mode is not DRY_RUN" `
+        -Expected "Valid JSON with Mode=DRY_RUN" -Actual $(if ($parsedJson) { $parsedJson.Mode } else { "Invalid JSON" 
+}) `
+        -DurationMs $t11Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t11Sw.Stop()
+    Register-TestResult -TestId "TC-DRY-06" -Category "DryRun" `
+        -Name "-AsJson switch outputs valid parsable JSON object" `
+        -Description "Verifies strict JSON output formatting for automation pipelines" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t11Sw.Elapsed.TotalMilliseconds
+}
+# ==============================================================================
+# SUITE 3: Occupied Mount Target (Collision Detection)
+# ==============================================================================
+Write-Host "`n--- [SUITE 3] Mount Target Collision Detection ---" -ForegroundColor Yellow
+# Test 3.1: Occupied system drive letter C:
+$t12Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $preflightC = & $preflightPath -MountPoint "C:" | ConvertFrom-Json
+    $t12Sw.Stop()
+    $cBlocked = ($preflightC.MountTarget.Available -eq $false)
+    $hasReason = ($preflightC.MountTarget.ConflictReason -match "in use|already assigned")
+    $readinessBlocked = ($preflightC.IsReady -eq $false)
+    $p12Passed = ($cBlocked -and $hasReason -and $readinessBlocked)
+    $msg = if (-not $p12Passed) { "Drive C: collision was not properly flagged" } else { "" }
+    Register-TestResult -TestId "TC-COLLISION-01" -Category "Collision" `
+        -Name "Occupied system drive letter C: collision detected" `
+        -Description "Validates preflight detects active drive C: as unavailable and includes conflict reason" `
+        -Passed $p12Passed -FailureMessage $msg `
+        -Expected "Available=False, IsReady=False" `
+        -Actual "Available=$($preflightC.MountTarget.Available), Reason=$($preflightC.MountTarget.ConflictReason)" `
+        -DurationMs $t12Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t12Sw.Stop()
+    Register-TestResult -TestId "TC-COLLISION-01" -Category "Collision" `
+        -Name "Occupied system drive letter C: collision detected" `
+        -Description "Validates preflight detects active drive C: as unavailable and includes conflict reason" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t12Sw.Elapsed.TotalMilliseconds
+}
+# Test 3.2: Occupied drive letter with trailing slash C:\
+$t13Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $preflightCSlash = & $preflightPath -MountPoint "C:\" | ConvertFrom-Json
+    $t13Sw.Stop()
+    $slashBlocked = ($preflightCSlash.MountTarget.Available -eq $false)
+    Register-TestResult -TestId "TC-COLLISION-02" -Category "Collision" `
+        -Name "Occupied drive letter with trailing slash (C:\) collision detected" `
+        -Description "Validates drive collision detection handles trailing backslash normalization" `
+        -Passed $slashBlocked -FailureMessage "C:\ was reported as Available: 
+$($preflightCSlash.MountTarget.Available)" `
+        -Expected "Available=False" -Actual "Available=$($preflightCSlash.MountTarget.Available)" `
+        -DurationMs $t13Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t13Sw.Stop()
+    Register-TestResult -TestId "TC-COLLISION-02" -Category "Collision" `
+        -Name "Occupied drive letter with trailing slash (C:\) collision detected" `
+        -Description "Validates drive collision detection handles trailing backslash normalization" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t13Sw.Elapsed.TotalMilliseconds
+}
+# Test 3.3: Available unused drive letter detection (e.g. searching Z..E)
+$t14Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $usedLetters = (Get-PSDrive -PSProvider FileSystem | Select-Object -ExpandProperty Name)
+    $availableLetter = $null
+    foreach ($candidate in @("Z", "Y", "X", "W", "V", "U", "T", "S", "R", "Q", "P", "N", "M")) {
+        if ($candidate -notin $usedLetters) {
+            $availableLetter = "$candidate`:"
+            break
+        }
+    }
+    if (-not $availableLetter) {
+        throw "Could not find an unused drive letter for collision baseline test"
+    }
+    $preflightFree = & $preflightPath -MountPoint $availableLetter | ConvertFrom-Json
+    $t14Sw.Stop()
+    $isFree = ($preflightFree.MountTarget.Available -eq $true)
+    Register-TestResult -TestId "TC-COLLISION-03" -Category "Collision" `
+        -Name "Unassigned drive letter ($availableLetter) recognized as available" `
+        -Description "Validates that an unused drive letter passes target collision check" `
+        -Passed $isFree -FailureMessage "Unused drive $availableLetter was flagged as unavailable" `
+        -Expected "Available=True" -Actual "Available=$($preflightFree.MountTarget.Available)" `
+        -DurationMs $t14Sw.Elapsed.TotalMilliseconds
+} catch {
+    $t14Sw.Stop()
+    Register-TestResult -TestId "TC-COLLISION-03" -Category "Collision" `
+        -Name "Unassigned drive letter recognized as available" `
+        -Description "Validates that an unused drive letter passes target collision check" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t14Sw.Elapsed.TotalMilliseconds
+}
+# Test 3.4: Occupied directory collision (non-empty directory)
+$t15Sw = [System.Diagnostics.Stopwatch]::StartNew()
+$tempOccupiedDir = Join-Path ([System.IO.Path]::GetTempPath()) 
+"movie-rcm-collision-dir-$([Guid]::NewGuid().ToString('N'))"
+try {
+    New-Item -ItemType Directory -Path $tempOccupiedDir -Force | Out-Null
+    # Create multiple files to ensure collection count is robust in StrictMode
+    Set-Content -Path (Join-Path $tempOccupiedDir "file1.txt") -Value "payload1"
+    Set-Content -Path (Join-Path $tempOccupiedDir "file2.txt") -Value "payload2"
+    $preflightDir = & $preflightPath -MountPoint $tempOccupiedDir | ConvertFrom-Json
+    $t15Sw.Stop()
+    $dirBlocked = ($preflightDir.MountTarget.Available -eq $false)
+    $dirReasonMatch = ($preflightDir.MountTarget.ConflictReason -match "not empty")
+    $p15Passed = ($dirBlocked -and $dirReasonMatch)
+    $msg = if (-not $p15Passed) { "Non-empty directory was not blocked: $($preflightDir.MountTarget.ConflictReason)" } 
+else { "" }
+    Register-TestResult -TestId "TC-COLLISION-04" -Category "Collision" `
+        -Name "Non-empty directory collision detected" `
+        -Description "Validates that targeting a non-empty directory is blocked as unavailable" `
+        -Passed $p15Passed -FailureMessage $msg `
+        -Expected "Available=False with 'not' in expression or statement.
+At D:\Class\movie-rcm-system\scripts\drive-tests\test_drive_toolkit_comprehensive.ps1:829 char:164
++ ... drive.ps1"', ('$preflightScript = "' + $escapedPreflightPath5 + '"'))
++                                                                       ~~~
+The string is missing the terminator: '.
+At D:\Class\movie-rcm-system\scripts\drive-tests\test_drive_toolkit_comprehensive.ps1:142 char:5
++ try {
++     ~
+Missing closing '}' in statement block or type definition.
+At D:\Class\movie-rcm-system\scripts\drive-tests\test_drive_toolkit_comprehensive.ps1:965 char:1
++ 
+The Try statement is missing its Catch or Finally block.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+ 

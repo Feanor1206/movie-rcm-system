@@ -19,8 +19,8 @@ flowchart TD
     WinFsp <-->|"I/O Requests (Read-Only)"| Rclone["Tiến trình rclone.exe (PID xác thực)"]
     
     subgraph Host Memory & Storage Boundary
-        Rclone -.->|"vfs-cache-mode: off (0 BYTE GHI SSD)"| RAM["Bộ nhớ RAM Host (Buffer 32M / luồng)"]
-        Rclone -.->|"NGHIÊM CẤM TẠO FILE CACHE"| SSD["Ổ đĩa vật lý SSD C: / D: (BẢO TOÀN DUNG LƯỢNG)"]
+        Rclone -.->|"vfs-cache-mode: off (0 byte VFS media disk cache)"| RAM["Bộ nhớ RAM Host (Buffer 32M / luồng)"]
+        Rclone -.->|"Không đệm media vào SSD"| SSD["SSD Cục bộ (Bảo toàn dung lượng cho OS & App)"]
     end
 
     Rclone <-->|"HTTPS / TLS 1.3 Chunked Range (8M -> 32M)"| GDriveAPI["Google Drive REST API (drive.readonly)"]
@@ -38,11 +38,11 @@ Khi mount lưu trữ đám mây qua rclone VFS (Virtual File System), quyết đ
 
 #### Nguyên lý vận hành:
 - **Cơ chế đọc:** Khi Spring Boot gửi yêu cầu đọc một dải byte (ví dụ: `bytes=0-1048575`), WinFsp chuyển tiếp lệnh đọc tới rclone. Rclone mở một kết nối HTTPS tới Google Drive API, tải chính xác các khối dữ liệu cần thiết theo cấu hình `--vfs-read-chunk-size` vào bộ đệm RAM nội bộ (`--buffer-size 32M`) và truyền trực tiếp về kernel WinFsp mà **hoàn toàn không ghi bất kỳ byte nào xuống đĩa cứng**.
-- **Lượng ghi đĩa (Disk Write Amplification):** **Chính xác 0 byte**.
+- **Lượng ghi đệm media VFS (Disk Write Amplification):** **Chính xác 0 byte từ rclone cache**. Rclone hoàn toàn không tạo tệp cache media trên đĩa cứng; tuy nhiên các hoạt động ghi chép thông thường của hệ điều hành, trình duyệt và application log vẫn diễn ra độc lập.
 - **Tác động SSD & An toàn dung lượng:** 
-  - Không tiêu tốn dung lượng đĩa khả dụng của hệ thống máy chủ host.
-  - Không gây hao mòn tế bào nhớ flash (0 TBW - Terabytes Written).
-  - Loại trừ 100% rủi ro tràn ổ đĩa (Disk Full Outage) khi người dùng xem phim có dung lượng lớn (10 GB – 50 GB) hoặc xem liên tục nhiều phim.
+  - Không tiêu tốn dung lượng đĩa khả dụng của hệ thống máy chủ host cho việc đệm video.
+  - Không gây hao mòn tế bào nhớ flash cho các tệp video đã xem.
+  - Triệt tiêu nguy cơ tràn ổ đĩa do cache media (Disk Full Outage từ video tích tụ) khi người dùng xem phim dung lượng lớn hoặc xem liên tục nhiều phim.
 - **Hạn chế:** Mỗi khi người dùng thực hiện thao tác tua (seek) ra khỏi phạm vi cửa sổ bộ đệm RAM hiện hành, rclone phải mở một HTTP Range Request mới tới Google Drive qua mạng WAN, dẫn đến độ trễ phụ thuộc vào thời gian phản hồi mạng (RTT).
 
 ### 2.2. Phương án B: Đệm Đĩa Toàn phần — `vfs-cache-mode full`
@@ -60,8 +60,9 @@ Khi mount lưu trữ đám mây qua rclone VFS (Virtual File System), quyết đ
 
 | Tiêu chí So sánh | `vfs-cache-mode off` (Baseline Chọn) | `vfs-cache-mode full` (Đệm Đĩa Cục bộ) | Đánh giá Kỹ thuật |
 | :--- | :--- | :--- | :--- |
-| **Lượng ghi đĩa SSD** | **0 Byte** (Hoàn toàn không ghi đĩa) | Hàng GB đến hàng chục GB trên mỗi phim | `cache-off` bảo toàn 100% tuổi thọ SSD |
-| **Rủi ro cạn kiệt đĩa (Disk Full)** | **Tuyệt đối an toàn** (0% rủi ro) | **Cực kỳ nguy hiểm** (Đĩa còn ~22-28 GB sẽ cạn sau vài phim) | `cache-off` ngăn chặn rủi ro sập hệ thống |
+| **Ghi bộ đệm media vào SSD** | **0 Byte ghi cache media vào SSD** (Rclone không tạo tệp cache media trên đĩa) | Hàng GB đến hàng chục GB trên mỗi phim | `cache-off` không gây hao mòn SSD do video cache |
+| **Ghi chép khác của Host** | Các ghi chép bình thường của HĐH, trình duyệt, app log vẫn diễn ra độc lập | Tương tự, cộng thêm hàng chục GB ghi đệm media | `cache-off` tách biệt hoàn toàn rclone khỏi đĩa |
+| **Nguy cơ cạn kiệt đĩa do video** | **Triệt tiêu nguy cơ cạn đĩa từ cache media** (Bảo toàn đĩa host) | **Cực kỳ nguy hiểm** (Đĩa còn ~22-28 GB sẽ cạn sau vài phim) | `cache-off` ngăn chặn rủi ro tràn đĩa do video |
 | **Độ trễ khởi phát (Cold Start)** | RTT mạng tới Google API (~800 – 1500 ms) | RTT mạng tới Google API (~800 – 1500 ms) | Hai phương án tương đương ở lần đầu |
 | **Độ trễ tua trong phạm vi RAM** | **Tức thì (< 5 ms)** từ RAM buffer 32M | **Tức thì (< 5 ms)** từ đĩa SSD | Hai phương án tương đương |
 | **Độ trễ tua xa (Random Seek)** | Phát sinh HTTP Range Request mới | Tải chunk mới xuống SSD rồi đọc lên | `cache-off` không chịu độ trễ ghi đĩa |
@@ -70,6 +71,10 @@ Khi mount lưu trữ đám mây qua rclone VFS (Virtual File System), quyết đ
 | **Tranh chấp I/O File Lock** | Không có tranh chấp file lock | Rủi ro xung đột lock giữa rclone và WinFsp | `cache-off` đơn giản và ổn định hơn |
 | **Chi phí quản lý dọn dẹp** | Không cần eviction loop | Phải cấu hình max-size, max-age, dọn rác | `cache-off` loại bỏ độ phức tạp vận hành |
 | **Khả năng mở rộng đồng thời** | Cao, độc lập giữa các stream | Bị thắt nút cổ chai tại băng thông ghi SSD | `cache-off` tối ưu cho máy chủ tải cao |
+
+> [!NOTE]
+> **Làm rõ về cơ chế định vị ngẫu nhiên và độ trễ đám mây:**
+> Việc ứng dụng Spring Boot sử dụng `FileChannel.position(start)` loại bỏ hoàn toàn việc đọc bỏ byte tuần tự của tầng ứng dụng (application byte-discard), giúp gửi yêu cầu đọc chính xác dải byte cần thiết. Tuy nhiên, trên môi trường Google Drive thực tế, độ trễ truy xuất dải byte từ xa vẫn phụ thuộc vào Round-Trip Time (RTT) mạng và chu kỳ phản hồi của Google Drive API chứ không phải độ trễ $O(1)$ cố định tức thời.
 
 ---
 
@@ -331,10 +336,14 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
 - [ ] **5.4.** Thực hiện 20 lượt tua tại 10%, 50%, 90% timeline, tính toán $P_{50}$ và $P_{95}$ (Mục tiêu: $P_{50} < 800 \text{ ms}$, $P_{95} < 1800 \text{ ms}$).
 - [ ] **5.5.** Phát liên tục trong 10 phút, ghi nhận Stall Ratio (Mục tiêu: $\le 0.5\%$).
 - [ ] **5.6.** Chạy thử tải đồng thời với 2 và 3 luồng phát song song, xác nhận không xuất hiện lỗi HTTP 429 hay crash tiến trình rclone.
-- [ ] **5.7.** Xác nhận mức tiêu thụ ổ đĩa: Kiểm tra dung lượng ổ đĩa `C:\` và `D:\` trước và sau khi xem phim — **lượng đĩa trống phải hoàn toàn không thay đổi** (0 byte ghi đĩa).
+- [ ] **5.7.** Xác nhận mức tiêu thụ ổ đĩa của rclone: Kiểm tra thư mục đệm rclone (`%LOCALAPPDATA%\rclone\vfs`) — xác nhận **0 byte tệp đệm media VFS** sinh ra trên SSD. Các biến động nhỏ về dung lượng tệp của OS hay application logging được ghi nhận riêng biệt.
 - [ ] **5.8.** Dừng tiến trình rclone an toàn khi hoàn tất:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -MountPoint "M:"
+  # Dừng an toàn theo state file mặc định:
+  powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
+
+  # Hoặc chỉ định rõ StateFile:
+  powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -StateFile "$env:TEMP\movie-rcm-drive-mount.json"
   ```
 
 ---

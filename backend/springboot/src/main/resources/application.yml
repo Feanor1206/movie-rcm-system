@@ -21,6 +21,12 @@ app:
     root: ${APP_MEDIA_ROOT:./media}
     drive-mount: ${APP_MEDIA_DRIVE_MOUNT:}
     max-concurrent-streams: ${APP_MEDIA_MAX_CONCURRENT_STREAMS:10}
+    max-concurrent-drive-streams: ${APP_MEDIA_MAX_CONCURRENT_DRIVE_STREAMS:5}
+    drive-metadata-timeout-ms: ${APP_MEDIA_DRIVE_METADATA_TIMEOUT_MS:3000}
+    drive-read-timeout-ms: ${APP_MEDIA_DRIVE_READ_TIMEOUT_MS:5000}
+    drive-max-io-workers: ${APP_MEDIA_DRIVE_MAX_IO_WORKERS:10}
+    drive-circuit-failure-threshold: ${APP_MEDIA_DRIVE_CIRCUIT_FAILURE_THRESHOLD:5}
+    drive-circuit-cooldown-ms: ${APP_MEDIA_DRIVE_CIRCUIT_COOLDOWN_MS:10000}
 
 ---
 # Development Profile (H2 Persistent File Database)

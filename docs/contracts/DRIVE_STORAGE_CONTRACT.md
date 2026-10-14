@@ -71,16 +71,29 @@ Configured in `application.yml` and overridable via environment variables:
 
 1. **Random-Access Seek via `FileChannel`:**
    - Controller uses `SeekableByteChannel channel = mediaStreamService.openMediaChannel(asset)`.
-   - On HTTP Range requests, `channel.position(range.getStart())` seeks directly at OS kernel level ($O(1)$) without discarding or reading intermediate bytes.
+   - On HTTP Range requests, `channel.position(range.getStart())` seeks directly at OS kernel level without discarding intermediate bytes ($O(1)$ application-level discard elimination).
+   - Note on cloud latency: While application-level sequential discard is eliminated, remote cloud retrieval latency across network WAN still depends on network RTT and Google Drive API response times.
    - Streaming loop reads bounded 64 KiB chunks (`ByteBuffer.allocate(64 * 1024)`) until `contentLength` is exhausted.
-2. **Availability Consistency:**
+2. **Availability Consistency & D1 Error Handling Contract:**
    - If a movie's feature asset specifies `storageProvider == "drive"` but `driveStorageAdapter.isAvailable() == false`, `getMediaDescriptor()` throws `MediaUnavailableException` (HTTP 503).
-   - Client receives HTTP 503, rendering `<div role="alert">` and `<button data-testid="descriptor-retry-btn">` without falsely marking the movie as missing media (`hasFeature: false`).
+   - Strict D1 Invariant: Under no circumstances may an offline Drive mount cause the descriptor endpoint to return HTTP 200 with `hasFeature: false` (which would falsely report to the user that the film lacks media).
+   - Client receives HTTP 503, rendering `<div role="alert">` and `<button data-testid="descriptor-retry-btn">`.
    - Once mount is restored, retry click recovers HTTP 200 descriptor and activates playback.
-3. **Permit Admission & Overload:**
-   - Bounded by `app.media.max-concurrent-streams` (default 10).
-   - Exceeded permits return HTTP 429 Too Many Requests with `Retry-After: 5` and `Cache-Control: no-store, no-cache, must-revalidate`.
-   - Permit is unconditionally released in a `finally` block in `MediaStreamController` even on client disconnect (`ClientAbortException`).
+   - Provider Isolation: Failures or downtime on the Google Drive mount must NEVER impact local storage assets (`storageProvider == "local"`), which remain 100% available.
+3. **Bulkhead Pattern & Bounded Concurrency Contract:**
+   - Concurrency is strictly bounded by `app.media.max-concurrent-streams` (default 10, configurable).
+   - Streaming traffic is isolated in its own bulkhead to prevent connection starvation on other business endpoints (recommendations, ratings, search).
+   - Atomic permit accounting via `AtomicInteger activeStreamCount` and `AtomicLong totalRejectedCount`.
+   - Overload handling: Exceeded permits immediately return HTTP 429 Too Many Requests with mandatory headers:
+     - `Retry-After: 5`
+     - `Cache-Control: no-store, no-cache, must-revalidate`
+     - JSON body: `{"status":429,"error":"Too Many Requests","message":"Hệ thống đang phục vụ tối đa luồng phát media đồng thời. Vui lòng thử lại sau 5 giây."}`
+   - Guaranteed permit recovery: Permits are unconditionally released in a `finally` block in `MediaStreamController` even on client abort (`ClientAbortException`), socket resets, or broken pipes.
+4. **Timeout & Circuit Breaker Contract:**
+   - Diagnostic test gate `awaitTestStreamGate` enforces a strict 5000ms deadline to prevent thread starvation.
+   - Non-blocking availability checks: `DriveMediaStorageAdapter.isAvailable()` evaluates local mount point vitality synchronously without unbounded blocking.
+   - Fast fail: When mount is missing or unreadable, adapter trips immediately to unavailable status, short-circuiting downstream I/O requests with HTTP 503.
+   - Self-healing: As soon as the mount directory becomes readable again, requests succeed automatically without requiring application restart.
 
 ---
 

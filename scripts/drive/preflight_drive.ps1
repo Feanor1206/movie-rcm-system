@@ -211,26 +211,26 @@ function Test-MountPointAvailable {
 
     # Otherwise treat target as an NTFS directory path
     $res.IsDirectory = $true
-    if (Test-Path -Path $Target -ErrorAction SilentlyContinue) {
-        $item = Get-Item -Path $Target -ErrorAction SilentlyContinue
-        if ($item -and -not $item.PSIsContainer) {
-            $res.Available = $false
-            $res.ConflictReason = "Mount point '$Target' exists and is a regular file, not a directory."
-            return $res
-        }
 
-        # Check if directory is empty (rclone directory mount requires empty directory)
-        $children = Get-ChildItem -Path $Target -Force -ErrorAction SilentlyContinue
-        if ($children -and $children.Count -gt 0) {
-            $res.Available = $false
-            $res.ConflictReason = "Mount directory '$Target' is not empty ($($children.Count) items found)."
-            return $res
-        }
+    # Reject Alternate Data Streams (ADS) and invalid stream syntax
+    $afterDrive = if ($Target -match '^[A-Za-z]:[\\/](.*)$') { $matches[1] } else { $Target }
+    if ($afterDrive -match ':') {
+        $res.Available = $false
+        $res.ConflictReason = "Mount directory target path '$Target' contains an alternate data stream (ADS) delimiter."
+        return $res
+    }
+
+    $fullPath = $Target
+    try {
+        $fullPath = [System.IO.Path]::GetFullPath($Target)
+    } catch {
+        $res.Available = $false
+        $res.ConflictReason = "Mount directory target path '$Target' cannot be resolved: $($_.Exception.Message)"
+        return $res
     }
 
     # Check filesystem type of target volume (must be NTFS for WinFsp directory mount)
     try {
-        $fullPath = [System.IO.Path]::GetFullPath($Target)
         $root = [System.IO.Path]::GetPathRoot($fullPath)
         $driveInfo = [System.IO.DriveInfo]::new($root)
         $res.FileSystem = $driveInfo.DriveFormat
@@ -241,6 +241,51 @@ function Test-MountPointAvailable {
         }
     } catch {
         # Fallback if DriveInfo fails
+    }
+
+    if (Test-Path -LiteralPath $fullPath -ErrorAction SilentlyContinue) {
+        $item = Get-Item -LiteralPath $fullPath -Force -ErrorAction SilentlyContinue
+        if ($item -and -not $item.PSIsContainer) {
+            $res.Available = $false
+            $res.ConflictReason = "Mount point '$Target' exists and is a regular file, not a directory."
+            return $res
+        }
+
+        # Check if existing directory is a reparse point (junction, symlink, or active mount)
+        if ($item -and ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            $res.Available = $false
+            $res.ConflictReason = "Mount directory '$Target' is a reparse point (junction, symlink, or active mount). WinFsp directory mount requires a standard directory or will instantiate its own."
+            return $res
+        }
+
+        # Check if directory has ReadOnly attribute
+        if ($item -and ($item.Attributes -band [System.IO.FileAttributes]::ReadOnly)) {
+            $res.Available = $false
+            $res.ConflictReason = "Mount directory '$Target' has the ReadOnly attribute set."
+            return $res
+        }
+
+        # Check if directory is empty (rclone directory mount requires empty directory)
+        $children = Get-ChildItem -LiteralPath $fullPath -Force -ErrorAction SilentlyContinue
+        if ($children -and $children.Count -gt 0) {
+            $res.Available = $false
+            $res.ConflictReason = "Mount directory '$Target' is not empty ($($children.Count) items found)."
+            return $res
+        }
+    } else {
+        # Target does not exist yet: parent directory must exist and not be a reparse point
+        $parent = [System.IO.Path]::GetDirectoryName($fullPath)
+        if (-not $parent -or -not (Test-Path -LiteralPath $parent -PathType Container -ErrorAction SilentlyContinue)) {
+            $res.Available = $false
+            $res.ConflictReason = "Parent directory '$parent' for mount point '$Target' does not exist."
+            return $res
+        }
+        $parentItem = Get-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+        if ($parentItem -and ($parentItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            $res.Available = $false
+            $res.ConflictReason = "Parent directory '$parent' is a reparse point (junction or symlink)."
+            return $res
+        }
     }
 
     return $res

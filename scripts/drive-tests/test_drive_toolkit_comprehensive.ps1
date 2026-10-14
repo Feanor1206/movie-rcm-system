@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Comprehensive test suite for Google Drive operational tooling on Windows.
 .DESCRIPTION
@@ -647,6 +647,216 @@ try {
         -Name "Baseline streaming flags extraction" `
         -Description "Validates error-free execution of baseline flag extraction" `
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t18Sw.Elapsed.TotalMilliseconds
+}
+
+# ==============================================================================
+# SUITE 5: Native Argument Preservation & Bounded Readiness Timeout (D3 & D4)
+# ==============================================================================
+Write-Host "`n--- [SUITE 5] Native Argument Preservation & Bounded Mount Readiness (D3 & D4) ---" -ForegroundColor Yellow
+
+# Test 5.1: TC-D3-01 Dry-run ExpectedCommand correctly quotes arguments with spaces
+$tD3_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    $remoteWithSpace = "fixture"
+    $subpathWithSpace = "Animation Films"
+    $configWithSpace = Join-Path ([System.IO.Path]::GetTempPath()) "secret config with spaces.conf"
+    $planD3 = & $mountPath -WhatIf -Remote $remoteWithSpace -RemoteSubpath $subpathWithSpace -ConfigPath $configWithSpace -MountPoint "M:"
+    $tD3_1Sw.Stop()
+
+    $cmdLine = [string]$planD3.ExpectedCommand
+    $quotedTargetMatch = ($cmdLine -match '"fixture:Animation Films"')
+    $quotedConfigMatch = ($cmdLine -match [regex]::Escape('"' + $configWithSpace + '"'))
+
+    $pD3_1Passed = ($quotedTargetMatch -and $quotedConfigMatch)
+    Register-TestResult -TestId "TC-D3-01" -Category "ArgvPreservation" `
+        -Name "mount_drive -WhatIf quotes arguments with spaces in ExpectedCommand" `
+        -Description "Confirms remote targets and configuration paths containing spaces are safely double-quoted" `
+        -Passed $pD3_1Passed `
+        -Expected 'ExpectedCommand contains "fixture:Animation Films" and quoted config' `
+        -Actual "QuotedTarget=$quotedTargetMatch, QuotedConfig=$quotedConfigMatch" `
+        -DurationMs $tD3_1Sw.Elapsed.TotalMilliseconds
+} catch {
+    $tD3_1Sw.Stop()
+    Register-TestResult -TestId "TC-D3-01" -Category "ArgvPreservation" `
+        -Name "mount_drive -WhatIf quotes arguments with spaces in ExpectedCommand" `
+        -Description "Confirms remote targets and configuration paths containing spaces are safely double-quoted" `
+        -Passed $false -FailureMessage $_.Exception.Message -DurationMs $tD3_1Sw.Elapsed.TotalMilliseconds
+}
+
+# Test 5.2: TC-D3-02 Native child argv preservation via Node argv recorder
+$tD3_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
+$d3TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d3-test-$([Guid]::NewGuid().ToString('N'))"
+try {
+    New-Item -ItemType Directory -Path $d3TempDir | Out-Null
+    $preflightMock = Join-Path $d3TempDir "preflight.ps1"
+    $preflightBody = 'param($MountPoint,$RclonePath,$ConfigPath); [PSCustomObject]@{ IsReady=$true; Rclone=[PSCustomObject]@{ExecutablePath="C:\Fixture\rclone.exe"}; BlockReasons=@() } | ConvertTo-Json -Compress'
+    Set-Content -LiteralPath $preflightMock -Value $preflightBody -Encoding UTF8
+
+    $global:capturedLaunchArgs = $null
+    function Start-Process {
+        param($FilePath, $ArgumentList, $WindowStyle, [switch]$PassThru)
+        $global:capturedLaunchArgs = $ArgumentList
+        [PSCustomObject]@{
+            Id          = 987654
+            HasExited   = $false
+            ProcessName = "rclone"
+            StartTime   = [DateTime]::Now
+        }
+    }
+
+    $mountSource = Get-Content -LiteralPath $mountPath -Raw -Encoding UTF8
+    $escapedPreflightPath = $preflightMock.Replace("\", "\\")
+    $mountSource = $mountSource.Replace('$preflightScript = Join-Path $PSScriptRoot "preflight_drive.ps1"', ('$preflightScript = "' + $escapedPreflightPath + '"'))
+    
+    $missingMountTarget = Join-Path $d3TempDir "not-mounted-folder"
+    $configWithSpace2 = Join-Path $d3TempDir "secret config.conf"
+    $stateFileD3 = Join-Path $d3TempDir "state.json"
+
+    $null = & ([scriptblock]::Create($mountSource)) -Execute -Remote "fixture" -RemoteSubpath "Animation Films" `
+        -MountPoint $missingMountTarget -ConfigPath $configWithSpace2 -StateFile $stateFileD3 `
+        -ReadinessTimeoutSeconds 1 -ReadinessIntervalMs 50
+
+    # Launch native Node.js argv recorder with the captured arguments
+    $recorderCjs = Join-Path $d3TempDir "argv_recorder.cjs"
+    $recorderBody = 'console.log(JSON.stringify(process.argv.slice(2)))'
+    Set-Content -LiteralPath $recorderCjs -Value $recorderBody -Encoding UTF8
+    $stdoutJson = Join-Path $d3TempDir "argv.json"
+    $nodeCmd = (Get-Command node -ErrorAction SilentlyContinue)
+    $nodeExe = if ($nodeCmd) { $nodeCmd.Source } else { "node" }
+
+    $nativeProc = Microsoft.PowerShell.Management\Start-Process -FilePath $nodeExe `
+        -ArgumentList (@($recorderCjs) + $global:capturedLaunchArgs) `
+        -WindowStyle Hidden -RedirectStandardOutput $stdoutJson -PassThru -Wait
+
+    $actualTokens = Get-Content -LiteralPath $stdoutJson -Raw -Encoding UTF8 | ConvertFrom-Json
+    $tD3_2Sw.Stop()
+
+    $remoteTokenPreserved = ($actualTokens -contains "fixture:Animation Films")
+    $configTokenPreserved = ($actualTokens -contains $configWithSpace2)
+    $pD3_2Passed = ($remoteTokenPreserved -and $configTokenPreserved)
+
+    Register-TestResult -TestId "TC-D3-02" -Category "ArgvPreservation" `
+        -Name "Native child process argv preserves tokens with spaces without word-splitting" `
+        -Description "Exercises native Node.js process launch to verify formatted arguments preserve whitespace" `
+        -Passed $pD3_2Passed `
+        -FailureMessage "Token preservation failed: Remote=$remoteTokenPreserved, Config=$configTokenPreserved" `
+        -Expected "Tokens 'fixture:Animation Films' and '$configWithSpace2' preserved exactly" `
+        -Actual "RemoteTokenPreserved=$remoteTokenPreserved, ConfigTokenPreserved=$configTokenPreserved" `
+        -DurationMs $tD3_2Sw.Elapsed.TotalMilliseconds
+} finally {
+    Remove-Item -Path "function:Start-Process" -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $d3TempDir) {
+        Remove-Item -LiteralPath $d3TempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Test 5.3: TC-D4-01 Bounded readiness verification reports TIMEOUT on missing/unmounted target
+$tD4_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
+$d4TempDir1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d4-timeout-$([Guid]::NewGuid().ToString('N'))"
+try {
+    New-Item -ItemType Directory -Path $d4TempDir1 | Out-Null
+    $preflightMock4 = Join-Path $d4TempDir1 "preflight.ps1"
+    $preflightBody4 = 'param($MountPoint,$RclonePath,$ConfigPath); [PSCustomObject]@{ IsReady=$true; Rclone=[PSCustomObject]@{ExecutablePath="C:\Fixture\rclone.exe"}; BlockReasons=@() } | ConvertTo-Json -Compress'
+    Set-Content -LiteralPath $preflightMock4 -Value $preflightBody4 -Encoding UTF8
+
+    function Start-Process {
+        param($FilePath, $ArgumentList, $WindowStyle, [switch]$PassThru)
+        [PSCustomObject]@{
+            Id          = 987655
+            HasExited   = $false
+            ProcessName = "rclone"
+            StartTime   = [DateTime]::Now
+        }
+    }
+
+    $mountSource4 = Get-Content -LiteralPath $mountPath -Raw -Encoding UTF8
+    $escapedPreflightPath4 = $preflightMock4.Replace("\", "\\")
+    $mountSource4 = $mountSource4.Replace('$preflightScript = Join-Path $PSScriptRoot "preflight_drive.ps1"', ('$preflightScript = "' + $escapedPreflightPath4 + '"'))
+    
+    $missingMount4 = Join-Path $d4TempDir1 "unmounted-target"
+    $stateFileD4 = Join-Path $d4TempDir1 "state.json"
+
+    $resD4_1 = & ([scriptblock]::Create($mountSource4)) -Execute -Remote "cinema-gdrive" -RemoteSubpath "Media" `
+        -MountPoint $missingMount4 -StateFile $stateFileD4 `
+        -ReadinessTimeoutSeconds 1 -ReadinessIntervalMs 50
+
+    $tD4_1Sw.Stop()
+
+    $isTimeout = ($resD4_1.Status -eq "TIMEOUT") -and ($resD4_1.Success -eq $false)
+    $neverMounted = ($resD4_1.Status -ne "MOUNTED")
+    $savedState4 = Get-Content -LiteralPath $stateFileD4 -Raw -Encoding UTF8 | ConvertFrom-Json
+    $stateMarkedTimeout = ($savedState4.status -eq "TIMEOUT")
+
+    $pD4_1Passed = ($isTimeout -and $neverMounted -and $stateMarkedTimeout)
+
+    Register-TestResult -TestId "TC-D4-01" -Category "MountReadiness" `
+        -Name "mount_drive reports TIMEOUT (not MOUNTED) when mount target fails to become ready" `
+        -Description "Validates bounded readiness polling loop enforces timeout and never falsely claims MOUNTED" `
+        -Passed $pD4_1Passed `
+        -FailureMessage "Status: $($resD4_1.Status), Success: $($resD4_1.Success), StateStatus: $($savedState4.status)" `
+        -Expected "Status=TIMEOUT, Success=False, State.status=TIMEOUT" `
+        -Actual "Status=$($resD4_1.Status), Success=$($resD4_1.Success), State.status=$($savedState4.status)" `
+        -DurationMs $tD4_1Sw.Elapsed.TotalMilliseconds
+} finally {
+    Remove-Item -Path "function:Start-Process" -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $d4TempDir1) {
+        Remove-Item -LiteralPath $d4TempDir1 -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Test 5.4: TC-D4-02 Premature process exit during mount readiness loop reports FAILED
+$tD4_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
+$d4TempDir2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d4-fail-$([Guid]::NewGuid().ToString('N'))"
+try {
+    New-Item -ItemType Directory -Path $d4TempDir2 | Out-Null
+    $preflightMock5 = Join-Path $d4TempDir2 "preflight.ps1"
+    $preflightBody5 = 'param($MountPoint,$RclonePath,$ConfigPath); [PSCustomObject]@{ IsReady=$true; Rclone=[PSCustomObject]@{ExecutablePath="C:\Fixture\rclone.exe"}; BlockReasons=@() } | ConvertTo-Json -Compress'
+    Set-Content -LiteralPath $preflightMock5 -Value $preflightBody5 -Encoding UTF8
+
+    function Start-Process {
+        param($FilePath, $ArgumentList, $WindowStyle, [switch]$PassThru)
+        [PSCustomObject]@{
+            Id          = 987656
+            HasExited   = $true
+            ExitCode    = 2
+            ProcessName = "rclone"
+            StartTime   = [DateTime]::Now
+        }
+    }
+
+    $mountSource5 = Get-Content -LiteralPath $mountPath -Raw -Encoding UTF8
+    $escapedPreflightPath5 = $preflightMock5.Replace("\", "\\")
+    $mountSource5 = $mountSource5.Replace('$preflightScript = Join-Path $PSScriptRoot "preflight_drive.ps1"', ('$preflightScript = "' + $escapedPreflightPath5 + '"'))
+    
+    $missingMount5 = Join-Path $d4TempDir2 "unmounted-target"
+    $stateFileD4_2 = Join-Path $d4TempDir2 "state.json"
+
+    $resD4_2 = & ([scriptblock]::Create($mountSource5)) -Execute -Remote "cinema-gdrive" -RemoteSubpath "Media" `
+        -MountPoint $missingMount5 -StateFile $stateFileD4_2 `
+        -ReadinessTimeoutSeconds 1 -ReadinessIntervalMs 50
+
+    $tD4_2Sw.Stop()
+
+    $isFailed = ($resD4_2.Status -eq "FAILED") -and ($resD4_2.Success -eq $false) -and ($resD4_2.ExitCode -eq 2)
+    $neverMounted2 = ($resD4_2.Status -ne "MOUNTED")
+    $savedState5 = Get-Content -LiteralPath $stateFileD4_2 -Raw -Encoding UTF8 | ConvertFrom-Json
+    $stateMarkedFailed = ($savedState5.status -eq "FAILED")
+
+    $pD4_2Passed = ($isFailed -and $neverMounted2 -and $stateMarkedFailed)
+
+    Register-TestResult -TestId "TC-D4-02" -Category "MountReadiness" `
+        -Name "mount_drive reports FAILED with exit code when background process exits prematurely" `
+        -Description "Validates early process crash is detected during readiness loop and returned as FAILED" `
+        -Passed $pD4_2Passed `
+        -FailureMessage "Status: $($resD4_2.Status), Success: $($resD4_2.Success), ExitCode: $($resD4_2.ExitCode)" `
+        -Expected "Status=FAILED, Success=False, ExitCode=2, State.status=FAILED" `
+        -Actual "Status=$($resD4_2.Status), Success=$($resD4_2.Success), ExitCode=$($resD4_2.ExitCode)" `
+        -DurationMs $tD4_2Sw.Elapsed.TotalMilliseconds
+} finally {
+    Remove-Item -Path "function:Start-Process" -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $d4TempDir2) {
+        Remove-Item -LiteralPath $d4TempDir2 -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # ==============================================================================

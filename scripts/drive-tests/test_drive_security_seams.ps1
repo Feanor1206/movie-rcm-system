@@ -106,12 +106,13 @@ function Register-TestResult {
 function Test-ObjectContainsSecrets {
     param(
         [object]$TargetObject,
-        [string[]]$SecretList
+        [string[]]$SecretList,
+        [int]$Depth = 0
     )
 
-    if ($TargetObject -eq $null) { return $false }
+    if ($TargetObject -eq $null -or $Depth -gt 20) { return $false }
 
-    # If primitive or string
+    # If string
     if ($TargetObject -is [string]) {
         foreach ($sec in $SecretList) {
             if ($TargetObject.Contains($sec)) {
@@ -121,10 +122,15 @@ function Test-ObjectContainsSecrets {
         return $false
     }
 
+    # ValueTypes (int, bool, double, DateTime, etc.) cannot contain secret strings
+    if ($TargetObject -is [System.ValueType]) {
+        return $false
+    }
+
     # If array or collection
     if ($TargetObject -is [System.Collections.IEnumerable] -and -not ($TargetObject -is [hashtable])) {
         foreach ($item in $TargetObject) {
-            if (Test-ObjectContainsSecrets -TargetObject $item -SecretList $SecretList) {
+            if (Test-ObjectContainsSecrets -TargetObject $item -SecretList $SecretList -Depth ($Depth + 1)) {
                 return $true
             }
         }
@@ -135,7 +141,7 @@ function Test-ObjectContainsSecrets {
     if ($TargetObject.PSObject -and $TargetObject.PSObject.Properties) {
         foreach ($prop in $TargetObject.PSObject.Properties) {
             if ($prop.Value) {
-                if (Test-ObjectContainsSecrets -TargetObject $prop.Value -SecretList $SecretList) {
+                if (Test-ObjectContainsSecrets -TargetObject $prop.Value -SecretList $SecretList -Depth ($Depth + 1)) {
                     return $true
                 }
             }
@@ -307,9 +313,9 @@ try {
     # Create fake state recording current PowerShell process, but with actual process name powershell/pwsh
     $fakeState = [PSCustomObject]@{
         pid            = $currentProcess.Id
-        processName    = "powershell"
+        processName    = "rclone"
         startTime      = $currentProcess.StartTime.ToString("o")
-        executablePath = "C:\Program Files\PowerShell\7\pwsh.exe"
+        executablePath = "C:\rclone\rclone.exe"
         mountPoint     = "M:"
         remoteTarget   = "cinema-gdrive:DippieMedia"
     }
@@ -318,8 +324,8 @@ try {
     $stopRes1 = & $stopPath -StateFile $pidMismatchStateFile
     $t6Sw.Stop()
 
-    $rejected = ($stopRes1.Success -eq $false) -and ($stopRes1.Status -eq "PID_REUSE_REJECTED")
-    $hasSafetyMsg = ($stopRes1.Message -match "Refusing to kill PID|Process identity mismatch|PID reuse detected")
+    $rejected = ($stopRes1.Success -eq $false) -and ($stopRes1.Status -in @("PID_REUSE_REJECTED", "IDENTITY_MISMATCH"))
+    $hasSafetyMsg = ($stopRes1.Message -match "Refusing to kill PID|Process identity mismatch|PID reuse detected|Identity verification failed")
     $currentStillAlive = (Get-Process -Id $PID -ErrorAction SilentlyContinue) -ne $null
     $statePreserved = Test-Path -Path $pidMismatchStateFile -PathType Leaf
 
@@ -419,7 +425,7 @@ $degradedStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-stat
 try {
     $degradedState = [PSCustomObject]@{
         pid            = $currentProcess.Id
-        processName    = "powershell"
+        processName    = "rclone"
         startTime      = $currentProcess.StartTime.ToString("o")
         mountPoint     = "Z:"
         remoteTarget   = "cinema-gdrive:DippieMedia"
@@ -541,7 +547,7 @@ Register-TestResult -TestId "TC-PID-07" -Category "PIDSafety" `
     -Actual "Status=$($stopMissingRes.Status), Success=$($stopMissingRes.Success)" `
     -DurationMs $t12Sw.Elapsed.TotalMilliseconds
 
-# Test 2.8: Empty or invalid state file cleaned up by stop_drive
+# Test 2.8: Empty or invalid state file rejected and preserved (Fail Closed)
 $t13Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $emptyStatePath = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-empty-$([Guid]::NewGuid().ToString('N')).json"
 try {
@@ -551,16 +557,16 @@ try {
     $stopEmptyRes = & $stopPath -StateFile $emptyStatePath
     $t13Sw.Stop()
 
-    $emptyCleaned = ($stopEmptyRes.Success -eq $true) -and ($stopEmptyRes.Status -eq "CLEANED_EMPTY_STATE")
-    $emptyFileGone = (-not (Test-Path -Path $emptyStatePath -PathType Leaf))
+    $emptyRejected = ($stopEmptyRes.Success -eq $false) -and ($stopEmptyRes.Status -eq "VERIFICATION_FAILED")
+    $emptyFilePreserved = (Test-Path -Path $emptyStatePath -PathType Leaf)
 
-    $p13Passed = ($emptyCleaned -and $emptyFileGone)
+    $p13Passed = ($emptyRejected -and $emptyFilePreserved)
     Register-TestResult -TestId "TC-PID-08" -Category "PIDSafety" `
-        -Name "stop_drive cleans up empty or invalid state file (Status: CLEANED_EMPTY_STATE)" `
-        -Description "Validates empty state file is removed and reported as CLEANED_EMPTY_STATE" `
-        -Passed $p13Passed -FailureMessage "Status was: $($stopEmptyRes.Status), FileDeleted=$emptyFileGone" `
-        -Expected "Status=CLEANED_EMPTY_STATE, File removed" `
-        -Actual "Status=$($stopEmptyRes.Status), FileDeleted=$emptyFileGone" `
+        -Name "stop_drive fails closed on empty or invalid state file (Status: VERIFICATION_FAILED, state preserved)" `
+        -Description "Validates empty state file is preserved for forensic inspection rather than deleted without verification" `
+        -Passed $p13Passed -FailureMessage "Status was: $($stopEmptyRes.Status), FileDeleted=$(-not $emptyFilePreserved)" `
+        -Expected "Status=VERIFICATION_FAILED, File preserved" `
+        -Actual "Status=$($stopEmptyRes.Status), FilePreserved=$emptyFilePreserved" `
         -DurationMs $t13Sw.Elapsed.TotalMilliseconds
 } finally {
     if (Test-Path -Path $emptyStatePath) {
@@ -600,6 +606,307 @@ try {
     if (Test-Path -Path $idempotentStatePath) {
         Remove-Item -Path $idempotentStatePath -Force -ErrorAction SilentlyContinue
     }
+}
+
+# ==============================================================================
+# SUITE 3: Strict Process Identity Verification & Fail-Closed Seams (Finding D2)
+# ==============================================================================
+Write-Host "`n--- [SUITE 3] Strict Process Identity & Fail-Closed Verification (Finding D2) ---" -ForegroundColor Yellow
+
+$global:MockProcessMap = @{}
+$global:MockStoppedPids = [System.Collections.Generic.List[int]]::new()
+
+function global:Get-Process {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [int[]]$Id
+    )
+    if ($Id -and $global:MockProcessMap.ContainsKey($Id[0])) {
+        return $global:MockProcessMap[$Id[0]]
+    }
+    Microsoft.PowerShell.Management\Get-Process @PSBoundParameters
+}
+
+function global:Stop-Process {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true)]
+        [int[]]$Id,
+        [switch]$Force
+    )
+    if ($Id -and $global:MockProcessMap.ContainsKey($Id[0])) {
+        $global:MockStoppedPids.Add($Id[0])
+        $global:MockProcessMap.Remove($Id[0])
+        return
+    }
+    Microsoft.PowerShell.Management\Stop-Process @PSBoundParameters
+}
+
+try {
+    # Test 3.1: TC-D2-01 ExecutablePath mismatch fails closed
+    $tD2_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d2State1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-exepath-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $st1 = [DateTime]::UtcNow
+        $global:MockProcessMap[880001] = [PSCustomObject]@{
+            Id          = 880001
+            ProcessName = "rclone"
+            Path        = "C:\Different\rclone.exe"
+            StartTime   = $st1
+            SessionId   = 1
+        }
+        $stateContent1 = [PSCustomObject]@{
+            pid            = 880001
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $st1.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+        }
+        $stateContent1 | ConvertTo-Json | Set-Content -Path $d2State1 -Encoding UTF8
+
+        $resD2_1 = & $stopPath -StateFile $d2State1
+        $tD2_1Sw.Stop()
+
+        $pD2_1Passed = ($resD2_1.Success -eq $false) -and `
+                       ($resD2_1.Status -eq "IDENTITY_MISMATCH") -and `
+                       ($resD2_1.VerificationReason -eq "ExecutablePathMismatch") -and `
+                       ($global:MockStoppedPids -notcontains 880001) -and `
+                       (Test-Path -Path $d2State1 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-D2-01" -Category "ProcessIdentity" `
+            -Name "stop_drive refuses to kill process when ExecutablePath differs (Status: IDENTITY_MISMATCH)" `
+            -Description "Confirms stop_drive strictly compares full executable path and aborts termination on mismatch" `
+            -Passed $pD2_1Passed `
+            -FailureMessage "Status: $($resD2_1.Status), Reason: $($resD2_1.VerificationReason), Stopped: $($global:MockStoppedPids -contains 880001)" `
+            -Expected "Status=IDENTITY_MISMATCH, Reason=ExecutablePathMismatch, StatePreserved=True" `
+            -Actual "Status=$($resD2_1.Status), Reason=$($resD2_1.VerificationReason), StatePreserved=$(Test-Path -Path $d2State1 -PathType Leaf)" `
+            -DurationMs $tD2_1Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $d2State1) { Remove-Item -Path $d2State1 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 3.2: TC-D2-02 StartTime mismatch (delta >= 500ms) fails closed
+    $tD2_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d2State2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-starttime-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $st2 = [DateTime]::UtcNow
+        $global:MockProcessMap[880002] = [PSCustomObject]@{
+            Id          = 880002
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $st2
+            SessionId   = 1
+        }
+        $stateContent2 = [PSCustomObject]@{
+            pid            = 880002
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = ($st2.AddSeconds(-3)).ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+        }
+        $stateContent2 | ConvertTo-Json | Set-Content -Path $d2State2 -Encoding UTF8
+
+        $resD2_2 = & $stopPath -StateFile $d2State2
+        $tD2_2Sw.Stop()
+
+        $pD2_2Passed = ($resD2_2.Success -eq $false) -and `
+                       ($resD2_2.Status -eq "IDENTITY_MISMATCH") -and `
+                       ($resD2_2.VerificationReason -eq "StartTimeMismatch") -and `
+                       ($global:MockStoppedPids -notcontains 880002) -and `
+                       (Test-Path -Path $d2State2 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-D2-02" -Category "ProcessIdentity" `
+            -Name "stop_drive refuses to kill process when StartTime delta >= 500ms (Status: IDENTITY_MISMATCH)" `
+            -Description "Confirms stop_drive enforces strict 500ms tolerance on process start time verification" `
+            -Passed $pD2_2Passed `
+            -FailureMessage "Status: $($resD2_2.Status), Reason: $($resD2_2.VerificationReason), Stopped: $($global:MockStoppedPids -contains 880002)" `
+            -Expected "Status=IDENTITY_MISMATCH, Reason=StartTimeMismatch, StatePreserved=True" `
+            -Actual "Status=$($resD2_2.Status), Reason=$($resD2_2.VerificationReason), StatePreserved=$(Test-Path -Path $d2State2 -PathType Leaf)" `
+            -DurationMs $tD2_2Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $d2State2) { Remove-Item -Path $d2State2 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 3.3: TC-D2-03 Missing startTime in state fails closed
+    $tD2_3Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d2State3 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-nostart-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $st3 = [DateTime]::UtcNow
+        $global:MockProcessMap[880003] = [PSCustomObject]@{
+            Id          = 880003
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $st3
+            SessionId   = 1
+        }
+        $stateContent3 = [PSCustomObject]@{
+            pid            = 880003
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+        }
+        $stateContent3 | ConvertTo-Json | Set-Content -Path $d2State3 -Encoding UTF8
+
+        $resD2_3 = & $stopPath -StateFile $d2State3
+        $tD2_3Sw.Stop()
+
+        $pD2_3Passed = ($resD2_3.Success -eq $false) -and `
+                       ($resD2_3.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resD2_3.VerificationReason -eq "MissingStartTimeInState") -and `
+                       ($global:MockStoppedPids -notcontains 880003) -and `
+                       (Test-Path -Path $d2State3 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-D2-03" -Category "ProcessIdentity" `
+            -Name "stop_drive fails closed when state file lacks startTime (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing startTime is rejected without termination and state file is preserved" `
+            -Passed $pD2_3Passed `
+            -FailureMessage "Status: $($resD2_3.Status), Reason: $($resD2_3.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingStartTimeInState, StatePreserved=True" `
+            -Actual "Status=$($resD2_3.Status), Reason=$($resD2_3.VerificationReason), StatePreserved=$(Test-Path -Path $d2State3 -PathType Leaf)" `
+            -DurationMs $tD2_3Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $d2State3) { Remove-Item -Path $d2State3 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 3.4: TC-D2-04 Missing executablePath in state fails closed
+    $tD2_4Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d2State4 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-noexe-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $st4 = [DateTime]::UtcNow
+        $global:MockProcessMap[880004] = [PSCustomObject]@{
+            Id          = 880004
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $st4
+            SessionId   = 1
+        }
+        $stateContent4 = [PSCustomObject]@{
+            pid            = 880004
+            processName    = "rclone"
+            startTime      = $st4.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+        }
+        $stateContent4 | ConvertTo-Json | Set-Content -Path $d2State4 -Encoding UTF8
+
+        $resD2_4 = & $stopPath -StateFile $d2State4
+        $tD2_4Sw.Stop()
+
+        $pD2_4Passed = ($resD2_4.Success -eq $false) -and `
+                       ($resD2_4.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resD2_4.VerificationReason -eq "MissingExecutablePathInState") -and `
+                       ($global:MockStoppedPids -notcontains 880004) -and `
+                       (Test-Path -Path $d2State4 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-D2-04" -Category "ProcessIdentity" `
+            -Name "stop_drive fails closed when state lacks executablePath (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing executablePath is rejected without termination and state file is preserved" `
+            -Passed $pD2_4Passed `
+            -FailureMessage "Status: $($resD2_4.Status), Reason: $($resD2_4.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingExecutablePathInState, StatePreserved=True" `
+            -Actual "Status=$($resD2_4.Status), Reason=$($resD2_4.VerificationReason), StatePreserved=$(Test-Path -Path $d2State4 -PathType Leaf)" `
+            -DurationMs $tD2_4Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $d2State4) { Remove-Item -Path $d2State4 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 3.5: TC-D2-05 SessionId mismatch fails closed
+    $tD2_5Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d2State5 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-session-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $st5 = [DateTime]::UtcNow
+        $global:MockProcessMap[880005] = [PSCustomObject]@{
+            Id          = 880005
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $st5
+            SessionId   = 1
+        }
+        $stateContent5 = [PSCustomObject]@{
+            pid            = 880005
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $st5.ToString("o")
+            sessionId      = 99
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+        }
+        $stateContent5 | ConvertTo-Json | Set-Content -Path $d2State5 -Encoding UTF8
+
+        $resD2_5 = & $stopPath -StateFile $d2State5
+        $tD2_5Sw.Stop()
+
+        $pD2_5Passed = ($resD2_5.Success -eq $false) -and `
+                       ($resD2_5.Status -eq "IDENTITY_MISMATCH") -and `
+                       ($resD2_5.VerificationReason -eq "SessionIdMismatch") -and `
+                       ($global:MockStoppedPids -notcontains 880005) -and `
+                       (Test-Path -Path $d2State5 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-D2-05" -Category "ProcessIdentity" `
+            -Name "stop_drive refuses to kill process when SessionId differs (Status: IDENTITY_MISMATCH)" `
+            -Description "Confirms session ID mismatch prevents process termination" `
+            -Passed $pD2_5Passed `
+            -FailureMessage "Status: $($resD2_5.Status), Reason: $($resD2_5.VerificationReason)" `
+            -Expected "Status=IDENTITY_MISMATCH, Reason=SessionIdMismatch, StatePreserved=True" `
+            -Actual "Status=$($resD2_5.Status), Reason=$($resD2_5.VerificationReason), StatePreserved=$(Test-Path -Path $d2State5 -PathType Leaf)" `
+            -DurationMs $tD2_5Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $d2State5) { Remove-Item -Path $d2State5 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 3.6: TC-D2-06 Fully verified process terminated cleanly and state file removed
+    $tD2_6Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d2State6 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-success-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $st6 = [DateTime]::UtcNow
+        $global:MockProcessMap[880006] = [PSCustomObject]@{
+            Id          = 880006
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $st6
+            SessionId   = 1
+        }
+        $stateContent6 = [PSCustomObject]@{
+            pid            = 880006
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $st6.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+        }
+        $stateContent6 | ConvertTo-Json | Set-Content -Path $d2State6 -Encoding UTF8
+
+        $resD2_6 = & $stopPath -StateFile $d2State6
+        $tD2_6Sw.Stop()
+
+        $pD2_6Passed = ($resD2_6.Success -eq $true) -and `
+                       ($resD2_6.Status -eq "STOPPED") -and `
+                       ($global:MockStoppedPids -contains 880006) -and `
+                       (-not (Test-Path -Path $d2State6 -PathType Leaf))
+
+        Register-TestResult -TestId "TC-D2-06" -Category "ProcessIdentity" `
+            -Name "stop_drive terminates strictly verified process and removes state file (Status: STOPPED)" `
+            -Description "Confirms fully matching process is safely terminated and state file is deleted" `
+            -Passed $pD2_6Passed `
+            -FailureMessage "Status: $($resD2_6.Status), Stopped: $($global:MockStoppedPids -contains 880006), StateDeleted: $(-not (Test-Path -Path $d2State6 -PathType Leaf))" `
+            -Expected "Status=STOPPED, Success=True, StateDeleted=True" `
+            -Actual "Status=$($resD2_6.Status), Success=$($resD2_6.Success), StateDeleted=$(-not (Test-Path -Path $d2State6 -PathType Leaf))" `
+            -DurationMs $tD2_6Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $d2State6) { Remove-Item -Path $d2State6 -Force -ErrorAction SilentlyContinue }
+    }
+} finally {
+    Remove-Item -Path "function:global:Get-Process" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "function:global:Stop-Process" -Force -ErrorAction SilentlyContinue
 }
 
 # ==============================================================================

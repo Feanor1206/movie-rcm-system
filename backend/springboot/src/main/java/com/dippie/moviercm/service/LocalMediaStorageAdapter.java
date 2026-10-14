@@ -64,7 +64,7 @@ public class LocalMediaStorageAdapter implements MediaStorageAdapter {
 
         Path root = getNormalizedRoot();
         if (!Files.exists(root) || !Files.isDirectory(root) || !Files.isReadable(root)) {
-            throw new MediaUnavailableException("Thư mục lưu trữ media cục bộ không sẵn sàng hoặc không đọc được: " + root);
+            throw new MediaUnavailableException("Thư mục lưu trữ media cục bộ không sẵn sàng hoặc không đọc được");
         }
 
         Path resolved = root.resolve(relativePath).normalize();

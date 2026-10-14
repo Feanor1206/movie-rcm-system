@@ -328,8 +328,8 @@ describe('DRIVE-01: Drive Media Mapping & Validation Suite', () => {
     }
   });
 
-  // Test 7: Tính lũy đẳng (idempotent): chạy nhiều lần cho cùng kết quả
-  it('7. Validation is purely idempotent across consecutive executions', () => {
+  // Test 7: Tính lũy đẳng (idempotent): chạy nhiều lần cho cùng kết quả (so sánh sâu deep equality)
+  it('7. Validation is purely idempotent across consecutive executions (deep equality)', () => {
     // Run 3 times on default fixture
     const run1 = validateManifest(FIXTURE_PATH);
     const run2 = validateManifest(FIXTURE_PATH);
@@ -374,6 +374,140 @@ describe('DRIVE-01: Drive Media Mapping & Validation Suite', () => {
     assert.deepStrictEqual(invRun2, invRun3, 'Invalid run 2 and run 3 must be deeply identical');
     assert.equal(invRun1.isValid, false);
     assert.equal(invRun1.conflicts.length, 2); // 1 DUPLICATE_ASSET_ID + 1 DUPLICATE_MOVIE_KIND
+
+    // Also verify idempotency with mount verification
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'drive-idem-mount-'));
+    try {
+      const subDir = path.join(tempDir, 'movies/m-test/v1');
+      fs.mkdirSync(subDir, { recursive: true });
+      fs.writeFileSync(path.join(subDir, 'test.mp4'), Buffer.alloc(128, 0x11));
+
+      const mountManifest = {
+        assets: [
+          {
+            assetId: 'ast-idem-mount',
+            movieId: 'm-test',
+            storageProvider: 'drive',
+            relativePath: 'movies/m-test/v1/test.mp4',
+            kind: 'feature',
+            mimeType: 'video/mp4',
+            byteLength: 128,
+            version: 'v1',
+            isPublic: true,
+          },
+        ],
+      };
+
+      const mRun1 = validateManifest(mountManifest, { mountPath: tempDir });
+      const mRun2 = validateManifest(mountManifest, { mountPath: tempDir });
+      assert.deepStrictEqual(mRun1, mRun2, 'Mount validation runs must be deeply identical');
+      assert.equal(mRun1.isValid, true);
+      assert.equal(mRun1.mountReport.verified.length, 1);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  // Test 8: Chặn triệt để NTFS Alternate Data Streams (ADS) và namespace thiết bị
+  it('8. Strictly rejects NTFS Alternate Data Streams (ADS) and device namespace paths', () => {
+    const adsPaths = [
+      'clip.mp4:secret',
+      'movies/m-test-2026/v1/feature.mp4:hidden_stream',
+      'video.mp4:$DATA',
+      ':leading_colon.mp4',
+      'subfolder/:stream',
+      'C:relative_drive.mp4',
+      '\\\\.\\pipe\\test',
+      '\\\\?\\C:\\Windows\\calc.exe',
+    ];
+
+    for (const ap of adsPaths) {
+      const check = isSafeRelativePath(ap);
+      assert.equal(check.safe, false, `ADS / device path "${ap}" must be marked unsafe`);
+      assert.ok(check.reason, `ADS / device path "${ap}" must include rejection reason`);
+
+      const testManifest = {
+        assets: [
+          {
+            assetId: 'ast-ads-test',
+            movieId: 'm-test-ads',
+            storageProvider: 'drive',
+            relativePath: ap,
+            kind: 'feature',
+            mimeType: 'video/mp4',
+            byteLength: 1048576,
+            version: 'v1',
+            isPublic: true,
+          },
+        ],
+      };
+
+      const res = validateManifest(testManifest);
+      assert.equal(res.isValid, false, `Manifest with ADS path "${ap}" must fail validation`);
+      assert.ok(
+        res.unsafePaths.length > 0 || res.schemaErrors.length > 0,
+        `Manifest with ADS path "${ap}" must record unsafePaths or schemaErrors`
+      );
+    }
+  });
+
+  // Test 9: Chặn Windows junction / symlink trỏ ra ngoài mount root (Finding D6)
+  it('9. Strictly rejects Windows junction and symlink boundary escapes outside mount root (Finding D6)', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-drive-mapping-junc-'));
+    try {
+      const mountRoot = path.join(tempDir, 'mount');
+      const outsideDir = path.join(tempDir, 'outside');
+      fs.mkdirSync(mountRoot, { recursive: true });
+      fs.mkdirSync(outsideDir, { recursive: true });
+
+      const outsideFile = path.join(outsideDir, 'clip.mp4');
+      fs.writeFileSync(outsideFile, Buffer.alloc(123, 0x42));
+
+      // Create real Windows junction pointing outside
+      const junctionPath = path.join(mountRoot, 'escape');
+      try {
+        fs.symlinkSync(outsideDir, junctionPath, 'junction');
+      } catch (err) {
+        fs.symlinkSync(outsideDir, junctionPath, 'dir');
+      }
+
+      const escapeManifest = {
+        assets: [
+          {
+            assetId: 'ast-junction-escape',
+            movieId: 'm-review-test',
+            storageProvider: 'drive',
+            relativePath: 'escape/clip.mp4',
+            kind: 'feature',
+            mimeType: 'video/mp4',
+            byteLength: 123,
+            version: 'v1',
+            isPublic: true,
+          },
+        ],
+      };
+
+      const result = validateManifest(escapeManifest, { mountPath: mountRoot });
+      assert.equal(result.isValid, false, 'Manifest accessing file through junction escape must be invalid');
+      assert.equal(result.mountReport.mountChecked, true);
+      assert.equal(result.mountReport.verified.length, 0, 'Target escaping mount root must NEVER be verified');
+      assert.equal(result.mountReport.mismatches.length, 1, 'Must record exactly 1 mismatch for junction escape');
+      assert.match(
+        result.mountReport.mismatches[0].error,
+        /escapes mount root boundary via junction or symlink/
+      );
+
+      // Direct checkMountFiles verification
+      const directCheck = checkMountFiles(escapeManifest.assets, mountRoot);
+      assert.equal(directCheck.verified.length, 0, 'direct checkMountFiles must not verify outside file');
+      assert.equal(directCheck.mismatches.length, 1, 'direct checkMountFiles must flag mismatch');
+      assert.match(
+        directCheck.mismatches[0].error,
+        /escapes mount root boundary via junction or symlink/
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
 });

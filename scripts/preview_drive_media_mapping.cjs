@@ -40,13 +40,20 @@ function isSafeRelativePath(relPath) {
   if (relPath.includes('\0')) {
     return { safe: false, reason: 'relativePath contains forbidden null byte' };
   }
+  // Forbid colon (prevents NTFS Alternate Data Streams, e.g. clip.mp4:secret, Windows drive prefixes, device paths)
+  if (relPath.includes(':')) {
+    return { safe: false, reason: 'relativePath contains forbidden colon (device path or NTFS Alternate Data Stream)' };
+  }
   // Forbid Windows drive letter prefix (e.g. C:, D:)
   if (/^[a-zA-Z]:/.test(relPath)) {
     return { safe: false, reason: 'Absolute Windows drive path is forbidden' };
   }
-  // Forbid Unix root or Windows UNC path
+  // Forbid Unix root, Windows UNC path, device namespaces
   if (relPath.startsWith('/') || relPath.startsWith('\\')) {
     return { safe: false, reason: 'Absolute or UNC path is forbidden' };
+  }
+  if (/^[/\\]{2}/.test(relPath) || /^[/\\]{2}[.?][/\\]/.test(relPath)) {
+    return { safe: false, reason: 'Device namespace or UNC path is forbidden' };
   }
   // Check directory traversal segments
   const segments = relPath.split(/[/\\]/);
@@ -192,6 +199,23 @@ function checkMountFiles(assets, mountPath) {
     };
   }
 
+  let realRoot;
+  try {
+    realRoot = fs.realpathSync(normMount);
+  } catch (rootErr) {
+    return {
+      mountChecked: true,
+      mountPath: normMount,
+      verified: [],
+      mismatches: [],
+      missing: [],
+      mountError: `Cannot resolve canonical mount root path "${normMount}": ${rootErr.message}`,
+    };
+  }
+
+  const normalizedRealRoot = path.normalize(realRoot);
+  const rootPrefix = normalizedRealRoot.endsWith(path.sep) ? normalizedRealRoot : normalizedRealRoot + path.sep;
+
   const verified = [];
   const mismatches = [];
   const missing = [];
@@ -202,7 +226,7 @@ function checkMountFiles(assets, mountPath) {
     if (!safety.safe) continue;
 
     const fullPath = path.resolve(normMount, asset.relativePath);
-    // Security check: ensure resolved path is contained within mount root
+    // Security check 1: Lexical containment
     const relToMount = path.relative(normMount, fullPath);
     if (relToMount.startsWith('..') || path.isAbsolute(relToMount)) {
       mismatches.push({
@@ -222,6 +246,38 @@ function checkMountFiles(assets, mountPath) {
       });
     } else {
       try {
+        // Security check 2: Canonical / real path containment (junction / symlink traversal)
+        let realTarget;
+        try {
+          realTarget = fs.realpathSync(fullPath);
+        } catch (realErr) {
+          mismatches.push({
+            assetId: asset.assetId,
+            relativePath: asset.relativePath,
+            resolvedPath: fullPath,
+            error: `Cannot resolve canonical target path: ${realErr.message}`,
+          });
+          continue;
+        }
+
+        const normalizedRealTarget = path.normalize(realTarget);
+        const relCanonical = path.relative(normalizedRealRoot, normalizedRealTarget);
+
+        const isContained = process.platform === 'win32'
+          ? (normalizedRealTarget.toLowerCase().startsWith(rootPrefix.toLowerCase()) || normalizedRealTarget.toLowerCase() === normalizedRealRoot.toLowerCase())
+          : (normalizedRealTarget.startsWith(rootPrefix) || normalizedRealTarget === normalizedRealRoot);
+
+        if (!isContained || relCanonical.startsWith('..') || path.isAbsolute(relCanonical)) {
+          mismatches.push({
+            assetId: asset.assetId,
+            relativePath: asset.relativePath,
+            resolvedPath: fullPath,
+            realTarget,
+            error: 'Target escapes mount root boundary via junction or symlink',
+          });
+          continue;
+        }
+
         const stat = fs.statSync(fullPath);
         if (!stat.isFile()) {
           mismatches.push({

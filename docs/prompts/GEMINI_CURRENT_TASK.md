@@ -1,11 +1,11 @@
-# DRIVE-01-F01 — Fix review findings with six parallel Gemini agents
+# DRIVE-01-F02 — Three scoped follow-up groups, six parallel agents
 
-taskId: DRIVE-01-F01
-promptVersion: 3
-reviewedCheckpoint: DRIVE-01-CHECKPOINT-01
+taskId: DRIVE-01-F02
+promptVersion: 4
+reviewedCheckpoint: DRIVE-01-F01-CHECKPOINT-01
 
-Work at D:\Class\movie-rcm-system on dev. Read docs/reviews/DRIVE_01_REVIEW.md and execute docs/prompts/DRIVE_01_F01_GEMINI_PROMPT.md in full. G1 is REQUEST CHANGES; G2/G3 remain BLOCKED_EXTERNAL_INPUT. M4 local is still accepted.
+At D:\Class\movie-rcm-system on dev, read docs/reviews/DRIVE_01_F01_REVIEW.md and execute docs/prompts/DRIVE_01_F02_GEMINI_PROMPT.md. G1 still needs fixes F1 resource lifecycle/cleanup, F2 complete process ownership, F3 actual PowerShell5.1 compatibility. G2/G3 external blocked; M4 local accepted.
 
-Use six real subagents where slots permit: A production Drive IO isolation/deadlines, B process identity, C native launcher/readiness, D backend fault tests, E toolkit/mapping tests and fixes, F fresh-root browser evidence/docs. Parent announces contracts, dispatches independent work promptly, integrates after handoffs and runs shared checks once without build collisions.
+Six agents where slots permit: A IO implementation, B process identity, C late-open tests, D stalled-close tests, E Windows tests/encoding, F integration evidence/docs. Parent publishes contracts immediately, integrates after handoffs, runs one necessary final regression and finalizes artifacts. Preserve D3-D6 passing work; no feature expansion or repeated unaffected builds.
 
-Preserve original frozen DRIVE_01/M4 artifacts and unrelated backend/fastapi/.env.example. Gemini must not edit Codex-owned controls/reviews/repros/prompts. No live DB, AI/FastAPI/Qwen/GPU, deploy, installer/OAuth/mount or OS changes. No commit/push/reset/new branch. Finish follow-up artifacts, freeze and end the turn for manual review. Automation stays paused; file publication does not start an agent.
+Automation remains paused/manual. Preserve frozen reports/manifests and unrelated backend/fastapi/.env.example. Gemini cannot edit Codex control/prompt/review/repro files. No live DB, AI/GPU, OS settings, install/OAuth/mount, deploy, branch/commit/push/reset. Freeze after artifacts and end turn for Codex review.

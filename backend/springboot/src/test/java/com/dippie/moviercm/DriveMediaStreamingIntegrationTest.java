@@ -424,14 +424,14 @@ public class DriveMediaStreamingIntegrationTest {
     @Test
     @DisplayName("Stream concurrency overload returns HTTP 429 Too Many Requests with Retry-After and no-store headers")
     void testDriveStreamConcurrencyLimitAndOverload429() throws Exception {
-        int originalLimit = mediaStreamService.getMaxConcurrentStreams();
+        int originalLimit = mediaStreamService.getMaxConcurrentDriveStreams();
         try {
-            mediaStreamService.setMaxConcurrentStreams(1);
-            assertEquals(0, mediaStreamService.getActiveStreamCount());
+            mediaStreamService.setMaxConcurrentDriveStreams(1);
+            assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
 
-            // Acquire the single allowed stream permit
-            assertTrue(mediaStreamService.acquireStreamPermit());
-            assertEquals(1, mediaStreamService.getActiveStreamCount());
+            // Acquire the single allowed drive stream permit
+            assertTrue(mediaStreamService.acquireDriveStreamPermit());
+            assertEquals(1, mediaStreamService.getDriveActiveStreamCount());
 
             // Next stream request MUST be rejected with HTTP 429
             mockMvc.perform(get("/api/media/stream/ast-drive-feat-1"))
@@ -442,48 +442,53 @@ public class DriveMediaStreamingIntegrationTest {
                     .andExpect(jsonPath("$.error", is("Too Many Requests")));
 
             // Active counter remains 1
-            assertEquals(1, mediaStreamService.getActiveStreamCount());
+            assertEquals(1, mediaStreamService.getDriveActiveStreamCount());
 
             // Release permit
-            mediaStreamService.releaseStreamPermit();
-            assertEquals(0, mediaStreamService.getActiveStreamCount());
+            mediaStreamService.releaseDriveStreamPermit();
+            assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
 
             // Now request succeeds with HTTP 200
             mockMvc.perform(get("/api/media/stream/ast-drive-feat-1"))
                     .andExpect(status().isOk());
 
             // Counter returns to 0 after completion
-            assertEquals(0, mediaStreamService.getActiveStreamCount());
+            assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
         } finally {
-            mediaStreamService.setMaxConcurrentStreams(originalLimit);
+            mediaStreamService.setMaxConcurrentDriveStreams(originalLimit);
         }
     }
 
     @Test
     @DisplayName("Active stream counter reliably returns to 0 on 200, 206, 404, 416, and 503 outcomes")
     void testObservableStreamCleanupOnAllDriveOutcomes() throws Exception {
+        assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
         assertEquals(0, mediaStreamService.getActiveStreamCount());
 
         // 1. Success full stream -> counter returns to 0
         mockMvc.perform(get("/api/media/stream/ast-drive-feat-1"))
                 .andExpect(status().isOk());
+        assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
         assertEquals(0, mediaStreamService.getActiveStreamCount());
 
         // 2. Partial range stream -> counter returns to 0
         mockMvc.perform(get("/api/media/stream/ast-drive-feat-1")
                         .header(HttpHeaders.RANGE, "bytes=0-100"))
                 .andExpect(status().isPartialContent());
+        assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
         assertEquals(0, mediaStreamService.getActiveStreamCount());
 
         // 3. Error outcome (404 MediaNotFoundException) -> counter returns to 0
         mockMvc.perform(get("/api/media/stream/non-existent-drive-asset-id"))
                 .andExpect(status().isNotFound());
+        assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
         assertEquals(0, mediaStreamService.getActiveStreamCount());
 
         // 4. Invalid range (416 InvalidMediaRangeException) -> counter returns to 0
         mockMvc.perform(get("/api/media/stream/ast-drive-feat-1")
                         .header(HttpHeaders.RANGE, "bytes=999999-9999999"))
                 .andExpect(status().isRequestedRangeNotSatisfiable());
+        assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
         assertEquals(0, mediaStreamService.getActiveStreamCount());
 
         // 5. Unmounted / offline outcome (503 MediaUnavailableException) -> counter returns to 0
@@ -492,6 +497,7 @@ public class DriveMediaStreamingIntegrationTest {
             Files.move(mockDriveMount, offlinePath);
             mockMvc.perform(get("/api/media/stream/ast-drive-feat-1"))
                     .andExpect(status().isServiceUnavailable());
+            assertEquals(0, mediaStreamService.getDriveActiveStreamCount());
             assertEquals(0, mediaStreamService.getActiveStreamCount());
         } finally {
             if (Files.exists(offlinePath)) {

@@ -8,7 +8,7 @@
 
 ## 1. Tổng quan Bộ Công cụ Vận hành Google Drive
 
-Nhằm tích hợp dịch vụ lưu trữ đám mây Google Drive vào hệ sinh thái phát media của Dippie Cinema một cách an toàn, hiệu quả và không gây hao mòn đĩa cứng vật lý (SSD), bộ công cụ PowerShell tự động hóa được xây dựng tại thư mục `scripts/drive/`:
+Nhằm tích hợp dịch vụ lưu trữ đám mây Google Drive vào hệ sinh thái phát media của Dippie Cinema một cách an toàn, hiệu quả và không sử dụng đĩa cứng vật lý (SSD) làm bộ đệm media trung gian, bộ công cụ PowerShell tự động hóa được xây dựng tại thư mục `scripts/drive/`:
 
 ```
 scripts/drive/
@@ -29,7 +29,8 @@ flowchart TD
     RcloneProc <-->|"RAM Buffer 32M (Chunk 8M -> 32M)"| GDriveAPI["Google Drive REST API (drive.readonly)"]
 
     subgraph Memory & Disk Boundary
-        RcloneProc -.->|"vfs-cache-mode: off (KHÔNG GHI SSD)"| RAM["Bộ nhớ RAM Host (Free >= 128MB)"]
+        RcloneProc -.->|"vfs-cache-mode: off (0 byte VFS media disk cache)"| RAM["Bộ nhớ RAM Host (Free >= 128MB)"]
+        RcloneProc -.->|"Không đệm media vào SSD"| SSD["SSD Cục bộ (Bảo tồn dung lượng cho OS & App)"]
     end
 ```
 
@@ -211,7 +212,17 @@ powershell -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPo
 Khi cần bảo trì hoặc tháo gỡ ổ đĩa:
 
 ```powershell
+# Dừng tiến trình rclone an toàn theo state file mặc định ($env:TEMP\movie-rcm-drive-mount.json):
 powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
+
+# Hoặc chỉ định rõ StateFile cụ thể:
+powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -StateFile "$env:TEMP\movie-rcm-drive-mount.json"
+
+# Xuất kết quả dạng JSON:
+powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -AsJson
+
+# Buộc dừng nếu tiến trình bị treo:
+powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -Force
 ```
 
 **Cơ chế bảo vệ chống dừng nhầm tiến trình:**
@@ -239,13 +250,19 @@ Thiết kế cờ mount của Dippie Cinema được tối ưu hóa đặc biệ
 
 | Tiêu chí | `--vfs-cache-mode off` (Được chọn) | `--vfs-cache-mode full` (Chế độ cache đĩa) |
 | :--- | :--- | :--- |
-| **Ghi đĩa SSD Host** | **0 Byte ghi vào SSD** (Bảo vệ tuyệt đối tuổi thọ ổ SSD) | Ghi liên tục các đoạn chunk video vào đĩa cứng cục bộ |
-| **Nguy cơ tràn đĩa** | **Không có nguy cơ** (Đĩa cứng host không bị chiếm dụng) | Rất cao khi phát đồng thời nhiều phim 4K dung lượng lớn |
-| **Phù hợp HTTP Range** | Hoàn hảo cho tác vụ tua video, đọc header `moov` atom | Phải chờ tải hoặc ghi file tạm xuống đĩa |
+| **Ghi bộ đệm media vào SSD** | **0 Byte ghi cache media vào SSD** (Rclone đọc streaming qua RAM, không tạo file cache trên đĩa) | Ghi liên tục các đoạn chunk video vào thư mục cache cục bộ |
+| **Ghi chép khác của Host** | Các ghi chép bình thường của HĐH, trình duyệt, app log vẫn diễn ra độc lập | Tương tự, cộng thêm hàng chục GB ghi đệm media |
+| **Nguy cơ cạn kiệt đĩa do video** | **Triệt tiêu nguy cơ cạn đĩa từ cache media** (Không tích tụ file đệm trên ổ C:/D:) | Rất cao khi phát đồng thời nhiều phim dung lượng lớn trên ổ đĩa có hạn |
+| **Phù hợp HTTP Range** | Tối ưu cho tác vụ tua video, đọc header `moov` atom trực tiếp | Phải chờ tải hoặc ghi file tạm xuống đĩa |
 | **Độ trễ khởi động** | Tức thì khi Range request gửi đến | Trễ I/O do ghi đệm file xuống hệ thống tệp |
 
+> [!NOTE]
+> **Làm rõ ranh giới ghi đĩa và độ trễ:**
+> 1. Thiết lập `--vfs-cache-mode off` đảm bảo rclone hoàn toàn không sử dụng ổ SSD làm bộ đệm video. Tuy nhiên, nó không ngăn cản các hoạt động ghi chép thông thường của hệ điều hành Windows, trình duyệt (browser cache), hoặc logging của ứng dụng.
+> 2. Ở tầng ứng dụng, cơ chế `FileChannel.position(start)` loại bỏ việc đọc bỏ byte tuần tự (application byte-discard), cho phép gửi yêu cầu đọc chính xác dải byte cần thiết. Mặc dù vậy, trên môi trường Google Drive thực tế, độ trễ truy xuất dải byte từ xa vẫn phụ thuộc vào Round-Trip Time (RTT) mạng và thời gian xử lý API của Google Drive chứ không phải độ trễ cố định tức thời.
+
 > [!TIP]
-> **Kết luận kiến trúc:** Các tệp phim chất lượng cao (1080p, 4K) có dung lượng từ 2GB đến hơn 20GB. Nếu sử dụng `--vfs-cache-mode full`, mỗi lần người dùng xem phim hoặc tua ngẫu nhiên, rclone sẽ liên tục đọc-ghi hàng gigabyte dữ liệu lên SSD host. Điều này nhanh chóng làm suy giảm tuổi thọ tế bào nhớ NAND Flash của SSD và gây cạn kiệt dung lượng đĩa khả dụng. Do hệ thống chỉ phục vụ các yêu cầu HTTP Range đọc dữ liệu tuần tự từng đoạn, **chế độ `vfs-cache-mode off` là lựa chọn tối ưu và an toàn nhất**.
+> **Kết luận kiến trúc:** Các tệp phim chất lượng cao (1080p, 4K) có dung lượng từ 2GB đến hơn 20GB. Nếu sử dụng `--vfs-cache-mode full`, mỗi lần người dùng xem phim hoặc tua ngẫu nhiên, rclone sẽ liên tục đọc-ghi hàng gigabyte dữ liệu lên SSD host. Điều này nhanh chóng làm suy giảm tuổi thọ tế bào nhớ NAND Flash của SSD và gây cạn kiệt dung lượng đĩa khả dụng (~22-28 GB). Do hệ thống chỉ phục vụ các yêu cầu HTTP Range đọc dữ liệu tuần tự từng đoạn, **chế độ `vfs-cache-mode off` kết hợp RAM buffer 32M là giải pháp baseline an toàn và phù hợp nhất**.
 
 ### 5.2. Vai trò của RAM Buffer 32M (`--buffer-size 32M`)
 - Khi người dùng bắt đầu phát một video MP4, trình duyệt gửi yêu cầu HTTP Range để đọc header tệp (`moov` atom) nhằm xác định codec, thời lượng, và bảng định vị khung hình (sample tables).
