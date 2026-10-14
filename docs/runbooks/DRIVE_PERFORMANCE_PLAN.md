@@ -1,10 +1,11 @@
 # KẾ HOẠCH ĐO LƯỜNG HIỆU NĂNG VÀ BÀN GIAO VẬN HÀNH GOOGLE DRIVE STREAMING (DRIVE PERFORMANCE & HANDOFF PLAN)
 
 **Nhiệm vụ:** DRIVE-01 — Google Drive Windows Integration, Tooling & Performance Plan  
-**Phiên bản:** 1.0.0 (Ngày ban hành: 15/10/2026)  
+**Phiên bản:** 1.1.0 (Ngày cập nhật: 15/10/2026 — Kiểm định DRIVE-01-F02)  
 **Tác giả:** Agent F — Mapping & Performance Handoff Engineer  
 **Đối tượng áp dụng:** Kỹ sư Vận hành, Quản trị viên Hệ thống, Đội ngũ Phát triển Dippie Cinema  
 **Môi trường mục tiêu:** Windows 10 / Windows 11 x64, Spring Boot 3.4.x, Next.js 15 Standalone, Rclone + WinFsp  
+**Môi trường thực thi kịch bản:** Windows PowerShell 5.1 (`powershell.exe`) & PowerShell 7+ (`pwsh.exe`)  
 
 ---
 
@@ -250,7 +251,7 @@ flowchart LR
     end
 ```
 
-### Bảng So sánh Thuộc tính Kỹ thuật Giữa Hai Môi trường
+### 5.1. Bảng So sánh Thuộc tính Kỹ thuật Giữa Hai Môi trường
 
 | Thuộc tính Kỹ thuật | Môi trường Giả lập (Harness / Local Mock) | Môi trường Google Drive Mạng Thật (Production WAN) |
 | :--- | :--- | :--- |
@@ -262,8 +263,14 @@ flowchart LR
 | **Biến động mạng (Jitter & Packet Loss)** | $0\%$ mất gói, 0 jitter | Có hiện tượng jitter, tái truyền TCP khi mạng suy giảm |
 | **Mục đích sử dụng** | **Xác nhận tính đúng đắn của logic**, state machine UI, hợp đồng API và kiểm thử tự động CI | **Đánh giá trải nghiệm người dùng thực tế**, cấu hình tối ưu buffer và đo đạc SLA vận hành |
 
+### 5.2. Phân định Môi trường Thực thi Kịch bản: PowerShell 5.1 vs PowerShell 7+
+
+Các script tự động hóa và đo lường trong kế hoạch này hỗ trợ cả hai runner PowerShell trên Windows:
+- **Windows PowerShell 5.1 (`powershell.exe`):** Môi trường mặc định đi kèm hệ điều hành Windows, vận hành trên .NET Framework 4.8. Khi gọi script kiểm tra, bắt buộc sử dụng tham số `-NoProfile -ExecutionPolicy Bypass -File ...` để đảm bảo thực thi đúng quy cách và tránh các lỗi phân tích cú pháp ký tự mã hóa ngoài ASCII.
+- **PowerShell 7+ (`pwsh.exe`):** Môi trường mã nguồn mở hiện đại dựa trên .NET Core 8.0+, mặc định hỗ trợ UTF-8 toàn diện.
+
 > [!IMPORTANT]
-> Toàn bộ các chỉ số đo đạc thu được từ test harness trên môi trường cục bộ (ví dụ: seek latency 15 ms, throughput 500 MB/s) chỉ chứng minh luồng mã nguồn hoạt động chính xác theo quy chuẩn. Tuyệt đối **không được công bố các con số này như là hiệu năng thực tế của Google Drive**. Hiệu năng thực tế bắt buộc phải được tái đo đạc trên kết nối WAN thực tế theo quy trình tại Mục 4.
+> Toàn bộ các chỉ số đo đạc thu được từ test harness trên môi trường cục bộ (ví dụ: seek latency 15 ms, throughput 500 MB/s) chỉ chứng minh luồng mã nguồn hoạt động chính xác theo quy chuẩn. Tuyệt đối **không được công bố các con số này như là hiệu năng thực tế của Google Drive**. Hiệu năng thực tế bắt buộc phải được tái đo đạc trên kết nối WAN thực tế theo quy trình tại Mục 4 khi các cổng G2/G3 được kích hoạt.
 
 ---
 
@@ -278,7 +285,11 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
 - [ ] **1.4.** Xác nhận cấu hình Scope truy cập là chỉ đọc: **`drive.readonly`** (Tuyệt đối không cấp quyền ghi).
 - [ ] **1.5.** Chạy kiểm tra môi trường bằng script tự động:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File scripts/drive/preflight_drive.ps1 -MountPoint "M:"
+  # Windows PowerShell 5.1:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/preflight_drive.ps1 -MountPoint "M:"
+
+  # PowerShell 7+:
+  pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/preflight_drive.ps1 -MountPoint "M:"
   ```
   *Yêu cầu:* Kết quả JSON trả về `"IsReady": true`.
 
@@ -312,15 +323,28 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
 ### Giai đoạn 4: Khởi chạy Mount Ổ đĩa Logic & Đối chiếu Tệp Vật lý
 - [ ] **4.1.** Khởi chạy mount Google Drive thành ổ đĩa `M:` ở chế độ chạy ngầm an toàn (Baseline `cache-off`):
   ```powershell
-  powershell -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
+  # Windows PowerShell 5.1:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
+    -Remote "cinema-gdrive:" `
+    -RemoteSubpath "DippieMedia" `
+    -MountPoint "M:" `
+    -Execute
+
+  # PowerShell 7+:
+  pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
     -Remote "cinema-gdrive:" `
     -RemoteSubpath "DippieMedia" `
     -MountPoint "M:" `
     -Execute
   ```
+  *Yêu cầu:* Ghi nhận đầy đủ 9 trường schema state (`pid`, `processName`, `executablePath`, `startTime`, `sessionId`, `mountPoint`, `remoteTarget`, `arguments`, `status`).
 - [ ] **4.2.** Kiểm tra trạng thái ổ đĩa qua script giám sát:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
+  # Windows PowerShell 5.1:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
+
+  # PowerShell 7+:
+  pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
   ```
   *Yêu cầu:* Trạng thái trả về `"Status": "MOUNTED"` và phản hồi đọc danh mục thành công.
 - [ ] **4.3.** Đối chiếu trực tiếp tệp trên ổ ảo `M:` với manifest:
@@ -339,12 +363,16 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
 - [ ] **5.7.** Xác nhận mức tiêu thụ ổ đĩa của rclone: Kiểm tra thư mục đệm rclone (`%LOCALAPPDATA%\rclone\vfs`) — xác nhận **0 byte tệp đệm media VFS** sinh ra trên SSD. Các biến động nhỏ về dung lượng tệp của OS hay application logging được ghi nhận riêng biệt.
 - [ ] **5.8.** Dừng tiến trình rclone an toàn khi hoàn tất:
   ```powershell
-  # Dừng an toàn theo state file mặc định:
-  powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
+  # Dừng an toàn trên Windows PowerShell 5.1:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
+
+  # Hoặc trên PowerShell 7+:
+  pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
 
   # Hoặc chỉ định rõ StateFile:
-  powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -StateFile "$env:TEMP\movie-rcm-drive-mount.json"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -StateFile "$env:TEMP\movie-rcm-drive-mount.json"
   ```
+  *Yêu cầu:* Đối chiếu nghiêm ngặt 9 trường định danh tiến trình, kích hoạt Fail-Closed nếu thiếu trường hoặc phát hiện PID reuse, giữ nguyên file state trên đĩa.
 
 ---
 
@@ -353,3 +381,4 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
 Chiến lược lưu trữ media đám mây qua kiến trúc **Baseline `vfs-cache-mode off` kết hợp bộ đệm RAM 32M** là giải pháp tối ưu toàn diện cho Dippie Cinema trên nền tảng Windows. Thiết kế này loại trừ hoàn toàn nguy cơ cạn kiệt dung lượng ổ đĩa và hao mòn phần cứng SSD của máy chủ, đồng thời vẫn đáp ứng xuất sắc các tiêu chuẩn trải nghiệm phát trực tuyến và tua video mượt mà của người dùng.
 
 Bộ công cụ kiểm tra `scripts/preview_drive_media_mapping.cjs`, bộ kiểm thử tự động `scripts/drive_mapping_suite.cjs`, tệp mẫu mapping `docs/fixtures/drive_media_mapping.example.json` cùng tài liệu hướng dẫn này cung cấp nền tảng vững chắc để chuyển giao sang giai đoạn vận hành thực tế khi có thông tin xác thực Google Drive.
+

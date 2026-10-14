@@ -4,33 +4,79 @@ import com.dippie.moviercm.exception.MediaUnavailableException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * SeekableByteChannel wrapper for Google Drive storage providing:
  * 1. O(1) random-access seeking at kernel FileChannel level
  * 2. Finite deadline protection for read operations
  * 3. Read-only channel safety
+ * 4. Ownership and lifecycle management with non-blocking caller close
  */
 public class DriveSeekableByteChannel implements SeekableByteChannel {
 
     private final FileChannel delegate;
     private final DriveIoExecutor ioExecutor;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicBoolean delegateClosed = new AtomicBoolean(false);
+    private final AtomicInteger activeWorkerReads = new AtomicInteger(0);
 
     public DriveSeekableByteChannel(FileChannel delegate, DriveIoExecutor ioExecutor) {
+        if (delegate == null) {
+            throw new IllegalArgumentException("FileChannel delegate cannot be null");
+        }
+        if (ioExecutor == null) {
+            throw new IllegalArgumentException("DriveIoExecutor cannot be null");
+        }
         this.delegate = delegate;
         this.ioExecutor = ioExecutor;
     }
 
+    private void ensureOpen() throws ClosedChannelException {
+        if (closed.get()) {
+            throw new ClosedChannelException();
+        }
+    }
+
     @Override
     public int read(ByteBuffer dst) throws IOException {
+        ensureOpen();
         try {
-            return ioExecutor.executeRead(() -> delegate.read(dst));
+            return ioExecutor.executeRead(() -> {
+                ensureOpen();
+                activeWorkerReads.incrementAndGet();
+                try {
+                    return delegate.read(dst);
+                } finally {
+                    activeWorkerReads.decrementAndGet();
+                    if (closed.get()) {
+                        closeDelegateSilently();
+                    }
+                }
+            });
         } catch (MediaUnavailableException e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
+            if (e.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
             throw new IOException(e.getMessage(), e);
         } catch (Exception e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
             if (e.getCause() instanceof IOException ioe) {
                 throw ioe;
             }
@@ -39,38 +85,157 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
     }
 
     @Override
-    public int write(ByteBuffer src) {
+    public int write(ByteBuffer src) throws IOException {
+        ensureOpen();
         throw new NonWritableChannelException();
     }
 
     @Override
     public long position() throws IOException {
-        return delegate.position();
+        ensureOpen();
+        try {
+            return delegate.position();
+        } catch (ClosedChannelException cce) {
+            throw cce;
+        } catch (IOException e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            throw e;
+        }
     }
 
     @Override
     public SeekableByteChannel position(long newPosition) throws IOException {
-        delegate.position(newPosition);
-        return this;
+        ensureOpen();
+        if (newPosition < 0) {
+            throw new IllegalArgumentException("Vị trí đọc không hợp lệ (nhỏ hơn 0): " + newPosition);
+        }
+        try {
+            return ioExecutor.executeMetadata(() -> {
+                ensureOpen();
+                delegate.position(newPosition);
+                return this;
+            });
+        } catch (MediaUnavailableException e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
+            if (e.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException(e.getMessage(), e);
+        } catch (Exception e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
+            if (e.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException("Lỗi thiết lập vị trí đọc trên Google Drive: " + e.getMessage(), e);
+        }
     }
 
     @Override
     public long size() throws IOException {
-        return delegate.size();
+        ensureOpen();
+        try {
+            return ioExecutor.executeMetadata(() -> {
+                ensureOpen();
+                return delegate.size();
+            });
+        } catch (MediaUnavailableException e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
+            if (e.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException(e.getMessage(), e);
+        } catch (Exception e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
+            if (e.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException("Lỗi xác định kích thước tệp trên Google Drive: " + e.getMessage(), e);
+        }
     }
 
     @Override
-    public SeekableByteChannel truncate(long size) {
+    public SeekableByteChannel truncate(long size) throws IOException {
+        ensureOpen();
         throw new NonWritableChannelException();
     }
 
     @Override
     public boolean isOpen() {
-        return delegate.isOpen();
+        return !closed.get() && delegate.isOpen();
     }
 
     @Override
     public void close() throws IOException {
-        delegate.close();
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+
+        // If a worker thread is actively reading on this channel, that worker
+        // thread will close the delegate when the read completes or unblocks.
+        // The caller returns immediately without being blocked by kernel WinFsp IO.
+        if (activeWorkerReads.get() > 0) {
+            return;
+        }
+
+        // No active read in progress. Delegate closure to bounded cleanup pool.
+        closeDelegateAsyncOrDirect();
+    }
+
+    private void closeDelegateAsyncOrDirect() {
+        if (delegateClosed.compareAndSet(false, true)) {
+            try {
+                ioExecutor.executeCleanupAsync(delegate, "closeChannel");
+            } catch (MediaUnavailableException e) {
+                // If worker pool is saturated, fall back to safe direct close
+                // (safe because activeWorkerReads is 0, so no thread is reading)
+                try {
+                    delegate.close();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
+    private void closeDelegateSilently() {
+        if (delegateClosed.compareAndSet(false, true)) {
+            try {
+                delegate.close();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    public boolean isClosed() {
+        return closed.get();
+    }
+
+    public FileChannel getDelegate() {
+        return delegate;
+    }
+
+    public DriveIoExecutor getIoExecutor() {
+        return ioExecutor;
     }
 }

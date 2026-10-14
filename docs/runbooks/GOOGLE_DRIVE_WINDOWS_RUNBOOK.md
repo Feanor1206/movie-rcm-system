@@ -1,8 +1,9 @@
 # HƯỚNG DẪN VẬN HÀNH GOOGLE DRIVE TRÊN WINDOWS (GOOGLE DRIVE WINDOWS RUNBOOK)
 **Tác vụ:** DRIVE-01 — Windows Operations & Google Drive Tooling Foundation  
-**Phiên bản:** 1.0.0 (Ngày cập nhật: 15/10/2026)  
+**Phiên bản:** 1.1.0 (Ngày cập nhật: 15/10/2026 — Kiểm định DRIVE-01-F02)  
 **Phạm vi áp dụng:** Hệ điều hành Windows 10 / Windows 11 / Windows Server x64  
-**Trạng thái công cụ:** Đã kiểm thử tự động đạt 100% (`scripts/drive/test_drive_tooling.ps1`)
+**Môi trường thực thi hỗ trợ:** Windows PowerShell 5.1 (`powershell.exe`) & PowerShell 7+ (`pwsh.exe`)  
+**Trạng thái công cụ:** Đã kiểm thử tự động đạt 100% trên cả PowerShell 5.1 và PowerShell 7 (`scripts/drive/test_drive_tooling.ps1`)
 
 ---
 
@@ -15,9 +16,27 @@ scripts/drive/
 ├── preflight_drive.ps1    # Kiểm tra điều kiện tiên quyết hệ điều hành, WinFsp, rclone, RAM, session
 ├── mount_drive.ps1        # Mount Google Drive với baseline streaming (mặc định dry-run, -Execute để chạy ngầm)
 ├── status_drive.ps1       # Truy vấn trạng thái ổ đĩa (MOUNTED, NOT_MOUNTED, DEGRADED) với chống PID reuse
-├── stop_drive.ps1         # Dừng tiến trình rclone an toàn theo PID đã xác thực danh tính
-└── test_drive_tooling.ps1 # Bộ kiểm thử tự động 14 ca kiểm thử cho toàn bộ công cụ
+├── stop_drive.ps1         # Dừng tiến trình rclone an toàn theo PID đã xác thực 9 trường danh tính (Fail-Closed)
+└── test_drive_tooling.ps1 # Bộ kiểm thử tự động toàn diện cho bộ công cụ trên PS 5.1 và PS 7
 ```
+
+### 1.1. Phân biệt Môi trường Thực thi: Windows PowerShell 5.1 vs PowerShell 7+
+
+Hệ thống được thiết kế và kiểm thử nghiêm ngặt để tương thích độc lập trên cả hai môi trường PowerShell phổ biến của Windows:
+
+| Đặc điểm Kỹ thuật | Windows PowerShell 5.1 (`powershell.exe`) | PowerShell 7+ (`pwsh.exe`) |
+| :--- | :--- | :--- |
+| **Nền tảng thực thi** | .NET Framework 4.8 (Windows Desktop CLR) | .NET Core 8.0+ / .NET 9 |
+| **Cơ chế mã hóa tệp (File Encoding)** | Mặc định ANSI/ASCII nếu không có BOM; yêu cầu UTF-8 with BOM hoặc ký tự ASCII thuần cho script | Mặc định UTF-8 without BOM |
+| **Cú pháp hỗ trợ** | Cú pháp PowerShell 5 truyền thống (không hỗ trợ `?:`, `??=`, `&&`, `||`) | Hỗ trợ đầy đủ toán tử pipeline chains và ternary |
+| **Lệnh thực thi chuẩn** | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ...` | `pwsh.exe -NoProfile -ExecutionPolicy Bypass -File ...` |
+| **Bảo đảm tương thích** | Mã nguồn script trong `scripts/drive/` tuân thủ cú pháp PS 5.1, an toàn mã hóa | Tương thích ngược hoàn toàn, thực thi tối ưu trên runtime hiện đại |
+
+### 1.2. Phân định Ranh giới Môi trường: Môi trường Giả lập vs Google Drive Thật
+
+Để đảm bảo tính trung thực và độ tin cậy của các báo cáo kỹ thuật:
+- **Môi trường Giả lập (Local Temp Fixture / Test Harness):** Được sử dụng trong các bài kiểm thử tự động CI, test suite (`test_drive_tooling.ps1`, harness browser walkthrough). Môi trường này sử dụng thư mục tạm trên ổ cứng cục bộ, đường truyền loopback nội bộ máy tính ($0 \text{ ms}$ RTT), không có độ trễ mạng Internet và không tiêu tốn hạn ngạch Google API.
+- **Môi trường Google Drive Thực tế (Production WAN):** Là môi trường vận hành thật khi kết nối tới remote Google Drive qua rclone và WinFsp. Dữ liệu đi qua mạng Internet WAN ($30 - 150 \text{ ms}$ RTT), phải chịu giới hạn hạn ngạch Google Drive API (10 QPS/user), bắt tay TLS 1.3 và phụ thuộc băng thông ISP. Các chỉ số đo lường hiệu năng thực tế (Startup latency, Seek latency, Stall ratio) chỉ có giá trị khi được thực hiện trên môi trường này.
 
 ### Kiến trúc Luồng Dữ liệu Streaming Media
 
@@ -135,8 +154,11 @@ Rclone là công cụ đồng bộ và mount lưu trữ đám mây đa nền t�
 Chạy script kiểm tra hệ điều hành, rclone, WinFsp, bộ nhớ và phiên làm việc trước khi thực hiện bất kỳ thao tác mount nào:
 
 ```powershell
-# Chạy preflight cơ bản kiểm tra ổ M:
-powershell -ExecutionPolicy Bypass -File scripts/drive/preflight_drive.ps1 -MountPoint "M:"
+# Chạy trên Windows PowerShell 5.1:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/preflight_drive.ps1 -MountPoint "M:"
+
+# Hoặc chạy trên PowerShell 7+:
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/preflight_drive.ps1 -MountPoint "M:"
 ```
 
 **Tham số:**
@@ -157,15 +179,26 @@ powershell -ExecutionPolicy Bypass -File scripts/drive/preflight_drive.ps1 -Moun
 Mặc định, lệnh chạy ở chế độ **Dry-Run** an toàn để quản trị viên đối chiếu các cờ lệnh mà không tạo tiến trình nền:
 
 ```powershell
-# Xem trước kế hoạch mount ổ M:
-powershell -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 -Remote "cinema-gdrive:" -RemoteSubpath "DippieMedia" -MountPoint "M:"
+# Windows PowerShell 5.1:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 -Remote "cinema-gdrive:" -RemoteSubpath "DippieMedia" -MountPoint "M:"
+
+# PowerShell 7+:
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 -Remote "cinema-gdrive:" -RemoteSubpath "DippieMedia" -MountPoint "M:"
 ```
 
 #### Thực hiện Mount thật sự (`-Execute`):
 Khi các điều kiện preflight đã sẵn sàng, thêm cờ `-Execute` để khởi chạy tiến trình chạy ngầm:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
+# Windows PowerShell 5.1:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
+  -Remote "cinema-gdrive:" `
+  -RemoteSubpath "DippieMedia" `
+  -MountPoint "M:" `
+  -Execute
+
+# PowerShell 7+:
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
   -Remote "cinema-gdrive:" `
   -RemoteSubpath "DippieMedia" `
   -MountPoint "M:" `
@@ -185,9 +218,17 @@ powershell -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
 --attr-timeout 1s
 ```
 
-**Lưu trữ trạng thái (State Persistence):**
-- Khi kích hoạt với `-Execute`, script lưu thông tin tiến trình vào file state JSON (`$env:TEMP\movie-rcm-drive-mount.json`).
-- Thông tin bao gồm: `pid`, `processName`, `startTime`, `executablePath`, `mountPoint`, `remoteTarget`, `flags`, `sessionId`.
+**Lưu trữ trạng thái chuẩn hóa (9-Field State Schema):**
+- Khi kích hoạt với `-Execute`, script ghi nhận đầy đủ **9 trường dữ liệu định danh bắt buộc** vào file state JSON (`$env:TEMP\movie-rcm-drive-mount.json`):
+  1. `pid`: ID tiến trình rclone được hệ điều hành cấp phát.
+  2. `processName`: Tên tiến trình chuẩn (`"rclone"`).
+  3. `executablePath`: Đường dẫn tuyệt đối chuẩn hóa tới `rclone.exe`.
+  4. `startTime`: Dấu thời gian khởi tạo chính xác theo định dạng ISO 8601.
+  5. `sessionId`: Windows Logon Session ID của người dùng khởi chạy.
+  6. `mountPoint`: Điểm mount ổ đĩa logic (ví dụ: `"M:"`).
+  7. `remoteTarget`: Tên remote và đường dẫn con (ví dụ: `"cinema-gdrive:DippieMedia"`).
+  8. `arguments`: Danh sách hoặc chuỗi tham số cờ lệnh streaming đã kích hoạt.
+  9. `status`: Trạng thái ban đầu của vòng đời tiến trình (`"MOUNTING"` / `"RUNNING"`).
 
 ---
 
@@ -195,15 +236,20 @@ powershell -ExecutionPolicy Bypass -File scripts/drive/mount_drive.ps1 `
 Để kiểm tra tiến trình rclone và mức độ phản hồi của ổ đĩa ảo:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
+# Windows PowerShell 5.1:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
+
+# PowerShell 7+:
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
 ```
 
 **Các trạng thái trả về:**
-- **`MOUNTED`**: Tiến trình rclone chạy hợp lệ (PID, process name và start time trùng khớp) và ổ đĩa `M:` có thể truy cập, đọc dữ liệu bình thường.
+- **`MOUNTED`**: Tiến trình rclone chạy hợp lệ (toàn bộ 9 trường định danh trùng khớp với tiến trình sống) và ổ đĩa `M:` có thể truy cập, đọc dữ liệu bình thường.
 - **`NOT_MOUNTED`**: Không có file state hoặc tiến trình rclone đã kết thúc.
 - **`DEGRADED`**: Phát hiện một trong các tình huống bất thường:
   - Ổ đĩa xuất hiện nhưng không có file state quản lý (untracked mount).
   - Tiến trình đã tắt nhưng ổ đĩa chưa được gỡ (stale mount).
+  - Thiếu bất kỳ trường nào trong 9 trường định danh của file state (Incomplete State Schema).
   - PID ghi nhận trong state file đã bị chiếm bởi một tiến trình khác của hệ thống (**PID reuse detected**).
 
 ---
@@ -213,20 +259,25 @@ Khi cần bảo trì hoặc tháo gỡ ổ đĩa:
 
 ```powershell
 # Dừng tiến trình rclone an toàn theo state file mặc định ($env:TEMP\movie-rcm-drive-mount.json):
-powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
+# Windows PowerShell 5.1:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
+
+# PowerShell 7+:
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1
 
 # Hoặc chỉ định rõ StateFile cụ thể:
-powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -StateFile "$env:TEMP\movie-rcm-drive-mount.json"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -StateFile "$env:TEMP\movie-rcm-drive-mount.json"
 
 # Xuất kết quả dạng JSON:
-powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -AsJson
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -AsJson
 
 # Buộc dừng nếu tiến trình bị treo:
-powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -Force
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -Force
 ```
 
-**Cơ chế bảo vệ chống dừng nhầm tiến trình:**
-- Script đọc PID từ file state JSON và đối chiếu với danh tính tiến trình đang chạy (`processName == "rclone"` và `StartTime` khớp với thời điểm khởi tạo).
+**Cơ chế bảo vệ chống dừng nhầm tiến trình & Hợp đồng Fail-Closed:**
+- **Bắt buộc đủ 9 trường định danh:** Script đối chiếu toàn bộ 9 trường dữ liệu của file state. Nếu thiếu bất kỳ trường nào, script lập tức kích hoạt chính sách **Fail-Closed**: từ chối gửi bất kỳ tín hiệu dừng tiến trình nào và **giữ nguyên file state trên đĩa** để phục vụ kiểm tra/truy vết.
+- **Đối chiếu danh tính chính xác (Strict Ownership Verification):** PID trong state file được đối chiếu nghiêm ngặt với tiến trình sống qua 5 thuộc tính: PID, `processName == "rclone"`, đường dẫn thực thi chuẩn hóa, thời điểm khởi động chính xác (loại trừ dung sai thời gian lỏng lẻo) và Session ID.
 - **Tuyệt đối không** sử dụng lệnh `taskkill /IM rclone.exe /F` hay dừng theo tên hàng loạt để tránh tắt nhầm các tác vụ rclone khác của người dùng trên máy.
 - Nếu PID đã bị hệ thống tái sử dụng cho tiến trình khác (PID reuse), script từ chối dừng (`PID_REUSE_REJECTED`) và phát cảnh báo an toàn.
 
@@ -236,9 +287,16 @@ powershell -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -Force
 Quản trị viên hoặc CI/CD pipeline có thể xác thực toàn bộ hoạt động của bộ công cụ bằng một lệnh duy nhất:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/drive/test_drive_tooling.ps1
+# Chạy kiểm thử trên Windows PowerShell 5.1:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/test_drive_tooling.ps1
+
+# Chạy kiểm thử trên PowerShell 7+:
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/test_drive_tooling.ps1
 ```
-Bộ kiểm thử tự động kiểm tra 14 hạng mục bao gồm tính bất biến của preflight, các cờ baseline streaming, bảo vệ chống PID reuse, kiểm tra các trạng thái status và bảo mật tuyệt đối secret/token.
+
+**Lưu ý quan trọng về tính chất kiểm thử:**
+- Bộ kiểm thử tự động kiểm tra các ca kiểm thử bảo mật, tính bất biến của preflight, các cờ baseline streaming, bảo vệ chống PID reuse, kiểm tra các trạng thái status và bảo mật tuyệt đối secret/token.
+- Toàn bộ quá trình kiểm thử này thực thi trên **Môi trường Giả lập Cục bộ (Local Temp Fixture & Mock Processes)** với các tiến trình giả lập vô hại (child process recorder) nhằm đảm bảo an toàn tuyệt đối, không thực hiện mount thật và không tiêu tốn hạn ngạch kết nối mạng Google Drive.
 
 ---
 
@@ -319,5 +377,26 @@ Trên hệ điều hành Windows, các ký tự ổ đĩa mạng hoặc ổ đĩ
   1. Kiểm tra lại cờ `--vfs-read-chunk-streams 0` đã được bật để không tạo luồng tải ồ ạt.
   2. Tạo Google Cloud OAuth Client ID & Secret riêng theo hướng dẫn tại [https://rclone.org/drive/#making-your-own-client-id](https://rclone.org/drive/#making-your-own-client-id) và cập nhật qua `rclone config`.
 
+### Sự cố 4: Lỗi `VERIFICATION_FAILED` hoặc `IDENTITY_MISMATCH` khi dừng tiến trình (`stop_drive.ps1`)
+- **Nguyên nhân:** State file bị thiếu một hoặc nhiều trường trong 9 trường định danh bắt buộc (ví dụ: thiếu `sessionId`, `arguments`, `status`), hoặc PID trong state file đã bị chiếm dụng bởi tiến trình khác của hệ thống (PID reuse).
+- **Khắc phục:**
+  1. Hệ thống tuân thủ chính sách **Fail-Closed**: Tuyệt đối không gửi tín hiệu kill bừa bãi và **giữ nguyên file state trên đĩa** để phục vụ kiểm tra/truy vết.
+  2. Mở file state tại `$env:TEMP\movie-rcm-drive-mount.json` để kiểm tra các trường bị thiếu hoặc sai lệch.
+  3. Sử dụng lệnh an toàn `Get-CimInstance Win32_Process -Filter "ProcessId = <PID>"` để xác định danh tính thực tế của tiến trình đang chiếm giữ PID.
+
+### Sự cố 5: Lỗi mã hóa ký tự (Encoding / Parser Error) trên Windows PowerShell 5.1
+- **Nguyên nhân:** Windows PowerShell 5.1 (`powershell.exe`) chạy trên .NET Framework 4.8 và mặc định đọc tệp script theo ANSI/ASCII nếu tệp không có byte UTF-8 BOM, có thể gây ra lỗi phân tích cú pháp (`UnexpectedToken`) nếu script chứa ký tự đa byte thô.
+- **Khắc phục:**
+  1. Toàn bộ script chuẩn trong thư mục `scripts/drive/` được chuẩn hóa cú pháp PS 5.1 an toàn và không phụ thuộc vào locale của hệ thống.
+  2. Khi thực thi trên Windows PowerShell 5.1, luôn sử dụng tham số `-NoProfile -File`:
+     ```powershell
+     powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
+     ```
+  3. Hoặc chuyển sang sử dụng PowerShell 7+ (`pwsh.exe`) với runtime .NET hiện đại mặc định hỗ trợ UTF-8 toàn diện:
+     ```powershell
+     pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
+     ```
+
 ---
 *Tài liệu được bảo trì bởi Dippie Cinema Platform Operations Team.*
+

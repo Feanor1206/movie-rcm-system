@@ -35,7 +35,7 @@ const STANDALONE_DIR = path.resolve(PROJECT_ROOT, 'frontend/.next/standalone');
 const STANDALONE_SERVER = path.resolve(STANDALONE_DIR, 'server.js');
 const DRIVE_MOUNT_DIR = path.resolve(PROJECT_ROOT, 'backend/springboot/target/test-drive-mount');
 const MEDIA_FILE = path.resolve(DRIVE_MOUNT_DIR, 'movies/m4-drive-movie/v1/feature.mp4');
-const EVIDENCE_DIR = path.resolve(PROJECT_ROOT, 'docs/reports/drive/DRIVE_01_F01');
+const EVIDENCE_DIR = path.resolve(PROJECT_ROOT, process.env.DRIVE_EVIDENCE_DIR || 'docs/reports/drive/DRIVE_01_F02');
 const SCREENSHOTS_DIR = path.resolve(EVIDENCE_DIR, 'screenshots');
 const BENCHMARK_OUT = path.resolve(EVIDENCE_DIR, 'walkthrough_results.json');
 

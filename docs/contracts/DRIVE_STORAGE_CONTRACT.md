@@ -94,6 +94,34 @@ Configured in `application.yml` and overridable via environment variables:
    - Non-blocking availability checks: `DriveMediaStorageAdapter.isAvailable()` evaluates local mount point vitality synchronously without unbounded blocking.
    - Fast fail: When mount is missing or unreadable, adapter trips immediately to unavailable status, short-circuiting downstream I/O requests with HTTP 503.
    - Self-healing: As soon as the mount directory becomes readable again, requests succeed automatically without requiring application restart.
+5. **Resource Lifecycle & Asynchronous Ownership Contract (F1):**
+   - **Resource Ownership Handshake:**
+     - Opening a storage channel on cloud-backed mounts involves asynchronous dispatch to a bounded worker pool (`DriveIoExecutor`).
+     - To prevent resource orphaning across timeout or cancellation races, the worker and caller execute a strict ownership handshake:
+       - State `PENDING`: Worker is executing `FileChannel.open(targetPath, StandardOpenOption.READ)`.
+       - State `TRANSFERRED_TO_CALLER`: If worker completes before caller deadline, caller assumes exclusive ownership of the channel. The worker thread yields ownership and will NEVER close the channel.
+       - State `DISOWNED_OR_TIMED_OUT`: If caller deadline expires before worker completes, caller marks the request as abandoned/timed out and returns `MediaUnavailableException` (HTTP 503).
+   - **Exactly-Once Late Close:**
+     - When a background open completes late after caller timeout (`DISOWNED_OR_TIMED_OUT`), the worker detects abandonment and immediately disposes of the newly opened `FileChannel` by calling `close()`.
+     - This closure executes **exactly once**.
+     - A successful, timely returned channel held by the caller is protected: a racing timeout handler can never close a caller-owned channel.
+     - Channel closure implementations must be idempotent to prevent race corruption.
+   - **Non-Blocking Caller Close Policy:**
+     - When the caller or Spring MVC `try-with-resources` terminates (e.g. client disconnect, broken pipe, or request completion), calling `DriveSeekableByteChannel.close()` must return promptly.
+     - **Non-blocking caller close:** The caller thread must not be held hostage or blocked indefinitely if an underlying kernel read or close is stalled.
+     - Kernel cleanup tasks (calling the underlying `delegate.close()`) are accounted for in the bounded physical worker pool (`actualOutstandingWorkers`).
+     - **True Capacity Accounting:** The physical worker permit (`actualOutstandingWorkers`) is NOT decremented early when the caller exits; it remains accounted for until the underlying OS/kernel delegate close operation physically returns.
+     - Unbounded thread spawning or unbounded background queues are strictly prohibited; cleanup occurs within bounded concurrency limits.
+   - **Detailed Lifecycle Breakdown by Operation:**
+     - `openChannel(relativePath)`: Asynchronous file open via bounded worker pool. Protected by metadata deadline (`metadataTimeoutMs`, default 3000ms). Handshake ensures either caller receives ownership or worker disposes of late handle.
+     - `read(ByteBuffer dst)`: Bounded chunk read executed via `executeRead(readTimeoutMs)`. On kernel hang, caller receives timeout exception, circuit breaker records failure, and physical worker count remains held until kernel IO physically resolves.
+     - `position()` / `position(long newPosition)`: Fast pointer adjustment. Standard filesystem file channel positions execute synchronously as in-memory file descriptor pointer adjustments.
+     - `size()`: Queried via metadata executor with strict deadline protection.
+     - `close()`: Prompt caller exit with bounded background cleanup accounting. Idempotent guard ensures `close()` executes once.
+   - **Hard Cancellation Limitations of WinFsp / Filesystem Kernel I/O:**
+     - WinFsp and the Windows NT I/O subsystem do not support safe, mid-flight "hard cancellation" of blocking kernel-level I/O operations (such as `ReadFile` or `NtReadFile` dispatched through FUSE file system drivers).
+     - Java thread interruption (`Thread.interrupt()`) sets an interrupt flag but cannot force-abort a native thread blocked inside a CGO/WinFsp kernel dispatch routine without risking OS deadlocks, process instability, or driver corruption.
+     - Therefore, the system contract explicitly acknowledges this physical reality: hard cancellation is neither promised nor attempted. Instead, caller latency is guaranteed via finite deadlines, and stalled kernel operations are safely isolated within a bounded worker pool governed by a circuit breaker to protect system stability.
 
 ---
 
@@ -106,11 +134,37 @@ Configured in `application.yml` and overridable via environment variables:
    - Parameters: `Remote`, `RemoteSubpath`, `MountPoint`, `ConfigPath`, `WhatIf`, `Execute`.
    - Default mode is dry-run (`-WhatIf`). Mounting requires explicit `-Execute`.
    - Mount baseline flags:
-     `--read-only --vfs-cache-mode off --buffer-size 32M --vfs-read-chunk-size 8M --vfs-read-chunk-size-limit 32M --vfs-read-chunk-streams 0`
-   - Background launch via `Start-Process -WindowStyle Hidden` recording PID, start timestamp, executable path, and mount target in a local state JSON file outside git.
+     `--read-only --vfs-cache-mode off --buffer-size 32M --vfs-read-chunk-size 8M --vfs-read-chunk-size-limit 32M --vfs-read-chunk-streams 0 --dir-cache-time 72h --poll-interval 15s --attr-timeout 1s`
+   - Background launch via `Start-Process -WindowStyle Hidden` recording complete 9-field process identity into runtime state JSON.
 3. **Status & Stop Scripts (`scripts/drive/status_drive.ps1`, `scripts/drive/stop_drive.ps1`):**
    - `status_drive.ps1`: Verifies process vitality and filesystem readability without secret leaks.
-   - `stop_drive.ps1`: Validates recorded PID against executable path and start time to prevent accidental killing of reused PIDs; terminates only helper-owned processes. Never kills arbitrary `rclone.exe` or user processes.
+   - `stop_drive.ps1`: Validates complete process identity before signaling; terminates only helper-owned processes. Never kills arbitrary `rclone.exe` or user processes.
+4. **Process Identity & Ownership Verification Contract (F2):**
+   - **Mandatory 9-Field Schema State:**
+     Every runtime state JSON file (default: `$env:TEMP\movie-rcm-drive-mount.json`) must contain all 9 required schema fields:
+     1. `pid`: Positive integer identifying the specific process ID.
+     2. `processName`: Exact process name (must strictly equal `"rclone"`).
+     3. `executablePath`: Fully-qualified, normalized path to `rclone.exe`.
+     4. `startTime`: ISO 8601 formatted timestamp or exact `DateTimeOffset` string.
+     5. `sessionId`: Windows Logon Session ID matching caller context.
+     6. `mountPoint`: Validated Windows drive letter (`M:`) or directory mount point.
+     7. `remoteTarget`: Exact remote name and subpath (`cinema-gdrive:DippieMedia`).
+     8. `arguments`: Exact arguments array or string used during launch.
+     9. `status`: Lifecycle status string (`"MOUNTING"` or `"RUNNING"`).
+   - **Strict Fail-Closed Policy on Missing or Corrupted Identity:**
+     - If ANY of the 9 required fields is missing, null, empty string, or invalid, the operation immediately **Fails Closed**.
+     - Under Fail-Closed:
+       - No termination signal (`Stop-Process`, `taskkill`) is ever issued.
+       - The state file is **preserved on disk** untouched (never deleted, overwritten, or assumed dead) to ensure traceability and auditability.
+       - Returns status `VERIFICATION_FAILED` or `IDENTITY_MISMATCH` with diagnostic details.
+     - **No Permissive Defaults:** The system never defaults missing fields (e.g., missing `processName` is never defaulted to `"rclone"`; missing `sessionId` is never bypassed).
+     - **Anti-PID Reuse & Exact Matching:** Process validation strictly compares live process attributes against state file attributes:
+       - PID must match live process.
+       - Process name must match live process name (`rclone`).
+       - Normalized executable path must match live process path.
+       - Start time must match exact recorded process start time (rejecting multi-second or multi-millisecond loose tolerances).
+       - Session ID must match live process session.
+     - **Universal Enforcement:** This verification logic is enforced uniformly across `status_drive.ps1`, `stop_drive.ps1`, and launcher failure cleanup inside `mount_drive.ps1`.
 
 ---
 
@@ -119,3 +173,4 @@ Configured in `application.yml` and overridable via environment variables:
 - **G1 (IMPLEMENTATION):** Production code compiles, unit tests pass, isolated tests pass with local temporary mock mount directory. Status: **PASS**.
 - **G2 (MOUNTED_DRIVE):** Real rclone + WinFsp mount on Windows with real user credentials. Status: **BLOCKED_EXTERNAL_INPUT** (requires interactive user setup outside automated coding scope).
 - **G3 (BROWSER_DRIVE):** Real end-to-end browser playback against live Google Drive. Status: **BLOCKED_EXTERNAL_INPUT** (depends on G2).
+

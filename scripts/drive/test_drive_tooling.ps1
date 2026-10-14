@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Automated test suite for Google Drive PowerShell operational tooling.
 .DESCRIPTION

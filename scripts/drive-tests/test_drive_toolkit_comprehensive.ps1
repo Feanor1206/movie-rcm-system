@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Comprehensive test suite for Google Drive operational tooling on Windows.
 .DESCRIPTION
@@ -40,7 +40,12 @@ $statusPath    = Join-Path $toolkitDir "status_drive.ps1"
 $stopPath      = Join-Path $toolkitDir "stop_drive.ps1"
 
 if (-not $EvidencePath) {
-    $EvidencePath = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01\agent-e\toolkit_test_evidence.json"
+    $f02EvidenceDir = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01_F02\agent-e"
+    if (Test-Path -Path (Split-Path -Path $f02EvidenceDir -Parent) -PathType Container) {
+        $EvidencePath = Join-Path $f02EvidenceDir "toolkit_test_evidence.json"
+    } else {
+        $EvidencePath = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01\agent-e\toolkit_test_evidence.json"
+    }
 }
 
 # Verify toolkit scripts exist
@@ -113,7 +118,8 @@ Write-Host "`n--- [SUITE 1] Parameter Robustness: Whitespace, Unicode & Complex 
 $t1Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $remoteWithSpace = "cinema gdrive:"
-    $unicodeSubpath = "Kho Phim Việt/1080p - Bản Rõ & Đầy Đủ [2026]"
+    # UTF-8 encoded bytes for Vietnamese Unicode subpath: "Kho Phim Viet/1080p - Ban Ro & Day Du [2026]"
+    $unicodeSubpath = [System.Text.Encoding]::UTF8.GetString([byte[]]@(75,104,111,32,80,104,105,109,32,86,105,225,187,135,116,47,49,48,56,48,112,32,45,32,66,225,186,163,110,32,82,195,181,32,38,32,196,144,225,186,167,121,32,196,144,225,187,167,32,91,50,48,50,54,93))
     $plan1 = & $mountPath -WhatIf -Remote $remoteWithSpace -RemoteSubpath $unicodeSubpath -MountPoint "M:"
     $t1Sw.Stop()
 
@@ -141,7 +147,8 @@ try {
 $t2Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $remoteNoColon = "anime-gdrive"
-    $cjkSubpath = "スタジオジブリ/映画/となりのトトロ (1988) [BD-Rip]"
+    # UTF-8 encoded bytes for Japanese CJK subpath: "Studio Ghibli / Totoro"
+    $cjkSubpath = [System.Text.Encoding]::UTF8.GetString([byte[]]@(227,130,185,227,130,191,227,130,184,227,130,170,227,130,184,227,131,150,227,131,170,47,230,152,160,231,148,187,47,227,129,168,227,129,170,227,130,138,227,129,174,227,131,136,227,131,136,227,131,173,32,40,49,57,56,56,41,32,91,66,68,45,82,105,112,93))
     $plan2 = & $mountPath -WhatIf -Remote $remoteNoColon -RemoteSubpath $cjkSubpath -MountPoint "M:"
     $t2Sw.Stop()
 
@@ -192,7 +199,8 @@ try {
 # Test 1.4: ConfigPath with spaces, unicode and symbols
 $t4Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
-    $complexConfigPath = "C:\Users\Admin\Đường Dẫn Cấu Hình (Rclone)\rclone test [safe].conf"
+    # UTF-8 encoded bytes for Vietnamese Unicode config path: "C:\Users\Admin\Duong Dan Cau Hinh (Rclone)\rclone test [safe].conf"
+    $complexConfigPath = [System.Text.Encoding]::UTF8.GetString([byte[]]@(67,58,92,85,115,101,114,115,92,65,100,109,105,110,92,196,144,198,176,225,187,157,110,103,32,68,225,186,171,110,32,67,225,186,165,117,32,72,195,172,110,104,32,40,82,99,108,111,110,101,41,92,114,99,108,111,110,101,32,116,101,115,116,32,91,115,97,102,101,93,46,99,111,110,102))
     $plan4 = & $mountPath -WhatIf -ConfigPath $complexConfigPath -MountPoint "M:"
     $t4Sw.Stop()
 

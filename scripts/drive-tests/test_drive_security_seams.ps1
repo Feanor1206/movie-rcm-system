@@ -44,7 +44,12 @@ $statusPath    = Join-Path $toolkitDir "status_drive.ps1"
 $stopPath      = Join-Path $toolkitDir "stop_drive.ps1"
 
 if (-not $EvidencePath) {
-    $EvidencePath = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01\agent-e\toolkit_test_evidence.json"
+    $f02EvidenceDir = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01_F02\agent-e"
+    if (Test-Path -Path (Split-Path -Path $f02EvidenceDir -Parent) -PathType Container) {
+        $EvidencePath = Join-Path $f02EvidenceDir "toolkit_test_evidence.json"
+    } else {
+        $EvidencePath = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01\agent-e\toolkit_test_evidence.json"
+    }
 }
 
 # Verify toolkit scripts exist
@@ -664,6 +669,8 @@ try {
             sessionId      = 1
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
         }
         $stateContent1 | ConvertTo-Json | Set-Content -Path $d2State1 -Encoding UTF8
 
@@ -708,6 +715,8 @@ try {
             sessionId      = 1
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
         }
         $stateContent2 | ConvertTo-Json | Set-Content -Path $d2State2 -Encoding UTF8
 
@@ -751,6 +760,8 @@ try {
             sessionId      = 1
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
         }
         $stateContent3 | ConvertTo-Json | Set-Content -Path $d2State3 -Encoding UTF8
 
@@ -794,6 +805,8 @@ try {
             sessionId      = 1
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
         }
         $stateContent4 | ConvertTo-Json | Set-Content -Path $d2State4 -Encoding UTF8
 
@@ -838,6 +851,8 @@ try {
             sessionId      = 99
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
         }
         $stateContent5 | ConvertTo-Json | Set-Content -Path $d2State5 -Encoding UTF8
 
@@ -882,6 +897,8 @@ try {
             sessionId      = 1
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
         }
         $stateContent6 | ConvertTo-Json | Set-Content -Path $d2State6 -Encoding UTF8
 
@@ -903,6 +920,505 @@ try {
             -DurationMs $tD2_6Sw.Elapsed.TotalMilliseconds
     } finally {
         if (Test-Path -Path $d2State6) { Remove-Item -Path $d2State6 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # ==============================================================================
+    # SUITE 4: Comprehensive Process Identity Schema & Reviewer Repro (Finding F2)
+    # ==============================================================================
+    Write-Host "`n--- [SUITE 4] Strict Identity Schema & Reviewer Repro (Finding F2) ---" -ForegroundColor Yellow
+
+    # Test 4.1: TC-F2-01 Missing processName in state fails closed (Status: VERIFICATION_FAILED)
+    $tF2_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $f2State1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-noprocname-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stF2_1 = [DateTime]::UtcNow
+        $global:MockProcessMap[881001] = [PSCustomObject]@{
+            Id          = 881001
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stF2_1
+            SessionId   = 1
+        }
+        $stateContentF2_1 = [PSCustomObject]@{
+            pid            = 881001
+            # Missing processName - must not fallback to rclone
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stF2_1.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
+        }
+        $stateContentF2_1 | ConvertTo-Json | Set-Content -Path $f2State1 -Encoding UTF8
+
+        $resF2_1 = & $stopPath -StateFile $f2State1
+        $tF2_1Sw.Stop()
+
+        $pF2_1Passed = ($resF2_1.Success -eq $false) -and `
+                       ($resF2_1.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resF2_1.VerificationReason -eq "MissingProcessNameInState") -and `
+                       ($global:MockStoppedPids -notcontains 881001) -and `
+                       (Test-Path -Path $f2State1 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-F2-01" -Category "ProcessIdentityF2" `
+            -Name "stop_drive fails closed when state lacks processName (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing processName does not fallback to rclone, aborts termination and preserves state" `
+            -Passed $pF2_1Passed `
+            -FailureMessage "Status: $($resF2_1.Status), Reason: $($resF2_1.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingProcessNameInState, StatePreserved=True" `
+            -Actual "Status=$($resF2_1.Status), Reason=$($resF2_1.VerificationReason), StatePreserved=$(Test-Path -Path $f2State1 -PathType Leaf)" `
+            -DurationMs $tF2_1Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $f2State1) { Remove-Item -Path $f2State1 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.2: TC-F2-02 Missing sessionId in state fails closed (Status: VERIFICATION_FAILED)
+    $tF2_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $f2State2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nosession-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stF2_2 = [DateTime]::UtcNow
+        $global:MockProcessMap[881002] = [PSCustomObject]@{
+            Id          = 881002
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stF2_2
+            SessionId   = 1
+        }
+        $stateContentF2_2 = [PSCustomObject]@{
+            pid            = 881002
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stF2_2.ToString("o")
+            # Missing sessionId
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
+        }
+        $stateContentF2_2 | ConvertTo-Json | Set-Content -Path $f2State2 -Encoding UTF8
+
+        $resF2_2 = & $stopPath -StateFile $f2State2
+        $tF2_2Sw.Stop()
+
+        $pF2_2Passed = ($resF2_2.Success -eq $false) -and `
+                       ($resF2_2.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resF2_2.VerificationReason -eq "MissingSessionIdInState") -and `
+                       ($global:MockStoppedPids -notcontains 881002) -and `
+                       (Test-Path -Path $f2State2 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-F2-02" -Category "ProcessIdentityF2" `
+            -Name "stop_drive fails closed when state lacks sessionId (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing sessionId is rejected without termination and state file is preserved" `
+            -Passed $pF2_2Passed `
+            -FailureMessage "Status: $($resF2_2.Status), Reason: $($resF2_2.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingSessionIdInState, StatePreserved=True" `
+            -Actual "Status=$($resF2_2.Status), Reason=$($resF2_2.VerificationReason), StatePreserved=$(Test-Path -Path $f2State2 -PathType Leaf)" `
+            -DurationMs $tF2_2Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $f2State2) { Remove-Item -Path $f2State2 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.3: TC-F2-03 Missing mountPoint in state fails closed (Status: VERIFICATION_FAILED)
+    $tF2_3Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $f2State3 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nomount-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stF2_3 = [DateTime]::UtcNow
+        $global:MockProcessMap[881003] = [PSCustomObject]@{
+            Id          = 881003
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stF2_3
+            SessionId   = 1
+        }
+        $stateContentF2_3 = [PSCustomObject]@{
+            pid            = 881003
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stF2_3.ToString("o")
+            sessionId      = 1
+            # Missing mountPoint
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
+        }
+        $stateContentF2_3 | ConvertTo-Json | Set-Content -Path $f2State3 -Encoding UTF8
+
+        $resF2_3 = & $stopPath -StateFile $f2State3
+        $tF2_3Sw.Stop()
+
+        $pF2_3Passed = ($resF2_3.Success -eq $false) -and `
+                       ($resF2_3.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resF2_3.VerificationReason -eq "MissingMountPointInState") -and `
+                       ($global:MockStoppedPids -notcontains 881003) -and `
+                       (Test-Path -Path $f2State3 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-F2-03" -Category "ProcessIdentityF2" `
+            -Name "stop_drive fails closed when state lacks mountPoint (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing mountPoint is rejected without termination and state file is preserved" `
+            -Passed $pF2_3Passed `
+            -FailureMessage "Status: $($resF2_3.Status), Reason: $($resF2_3.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingMountPointInState, StatePreserved=True" `
+            -Actual "Status=$($resF2_3.Status), Reason=$($resF2_3.VerificationReason), StatePreserved=$(Test-Path -Path $f2State3 -PathType Leaf)" `
+            -DurationMs $tF2_3Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $f2State3) { Remove-Item -Path $f2State3 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.4: TC-F2-04 Missing remoteTarget in state fails closed (Status: VERIFICATION_FAILED)
+    $tF2_4Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $f2State4 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-noremote-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stF2_4 = [DateTime]::UtcNow
+        $global:MockProcessMap[881004] = [PSCustomObject]@{
+            Id          = 881004
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stF2_4
+            SessionId   = 1
+        }
+        $stateContentF2_4 = [PSCustomObject]@{
+            pid            = 881004
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stF2_4.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            # Missing remoteTarget
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
+        }
+        $stateContentF2_4 | ConvertTo-Json | Set-Content -Path $f2State4 -Encoding UTF8
+
+        $resF2_4 = & $stopPath -StateFile $f2State4
+        $tF2_4Sw.Stop()
+
+        $pF2_4Passed = ($resF2_4.Success -eq $false) -and `
+                       ($resF2_4.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resF2_4.VerificationReason -eq "MissingRemoteTargetInState") -and `
+                       ($global:MockStoppedPids -notcontains 881004) -and `
+                       (Test-Path -Path $f2State4 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-F2-04" -Category "ProcessIdentityF2" `
+            -Name "stop_drive fails closed when state lacks remoteTarget (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing remoteTarget is rejected without termination and state file is preserved" `
+            -Passed $pF2_4Passed `
+            -FailureMessage "Status: $($resF2_4.Status), Reason: $($resF2_4.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingRemoteTargetInState, StatePreserved=True" `
+            -Actual "Status=$($resF2_4.Status), Reason=$($resF2_4.VerificationReason), StatePreserved=$(Test-Path -Path $f2State4 -PathType Leaf)" `
+            -DurationMs $tF2_4Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $f2State4) { Remove-Item -Path $f2State4 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.5: TC-F2-05 Missing arguments in state fails closed (Status: VERIFICATION_FAILED)
+    $tF2_5Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $f2State5 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-noargs-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stF2_5 = [DateTime]::UtcNow
+        $global:MockProcessMap[881005] = [PSCustomObject]@{
+            Id          = 881005
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stF2_5
+            SessionId   = 1
+        }
+        $stateContentF2_5 = [PSCustomObject]@{
+            pid            = 881005
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stF2_5.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            # Missing arguments
+            status         = "MOUNTED"
+        }
+        $stateContentF2_5 | ConvertTo-Json | Set-Content -Path $f2State5 -Encoding UTF8
+
+        $resF2_5 = & $stopPath -StateFile $f2State5
+        $tF2_5Sw.Stop()
+
+        $pF2_5Passed = ($resF2_5.Success -eq $false) -and `
+                       ($resF2_5.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resF2_5.VerificationReason -eq "MissingArgumentsInState") -and `
+                       ($global:MockStoppedPids -notcontains 881005) -and `
+                       (Test-Path -Path $f2State5 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-F2-05" -Category "ProcessIdentityF2" `
+            -Name "stop_drive fails closed when state lacks arguments (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing arguments is rejected without termination and state file is preserved" `
+            -Passed $pF2_5Passed `
+            -FailureMessage "Status: $($resF2_5.Status), Reason: $($resF2_5.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingArgumentsInState, StatePreserved=True" `
+            -Actual "Status=$($resF2_5.Status), Reason=$($resF2_5.VerificationReason), StatePreserved=$(Test-Path -Path $f2State5 -PathType Leaf)" `
+            -DurationMs $tF2_5Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $f2State5) { Remove-Item -Path $f2State5 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.6: TC-F2-06 Missing status in state fails closed (Status: VERIFICATION_FAILED)
+    $tF2_6Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $f2State6 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nostatus-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stF2_6 = [DateTime]::UtcNow
+        $global:MockProcessMap[881006] = [PSCustomObject]@{
+            Id          = 881006
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stF2_6
+            SessionId   = 1
+        }
+        $stateContentF2_6 = [PSCustomObject]@{
+            pid            = 881006
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stF2_6.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            # Missing status
+        }
+        $stateContentF2_6 | ConvertTo-Json | Set-Content -Path $f2State6 -Encoding UTF8
+
+        $resF2_6 = & $stopPath -StateFile $f2State6
+        $tF2_6Sw.Stop()
+
+        $pF2_6Passed = ($resF2_6.Success -eq $false) -and `
+                       ($resF2_6.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resF2_6.VerificationReason -eq "MissingStatusInState") -and `
+                       ($global:MockStoppedPids -notcontains 881006) -and `
+                       (Test-Path -Path $f2State6 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-F2-06" -Category "ProcessIdentityF2" `
+            -Name "stop_drive fails closed when state lacks status (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing status is rejected without termination and state file is preserved" `
+            -Passed $pF2_6Passed `
+            -FailureMessage "Status: $($resF2_6.Status), Reason: $($resF2_6.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingStatusInState, StatePreserved=True" `
+            -Actual "Status=$($resF2_6.Status), Reason=$($resF2_6.VerificationReason), StatePreserved=$(Test-Path -Path $f2State6 -PathType Leaf)" `
+            -DurationMs $tF2_6Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $f2State6) { Remove-Item -Path $f2State6 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.7: TC-F2-07 Missing or invalid pid in state fails closed (Status: VERIFICATION_FAILED)
+    $tF2_7Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $f2State7 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nopid-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stF2_7 = [DateTime]::UtcNow
+        $stateContentF2_7 = [PSCustomObject]@{
+            # Missing pid
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stF2_7.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:")
+            status         = "MOUNTED"
+        }
+        $stateContentF2_7 | ConvertTo-Json | Set-Content -Path $f2State7 -Encoding UTF8
+
+        $resF2_7 = & $stopPath -StateFile $f2State7
+        $tF2_7Sw.Stop()
+
+        $pF2_7Passed = ($resF2_7.Success -eq $false) -and `
+                       ($resF2_7.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resF2_7.VerificationReason -match "MissingPid") -and `
+                       (Test-Path -Path $f2State7 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-F2-07" -Category "ProcessIdentityF2" `
+            -Name "stop_drive fails closed when state lacks valid PID (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms missing PID aborts termination and preserves state file" `
+            -Passed $pF2_7Passed `
+            -FailureMessage "Status: $($resF2_7.Status), Reason: $($resF2_7.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=MissingPid*, StatePreserved=True" `
+            -Actual "Status=$($resF2_7.Status), Reason=$($resF2_7.VerificationReason), StatePreserved=$(Test-Path -Path $f2State7 -PathType Leaf)" `
+            -DurationMs $tF2_7Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $f2State7) { Remove-Item -Path $f2State7 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.8: TC-F2-08 Exact reproduction of reviewer DRIVE_F01_stop_missing_identity scenario
+    $tF2_8Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $reproState = Join-Path ([System.IO.Path]::GetTempPath()) "codex-drive-f01-stop-test-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $reproStart = [DateTime]::UtcNow
+        $reproPid = 987654
+        $global:MockProcessMap[$reproPid] = [PSCustomObject]@{
+            Id          = $reproPid
+            ProcessName = "rclone"
+            Path        = "C:\Fixture\rclone.exe"
+            StartTime   = $reproStart
+            SessionId   = 1
+        }
+        # Reviewer state: contains only pid, processName, startTime, executablePath
+        # Missing sessionId, mountPoint, remoteTarget, arguments, status
+        $reviewerStateObj = [PSCustomObject]@{
+            pid            = $reproPid
+            processName    = "rclone"
+            startTime      = $reproStart.ToString("o")
+            executablePath = "C:\Fixture\rclone.exe"
+        }
+        $reviewerStateObj | ConvertTo-Json | Set-Content -LiteralPath $reproState -Encoding UTF8
+
+        $reproRes = & $stopPath -StateFile $reproState -AsJson | ConvertFrom-Json
+        $tF2_8Sw.Stop()
+
+        $reproStopped = ($global:MockStoppedPids -contains $reproPid)
+        $terminationRequested = $reproStopped
+        $stateStillExists = (Test-Path -LiteralPath $reproState)
+
+        $pF2_8Passed = ($reproRes.Success -eq $false) -and `
+                       ($reproRes.Status -eq "VERIFICATION_FAILED") -and `
+                       (-not $terminationRequested) -and `
+                       $stateStillExists
+
+        Register-TestResult -TestId "TC-F2-08" -Category "ProcessIdentityF2" `
+            -Name "Reviewer repro DRIVE_F01_stop_missing_identity confirmation" `
+            -Description "Confirms terminationRequestedWithMissingIdentityFields is FALSE and state file is preserved" `
+            -Passed $pF2_8Passed `
+            -FailureMessage "Success: $($reproRes.Success), Status: $($reproRes.Status), TerminationRequested: $terminationRequested" `
+            -Expected "Success=False, Status=VERIFICATION_FAILED, TerminationRequested=False, StatePreserved=True" `
+            -Actual "Success=$($reproRes.Success), Status=$($reproRes.Status), TerminationRequested=$terminationRequested, StatePreserved=$stateStillExists" `
+            -DurationMs $tF2_8Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -LiteralPath $reproState) { Remove-Item -LiteralPath $reproState -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 4.9: TC-F2-09 mount_drive timeout cleanup refuses to terminate process on identity mismatch
+    $tF2_9Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d4TempDirMismatch = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-mount-mismatch-$([Guid]::NewGuid().ToString('N'))"
+    try {
+        New-Item -ItemType Directory -Path $d4TempDirMismatch -Force | Out-Null
+        $preflightMockM = Join-Path $d4TempDirMismatch "preflight.ps1"
+        $preflightBodyM = 'param($MountPoint,$RclonePath,$ConfigPath); [PSCustomObject]@{ IsReady=$true; Rclone=[PSCustomObject]@{ExecutablePath="C:\Fixture\rclone.exe"}; BlockReasons=@() } | ConvertTo-Json -Compress'
+        Set-Content -LiteralPath $preflightMockM -Value $preflightBodyM -Encoding UTF8
+
+        $mismatchChildPid = 882001
+        $startM = [DateTime]::UtcNow
+        # Mock child process returned by Start-Process has mismatched SessionId
+        function Start-Process {
+            param($FilePath, $ArgumentList, $WindowStyle, [switch]$PassThru)
+            [PSCustomObject]@{
+                Id          = $mismatchChildPid
+                HasExited   = $false
+                ProcessName = "rclone"
+                StartTime   = $startM
+                Path        = "C:\Fixture\rclone.exe"
+            }
+        }
+        # In MockProcessMap, live process has SessionId 999 (which does not match caller's session)
+        $global:MockProcessMap[$mismatchChildPid] = [PSCustomObject]@{
+            Id          = $mismatchChildPid
+            ProcessName = "rclone"
+            Path        = "C:\Fixture\rclone.exe"
+            StartTime   = $startM
+            SessionId   = 999
+            HasExited   = $false
+        }
+
+        $mountSourceM = Get-Content -LiteralPath $mountPath -Raw -Encoding UTF8
+        $escapedPreflightM = $preflightMockM.Replace("\", "\\")
+        $mountSourceM = $mountSourceM.Replace('$preflightScript = Join-Path $PSScriptRoot "preflight_drive.ps1"', ('$preflightScript = "' + $escapedPreflightM + '"'))
+
+        $missingMountM = Join-Path $d4TempDirMismatch "unmounted-target"
+        $stateFileM = Join-Path $d4TempDirMismatch "state.json"
+
+        $resM = & ([scriptblock]::Create($mountSourceM)) -Execute -Remote "cinema-gdrive" -RemoteSubpath "Media" `
+            -MountPoint $missingMountM -StateFile $stateFileM `
+            -ReadinessTimeoutSeconds 1 -ReadinessIntervalMs 50
+
+        $tF2_9Sw.Stop()
+
+        # Termination should NOT have occurred because SessionId did not match
+        $mismatchNotKilled = ($global:MockStoppedPids -notcontains $mismatchChildPid)
+        $isTimeout = ($resM.Status -eq "TIMEOUT")
+
+        $pF2_9Passed = ($isTimeout -and $mismatchNotKilled)
+
+        Register-TestResult -TestId "TC-F2-09" -Category "ProcessIdentityF2" `
+            -Name "mount_drive timeout cleanup refuses to kill child process on session/identity mismatch" `
+            -Description "Confirms mount_drive verifies full identity before stopping child and preserves mismatched process" `
+            -Passed $pF2_9Passed `
+            -FailureMessage "Status: $($resM.Status), MismatchChildKilled: $(-not $mismatchNotKilled)" `
+            -Expected "Status=TIMEOUT, MismatchChildKilled=False" `
+            -Actual "Status=$($resM.Status), MismatchChildKilled=$(-not $mismatchNotKilled)" `
+            -DurationMs $tF2_9Sw.Elapsed.TotalMilliseconds
+    } finally {
+        Remove-Item -Path "function:Start-Process" -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $d4TempDirMismatch) {
+            Remove-Item -LiteralPath $d4TempDirMismatch -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # Test 4.10: TC-F2-10 mount_drive timeout cleanup successfully terminates verified owned child process
+    $tF2_10Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $d4TempDirMatch = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-mount-match-$([Guid]::NewGuid().ToString('N'))"
+    try {
+        New-Item -ItemType Directory -Path $d4TempDirMatch -Force | Out-Null
+        $preflightMockOk = Join-Path $d4TempDirMatch "preflight.ps1"
+        $preflightBodyOk = 'param($MountPoint,$RclonePath,$ConfigPath); [PSCustomObject]@{ IsReady=$true; Rclone=[PSCustomObject]@{ExecutablePath="C:\Fixture\rclone.exe"}; BlockReasons=@() } | ConvertTo-Json -Compress'
+        Set-Content -LiteralPath $preflightMockOk -Value $preflightBodyOk -Encoding UTF8
+
+        $matchChildPid = 882002
+        $startOk = [DateTime]::UtcNow
+        $currentSession = (Get-Process -Id $PID).SessionId
+
+        function Start-Process {
+            param($FilePath, $ArgumentList, $WindowStyle, [switch]$PassThru)
+            [PSCustomObject]@{
+                Id          = $matchChildPid
+                HasExited   = $false
+                ProcessName = "rclone"
+                StartTime   = $startOk
+                Path        = "C:\Fixture\rclone.exe"
+            }
+        }
+        # In MockProcessMap, live process matches all identity factors exactly
+        $global:MockProcessMap[$matchChildPid] = [PSCustomObject]@{
+            Id          = $matchChildPid
+            ProcessName = "rclone"
+            Path        = "C:\Fixture\rclone.exe"
+            StartTime   = $startOk
+            SessionId   = $currentSession
+            HasExited   = $false
+        }
+
+        $mountSourceOk = Get-Content -LiteralPath $mountPath -Raw -Encoding UTF8
+        $escapedPreflightOk = $preflightMockOk.Replace("\", "\\")
+        $mountSourceOk = $mountSourceOk.Replace('$preflightScript = Join-Path $PSScriptRoot "preflight_drive.ps1"', ('$preflightScript = "' + $escapedPreflightOk + '"'))
+
+        $missingMountOk = Join-Path $d4TempDirMatch "unmounted-target"
+        $stateFileOk = Join-Path $d4TempDirMatch "state.json"
+
+        $resOk = & ([scriptblock]::Create($mountSourceOk)) -Execute -Remote "cinema-gdrive" -RemoteSubpath "Media" `
+            -MountPoint $missingMountOk -StateFile $stateFileOk `
+            -ReadinessTimeoutSeconds 1 -ReadinessIntervalMs 50
+
+        $tF2_10Sw.Stop()
+
+        # Termination SHOULD have occurred because all identity factors matched
+        $matchKilled = ($global:MockStoppedPids -contains $matchChildPid)
+        $isTimeoutOk = ($resOk.Status -eq "TIMEOUT")
+
+        $pF2_10Passed = ($isTimeoutOk -and $matchKilled)
+
+        Register-TestResult -TestId "TC-F2-10" -Category "ProcessIdentityF2" `
+            -Name "mount_drive timeout cleanup safely terminates verified owned child process" `
+            -Description "Confirms mount_drive successfully stops child process when all identity factors strictly match" `
+            -Passed $pF2_10Passed `
+            -FailureMessage "Status: $($resOk.Status), VerifiedChildKilled: $matchKilled" `
+            -Expected "Status=TIMEOUT, VerifiedChildKilled=True" `
+            -Actual "Status=$($resOk.Status), VerifiedChildKilled=$matchKilled" `
+            -DurationMs $tF2_10Sw.Elapsed.TotalMilliseconds
+    } finally {
+        Remove-Item -Path "function:Start-Process" -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $d4TempDirMatch) {
+            Remove-Item -LiteralPath $d4TempDirMatch -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 } finally {
     Remove-Item -Path "function:global:Get-Process" -Force -ErrorAction SilentlyContinue

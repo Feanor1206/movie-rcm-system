@@ -262,10 +262,12 @@ if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
                     try {
                         $expectedStart = [DateTimeOffset]::Parse([string]$existingState.startTime)
                         $actualStart = [DateTimeOffset]::new($existingProc.StartTime)
-                        if ([math]::Abs(($actualStart - $expectedStart).TotalSeconds) -gt 2) {
+                        if ([math]::Abs(($actualStart - $expectedStart).TotalMilliseconds) -ge 500) {
                             $startTimeMatch = $false
                         }
-                    } catch {}
+                    } catch {
+                        $startTimeMatch = $false
+                    }
                 }
                 if ($startTimeMatch) {
                     throw "A previous rclone mount process (PID $($existingState.pid)) is currently running for mount point '$($existingState.mountPoint)'. Use stop_drive.ps1 before remounting."
@@ -389,17 +391,47 @@ while ($elapsedMs -lt $timeoutMs) {
 
 # 7. Evaluate readiness outcome
 if (-not $isReady) {
-    # Timeout reached without mount becoming readable. Clean up only verified owned child process.
+    # Timeout reached without mount becoming readable. Clean up only strictly verified owned child process.
     $liveProc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
     if ($liveProc -and -not $liveProc.HasExited) {
         $isOwned = $false
         try {
-            if ($liveProc.ProcessName -ieq $procName) {
-                $liveStart = $liveProc.StartTime
-                $expectedStart = $proc.StartTime
-                if ([math]::Abs(($liveStart - $expectedStart).TotalSeconds) -le 2) {
-                    $isOwned = $true
+            # 1. Process Name match
+            $nameMatches = ($liveProc.ProcessName -ieq "rclone") -and ($liveProc.ProcessName -ieq $procName)
+
+            # 2. Executable Path match
+            $liveProcPath = $null
+            try {
+                if ($liveProc.Path) { $liveProcPath = $liveProc.Path }
+            } catch {}
+            if (-not $liveProcPath) {
+                try {
+                    if ($liveProc.MainModule -and $liveProc.MainModule.FileName) { $liveProcPath = $liveProc.MainModule.FileName }
+                } catch {}
+            }
+            $pathMatches = $false
+            if ($liveProcPath -and $rcloneExe) {
+                $normLivePath = [System.IO.Path]::GetFullPath($liveProcPath).TrimEnd('\')
+                $normExpectedPath = [System.IO.Path]::GetFullPath($rcloneExe).TrimEnd('\')
+                $pathMatches = [string]::Equals($normLivePath, $normExpectedPath, [System.StringComparison]::OrdinalIgnoreCase)
+            }
+
+            # 3. StartTime match (< 500ms)
+            $startMatches = $false
+            try {
+                $expectedStart = [DateTimeOffset]::Parse($startTimeIso)
+                $actualStart = [DateTimeOffset]::new($liveProc.StartTime)
+                $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
+                if ($diffMs -lt 500) {
+                    $startMatches = $true
                 }
+            } catch {}
+
+            # 4. SessionId match
+            $sessionMatches = ($liveProc.SessionId -eq $currentProc.SessionId)
+
+            if ($nameMatches -and $pathMatches -and $startMatches -and $sessionMatches) {
+                $isOwned = $true
             }
         } catch {}
 

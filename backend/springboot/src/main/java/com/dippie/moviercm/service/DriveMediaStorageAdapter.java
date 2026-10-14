@@ -219,13 +219,11 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
     @Override
     public SeekableByteChannel openChannel(String relativePath) throws IOException {
         Path targetPath = resolveValidatedPath(relativePath);
-        FileChannel rawChannel = ioExecutor.executeMetadata(() -> {
-            try {
-                return FileChannel.open(targetPath, StandardOpenOption.READ);
-            } catch (IOException e) {
-                throw new MediaUnavailableException("Không thể mở kênh đọc cho tệp media: " + relativePath);
-            }
-        });
+        FileChannel rawChannel = ioExecutor.executeOpen(
+                () -> FileChannel.open(targetPath, StandardOpenOption.READ),
+                ioExecutor.getMetadataTimeoutMs(),
+                "openChannel:" + relativePath
+        );
         return new DriveSeekableByteChannel(rawChannel, ioExecutor);
     }
 }

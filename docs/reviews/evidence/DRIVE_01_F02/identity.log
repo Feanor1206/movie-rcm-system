@@ -1,0 +1,21 @@
+{
+    "Success":  true,
+    "Status":  "STOPPED",
+    "PID":  987654,
+    "ProcessName":  "rclone",
+    "ExecutablePath":  "C:\\Fixture\\rclone.exe",
+    "StartTime":  "2026-10-15T03:10:24.2942628+07:00",
+    "SessionId":  1,
+    "MountPoint":  "Z:",
+    "RemoteTarget":  "expected:media",
+    "Arguments":  [
+                      "mount",
+                      "expected:media",
+                      "Z:",
+                      "--read-only"
+                  ],
+    "StateStatus":  "MOUNTED",
+    "Message":  "Successfully stopped verified rclone mount process (PID 987654).",
+    "StateFile":  "C:\\Users\\Admin\\AppData\\Local\\Temp\\codex-drive-f02-identity-8401e677-ca0a-4e85-88bd-03b7320952f2.json"
+}
+REPRO terminationRequestedDespiteCreationAndInvocationMismatch=True

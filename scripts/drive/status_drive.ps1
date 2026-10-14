@@ -5,7 +5,9 @@
     Checks active rclone processes against state JSON with strict identity verification
     (PID, process name, normalized executable path, sub-second StartTime tolerance,
     and SessionId). Inspects mount target accessibility and filesystem responsiveness.
-    Returns status: MOUNTED, NOT_MOUNTED, or DEGRADED with explanatory diagnostic reasons.
+    Enforces complete 9-field schema verification. If any identity field is missing or
+    mismatched, reports DEGRADED state with explanatory diagnostic reasons.
+    Returns status: MOUNTED, NOT_MOUNTED, or DEGRADED.
     Enforces Fail-Closed posture and does NOT leak secrets or tokens.
 .PARAMETER MountPoint
     Target mount point to verify (default "M:").
@@ -42,28 +44,43 @@ if ($stateExists) {
     }
 }
 
-# Extract complete state schema fields
-$savedPid          = if ($stateData -and $stateData.PSObject.Properties['pid']) { [int]$stateData.pid } else { $null }
-$expectedName      = if ($stateData -and $stateData.PSObject.Properties['processName']) { [string]$stateData.processName } else { "rclone" }
-$expectedPath      = if ($stateData -and $stateData.PSObject.Properties['executablePath']) { [string]$stateData.executablePath } else { $null }
-$recordedStartStr  = if ($stateData -and $stateData.PSObject.Properties['startTime'] -and $stateData.startTime) {
-                         if ($stateData.startTime -is [DateTime] -or $stateData.startTime -is [DateTimeOffset]) {
-                             $stateData.startTime.ToString("o")
-                         } else {
-                             [string]$stateData.startTime
-                         }
-                     } else { $null }
-$expectedSessionId = if ($stateData -and $stateData.PSObject.Properties['sessionId'] -and $stateData.sessionId -ne $null) { [int]$stateData.sessionId } else { $null }
-$targetMount       = if ($stateData -and $stateData.PSObject.Properties['mountPoint'] -and $stateData.mountPoint) { [string]$stateData.mountPoint } else { $MountPoint }
-$remoteTarget      = if ($stateData -and $stateData.PSObject.Properties['remoteTarget']) { [string]$stateData.remoteTarget } else { $null }
-$arguments         = if ($stateData) {
-                         if ($stateData.PSObject.Properties['arguments'] -and $stateData.arguments) {
-                             $stateData.arguments
-                         } elseif ($stateData.PSObject.Properties['flags'] -and $stateData.flags) {
-                             $stateData.flags
-                         } else { $null }
-                     } else { $null }
-$stateStatus       = if ($stateData -and $stateData.PSObject.Properties['status']) { [string]$stateData.status } else { $null }
+# Extract complete state schema fields without permissive defaults
+$savedPid = $null
+if ($stateData -and $stateData.PSObject.Properties['pid'] -and $stateData.pid -ne $null) {
+    $pVal = 0
+    if ([int]::TryParse([string]$stateData.pid, [ref]$pVal) -and $pVal -gt 0) {
+        $savedPid = $pVal
+    }
+}
+
+$expectedName = if ($stateData -and $stateData.PSObject.Properties['processName'] -and $stateData.processName) { [string]$stateData.processName } else { $null }
+$expectedPath = if ($stateData -and $stateData.PSObject.Properties['executablePath'] -and $stateData.executablePath) { [string]$stateData.executablePath } else { $null }
+$recordedStartStr = if ($stateData -and $stateData.PSObject.Properties['startTime'] -and $stateData.startTime) {
+                        if ($stateData.startTime -is [DateTime] -or $stateData.startTime -is [DateTimeOffset]) {
+                            $stateData.startTime.ToString("o")
+                        } else {
+                            [string]$stateData.startTime
+                        }
+                    } else { $null }
+
+$expectedSessionId = $null
+if ($stateData -and $stateData.PSObject.Properties['sessionId'] -and $stateData.sessionId -ne $null) {
+    $sVal = 0
+    if ([int]::TryParse([string]$stateData.sessionId, [ref]$sVal)) {
+        $expectedSessionId = $sVal
+    }
+}
+
+$targetMount = if ($stateData -and $stateData.PSObject.Properties['mountPoint'] -and $stateData.mountPoint) { [string]$stateData.mountPoint } else { $MountPoint }
+$remoteTarget = if ($stateData -and $stateData.PSObject.Properties['remoteTarget'] -and $stateData.remoteTarget) { [string]$stateData.remoteTarget } else { $null }
+$arguments = if ($stateData) {
+                 if ($stateData.PSObject.Properties['arguments'] -and $stateData.arguments) {
+                     $stateData.arguments
+                 } elseif ($stateData.PSObject.Properties['flags'] -and $stateData.flags) {
+                     $stateData.flags
+                 } else { $null }
+             } else { $null }
+$stateStatus = if ($stateData -and $stateData.PSObject.Properties['status'] -and $stateData.status) { [string]$stateData.status } else { $null }
 
 # Helper to check if a drive or directory is accessible
 function Test-MountAccessibility {
@@ -118,10 +135,10 @@ function Test-MountAccessibility {
 
 $mountAccess = Test-MountAccessibility -Target $targetMount
 
-# Scenario 1: No state file recorded
+# Scenario 1: No state file recorded or empty/corrupted state file
 if (-not $stateExists -or -not $stateData) {
     $status = "NOT_MOUNTED"
-    $reason = "No state file found at '$StateFile'."
+    $reason = if (-not $stateExists) { "No state file found at '$StateFile'." } else { "State file at '$StateFile' is unreadable or empty." }
 
     if ($mountAccess.Exists) {
         $status = "DEGRADED"
@@ -189,8 +206,8 @@ if (-not $proc) {
 
 # ================= STRICT PROCESS IDENTITY VERIFICATION =================
 
-# Verification 1: ProcessName
-if ($proc.ProcessName -ine "rclone" -and $proc.ProcessName -ine $expectedName) {
+# Verification 1: ProcessName match against OS process
+if ($proc.ProcessName -ine "rclone" -or ($expectedName -and $proc.ProcessName -ine $expectedName)) {
     $res = [PSCustomObject]@{
         Timestamp      = [DateTime]::UtcNow.ToString("o")
         Status         = "DEGRADED"
@@ -200,6 +217,51 @@ if ($proc.ProcessName -ine "rclone" -and $proc.ProcessName -ine $expectedName) {
         PID            = $savedPid
         ProcessName    = $proc.ProcessName
         ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Schema completeness checks
+if (-not $expectedName -or $expectedName -ine "rclone") {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "State file is missing or has invalid 'processName' field. Expected 'rclone'. Identity unverified."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+if (-not $expectedPath -or [string]::IsNullOrWhiteSpace($expectedPath)) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "State file is missing required 'executablePath' field. Identity unverified."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $null
         StartTime      = $recordedStartStr
         SessionId      = $expectedSessionId
         RemoteTarget   = $remoteTarget
@@ -223,102 +285,167 @@ if (-not $procPath) {
     } catch {}
 }
 
-if ($expectedPath) {
-    if (-not $procPath) {
-        $res = [PSCustomObject]@{
-            Timestamp      = [DateTime]::UtcNow.ToString("o")
-            Status         = "DEGRADED"
-            Reason         = "Unable to read process executable path for PID $($savedPid). Identity unverified."
-            MountPoint     = $targetMount
-            StateFile      = $StateFile
-            PID            = $savedPid
-            ProcessName    = $proc.ProcessName
-            ExecutablePath = $expectedPath
-            StartTime      = $recordedStartStr
-            SessionId      = $expectedSessionId
-            RemoteTarget   = $remoteTarget
-            Arguments      = $arguments
-            StateStatus    = $stateStatus
-            ProcessAlive   = $true
-            Accessible     = $mountAccess.IsReadable
-        }
-        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
-        return
+if (-not $procPath) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "Unable to read process executable path for PID $($savedPid). Identity unverified."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
     }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
 
-    $normProcPath = ""
-    $normExpectedPath = ""
-    try {
-        $normProcPath = [System.IO.Path]::GetFullPath($procPath).TrimEnd('\')
-        $normExpectedPath = [System.IO.Path]::GetFullPath($expectedPath).TrimEnd('\')
-    } catch {}
+$normProcPath = ""
+$normExpectedPath = ""
+try {
+    $normProcPath = [System.IO.Path]::GetFullPath($procPath).TrimEnd('\')
+    $normExpectedPath = [System.IO.Path]::GetFullPath($expectedPath).TrimEnd('\')
+} catch {}
 
-    if (-not [string]::Equals($normProcPath, $normExpectedPath, [System.StringComparison]::OrdinalIgnoreCase)) {
-        $res = [PSCustomObject]@{
-            Timestamp      = [DateTime]::UtcNow.ToString("o")
-            Status         = "DEGRADED"
-            Reason         = "PID $($savedPid) executable path '$procPath' does not match recorded executablePath '$expectedPath'. Identity mismatch / PID reuse detected."
-            MountPoint     = $targetMount
-            StateFile      = $StateFile
-            PID            = $savedPid
-            ProcessName    = $proc.ProcessName
-            ExecutablePath = $procPath
-            StartTime      = $recordedStartStr
-            SessionId      = $expectedSessionId
-            RemoteTarget   = $remoteTarget
-            Arguments      = $arguments
-            StateStatus    = $stateStatus
-            ProcessAlive   = $true
-            Accessible     = $mountAccess.IsReadable
-        }
-        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
-        return
+if (-not [string]::Equals($normProcPath, $normExpectedPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "PID $($savedPid) executable path '$procPath' does not match recorded executablePath '$expectedPath'. Identity mismatch / PID reuse detected."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $procPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
     }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
 }
 
 # Verification 3: StartTime (<500ms precision)
-if ($recordedStartStr) {
-    $startTimeMatch = $false
-    try {
-        $expectedStart = [DateTimeOffset]::Parse($recordedStartStr)
-        $actualStart = [DateTimeOffset]::new($proc.StartTime)
-        $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
-        if ($diffMs -lt 500) {
-            $startTimeMatch = $true
-        }
-    } catch {
-        $startTimeMatch = $false
+if (-not $recordedStartStr -or [string]::IsNullOrWhiteSpace($recordedStartStr)) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "State file is missing required 'startTime' field. Identity unverified."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $null
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
     }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
 
-    if (-not $startTimeMatch) {
-        $res = [PSCustomObject]@{
-            Timestamp      = [DateTime]::UtcNow.ToString("o")
-            Status         = "DEGRADED"
-            Reason         = "PID $($savedPid) start time ($($proc.StartTime.ToString('o'))) does not match recorded state ($recordedStartStr). PID reuse detected."
-            MountPoint     = $targetMount
-            StateFile      = $StateFile
-            PID            = $savedPid
-            ProcessName    = $proc.ProcessName
-            ExecutablePath = $expectedPath
-            StartTime      = $proc.StartTime.ToString("o")
-            SessionId      = $expectedSessionId
-            RemoteTarget   = $remoteTarget
-            Arguments      = $arguments
-            StateStatus    = $stateStatus
-            ProcessAlive   = $true
-            Accessible     = $mountAccess.IsReadable
-        }
-        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
-        return
+$startTimeMatch = $false
+try {
+    $expectedStart = [DateTimeOffset]::Parse($recordedStartStr)
+    $actualStart = [DateTimeOffset]::new($proc.StartTime)
+    $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
+    if ($diffMs -lt 500) {
+        $startTimeMatch = $true
     }
+} catch {
+    $startTimeMatch = $false
+}
+
+if (-not $startTimeMatch) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "PID $($savedPid) start time ($($proc.StartTime.ToString('o'))) does not match recorded state ($recordedStartStr). PID reuse detected."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $proc.StartTime.ToString("o")
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
 }
 
 # Verification 4: SessionId
-if ($expectedSessionId -ne $null -and $proc.SessionId -ne $expectedSessionId) {
+if ($expectedSessionId -eq $null) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "State file is missing required 'sessionId' field. Identity unverified."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $null
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+if ($proc.SessionId -ne $expectedSessionId) {
     $res = [PSCustomObject]@{
         Timestamp      = [DateTime]::UtcNow.ToString("o")
         Status         = "DEGRADED"
         Reason         = "PID $($savedPid) SessionId ($($proc.SessionId)) does not match recorded sessionId ($expectedSessionId)."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $proc.SessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Verification 5: Mount Target, Arguments, Status presence
+if (-not $targetMount -or [string]::IsNullOrWhiteSpace($targetMount) -or
+    -not $remoteTarget -or [string]::IsNullOrWhiteSpace($remoteTarget) -or
+    -not $arguments -or -not $stateStatus) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "State file is missing required mountPoint, remoteTarget, arguments, or status fields. Identity unverified."
         MountPoint     = $targetMount
         StateFile      = $StateFile
         PID            = $savedPid

@@ -5,9 +5,11 @@
     Reads state JSON and strictly verifies the recorded PID against process name,
     executable path (normalized full path), process start time (<500ms tolerance),
     and session ID before issuing any termination signal.
-    Enforces Fail-Closed security: if any identity attribute is missing, unreadable,
-    or mismatched, termination is strictly rejected (IDENTITY_MISMATCH / VERIFICATION_FAILED)
-    and the state file is preserved for diagnostic inspection.
+    Enforces Fail-Closed security: all 9 identity fields (pid, processName,
+    executablePath, startTime, sessionId, mountPoint, remoteTarget, arguments, status)
+    must be present, non-empty, and valid. If any identity attribute is missing,
+    unreadable, or mismatched, termination is strictly rejected (IDENTITY_MISMATCH /
+    VERIFICATION_FAILED) and the state file is preserved on disk for diagnostic inspection.
     Only the verified PID is terminated (never broad kill-by-name).
 .PARAMETER StateFile
     Path to runtime process state JSON. Defaults to $env:TEMP\movie-rcm-drive-mount.json.
@@ -77,26 +79,64 @@ try {
     return
 }
 
-# 2. Extract and validate required state schema fields
-$targetPid         = if ($stateData.PSObject.Properties['pid'] -and $stateData.pid) { [int]$stateData.pid } else { $null }
-$expectedName      = if ($stateData.PSObject.Properties['processName'] -and $stateData.processName) { [string]$stateData.processName } else { "rclone" }
-$expectedPath      = if ($stateData.PSObject.Properties['executablePath'] -and $stateData.executablePath) { [string]$stateData.executablePath } else { $null }
-$recordedStartStr  = if ($stateData.PSObject.Properties['startTime'] -and $stateData.startTime) {
-                         if ($stateData.startTime -is [DateTime] -or $stateData.startTime -is [DateTimeOffset]) {
-                             $stateData.startTime.ToString("o")
-                         } else {
-                             [string]$stateData.startTime
-                         }
-                     } else { $null }
-$expectedSessionId = if ($stateData.PSObject.Properties['sessionId'] -and $stateData.sessionId -ne $null) { [int]$stateData.sessionId } else { $null }
-$mountPoint        = if ($stateData.PSObject.Properties['mountPoint'] -and $stateData.mountPoint) { [string]$stateData.mountPoint } else { $null }
-$remoteTarget      = if ($stateData.PSObject.Properties['remoteTarget'] -and $stateData.remoteTarget) { [string]$stateData.remoteTarget } else { $null }
-$arguments         = if ($stateData.PSObject.Properties['arguments'] -and $stateData.arguments) {
-                         $stateData.arguments
-                     } elseif ($stateData.PSObject.Properties['flags'] -and $stateData.flags) {
-                         $stateData.flags
-                     } else { $null }
-$stateStatus       = if ($stateData.PSObject.Properties['status'] -and $stateData.status) { [string]$stateData.status } else { $null }
+if (-not $stateData) {
+    # Fail closed on empty state file
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $null
+        ProcessName        = $null
+        ExecutablePath     = $null
+        StartTime          = $null
+        SessionId          = $null
+        MountPoint         = $null
+        RemoteTarget       = $null
+        Arguments          = $null
+        StateStatus        = $null
+        VerificationReason = "EmptyStateFile"
+        Message            = "State file '$StateFile' is empty or invalid JSON. Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# 2. Extract state schema fields
+$targetPid = $null
+if ($stateData.PSObject.Properties['pid'] -and $stateData.pid -ne $null) {
+    $parsedPid = 0
+    if ([int]::TryParse([string]$stateData.pid, [ref]$parsedPid) -and $parsedPid -gt 0) {
+        $targetPid = $parsedPid
+    }
+}
+
+$expectedName = if ($stateData.PSObject.Properties['processName'] -and $stateData.processName) { [string]$stateData.processName } else { $null }
+$expectedPath = if ($stateData.PSObject.Properties['executablePath'] -and $stateData.executablePath) { [string]$stateData.executablePath } else { $null }
+$recordedStartStr = if ($stateData.PSObject.Properties['startTime'] -and $stateData.startTime) {
+                        if ($stateData.startTime -is [DateTime] -or $stateData.startTime -is [DateTimeOffset]) {
+                            $stateData.startTime.ToString("o")
+                        } else {
+                            [string]$stateData.startTime
+                        }
+                    } else { $null }
+
+$expectedSessionId = $null
+if ($stateData.PSObject.Properties['sessionId'] -and $stateData.sessionId -ne $null) {
+    $parsedSession = 0
+    if ([int]::TryParse([string]$stateData.sessionId, [ref]$parsedSession)) {
+        $expectedSessionId = $parsedSession
+    }
+}
+
+$mountPoint = if ($stateData.PSObject.Properties['mountPoint'] -and $stateData.mountPoint) { [string]$stateData.mountPoint } else { $null }
+$remoteTarget = if ($stateData.PSObject.Properties['remoteTarget'] -and $stateData.remoteTarget) { [string]$stateData.remoteTarget } else { $null }
+$arguments = if ($stateData.PSObject.Properties['arguments'] -and $stateData.arguments) {
+                 $stateData.arguments
+             } elseif ($stateData.PSObject.Properties['flags'] -and $stateData.flags) {
+                 $stateData.flags
+             } else { $null }
+$stateStatus = if ($stateData.PSObject.Properties['status'] -and $stateData.status) { [string]$stateData.status } else { $null }
 
 # Fail closed if PID is missing or invalid
 if (-not $targetPid -or $targetPid -le 0) {
@@ -113,7 +153,7 @@ if (-not $targetPid -or $targetPid -le 0) {
         RemoteTarget       = $remoteTarget
         Arguments          = $arguments
         StateStatus        = $stateStatus
-        VerificationReason = "MissingPid"
+        VerificationReason = "MissingPidInState"
         Message            = "State file does not contain a valid PID. Fail closed: refusing to stop any process. Preserving state file."
         StateFile          = $StateFile
     }
@@ -148,53 +188,8 @@ if (-not $proc) {
 
 # ================= STRICT PROCESS IDENTITY VERIFICATION (FAIL CLOSED) =================
 
-# Fail closed check A: State file must have executablePath and startTime recorded
-if (-not $expectedPath -or [string]::IsNullOrWhiteSpace($expectedPath)) {
-    $res = [PSCustomObject]@{
-        Success            = $false
-        Status             = "VERIFICATION_FAILED"
-        IdentityStatus     = "VERIFICATION_FAILED"
-        PID                = $targetPid
-        ProcessName        = $proc.ProcessName
-        ExecutablePath     = $null
-        StartTime          = $recordedStartStr
-        SessionId          = $expectedSessionId
-        MountPoint         = $mountPoint
-        RemoteTarget       = $remoteTarget
-        Arguments          = $arguments
-        StateStatus        = $stateStatus
-        VerificationReason = "MissingExecutablePathInState"
-        Message            = "State file is missing required 'executablePath' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
-        StateFile          = $StateFile
-    }
-    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
-    return
-}
-
-if (-not $recordedStartStr -or [string]::IsNullOrWhiteSpace($recordedStartStr)) {
-    $res = [PSCustomObject]@{
-        Success            = $false
-        Status             = "VERIFICATION_FAILED"
-        IdentityStatus     = "VERIFICATION_FAILED"
-        PID                = $targetPid
-        ProcessName        = $proc.ProcessName
-        ExecutablePath     = $expectedPath
-        StartTime          = $null
-        SessionId          = $expectedSessionId
-        MountPoint         = $mountPoint
-        RemoteTarget       = $remoteTarget
-        Arguments          = $arguments
-        StateStatus        = $stateStatus
-        VerificationReason = "MissingStartTimeInState"
-        Message            = "State file is missing required 'startTime' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
-        StateFile          = $StateFile
-    }
-    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
-    return
-}
-
-# Verification 1: Process Name match
-if ($proc.ProcessName -ine "rclone" -and $proc.ProcessName -ine $expectedName) {
+# Verification 1: Process Name match against active OS process
+if ($proc.ProcessName -ine "rclone" -or ($expectedName -and $proc.ProcessName -ine $expectedName)) {
     $res = [PSCustomObject]@{
         Success            = $false
         Status             = "PID_REUSE_REJECTED"
@@ -214,6 +209,74 @@ if ($proc.ProcessName -ine "rclone" -and $proc.ProcessName -ine $expectedName) {
         StateStatus        = $stateStatus
         VerificationReason = "ProcessNameMismatch"
         Message            = "Refusing to kill PID $($targetPid): active process name is '$($proc.ProcessName)', which does not match expected process '$expectedName'. PID reuse detected. Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Mandatory Schema Field Check 1: processName
+if (-not $expectedName -or [string]::IsNullOrWhiteSpace($expectedName)) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $null
+        ExecutablePath     = $expectedPath
+        StartTime          = $recordedStartStr
+        SessionId          = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "MissingProcessNameInState"
+        Message            = "State file is missing required 'processName' field. Fail closed: preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+if ($expectedName -ine "rclone") {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "PID_REUSE_REJECTED"
+        IdentityStatus     = "IDENTITY_MISMATCH"
+        PID                = $targetPid
+        ProcessName        = $expectedName
+        ExecutablePath     = $expectedPath
+        StartTime          = $recordedStartStr
+        SessionId          = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "ProcessNameMismatch"
+        Message            = "State file processName '$expectedName' does not equal required 'rclone'. Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Mandatory Schema Field Check 2: executablePath
+if (-not $expectedPath -or [string]::IsNullOrWhiteSpace($expectedPath)) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $proc.ProcessName
+        ExecutablePath     = $null
+        StartTime          = $recordedStartStr
+        SessionId          = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "MissingExecutablePathInState"
+        Message            = "State file is missing required 'executablePath' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
         StateFile          = $StateFile
     }
     if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
@@ -309,13 +372,43 @@ if (-not [string]::Equals($normProcPath, $normExpectedPath, [System.StringCompar
     return
 }
 
+# Mandatory Schema Field Check 3: startTime
+$parsedExpectedStart = $null
+if ($recordedStartStr -and -not [string]::IsNullOrWhiteSpace($recordedStartStr)) {
+    try {
+        $parsedExpectedStart = [DateTimeOffset]::Parse($recordedStartStr)
+    } catch {
+        $parsedExpectedStart = $null
+    }
+}
+if (-not $parsedExpectedStart) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $proc.ProcessName
+        ExecutablePath     = $expectedPath
+        StartTime          = $null
+        SessionId          = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "MissingStartTimeInState"
+        Message            = "State file is missing or contains invalid 'startTime' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
 # Verification 3: Process StartTime match (Strict <500ms window)
 $startTimeMatch = $false
 $diffMs = $null
 try {
-    $expectedStart = [DateTimeOffset]::Parse($recordedStartStr)
     $actualStart = [DateTimeOffset]::new($proc.StartTime)
-    $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
+    $diffMs = [math]::Abs(($actualStart - $parsedExpectedStart).TotalMilliseconds)
     if ($diffMs -lt 500) {
         $startTimeMatch = $true
     }
@@ -350,8 +443,31 @@ if (-not $startTimeMatch) {
     return
 }
 
-# Verification 4: Session ID match (if recorded)
-if ($expectedSessionId -ne $null -and $proc.SessionId -ne $expectedSessionId) {
+# Mandatory Schema Field Check 4: sessionId
+if ($expectedSessionId -eq $null) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $proc.ProcessName
+        ExecutablePath     = $expectedPath
+        StartTime          = $recordedStartStr
+        SessionId          = $null
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "MissingSessionIdInState"
+        Message            = "State file is missing required 'sessionId' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Verification 4: Session ID match
+if ($proc.SessionId -ne $expectedSessionId) {
     $res = [PSCustomObject]@{
         Success            = $false
         Status             = "IDENTITY_MISMATCH"
@@ -371,6 +487,106 @@ if ($expectedSessionId -ne $null -and $proc.SessionId -ne $expectedSessionId) {
         StateStatus        = $stateStatus
         VerificationReason = "SessionIdMismatch"
         Message            = "Refusing to kill PID $($targetPid): process SessionId ($($proc.SessionId)) does not match recorded sessionId ($expectedSessionId). Identity verification failed. Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Mandatory Schema Field Check 5: mountPoint
+if (-not $mountPoint -or [string]::IsNullOrWhiteSpace($mountPoint)) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $proc.ProcessName
+        ExecutablePath     = $expectedPath
+        StartTime          = $recordedStartStr
+        SessionId          = $expectedSessionId
+        MountPoint         = $null
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "MissingMountPointInState"
+        Message            = "State file is missing required 'mountPoint' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Mandatory Schema Field Check 6: remoteTarget
+if (-not $remoteTarget -or [string]::IsNullOrWhiteSpace($remoteTarget)) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $proc.ProcessName
+        ExecutablePath     = $expectedPath
+        StartTime          = $recordedStartStr
+        SessionId          = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $null
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "MissingRemoteTargetInState"
+        Message            = "State file is missing required 'remoteTarget' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Mandatory Schema Field Check 7: arguments
+$hasArgs = $false
+if ($arguments -ne $null) {
+    if ($arguments -is [string] -and -not [string]::IsNullOrWhiteSpace($arguments)) {
+        $hasArgs = $true
+    } elseif ($arguments -is [System.Collections.IEnumerable] -and -not ($arguments -is [string]) -and @($arguments).Count -gt 0) {
+        $hasArgs = $true
+    }
+}
+if (-not $hasArgs) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $proc.ProcessName
+        ExecutablePath     = $expectedPath
+        StartTime          = $recordedStartStr
+        SessionId          = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $null
+        StateStatus        = $stateStatus
+        VerificationReason = "MissingArgumentsInState"
+        Message            = "State file is missing required 'arguments' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Mandatory Schema Field Check 8: status
+if (-not $stateStatus -or [string]::IsNullOrWhiteSpace($stateStatus)) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ProcessName        = $proc.ProcessName
+        ExecutablePath     = $expectedPath
+        StartTime          = $recordedStartStr
+        SessionId          = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $null
+        VerificationReason = "MissingStatusInState"
+        Message            = "State file is missing required 'status' field. Fail closed: refusing to stop process $($targetPid). Preserving state file."
         StateFile          = $StateFile
     }
     if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
