@@ -1,5 +1,10 @@
 /**
  * Milestone M4: Media Playback & Local Storage Benchmark Script
+ * (Node RAM Transport Simulation Benchmark - Historical Baseline)
+ *
+ * NOTE: This script is an in-memory Node Buffer simulation benchmark used for
+ * baseline protocol validation. It does NOT replace the real Spring Boot HTTP
+ * streaming benchmark executed in scripts/run_m4_media_walkthrough.cjs.
  *
  * Measures:
  *   1. Startup latency (time to initial frame/chunk, cold vs warm)
@@ -8,7 +13,7 @@
  *   4. Concurrent streaming throughput & latency (1, 3, 5 parallel streams)
  *
  * Outputs:
- *   docs/reports/media_benchmark_results.json
+ *   docs/reports/media_benchmark_results.json (historical simulation)
  */
 
 const http = require('node:http');

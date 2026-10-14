@@ -20,4 +20,5 @@ app:
     expiration-ms: 86400000
   media:
     root: target/test-media
+    drive-mount: ""
 

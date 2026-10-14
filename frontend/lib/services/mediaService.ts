@@ -46,11 +46,16 @@ export async function getMediaDescriptor(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const signal = options?.signal
-    ? (AbortSignal as any).any
-      ? (AbortSignal as any).any([controller.signal, options.signal])
-      : controller.signal
-    : controller.signal;
+  let removeExternalListener: (() => void) | null = null;
+  if (options?.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      const onAbort = () => controller.abort();
+      options.signal.addEventListener('abort', onAbort, { once: true });
+      removeExternalListener = () => options.signal?.removeEventListener('abort', onAbort);
+    }
+  }
 
   try {
     const url = `${SPRINGBOOT_API}/movies/${encodeURIComponent(movieId)}/media-descriptor`;
@@ -59,7 +64,7 @@ export async function getMediaDescriptor(
       headers: {
         Accept: 'application/json',
       },
-      signal,
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -88,5 +93,8 @@ export async function getMediaDescriptor(
     };
   } finally {
     clearTimeout(timeoutId);
+    if (removeExternalListener) {
+      removeExternalListener();
+    }
   }
 }

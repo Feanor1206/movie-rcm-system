@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
-import { getMediaDescriptor, MediaDescriptor } from '@/lib/services/mediaService';
+import { getMediaDescriptor, MediaDescriptor, resolveStreamUrl } from '@/lib/services/mediaService';
 import { MovieSection } from './MovieSection';
 
 
@@ -70,15 +70,27 @@ export function MovieDetail({
 
   // Fetch descriptor for movie
   useEffect(() => {
+    // Immediately invalidate state for previous movie
+    setDescriptor(null);
+    setIsPlaying(false);
+    setActiveMediaUrl('');
+    setPlayerState('idle');
+    setPlaybackError(null);
+    setCurrentTime(0);
+    setDuration(0);
+    setRetryTime(0);
+
+    const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
     let mounted = true;
-    getMediaDescriptor(movie.id)
+
+    getMediaDescriptor(movie.id, { signal: abortController?.signal })
       .then((desc) => {
-        if (mounted) {
+        if (mounted && desc.movieId === movie.id) {
           setDescriptor(desc);
         }
       })
       .catch(() => {
-        if (mounted) {
+        if (mounted && (!abortController || !abortController.signal.aborted)) {
           setDescriptor({
             movieId: movie.id,
             hasFeature: false,
@@ -98,8 +110,10 @@ export function MovieDetail({
           });
         }
       });
+
     return () => {
       mounted = false;
+      abortController?.abort();
     };
   }, [movie.id, movie.videoUrl]);
 
@@ -115,11 +129,20 @@ export function MovieDetail({
       playerOpenerRef.current = opener;
     }
     setActiveMediaKind(kind);
-    const targetUrl =
-      kind === 'feature'
-        ? descriptor?.feature?.streamUrl || ''
-        : descriptor?.trailer?.streamUrl || movie.videoUrl || '';
-    setActiveMediaUrl(targetUrl);
+    let targetUrl = '';
+    if (kind === 'feature') {
+      if (descriptor?.movieId === movie.id) {
+        targetUrl = descriptor?.feature?.streamUrl || '';
+      }
+    } else {
+      if (descriptor?.movieId === movie.id && descriptor?.trailer?.streamUrl) {
+        targetUrl = descriptor.trailer.streamUrl;
+      } else if (hasVideo) {
+        targetUrl = movie.videoUrl || '';
+      }
+    }
+    if (!targetUrl) return;
+    setActiveMediaUrl(resolveStreamUrl(targetUrl));
     setPlayerState('buffering');
     setPlaybackError(null);
     setCurrentTime(0);
@@ -131,18 +154,25 @@ export function MovieDetail({
     setPlaybackError(null);
     setPlayerState('buffering');
     if (videoRef.current) {
-      videoRef.current.load();
-      if (retryTime > 0) {
-        videoRef.current.currentTime = retryTime;
-      }
-      videoRef.current.play().catch(() => setPlayerState('error'));
+      const v = videoRef.current;
+      v.load();
+      const onLoaded = () => {
+        v.removeEventListener('loadedmetadata', onLoaded);
+        if (retryTime > 0 && retryTime < (v.duration || Infinity)) {
+          try {
+            v.currentTime = retryTime;
+          } catch (_) {}
+        }
+        v.play().catch(() => setPlayerState('paused'));
+      };
+      v.addEventListener('loadedmetadata', onLoaded, { once: true });
     }
   };
 
   const togglePlayPause = () => {
     if (!videoRef.current) return;
     if (videoRef.current.paused) {
-      videoRef.current.play().catch(() => setPlayerState('error'));
+      videoRef.current.play().catch(() => setPlayerState('paused'));
       setPlayerState('playing');
     } else {
       videoRef.current.pause();
@@ -152,7 +182,7 @@ export function MovieDetail({
 
   const toggleMute = () => {
     if (!videoRef.current) return;
-    const nextMuted = !isMuted;
+    const nextMuted = !videoRef.current.muted;
     setIsMuted(nextMuted);
     videoRef.current.muted = nextMuted;
   };
@@ -168,25 +198,45 @@ export function MovieDetail({
 
   const seekBy = (seconds: number) => {
     if (!videoRef.current) return;
-    const target = Math.min(Math.max(0, videoRef.current.currentTime + seconds), duration || 100);
+    const dur = videoRef.current.duration || duration || 100;
+    const target = Math.min(Math.max(0, videoRef.current.currentTime + seconds), dur);
     videoRef.current.currentTime = target;
     setCurrentTime(target);
   };
 
   const adjustVolume = (delta: number) => {
     if (!videoRef.current) return;
-    const newVol = Math.min(Math.max(0, volume + delta), 1);
+    const currentVol = videoRef.current.volume;
+    const newVol = Math.min(Math.max(0, currentVol + delta), 1);
     setVolume(newVol);
     setIsMuted(newVol === 0);
     videoRef.current.volume = newVol;
     videoRef.current.muted = newVol === 0;
   };
 
+  // Autoplay rejection handler: transition to paused so user can click to play
+  useEffect(() => {
+    if (isPlaying && videoRef.current && activeMediaUrl) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err: any) => {
+          if (err?.name === 'AbortError') return;
+          setPlayerState('paused');
+        });
+      }
+    }
+  }, [isPlaying, activeMediaUrl]);
+
   // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration, shortcuts
+  // Decoupled from playback progress/volume changes so focus never jumps back prematurely
   useEffect(() => {
     if (!isPlaying) return;
 
-    if (document.activeElement && (!videoModalRef.current || !videoModalRef.current.contains(document.activeElement))) {
+    if (
+      document.activeElement &&
+      (!videoModalRef.current ||
+        (typeof videoModalRef.current.contains === 'function' && !videoModalRef.current.contains(document.activeElement)))
+    ) {
       playerOpenerRef.current = document.activeElement as HTMLElement | null;
     }
 
@@ -196,7 +246,7 @@ export function MovieDetail({
     const timer = setTimeout(() => {
       if (videoModalRef.current) {
         const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), video, [tabindex]:not([tabindex="-1"])'
+          'button:not([disabled]), input:not([disabled]), video, [tabindex]:not([tabindex="-1"])'
         );
         if (focusable.length > 0) {
           focusable[0].focus();
@@ -211,11 +261,53 @@ export function MovieDetail({
         return;
       }
 
-      // Keyboard shortcuts when playing
+      if (e.key === 'Tab' && videoModalRef.current) {
+        const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), video, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (!videoModalRef.current.contains(document.activeElement)) {
+          e.preventDefault();
+          if (e.shiftKey) last.focus();
+          else first.focus();
+          return;
+        }
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+        return;
+      }
+
+      // Respect editable targets (native sliders, text inputs)
+      const target = e.target as HTMLElement | null;
+      const isEditable = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      );
+
+      if (isEditable) {
+        return;
+      }
+
+      // Keyboard shortcuts when playing and not inside native control
       if (e.key === ' ' || e.code === 'Space') {
-        // Prevent page scroll when space is pressed inside player
-        e.preventDefault();
-        togglePlayPause();
+        if (target?.tagName !== 'BUTTON') {
+          e.preventDefault();
+          togglePlayPause();
+        }
         return;
       }
 
@@ -254,34 +346,6 @@ export function MovieDetail({
         toggleFullscreen();
         return;
       }
-
-      if (e.key === 'Tab' && videoModalRef.current) {
-        const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), video, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (!videoModalRef.current.contains(document.activeElement)) {
-          e.preventDefault();
-          if (e.shiftKey) last.focus();
-          else first.focus();
-          return;
-        }
-
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
-        }
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -292,7 +356,7 @@ export function MovieDetail({
       window.removeEventListener('keydown', handleKeyDown);
       (playerOpenerRef.current || playButtonRef.current)?.focus();
     };
-  }, [isPlaying, isMuted, volume, duration]);
+  }, [isPlaying]);
 
 
   const inWatchlist = isWatchlisted(movie.id);
@@ -603,7 +667,7 @@ export function MovieDetail({
 
               {/* Action Buttons */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                {descriptor?.hasFeature ? (
+                {descriptor && descriptor.movieId === movie.id && descriptor.hasFeature ? (
                   <>
                     <button
                       ref={playButtonRef}
@@ -615,7 +679,7 @@ export function MovieDetail({
                       Xem phim
                     </button>
 
-                    {(descriptor?.hasTrailer || hasVideo) && (
+                    {(descriptor.hasTrailer || hasVideo) && (
                       <button
                         data-testid="play-trailer-btn"
                         onClick={(e) => startPlayback('trailer', e.currentTarget)}
@@ -626,7 +690,7 @@ export function MovieDetail({
                       </button>
                     )}
                   </>
-                ) : (descriptor?.hasTrailer || hasVideo) ? (
+                ) : (descriptor && descriptor.movieId === movie.id && descriptor.hasTrailer) || (!descriptor && hasVideo) ? (
                   <button
                     ref={playButtonRef}
                     data-testid="play-trailer-btn"

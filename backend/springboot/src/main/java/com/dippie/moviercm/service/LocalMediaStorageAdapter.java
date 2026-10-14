@@ -38,20 +38,8 @@ public class LocalMediaStorageAdapter implements MediaStorageAdapter {
     }
 
     public Path getNormalizedRoot() {
-        Path root = Paths.get(mediaRootConfig).toAbsolutePath().normalize();
-        if (!Files.exists(root)) {
-            Path alt1 = Paths.get("../../media").toAbsolutePath().normalize();
-            if (Files.exists(alt1) && Files.isDirectory(alt1)) {
-                return alt1;
-            }
-            Path alt2 = Paths.get("../media").toAbsolutePath().normalize();
-            if (Files.exists(alt2) && Files.isDirectory(alt2)) {
-                return alt2;
-            }
-        }
-        return root;
+        return Paths.get(mediaRootConfig).toAbsolutePath().normalize();
     }
-
 
     @Override
     public Path resolveValidatedPath(String relativePath) {
@@ -75,12 +63,8 @@ public class LocalMediaStorageAdapter implements MediaStorageAdapter {
         }
 
         Path root = getNormalizedRoot();
-        if (!Files.exists(root)) {
-            try {
-                Files.createDirectories(root);
-            } catch (IOException e) {
-                throw new MediaUnavailableException("Thư mục lưu trữ media cục bộ không sẵn sàng: " + root);
-            }
+        if (!Files.exists(root) || !Files.isDirectory(root) || !Files.isReadable(root)) {
+            throw new MediaUnavailableException("Thư mục lưu trữ media cục bộ không sẵn sàng hoặc không đọc được: " + root);
         }
 
         Path resolved = root.resolve(relativePath).normalize();

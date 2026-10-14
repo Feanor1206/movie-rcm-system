@@ -38,7 +38,9 @@ public class MediaStreamService {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new MediaNotFoundException("Không tìm thấy phim với mã: " + movieId));
 
-        List<MediaAsset> assets = mediaAssetRepository.findByMovieIdAndIsAvailableTrue(movieId);
+        List<MediaAsset> assets = mediaAssetRepository.findByMovieIdAndIsAvailableTrue(movieId).stream()
+                .filter(a -> Boolean.TRUE.equals(a.getPublic()))
+                .toList();
 
         MediaAsset featureAsset = assets.stream()
                 .filter(a -> "feature".equalsIgnoreCase(a.getKind()))
@@ -79,15 +81,22 @@ public class MediaStreamService {
     }
 
     public MediaAsset getMediaAsset(String assetId) {
-        return mediaAssetRepository.findByIdAndIsAvailableTrue(assetId)
+        MediaAsset asset = mediaAssetRepository.findByIdAndIsAvailableTrue(assetId)
                 .orElseThrow(() -> new MediaNotFoundException("Không tìm thấy tài nguyên media: " + assetId));
+        if (!Boolean.TRUE.equals(asset.getPublic())) {
+            throw new MediaNotFoundException("Không tìm thấy tài nguyên media: " + assetId);
+        }
+        return asset;
     }
 
     public MediaStorageAdapter getStorageAdapter(String providerName) {
         if ("drive".equalsIgnoreCase(providerName)) {
             return driveStorageAdapter;
         }
-        return localStorageAdapter;
+        if ("local".equalsIgnoreCase(providerName)) {
+            return localStorageAdapter;
+        }
+        throw new MediaUnavailableException("Storage provider không được hỗ trợ: " + providerName);
     }
 
     public Resource getMediaResource(MediaAsset asset) {

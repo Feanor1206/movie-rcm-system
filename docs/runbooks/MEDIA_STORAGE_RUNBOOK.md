@@ -1,9 +1,9 @@
 # HƯỚNG DẪN VẬN HÀNH LƯU TRỮ VÀ TÍCH HỢP GOOGLE DRIVE (MEDIA STORAGE RUNBOOK)
 **Milestone:** M4 — Media Playback & Windows Storage Foundation  
-**Phiên bản:** 1.0.0 (Ngày cập nhật: 14/10/2026)  
+**Phiên bản:** 1.1.0-F01 (Ngày cập nhật: 14/10/2026)  
 **Tác giả:** Dippie Cinema Platform Team  
-**Trạng thái Google Drive:** `BLOCKED_EXTERNAL_INPUT` (Thiếu rclone & WinFsp trên host machine)  
-**Trạng thái Local Storage:** `PRODUCTION_READY` (Hoàn tất 100%, RFC 9110 compliant)
+**Trạng thái Google Drive:** `BLOCKED_EXTERNAL_INPUT / NOT_IMPLEMENTED` (DriveMediaStorageAdapter là unavailable stub; chưa mount & chưa wire implementation)  
+**Trạng thái Local Storage:** `VERIFIED_LOCAL` (Local boundary & player lifecycle verified qua M4-F01)
 
 ---
 
@@ -18,16 +18,16 @@ flowchart TD
     Service -->|"Tra cứu Asset"| DB[("media_assets (PostgreSQL / H2)")]
     Service --> Router{"Storage Adapter Router"}
     Router -->|"storage_provider = 'local'"| LocalAdapter["LocalMediaStorageAdapter"]
-    Router -->|"storage_provider = 'drive'"| DriveAdapter["DriveMediaStorageAdapter"]
+    Router -->|"storage_provider = 'drive'"| DriveAdapter["DriveMediaStorageAdapter (Stub)"]
     LocalAdapter -->|"Resolve canonical path"| LocalDisk["Local Disk (./media/...)"]
-    DriveAdapter -->|"Mount check (BLOCKED_EXTERNAL_INPUT)"| DriveMount["Google Drive VFS Mount (X:/...)"]
+    DriveAdapter -->|"Throw 503 (BLOCKED_EXTERNAL_INPUT)"| DriveUnavailable["503 Service Unavailable"]
 ```
 
 ---
 
 ## 2. Khảo sát Hiện trạng Môi trường Host
 
-Đợt kiểm tra tự động trước khi triển khai M4 ghi nhận:
+Đợt kiểm tra tự động ghi nhận:
 - **Hệ điều hành:** Windows 10/11 Enterprise x64.
 - **FFmpeg:** `ffmpeg version 8.1.1-full_build-www.gyan.dev` — **ĐÃ SẴN SÀNG** trên PATH.
 - **Rclone:** Chưa cài đặt (`rclone: The term 'rclone' is not recognized`).
@@ -35,13 +35,13 @@ flowchart TD
 - **Dung lượng đĩa khả dụng:**
   - Ổ đĩa `C:\`: ~28.3 GB khả dụng.
   - Ổ đĩa `D:\`: ~22.7 GB khả dụng (Thư mục dự án: `D:\Class\movie-rcm-system`).
-- **Kết luận:** Tuân thủ chỉ thị nghiêm ngặt của prompt, không tự động tải hoặc can thiệp cài đặt các gói hệ điều hành cấp sâu (WinFsp/rclone) mà ghi nhận rõ trạng thái `BLOCKED_EXTERNAL_INPUT`. Toàn bộ luồng phát cục bộ (Local Storage), tua HTTP Range, Player và Benchmark đã được hoàn thiện 100% độc lập.
+- **Kết luận:** Tuân thủ chỉ thị nghiêm ngặt của prompt, không tự động tải hoặc can thiệp cài đặt các gói hệ điều hành cấp sâu (WinFsp/rclone) mà ghi nhận rõ trạng thái `BLOCKED_EXTERNAL_INPUT`. Toàn bộ luồng phát cục bộ (Local Storage), tua HTTP Range, Player và kiểm thử đã được hoàn thiện độc lập.
 
 ---
 
-## 3. Quy trình Thiết lập Google Drive (Khi Người dùng Cung cấp Môi trường)
+## 3. Quy trình Thiết lập Google Drive (Khi Được Cung cấp Môi trường)
 
-Khi môi trường đã sẵn sàng cung cấp tài khoản và thông tin xác thực Google Drive, quản trị viên thực hiện các bước sau:
+Khi môi trường được cung cấp tài khoản và thông tin xác thực Google Drive, quản trị viên thực hiện các bước sau:
 
 ### Bước 1: Cài đặt WinFsp
 WinFsp cung cấp FUSE layer cho hệ điều hành Windows:
@@ -76,39 +76,34 @@ rclone config
 2. Tên remote: `cinema-gdrive`.
 3. Storage type: `drive` (Google Drive).
 4. Nhập Client ID và Client Secret (hoặc để trống để sử dụng mặc định).
-5. Phạm vi truy cập (Scope): `1` (Full access) hoặc `2` (Read-only access: `drive.readonly`).
+5. Phạm vi truy cập (Scope): `2` (Read-only access: `drive.readonly`).
 6. Hoàn tất xác thực OAuth trên trình duyệt theo hướng dẫn của rclone.
 
-### Bước 4: Khởi chạy Mount Ổ đĩa Ảo Windows
+### Bước 4: Khởi chạy Mount Ổ đĩa Ảo Windows (Baseline Read-Only, Cache-Off)
 Gắn remote Google Drive thành một ký tự ổ đĩa (ví dụ `X:`):
 ```powershell
-# Tạo lệnh mount có VFS Read Chunk Caching tối ưu cho streaming HTTP Range
+# Baseline Google Drive Mount: read-only, cache-off (không chiếm dụng đĩa cục bộ)
 rclone mount cinema-gdrive:cinema-media X: `
-  --vfs-cache-mode full `
-  --vfs-read-chunk-size 16M `
-  --vfs-read-chunk-size-limit 256M `
-  --buffer-size 32M `
+  --read-only `
+  --vfs-cache-mode off `
+  --buffer-size 16M `
   --dir-cache-time 72h `
   --poll-interval 15s `
   --attr-timeout 1s
 ```
-*Lưu ý:*
-- `--vfs-read-chunk-size 16M`: Tải trước chunk 16MB giúp tua mượt mà và giảm thiểu số lượng API calls tới Google Drive.
-- `--vfs-cache-mode full`: Đệm cục bộ để phục vụ các yêu cầu HTTP Range lặp lại (warm requests).
+*Ghi chú về Disk Caching:*
+- **Mặc định:** Sử dụng `--vfs-cache-mode off` để không chiếm dụng bộ nhớ đệm đĩa SSD cục bộ.
+- **Opt-in SSD Cache:** Chế độ đệm đĩa (`--vfs-cache-mode full`) chỉ được cân nhắc kích hoạt sau khi có số đo thực nghiệm latency/throughput và phải kèm giới hạn dung lượng nghiêm ngặt (ví dụ `--vfs-cache-max-size <limit>`). Tuyệt đối không bật cache không giới hạn hoặc giả định một con số cố định khi chưa đo đạc trên Drive thật.
 
 ### Bước 5: Cấu hình Ứng dụng Backend Spring Boot
-Kích hoạt đường dẫn mount Google Drive trong file cấu hình `application.yml` hoặc biến môi trường:
-```bash
-# Biến môi trường
-export APP_MEDIA_DRIVE_MOUNT="X:/cinema-media"
-```
-Hoặc trong `backend/springboot/src/main/resources/application.yml`:
+Khai báo biến môi trường hoặc cấu hình trong `application.yml`:
 ```yaml
 app:
   media:
-    root: ./media
-    drive-mount: "X:/cinema-media"
+    root: ${APP_MEDIA_ROOT:./media}
+    drive-mount: ${APP_MEDIA_DRIVE_MOUNT:}
 ```
+*Lưu ý quan trọng:* Trong backend hiện tại, `DriveMediaStorageAdapter` là một **stub có chủ đích** trả về `MediaUnavailableException` (503 Service Unavailable) với thông điệp `BLOCKED_EXTERNAL_INPUT: rclone/WinFsp chưa được cấu hình`. Việc chỉ thiết lập biến môi trường `APP_MEDIA_DRIVE_MOUNT` sẽ **không** tự động biến Drive thành khả dụng; việc cài đặt adapter đọc tệp Drive thật sẽ chỉ được triển khai khi hạ tầng và quyền truy cập Drive được phê duyệt.
 
 ---
 

@@ -1,0 +1,100 @@
+{
+  "version": "1.0",
+  "milestone": "M4-F01",
+  "timestamp": "2026-10-14T08:30:21.238Z",
+  "patchFile": "docs/reports/M4_F01.patch",
+  "patchVerification": {
+    "command": "git apply --check -R docs/reports/M4_F01.patch",
+    "status": "VERIFIED_CLEAN"
+  },
+  "files": {
+    "backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java": {
+      "sha256": "dd2dc473fc93cf3cb75d773f9fcca56731e9d9e9286817ecfd538aa58ca51bc1",
+      "bytes": 3523
+    },
+    "backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaAssetDto.java": {
+      "sha256": "4235fc80cf348803d545a6da946b642dab73d173004fc4dd17f82aa0eac347ce",
+      "bytes": 2454
+    },
+    "backend/springboot/src/main/java/com/dippie/moviercm/service/LocalMediaStorageAdapter.java": {
+      "sha256": "cea6f4296d0e33362a6d6a4ef33007d5423de1e658e65c2fd3610c6f01cc58e6",
+      "bytes": 4441
+    },
+    "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java": {
+      "sha256": "05046b5afd8e2f79dfaddb029108800672f98b26b1ecf8501d55efa3f9def996",
+      "bytes": 8335
+    },
+    "backend/springboot/src/main/resources/application.yml": {
+      "sha256": "bd363800543efe07cddd81326915461941381f09c07d2e2f5b3ee4fd77cecc92",
+      "bytes": 1600
+    },
+    "backend/springboot/src/test/java/com/dippie/moviercm/M4WalkthroughServer.java": {
+      "sha256": "c327cd0a05e8cb9fb115cc9f399076b34e3f7c4e0e57b449b295b1adbcbe7a0e",
+      "bytes": 4616
+    },
+    "backend/springboot/src/test/java/com/dippie/moviercm/MediaStreamingIntegrationTest.java": {
+      "sha256": "a5d9aa5d779ac688b6202f5467dfe92b41d3b3f6b9d81401d51bc14bfc7efa84",
+      "bytes": 17110
+    },
+    "backend/springboot/src/test/resources/application-test.yml": {
+      "sha256": "cfb5b81956cab3ced330dc54aa05e001a45b51b735354d2206dc47d89e97d894",
+      "bytes": 488
+    },
+    "docs/reports/M4_F01_REPORT.md": {
+      "sha256": "c48090d77f36ba0f33f3e97c0b310fd3db5225c04ecabbeeac71816c2bb307f5",
+      "bytes": 13600
+    },
+    "docs/reports/M4_F01_STATUS.json": {
+      "sha256": "eae6981aaebba2df1505b323d796abf1d283ef2091668eef3ed29b86f05159a9",
+      "bytes": 1549
+    },
+    "docs/reports/m4_f01_benchmark_results.json": {
+      "sha256": "ea611173dbd88d720dd856ff2c4af8a464736e0dcf94e9bec2b82773715211a3",
+      "bytes": 3936
+    },
+    "docs/reports/screenshots/M4_F01/01_desktop_playback_playing.png": {
+      "sha256": "3c7c3dc02f8720f9bbd2c8273373cae6c743cba7719d3c192731a5444f688bc9",
+      "bytes": 77231
+    },
+    "docs/reports/screenshots/M4_F01/02_desktop_seek_near_end.png": {
+      "sha256": "de60e92ac5ba57e4882c09206f0668a039fe2b0f0834d171e1c89f035c38632f",
+      "bytes": 74229
+    },
+    "docs/reports/screenshots/M4_F01/03_desktop_retry_recovery.png": {
+      "sha256": "56646712760c4f4257a782694eaed39992f323ce6649a993ad38e5e059381ff5",
+      "bytes": 74810
+    },
+    "docs/reports/screenshots/M4_F01/04_mobile_playback_375px.png": {
+      "sha256": "f5f538feb464f8cc84f6ecdd2734f810038ddd300ed1e9ecdf0c135680cab9ee",
+      "bytes": 127274
+    },
+    "docs/reports/M4_F01.patch": {
+      "sha256": "f545e0b1d1401ee79b5b7f2c6d5757a8f72343cd5372d07b8938d7cc58090562",
+      "bytes": 130916
+    },
+    "docs/runbooks/MEDIA_STORAGE_RUNBOOK.md": {
+      "sha256": "2dd6641bd9fcf74df7de74b4bdd27a3b69f19fab5a94fd92e5d3c92f0768848f",
+      "bytes": 7942
+    },
+    "frontend/features/movies/components/MovieDetail.tsx": {
+      "sha256": "feebda343746049dd69bcc6826d2f59c8f90ddebb74b9dd244a1346e1982a883",
+      "bytes": 40399
+    },
+    "frontend/lib/services/mediaService.ts": {
+      "sha256": "769c058494e12aee99d46bb52e58b15c9c159467204a1fc2755c74efd86b6aea",
+      "bytes": 2994
+    },
+    "frontend/tests/media_playback_suite.mjs": {
+      "sha256": "c3240cb34a674a6ed0aee99dc95f8c70fffb518f0d17f9e9095819c454abab43",
+      "bytes": 22920
+    },
+    "scripts/benchmark_media_playback.cjs": {
+      "sha256": "eb20b8dae84f2cdb0cfdfba879da36eb6fbae28e4a19aaebfdbadfbc640a23ee",
+      "bytes": 13009
+    },
+    "scripts/run_m4_media_walkthrough.cjs": {
+      "sha256": "19892ccbee6cab01cb232417877ddd7e6c7d84af144e636d6298ce1136b35b01",
+      "bytes": 38232
+    }
+  }
+}

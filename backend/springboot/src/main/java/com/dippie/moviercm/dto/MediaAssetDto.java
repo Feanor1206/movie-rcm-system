@@ -1,5 +1,7 @@
 package com.dippie.moviercm.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class MediaAssetDto {
 
     private String assetId;
@@ -8,7 +10,10 @@ public class MediaAssetDto {
     private String mimeType;
     private Long byteLength;
     private Double durationSeconds;
+
+    @JsonProperty("isPublic")
     private Boolean isPublic;
+
     private String version;
 
     public MediaAssetDto() {}
@@ -73,10 +78,22 @@ public class MediaAssetDto {
         this.durationSeconds = durationSeconds;
     }
 
+    @JsonProperty("isPublic")
+    public Boolean getIsPublic() {
+        return isPublic;
+    }
+
+    @JsonProperty("isPublic")
+    public void setIsPublic(Boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public Boolean getPublic() {
         return isPublic;
     }
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public void setPublic(Boolean aPublic) {
         isPublic = aPublic;
     }

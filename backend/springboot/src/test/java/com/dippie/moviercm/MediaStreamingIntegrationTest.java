@@ -2,10 +2,12 @@ package com.dippie.moviercm;
 
 import com.dippie.moviercm.entity.MediaAsset;
 import com.dippie.moviercm.entity.Movie;
+import com.dippie.moviercm.exception.MediaUnavailableException;
 import com.dippie.moviercm.exception.SecurityPathTraversalException;
 import com.dippie.moviercm.repository.MediaAssetRepository;
 import com.dippie.moviercm.repository.MovieRepository;
 import com.dippie.moviercm.service.LocalMediaStorageAdapter;
+import com.dippie.moviercm.service.MediaStreamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +48,9 @@ public class MediaStreamingIntegrationTest {
 
     @Autowired
     private LocalMediaStorageAdapter localStorageAdapter;
+
+    @Autowired
+    private MediaStreamService mediaStreamService;
 
     private long featureTestLength = 0;
     private long trailerTestLength = 0;
@@ -310,5 +315,83 @@ public class MediaStreamingIntegrationTest {
 
         assertThrows(SecurityPathTraversalException.class, () ->
                 localStorageAdapter.resolveValidatedPath("synthetic/feature_test.mp4\0.txt"));
+    }
+
+    @Test
+    @DisplayName("Private assets return 404 and no-cache on direct GET and HEAD, and are not in descriptor")
+    void testPrivateAssetIsolation() throws Exception {
+        Movie mPrivate = Movie.builder()
+                .id("test-movie-private")
+                .title("Private Movie")
+                .year(2026)
+                .rating(8.0)
+                .genres("Drama")
+                .build();
+        movieRepository.save(mPrivate);
+
+        MediaAsset privateFeat = new MediaAsset(
+                "ast-test-private-1",
+                "test-movie-private",
+                "feature",
+                "local",
+                "synthetic/feature_test.mp4",
+                "v1",
+                "video/mp4",
+                featureTestLength,
+                10.0,
+                false,
+                true
+        );
+        mediaAssetRepository.save(privateFeat);
+
+        // Direct GET returns 404 with no-cache headers
+        mockMvc.perform(get("/api/media/stream/ast-test-private-1"))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-cache")))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")));
+
+        // Direct HEAD returns 404 with no-cache headers
+        mockMvc.perform(head("/api/media/stream/ast-test-private-1"))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-cache")))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")));
+
+        // In descriptor, private asset is not advertised
+        mockMvc.perform(get("/api/movies/test-movie-private/media-descriptor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasFeature", is(false)))
+                .andExpect(jsonPath("$.feature").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Descriptor serializes isPublic field strictly as isPublic")
+    void testDescriptorIsPublicSerialization() throws Exception {
+        mockMvc.perform(get("/api/movies/test-movie-full/media-descriptor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.feature.isPublic", is(true)))
+                .andExpect(jsonPath("$.feature.public").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Missing media root throws 503 MediaUnavailableException without creating directories on read")
+    void testMissingRootThrows503WithoutCreatingDir() {
+        Path nonExistentRoot = Paths.get("target", "non-existent-media-root-" + System.nanoTime());
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(nonExistentRoot));
+
+        LocalMediaStorageAdapter adapter = new LocalMediaStorageAdapter(nonExistentRoot.toString());
+        org.junit.jupiter.api.Assertions.assertFalse(adapter.isAvailable());
+
+        assertThrows(MediaUnavailableException.class, () ->
+                adapter.resolveValidatedPath("test.mp4"));
+
+        // Crucial: verify no directories were created on disk
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(nonExistentRoot));
+    }
+
+    @Test
+    @DisplayName("Unknown storage provider throws MediaUnavailableException (503)")
+    void testUnknownStorageProviderThrowsUnavailable() {
+        assertThrows(MediaUnavailableException.class, () ->
+                mediaStreamService.getStorageAdapter("unknown-cloud-storage"));
     }
 }
