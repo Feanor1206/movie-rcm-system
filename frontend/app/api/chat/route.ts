@@ -34,6 +34,8 @@ export async function POST(req: Request) {
       text: data.text || data.reply || data.response,
       recommendedMovies: data.recommendedMovies || [],
       followUps: data.followUps || [],
+      structuredIntent: data.structuredIntent || null,
+      pipelineStages: data.pipelineStages || [],
     });
   } catch (error: any) {
     console.error('Chatbot API Error (Qwen LLM):', error);
@@ -41,7 +43,9 @@ export async function POST(req: Request) {
       {
         text: `⚠️ [Lỗi kết nối AI Gateway]: Không thể nhận phản hồi từ model Qwen (:8000). Chi tiết: ${error?.message || error}`,
         recommendedMovies: [],
-        followUps: []
+        followUps: [],
+        structuredIntent: null,
+        pipelineStages: [],
       },
       { status: 500 }
     );

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Lock, User, Mail, Sparkles, Loader2, ArrowRight } from 'lucide-react';
+import { X, Lock, User, Mail, Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
@@ -22,6 +22,8 @@ export function AuthModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setError(null);
     setIsSubmitting(true);
 
@@ -32,7 +34,7 @@ export function AuthModal() {
           showToast('Đăng nhập thành công! Chào mừng bạn trở lại.');
           closeAuthModal();
         } else {
-          setError(res.message || 'Đăng nhập thất bại.');
+          setError(res.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.');
         }
       } else {
         const res = await register(username, email, password, fullName);
@@ -40,27 +42,33 @@ export function AuthModal() {
           showToast('Đăng ký tài khoản thành công!');
           closeAuthModal();
         } else {
-          setError(res.message || 'Đăng ký thất bại.');
+          setError(res.message || 'Đăng ký không thành công. Vui lòng thử lại.');
         }
       }
+    } catch {
+      setError('Đã xảy ra sự cố kết nối. Vui lòng kiểm tra lại đường truyền.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const fillDemoAccount = () => {
-    setUsername('alex');
-    setPassword('password123');
-    setError(null);
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 p-6 sm:p-8 shadow-2xl">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="auth-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && !isSubmitting) closeAuthModal();
+      }}
+    >
+      <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-surface-border bg-surface p-6 sm:p-8 shadow-2xl">
         {/* Close Button */}
         <button
+          type="button"
           onClick={closeAuthModal}
-          className="absolute right-4 top-4 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-850 hover:text-white transition-colors cursor-pointer"
+          disabled={isSubmitting}
+          className="absolute right-4 top-4 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
           aria-label="Đóng popup"
         >
           <X size={18} />
@@ -70,40 +78,42 @@ export function AuthModal() {
         <div className="mb-6">
           <div className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white">
             <span className="tracking-tighter font-extrabold text-2xl">DIPPIE</span>
-            <span className="h-2 w-2 rounded-full bg-cinema-red" />
+            <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
           </div>
-          <h2 className="mt-2 text-xl font-bold tracking-tight text-white">
+          <h2 id="auth-modal-title" className="mt-2 text-xl font-bold tracking-tight text-white">
             {isLogin ? 'Đăng nhập tài khoản' : 'Tạo tài khoản mới'}
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
             {isLogin
               ? 'Lưu trữ Watchlist và đồng bộ điểm đánh giá phim của bạn'
-              : 'Tham gia cộng đồng yêu điện ảnh và nhận đề xuất phim cá nhân hóa'}
+              : 'Tham gia khám phá phim hoạt hình và nhận đề xuất cá nhân hóa'}
           </p>
         </div>
 
-        {/* Tab Switcher (Clean rectangular tabs) */}
-        <div className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1 mb-6">
+        {/* Tab Switcher */}
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-surface-border bg-surface-muted p-1 mb-6">
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={() => {
               setError(null);
               openAuthModal('login');
             }}
-            className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
-              isLogin ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+            className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-60 ${
+              isLogin ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
             }`}
           >
             Đăng nhập
           </button>
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={() => {
               setError(null);
               openAuthModal('register');
             }}
-            className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
-              !isLogin ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+            className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-60 ${
+              !isLogin ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
             }`}
           >
             Đăng ký
@@ -112,7 +122,7 @@ export function AuthModal() {
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-400">
+          <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-400 leading-relaxed">
             {error}
           </div>
         )}
@@ -124,15 +134,15 @@ export function AuthModal() {
               <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                 Họ và tên
               </label>
-              <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
+              <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
                 <User size={15} className="text-zinc-500 mr-2 shrink-0" />
                 <input
                   type="text"
-                  required
+                  disabled={isSubmitting}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Alex Morgan"
-                  className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+                  placeholder="Nguyễn Văn A"
+                  className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
                 />
               </div>
             </div>
@@ -142,15 +152,17 @@ export function AuthModal() {
             <label className="block text-xs font-medium text-zinc-300 mb-1.5">
               {isLogin ? 'Tên đăng nhập hoặc Email' : 'Tên đăng nhập'}
             </label>
-            <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
+            <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
               <User size={15} className="text-zinc-500 mr-2 shrink-0" />
               <input
                 type="text"
                 required
+                disabled={isSubmitting}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={isLogin ? 'alex hoặc alex@dippie.com' : 'alex'}
-                className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+                placeholder={isLogin ? 'Nhập tên đăng nhập hoặc email' : 'tentaikhoan'}
+                autoComplete={isLogin ? 'username' : 'new-username'}
+                className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
               />
             </div>
           </div>
@@ -160,15 +172,17 @@ export function AuthModal() {
               <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                 Email
               </label>
-              <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
+              <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
                 <Mail size={15} className="text-zinc-500 mr-2 shrink-0" />
                 <input
                   type="email"
                   required
+                  disabled={isSubmitting}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="alex@dippie.com"
-                  className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+                  placeholder="email@vidu.com"
+                  autoComplete="email"
+                  className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
                 />
               </div>
             </div>
@@ -178,15 +192,17 @@ export function AuthModal() {
             <label className="block text-xs font-medium text-zinc-300 mb-1.5">
               Mật khẩu
             </label>
-            <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
+            <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
               <Lock size={15} className="text-zinc-500 mr-2 shrink-0" />
               <input
                 type="password"
                 required
+                disabled={isSubmitting}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
               />
             </div>
           </div>
@@ -194,7 +210,7 @@ export function AuthModal() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary w-full justify-center py-2.5 text-xs sm:text-sm font-bold shadow-red-sm disabled:opacity-50 cursor-pointer"
+            className="btn-primary w-full justify-center py-2.5 text-xs sm:text-sm font-bold shadow-brand-sm disabled:opacity-50 cursor-pointer"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -211,20 +227,6 @@ export function AuthModal() {
             )}
           </button>
         </form>
-
-        {/* Demo Account Quick Fill (Helper for testing) */}
-        {isLogin && (
-          <div className="mt-5 pt-4 border-t border-zinc-850">
-            <button
-              type="button"
-              onClick={fillDemoAccount}
-              className="flex items-center justify-between w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-left text-xs text-zinc-400 hover:border-zinc-700 hover:text-white transition-colors cursor-pointer"
-            >
-              <span>Điền nhanh tài khoản Demo: <strong>alex / password123</strong></span>
-              <Sparkles size={13} className="text-cinema-red shrink-0 ml-1" />
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

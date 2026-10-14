@@ -1,0 +1,28 @@
+{
+  "artifact": "PHASE23_FINAL_TEST_GOLD_V1_FREEZE_MANIFEST",
+  "audit": {
+    "file": "phase23_test_gold_final_v1_audit.json",
+    "sha256": "ff97ebfa39892d58967b8d4f7cf868646bd58cede2c452e984ccffe84e133b44"
+  },
+  "construction": {
+    "deterministic_rows": 304,
+    "gemini_labels_used": false,
+    "human_reviewed_rows": 196,
+    "phase21_predictions_used": false,
+    "phase23_predictions_used": false,
+    "post_test_tuning_allowed": false
+  },
+  "final_gold": {
+    "file": "phase23_test_gold_final_v1.jsonl",
+    "sha256": "66715c4d9b901aaa5231ecb631d0b7da76a729fb46cda14335524dd392ab2e82"
+  },
+  "next_allowed_action": "Run Phase21 and Phase23 exactly once on this same frozen TEST_GOLD; do not tune, relabel, or alter the gold after observing results.",
+  "rows": 500,
+  "schema": "StructuredDiscoveryIntent v1 / StructuredIntentPatch v1",
+  "source_artifacts": {
+    "deterministic_repo_freeze_sha256": "22302b420a43ad73385055328d92a8ab3efb1ba23e403148a95f713cd5d408ff",
+    "deterministic_uploaded_copy_sha256": "89de9531aa5fb330369aa7cc66bd8bc0d272b0290ae8ceda2b9616ccdf39a8f5",
+    "human_reviewed_normalized_sha256": "ae28845ac1b8e72838fc0386217b60caa81d035472a51b53ea5dac09e6b618a4"
+  },
+  "state": "FROZEN_FINAL_TEST_GOLD"
+}

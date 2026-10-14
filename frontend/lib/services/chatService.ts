@@ -1,5 +1,19 @@
 import type { Movie } from '@/types/movie';
 
+export interface StructuredIntent {
+  intent_type: 'DISCOVERY' | 'CONVERSATIONAL_PATCH' | 'CLARIFICATION' | 'NO_OP' | string;
+  semantic_query?: string | null;
+  reference_films?: string[];
+  include_genres?: string[];
+  exclude_genres?: string[];
+  year_min?: number | null;
+  year_max?: number | null;
+  requested_k?: number | null;
+  requires_clarification?: boolean;
+  clarification_reason_code?: string | null;
+  no_op?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'bot';
@@ -7,12 +21,16 @@ export interface ChatMessage {
   timestamp: string;
   movies?: Movie[];
   followUps?: string[];
+  structuredIntent?: StructuredIntent | null;
+  pipelineStages?: string[];
 }
 
 export interface ChatServiceResponse {
   text: string;
   recommendedMovies: Movie[];
   followUps: string[];
+  structuredIntent?: StructuredIntent | null;
+  pipelineStages?: string[];
 }
 
 /**

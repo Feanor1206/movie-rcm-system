@@ -11,27 +11,44 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#000000',
-        foreground: '#ffffff',
+        background: '#090d0b',
+        foreground: '#f3f4f6',
         surface: {
-          DEFAULT: '#0f0f10',
-          elevated: '#161618',
-          hover: '#1e1e22',
-          border: '#27272a',
+          DEFAULT: '#111714',
+          elevated: '#16201b',
+          hover: '#1d2a23',
+          border: '#23332a',
+        },
+        brand: {
+          DEFAULT: '#10b981',
+          foreground: '#09090b',
+          hover: '#34d399',
+          active: '#059669',
+          dark: '#047857',
+          light: '#34d399',
+          muted: '#064e3b',
+          subtle: 'rgba(16, 185, 129, 0.12)',
+        },
+        danger: {
+          DEFAULT: '#ef4444',
+          hover: '#dc2626',
+          muted: '#7f1d1d',
         },
         cinema: {
-          red: '#e50914',
-          'red-hover': '#f40612',
-          'red-muted': '#2d0a0c',
+          red: '#10b981',
+          'red-hover': '#059669',
+          'red-muted': '#064e3b',
         },
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       boxShadow: {
-        'red-sm': '0 0 15px -3px rgba(229, 9, 20, 0.4)',
-        'red-lg': '0 0 30px -5px rgba(229, 9, 20, 0.5)',
-        'card-hover': '0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.15)',
+        'brand-sm': '0 0 15px -3px rgba(16, 185, 129, 0.35)',
+        'brand-lg': '0 0 30px -5px rgba(16, 185, 129, 0.4)',
+        'red-sm': '0 0 15px -3px rgba(16, 185, 129, 0.35)',
+        'red-lg': '0 0 30px -5px rgba(16, 185, 129, 0.4)',
+        'card-hover': '0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(16, 185, 129, 0.25)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out forwards',

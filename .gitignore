@@ -82,6 +82,9 @@ data/raw/
 
 # Docker & Database
 pgdata/
+backend/springboot/data/
+*.mv.db
+*.trace.db
 
 # Large Media & Video Files (>100MB)
 *.mp4
@@ -91,3 +94,8 @@ pgdata/
 storage/videos/
 frontend/public/videos/*
 !frontend/public/videos/.gitkeep
+
+# Local review baselines and generated model runtime artifacts
+/.f*_snapshot/
+/.round*_snapshot/
+/ai/phase23_package/best_adapter/

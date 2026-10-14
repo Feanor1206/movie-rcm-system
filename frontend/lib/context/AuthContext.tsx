@@ -1,6 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  ReactNode,
+} from 'react';
 
 export type AuthUser = {
   id: number;
@@ -10,11 +18,16 @@ export type AuthUser = {
   role: string;
 };
 
+export type AuthStatus = 'guest' | 'checking' | 'authenticated' | 'unavailable';
+
 type AuthContextType = {
   user: AuthUser | null;
   token: string | null;
+  status: AuthStatus;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isUnavailable: boolean;
+  errorMessage: string | null;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'register';
   openAuthModal: (mode?: 'login' | 'register') => void;
@@ -22,71 +35,238 @@ type AuthContextType = {
   login: (usernameOrEmail: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (username: string, email: string, password: string, fullName?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
+  retryVerify: () => Promise<void>;
+  handleSessionExpired: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
+const REQUEST_TIMEOUT_MS = 8000;
 
-const MOCK_50_USERS: Record<string, { id: number; fullName: string; email: string; role: string }> = {
-  alex: { id: 1, fullName: 'Alex Morgan', email: 'alex@dippie.com', role: 'ROLE_ADMIN' },
-  linh_dan: { id: 2, fullName: 'Nguyễn Linh Đan', email: 'linhdan@gmail.com', role: 'ROLE_USER' },
-  minh_tri: { id: 3, fullName: 'Trần Minh Trí', email: 'minhtri.tran@gmail.com', role: 'ROLE_USER' },
-  duc_anh: { id: 4, fullName: 'Lê Đức Anh', email: 'ducanh.le@yahoo.com', role: 'ROLE_USER' },
-  mai_anh: { id: 5, fullName: 'Phạm Mai Anh', email: 'maianh.pham@outlook.com', role: 'ROLE_USER' },
-  hoang_long: { id: 6, fullName: 'Hoàng Long', email: 'hoanglong99@gmail.com', role: 'ROLE_USER' },
-  viet_dung: { id: 7, fullName: 'Vũ Việt Dũng', email: 'dung.vu@gmail.com', role: 'ROLE_USER' },
-  huong_giang: { id: 8, fullName: 'Đặng Hương Giang', email: 'giang.dang@gmail.com', role: 'ROLE_USER' },
-  tuan_kiet: { id: 9, fullName: 'Bùi Tuấn Kiệt', email: 'kiet.bui@gmail.com', role: 'ROLE_USER' },
-  thao_vy: { id: 10, fullName: 'Võ Thảo Vy', email: 'thaovy.vo@gmail.com', role: 'ROLE_USER' },
-};
+function validateAuthPayload(data: any, fallbackToken?: string): { user: AuthUser; token: string } | null {
+  if (!data || typeof data !== 'object') return null;
+
+  const rawToken = typeof data.token === 'string' && data.token.trim().length > 0 ? data.token.trim() : fallbackToken;
+  if (!rawToken || typeof rawToken !== 'string' || rawToken.trim().length === 0) {
+    return null;
+  }
+
+  // ID must be a valid positive integer number
+  let numericId: number | null = null;
+  if (typeof data.id === 'number' && Number.isFinite(data.id) && data.id > 0) {
+    numericId = data.id;
+  } else if (typeof data.id === 'string' && /^\d+$/.test(data.id.trim())) {
+    const parsed = parseInt(data.id.trim(), 10);
+    if (parsed > 0) numericId = parsed;
+  }
+  if (numericId === null) {
+    return null;
+  }
+
+  if (typeof data.username !== 'string' || data.username.trim().length === 0) {
+    return null;
+  }
+
+  if (typeof data.email !== 'string' || !data.email.includes('@')) {
+    return null;
+  }
+
+  const user: AuthUser = {
+    id: numericId,
+    username: data.username.trim(),
+    email: data.email.trim(),
+    fullName: typeof data.fullName === 'string' && data.fullName.trim().length > 0 ? data.fullName.trim() : undefined,
+    role: typeof data.role === 'string' && data.role.trim().length > 0 ? data.role.trim() : 'ROLE_USER',
+  };
+
+  return { user, token: rawToken };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState<AuthStatus>('checking');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
-  // Load session from localStorage on boot
-  useEffect(() => {
-    try {
-      const savedToken = localStorage.getItem('dippie_auth_token');
-      const savedUser = localStorage.getItem('dippie_auth_user');
+  // Generation counter to invalidate stale asynchronous responses across async boundaries
+  const generationRef = useRef<number>(0);
+  const activeAbortCtrlRef = useRef<AbortController | null>(null);
 
-      if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-        fetchCurrentUser(savedToken);
-      } else {
-        setIsLoading(false);
-      }
-    } catch {
-      setIsLoading(false);
+  const abortActiveRequest = useCallback(() => {
+    if (activeAbortCtrlRef.current) {
+      activeAbortCtrlRef.current.abort();
+      activeAbortCtrlRef.current = null;
     }
   }, []);
 
-  const fetchCurrentUser = async (authToken: string) => {
+  const clearSessionStorage = useCallback(() => {
     try {
-      const res = await fetch(`${SPRINGBOOT_API}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
+      localStorage.removeItem('dippie_auth_token');
+      localStorage.removeItem('dippie_auth_user');
+    } catch {}
+  }, []);
 
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          setUser(json.data);
-          localStorage.setItem('dippie_auth_user', JSON.stringify(json.data));
+  const saveSessionStorage = useCallback((authToken: string, authUser: AuthUser) => {
+    try {
+      localStorage.setItem('dippie_auth_token', authToken);
+      localStorage.setItem('dippie_auth_user', JSON.stringify(authUser));
+    } catch {}
+  }, []);
+
+  // Verify stored session with backend /api/auth/me
+  const verifySession = useCallback(
+    async (authToken: string, generation: number) => {
+      abortActiveRequest();
+      const abortCtrl = new AbortController();
+      activeAbortCtrlRef.current = abortCtrl;
+      let timeoutId: any = null;
+
+      try {
+        timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
+
+        const res = await fetch(`${SPRINGBOOT_API}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            Accept: 'application/json',
+          },
+          signal: abortCtrl.signal,
+        });
+
+        // 1. Guard check immediately after fetch
+        if (generation !== generationRef.current) {
+          return;
+        }
+
+        if (res.ok) {
+          let json: any = null;
+          try {
+            json = await res.json();
+          } catch {
+            if (generation !== generationRef.current) return;
+            setStatus('unavailable');
+            setErrorMessage('Phản hồi từ máy chủ không hợp lệ.');
+            return;
+          }
+
+          // 2. Guard check after reading json body
+          if (generation !== generationRef.current) {
+            return;
+          }
+
+          const validated = validateAuthPayload(json?.data, authToken);
+          if (json?.success && validated) {
+            // 3. Guard check immediately before commit
+            if (generation !== generationRef.current) {
+              return;
+            }
+            setUser(validated.user);
+            setToken(validated.token);
+            setStatus('authenticated');
+            setErrorMessage(null);
+            saveSessionStorage(validated.token, validated.user);
+            return;
+          } else {
+            // Malformed data
+            if (generation !== generationRef.current) return;
+            setUser(null);
+            setToken(null);
+            setStatus('guest');
+            setErrorMessage(null);
+            clearSessionStorage();
+            return;
+          }
+        }
+
+        if (res.status === 401 || res.status === 403) {
+          if (generation !== generationRef.current) return;
+          setUser(null);
+          setToken(null);
+          setStatus('guest');
+          setErrorMessage(null);
+          clearSessionStorage();
+        } else {
+          if (generation !== generationRef.current) return;
+          setStatus('unavailable');
+          setErrorMessage('Máy chủ xác thực tạm thời không phản hồi. Vui lòng thử lại.');
+        }
+      } catch (err: unknown) {
+        if (generation !== generationRef.current) {
+          return;
+        }
+
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setStatus('unavailable');
+          setErrorMessage('Kết nối tới máy chủ quá thời gian chờ (timeout).');
+        } else {
+          setStatus('unavailable');
+          setErrorMessage('Không thể kết nối đến máy chủ xác thực.');
+        }
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        if (activeAbortCtrlRef.current === abortCtrl) {
+          activeAbortCtrlRef.current = null;
         }
       }
-    } catch {
-      // Backend not running or offline, keep local user state
-    } finally {
-      setIsLoading(false);
+    },
+    [abortActiveRequest, clearSessionStorage, saveSessionStorage]
+  );
+
+  // Boot check
+  useEffect(() => {
+    let savedToken: string | null = null;
+    try {
+      savedToken = localStorage.getItem('dippie_auth_token');
+    } catch {}
+
+    if (savedToken && typeof savedToken === 'string' && savedToken.trim().length > 0) {
+      generationRef.current += 1;
+      const gen = generationRef.current;
+      setStatus('checking');
+      verifySession(savedToken.trim(), gen);
+    } else {
+      setStatus('guest');
     }
+
+    return () => {
+      generationRef.current += 1;
+      abortActiveRequest();
+    };
+  }, [abortActiveRequest, verifySession]);
+
+  const retryVerify = async () => {
+    let savedToken: string | null = token;
+    if (!savedToken) {
+      try {
+        savedToken = localStorage.getItem('dippie_auth_token');
+      } catch {}
+    }
+
+    if (!savedToken) {
+      setStatus('guest');
+      return;
+    }
+
+    generationRef.current += 1;
+    const gen = generationRef.current;
+    setStatus('checking');
+    setErrorMessage(null);
+    await verifySession(savedToken, gen);
   };
+
+  const handleSessionExpired = useCallback(() => {
+    abortActiveRequest();
+    generationRef.current += 1;
+    setUser(null);
+    setToken(null);
+    setStatus('guest');
+    setErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    clearSessionStorage();
+  }, [abortActiveRequest, clearSessionStorage]);
 
   const openAuthModal = (mode: 'login' | 'register' = 'login') => {
     setAuthModalMode(mode);
@@ -97,68 +277,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthModalOpen(false);
   };
 
-  const login = async (usernameOrEmail: string, password: string): Promise<{ success: boolean; message?: string }> => {
-    const cleanInput = usernameOrEmail.trim().toLowerCase();
-    const cleanPass = password.trim();
+  const login = async (
+    usernameOrEmail: string,
+    password: string
+  ): Promise<{ success: boolean; message?: string }> => {
+    const cleanUsername = usernameOrEmail.trim();
+    // Raw password verbatim - NEVER trimmed or lowercased
+    const rawPassword = password;
+
+    if (!cleanUsername) {
+      return { success: false, message: 'Vui lòng nhập tên đăng nhập hoặc email' };
+    }
+    if (!rawPassword) {
+      return { success: false, message: 'Vui lòng nhập mật khẩu' };
+    }
+
+    abortActiveRequest();
+    generationRef.current += 1;
+    const currentGen = generationRef.current;
+
+    const abortCtrl = new AbortController();
+    activeAbortCtrlRef.current = abortCtrl;
+    let timeoutId: any = null;
 
     try {
-      // 1. Thử kết nối đến Spring Boot Backend
+      timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
+
       const res = await fetch(`${SPRINGBOOT_API}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernameOrEmail: cleanInput, password: cleanPass }),
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          usernameOrEmail: cleanUsername,
+          password: rawPassword,
+        }),
+        signal: abortCtrl.signal,
       });
 
-      const json = await res.json();
-      if (res.ok && json.success) {
-        const authData = json.data;
-        const loggedUser: AuthUser = {
-          id: authData.id,
-          username: authData.username,
-          email: authData.email,
-          fullName: authData.fullName,
-          role: authData.role,
-        };
+      // 1. Guard check after fetch
+      if (currentGen !== generationRef.current) {
+        return { success: false, message: 'Thao tác đã bị hủy.' };
+      }
 
-        setToken(authData.token);
-        setUser(loggedUser);
-        localStorage.setItem('dippie_auth_token', authData.token);
-        localStorage.setItem('dippie_auth_user', JSON.stringify(loggedUser));
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        if (currentGen !== generationRef.current) {
+          return { success: false, message: 'Thao tác đã bị hủy.' };
+        }
+        return { success: false, message: 'Phản hồi từ máy chủ không hợp lệ.' };
+      }
+
+      // 2. Guard check after reading json body
+      if (currentGen !== generationRef.current) {
+        return { success: false, message: 'Thao tác đã bị hủy.' };
+      }
+
+      const validated = validateAuthPayload(json?.data);
+      if (res.ok && json?.success && validated) {
+        // 3. Guard check immediately before commit
+        if (currentGen !== generationRef.current) {
+          return { success: false, message: 'Thao tác đã bị hủy.' };
+        }
+
+        setToken(validated.token);
+        setUser(validated.user);
+        setStatus('authenticated');
+        setErrorMessage(null);
+        saveSessionStorage(validated.token, validated.user);
         closeAuthModal();
         return { success: true };
       } else {
-        return { success: false, message: json.message || 'Tên đăng nhập hoặc mật khẩu không chính xác' };
+        const errorMsg =
+          json?.message ||
+          (res.status === 401
+            ? 'Tên đăng nhập hoặc mật khẩu không chính xác.'
+            : 'Đăng nhập thất bại.');
+        return { success: false, message: errorMsg };
       }
-    } catch {
-      // 2. Chế độ dự phòng thông minh (Zero-Downtime Mock Login khi Spring Boot chưa bật)
-      const matchedMock = MOCK_50_USERS[cleanInput] || {
-        id: Math.floor(Math.random() * 900) + 51,
-        fullName: cleanInput.charAt(0).toUpperCase() + cleanInput.slice(1),
-        email: `${cleanInput}@dippie.com`,
-        role: 'ROLE_USER',
-      };
-
-      if (cleanPass === 'password123' || cleanPass.length >= 6) {
-        const mockUser: AuthUser = {
-          id: matchedMock.id,
-          username: cleanInput,
-          email: matchedMock.email,
-          fullName: matchedMock.fullName,
-          role: matchedMock.role,
-        };
-        const mockToken = `mock_jwt_${cleanInput}_${Date.now()}`;
-        setToken(mockToken);
-        setUser(mockUser);
-        localStorage.setItem('dippie_auth_token', mockToken);
-        localStorage.setItem('dippie_auth_user', JSON.stringify(mockUser));
-        closeAuthModal();
-        return { success: true };
+    } catch (err: unknown) {
+      if (currentGen !== generationRef.current) {
+        return { success: false, message: 'Thao tác đã bị hủy.' };
       }
 
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return { success: false, message: 'Kết nối máy chủ quá thời gian chờ (timeout).' };
+      }
       return {
         success: false,
-        message: 'Mật khẩu mặc định là: password123 (hoặc tối thiểu 6 ký tự).',
+        message: 'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra lại mạng hoặc dịch vụ.',
       };
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (activeAbortCtrlRef.current === abortCtrl) {
+        activeAbortCtrlRef.current = null;
+      }
     }
   };
 
@@ -168,70 +386,126 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     fullName?: string
   ): Promise<{ success: boolean; message?: string }> => {
-    const cleanUsername = username.trim().toLowerCase();
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim();
+    const rawPassword = password; // Verbatim raw password
+
+    if (!cleanUsername || cleanUsername.length < 3) {
+      return { success: false, message: 'Tên đăng nhập phải có ít nhất 3 ký tự.' };
+    }
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Email không đúng định dạng.' };
+    }
+    if (!rawPassword || rawPassword.length < 6) {
+      return { success: false, message: 'Mật khẩu phải có ít nhất 6 ký tự.' };
+    }
+
+    abortActiveRequest();
+    generationRef.current += 1;
+    const currentGen = generationRef.current;
+
+    const abortCtrl = new AbortController();
+    activeAbortCtrlRef.current = abortCtrl;
+    let timeoutId: any = null;
 
     try {
+      timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
+
       const res = await fetch(`${SPRINGBOOT_API}/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUsername, email: cleanEmail, password: cleanPassword, fullName }),
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          username: cleanUsername,
+          email: cleanEmail,
+          password: rawPassword,
+          fullName: fullName?.trim() || undefined,
+        }),
+        signal: abortCtrl.signal,
       });
 
-      const json = await res.json();
-      if (res.ok && json.success) {
-        const authData = json.data;
-        const loggedUser: AuthUser = {
-          id: authData.id,
-          username: authData.username,
-          email: authData.email,
-          fullName: authData.fullName,
-          role: authData.role,
-        };
+      // 1. Guard check after fetch
+      if (currentGen !== generationRef.current) {
+        return { success: false, message: 'Thao tác đã bị hủy.' };
+      }
 
-        setToken(authData.token);
-        setUser(loggedUser);
-        localStorage.setItem('dippie_auth_token', authData.token);
-        localStorage.setItem('dippie_auth_user', JSON.stringify(loggedUser));
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        if (currentGen !== generationRef.current) {
+          return { success: false, message: 'Thao tác đã bị hủy.' };
+        }
+        return { success: false, message: 'Phản hồi từ máy chủ không hợp lệ.' };
+      }
+
+      // 2. Guard check after reading json body
+      if (currentGen !== generationRef.current) {
+        return { success: false, message: 'Thao tác đã bị hủy.' };
+      }
+
+      const validated = validateAuthPayload(json?.data);
+      if (res.ok && json?.success && validated) {
+        // 3. Guard check immediately before commit
+        if (currentGen !== generationRef.current) {
+          return { success: false, message: 'Thao tác đã bị hủy.' };
+        }
+
+        setToken(validated.token);
+        setUser(validated.user);
+        setStatus('authenticated');
+        setErrorMessage(null);
+        saveSessionStorage(validated.token, validated.user);
         closeAuthModal();
         return { success: true };
       } else {
-        return { success: false, message: json.message || 'Đăng ký thất bại' };
+        const errorMsg = json?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
+        return { success: false, message: errorMsg };
       }
-    } catch {
-      // Offline fallback for registration
-      const newMockUser: AuthUser = {
-        id: Math.floor(Math.random() * 900) + 100,
-        username: cleanUsername,
-        email: cleanEmail,
-        fullName: fullName || cleanUsername,
-        role: 'ROLE_USER',
+    } catch (err: unknown) {
+      if (currentGen !== generationRef.current) {
+        return { success: false, message: 'Thao tác đã bị hủy.' };
+      }
+
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return { success: false, message: 'Kết nối máy chủ quá thời gian chờ (timeout).' };
+      }
+      return {
+        success: false,
+        message: 'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra kết nối mạng.',
       };
-      const mockToken = `mock_jwt_${cleanUsername}_${Date.now()}`;
-      setToken(mockToken);
-      setUser(newMockUser);
-      localStorage.setItem('dippie_auth_token', mockToken);
-      localStorage.setItem('dippie_auth_user', JSON.stringify(newMockUser));
-      closeAuthModal();
-      return { success: true };
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (activeAbortCtrlRef.current === abortCtrl) {
+        activeAbortCtrlRef.current = null;
+      }
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    abortActiveRequest();
+    generationRef.current += 1; // Invalidate any incoming response across all boundaries
     setUser(null);
     setToken(null);
-    localStorage.removeItem('dippie_auth_token');
-    localStorage.removeItem('dippie_auth_user');
-  };
+    setStatus('guest');
+    setErrorMessage(null);
+    clearSessionStorage();
+  }, [abortActiveRequest, clearSessionStorage]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
-        isAuthenticated: !!user,
-        isLoading,
+        status,
+        isAuthenticated: status === 'authenticated',
+        isLoading: status === 'checking',
+        isUnavailable: status === 'unavailable',
+        errorMessage,
         isAuthModalOpen,
         authModalMode,
         openAuthModal,
@@ -239,6 +513,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        retryVerify,
+        handleSessionExpired,
       }}
     >
       {children}

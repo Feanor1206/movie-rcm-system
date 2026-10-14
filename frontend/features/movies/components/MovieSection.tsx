@@ -43,14 +43,14 @@ export function MovieSection({
             <button
               onClick={() => handleScroll('left')}
               aria-label={`Cuộn ${title} sang trái`}
-              className="rounded-md border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white cursor-pointer"
+              className="rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer"
             >
               <ArrowLeft size={14} />
             </button>
             <button
               onClick={() => handleScroll('right')}
               aria-label={`Cuộn ${title} sang phải`}
-              className="rounded-md border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white cursor-pointer"
+              className="rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer"
             >
               <ArrowRight size={14} />
             </button>
@@ -58,7 +58,7 @@ export function MovieSection({
 
           <Link
             href={exploreHref}
-            className="flex items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-cinema-red ml-2"
+            className="flex items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-brand ml-2"
           >
             <span>Tất cả</span>
             <ArrowUpRight size={13} />
@@ -66,15 +66,21 @@ export function MovieSection({
         </div>
       </div>
 
-      {/* Row */}
-      <div
-        ref={scrollRef}
-        className="movie-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 sm:gap-4 scroll-smooth"
-      >
-        {movies.map((movie) => (
-          <MovieCard key={movie.id} movie={movie} />
-        ))}
-      </div>
+      {/* Row or Empty State */}
+      {movies.length > 0 ? (
+        <div
+          ref={scrollRef}
+          className="movie-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 sm:gap-4 scroll-smooth"
+        >
+          {movies.map((movie) => (
+            <MovieCard key={movie.id} movie={movie} />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-surface-border bg-surface p-6 text-center text-xs sm:text-sm text-zinc-400">
+          Hiện chưa có tác phẩm hoạt hình nào trong danh mục này.
+        </div>
+      )}
     </section>
   );
 }
