@@ -3,13 +3,16 @@
     Safely terminates an rclone Google Drive mount process on Windows.
 .DESCRIPTION
     Reads state JSON and strictly verifies the recorded PID against process name,
-    executable path (normalized full path), process start time (<500ms tolerance),
-    and session ID before issuing any termination signal.
+    executable path (normalized full path), exact process creation StartTime (preserved
+    precision, <1ms delta), sessionId, and live process invocation (CommandLine matching
+    recorded remoteTarget and mountPoint) before issuing any termination signal.
     Enforces Fail-Closed security: all 9 identity fields (pid, processName,
     executablePath, startTime, sessionId, mountPoint, remoteTarget, arguments, status)
     must be present, non-empty, and valid. If any identity attribute is missing,
-    unreadable, or mismatched, termination is strictly rejected (IDENTITY_MISMATCH /
-    VERIFICATION_FAILED) and the state file is preserved on disk for diagnostic inspection.
+    unreadable (including unreadable live command line), or mismatched, termination
+    is strictly rejected (IDENTITY_MISMATCH / VERIFICATION_FAILED) and the state file
+    is preserved on disk for diagnostic inspection.
+    Re-verifies exact process identity immediately prior to termination signal.
     Only the verified PID is terminated (never broad kill-by-name).
 .PARAMETER StateFile
     Path to runtime process state JSON. Defaults to $env:TEMP\movie-rcm-drive-mount.json.
@@ -403,13 +406,13 @@ if (-not $parsedExpectedStart) {
     return
 }
 
-# Verification 3: Process StartTime match (Strict <500ms window)
+# Verification 3: Process StartTime match (Exact process creation identity)
 $startTimeMatch = $false
 $diffMs = $null
 try {
     $actualStart = [DateTimeOffset]::new($proc.StartTime)
     $diffMs = [math]::Abs(($actualStart - $parsedExpectedStart).TotalMilliseconds)
-    if ($diffMs -lt 500) {
+    if (($actualStart -eq $parsedExpectedStart) -or ($diffMs -lt 1.0)) {
         $startTimeMatch = $true
     }
 } catch {
@@ -436,7 +439,7 @@ if (-not $startTimeMatch) {
         Arguments          = $arguments
         StateStatus        = $stateStatus
         VerificationReason = "StartTimeMismatch"
-        Message            = "Refusing to kill PID $($targetPid): process start time ($($proc.StartTime.ToString('o'))) does not match recorded state ($recordedStartStr, delta: $diffMs ms >= 500ms). Identity verification failed. Preserving state file."
+        Message            = "Refusing to kill PID $($targetPid): process start time ($($proc.StartTime.ToString('o'))) does not match recorded state ($recordedStartStr, delta: $diffMs ms). Identity verification failed. Preserving state file."
         StateFile          = $StateFile
     }
     if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
@@ -593,8 +596,162 @@ if (-not $stateStatus -or [string]::IsNullOrWhiteSpace($stateStatus)) {
     return
 }
 
+# ================= STRICT LIVE PROCESS INVOCATION VERIFICATION (FAIL CLOSED) =================
+
+# Verification 5: Live Process Invocation & Command Line Verification (Trustworthy Live Invocation)
+$liveCmd = $null
+if ($proc.PSObject.Properties['CommandLine'] -and $proc.CommandLine) {
+    $liveCmd = [string]$proc.CommandLine
+}
+
+if (-not $liveCmd) {
+    try {
+        $cimProc = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $targetPid" -ErrorAction SilentlyContinue
+        if ($cimProc -and $cimProc.CommandLine) {
+            $liveCmd = [string]$cimProc.CommandLine
+        }
+    } catch {}
+}
+
+if (-not $liveCmd) {
+    try {
+        $wmiProc = Get-WmiObject -Class Win32_Process -Filter "ProcessId = $targetPid" -ErrorAction SilentlyContinue
+        if ($wmiProc -and $wmiProc.CommandLine) {
+            $liveCmd = [string]$wmiProc.CommandLine
+        }
+    } catch {}
+}
+
+# Fail closed if live identity / command line is unreadable
+if (-not $liveCmd -or [string]::IsNullOrWhiteSpace($liveCmd)) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "VERIFICATION_FAILED"
+        IdentityStatus     = "VERIFICATION_FAILED"
+        PID                = $targetPid
+        ActualName         = $proc.ProcessName
+        ExpectedName       = $expectedName
+        ActualPath         = $procPath
+        ExpectedPath       = $expectedPath
+        ActualStartTime    = $proc.StartTime.ToString("o")
+        ExpectedStartTime  = $recordedStartStr
+        ActualSessionId    = $proc.SessionId
+        ExpectedSessionId  = $expectedSessionId
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "CannotReadProcessCommandLine"
+        Message            = "Refusing to kill PID $($targetPid): unable to read process command line from OS. Fail closed: preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Verify live invocation against recorded remoteTarget and mountPoint
+$cleanMount = $mountPoint.TrimEnd('\')
+$invocationMatch = $true
+
+if ($liveCmd -notmatch '\bmount\b') {
+    $invocationMatch = $false
+}
+if ($liveCmd.IndexOf($remoteTarget, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+    $invocationMatch = $false
+}
+if (($liveCmd.IndexOf($cleanMount, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) -and
+    ($liveCmd.IndexOf($mountPoint, [System.StringComparison]::OrdinalIgnoreCase) -lt 0)) {
+    $invocationMatch = $false
+}
+
+if (-not $invocationMatch) {
+    $res = [PSCustomObject]@{
+        Success            = $false
+        Status             = "IDENTITY_MISMATCH"
+        IdentityStatus     = "IDENTITY_MISMATCH"
+        PID                = $targetPid
+        ActualName         = $proc.ProcessName
+        ExpectedName       = $expectedName
+        ActualPath         = $procPath
+        ExpectedPath       = $expectedPath
+        ActualStartTime    = $proc.StartTime.ToString("o")
+        ExpectedStartTime  = $recordedStartStr
+        ActualSessionId    = $proc.SessionId
+        ExpectedSessionId  = $expectedSessionId
+        ActualCommandLine  = $liveCmd
+        MountPoint         = $mountPoint
+        RemoteTarget       = $remoteTarget
+        Arguments          = $arguments
+        StateStatus        = $stateStatus
+        VerificationReason = "InvocationMismatch"
+        Message            = "Refusing to kill PID $($targetPid): active process command line '$liveCmd' does not match recorded mount target '$remoteTarget' and mount point '$mountPoint'. Identity verification failed. Preserving state file."
+        StateFile          = $StateFile
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
 # ================= TERMINATION OF STRICTLY VERIFIED PROCESS =================
 try {
+    # Re-verify process identity immediately before termination signal to prevent PID reuse race
+    $preSignalProc = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
+    if (-not $preSignalProc) {
+        Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
+        $res = [PSCustomObject]@{
+            Success        = $true
+            Status         = "ALREADY_STOPPED"
+            PID            = $targetPid
+            ProcessName    = $proc.ProcessName
+            ExecutablePath = $expectedPath
+            StartTime      = $recordedStartStr
+            SessionId      = $proc.SessionId
+            MountPoint     = $mountPoint
+            RemoteTarget   = $remoteTarget
+            Arguments      = $arguments
+            StateStatus    = $stateStatus
+            Message        = "Process with PID $($targetPid) exited immediately before signal. Cleaned up state file."
+            StateFile      = $StateFile
+        }
+        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+        return
+    }
+
+    $preSignalStartMatch = $false
+    try {
+        $preActualStart = [DateTimeOffset]::new($preSignalProc.StartTime)
+        if (($preActualStart -eq $parsedExpectedStart) -or ([math]::Abs(($preActualStart - $parsedExpectedStart).TotalMilliseconds) -lt 1.0)) {
+            $preSignalStartMatch = $true
+        }
+    } catch {
+        $preSignalStartMatch = $false
+    }
+
+    if (-not $preSignalStartMatch) {
+        $res = [PSCustomObject]@{
+            Success            = $false
+            Status             = "IDENTITY_MISMATCH"
+            IdentityStatus     = "IDENTITY_MISMATCH"
+            PID                = $targetPid
+            ActualName         = $preSignalProc.ProcessName
+            ExpectedName       = $expectedName
+            ActualPath         = $procPath
+            ExpectedPath       = $expectedPath
+            ActualStartTime    = $preSignalProc.StartTime.ToString("o")
+            ExpectedStartTime  = $recordedStartStr
+            ActualSessionId    = $preSignalProc.SessionId
+            ExpectedSessionId  = $expectedSessionId
+            MountPoint         = $mountPoint
+            RemoteTarget       = $remoteTarget
+            Arguments          = $arguments
+            StateStatus        = $stateStatus
+            VerificationReason = "StartTimeMismatch"
+            Message            = "Refusing to kill PID $($targetPid): process was replaced immediately before signal. PID reuse detected. Preserving state file."
+            StateFile          = $StateFile
+        }
+        if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+        return
+    }
+
     Stop-Process -Id $targetPid -Force:$Force -ErrorAction Stop
 
     # Wait up to 5 seconds for verified process termination

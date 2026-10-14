@@ -262,14 +262,44 @@ if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
                     try {
                         $expectedStart = [DateTimeOffset]::Parse([string]$existingState.startTime)
                         $actualStart = [DateTimeOffset]::new($existingProc.StartTime)
-                        if ([math]::Abs(($actualStart - $expectedStart).TotalMilliseconds) -ge 500) {
+                        $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
+                        if (-not (($actualStart -eq $expectedStart) -or ($diffMs -lt 1.0))) {
                             $startTimeMatch = $false
                         }
                     } catch {
                         $startTimeMatch = $false
                     }
                 }
-                if ($startTimeMatch) {
+
+                # Verify live invocation / command line
+                $cmdMatch = $true
+                $existingCmd = $null
+                if ($existingProc.PSObject.Properties['CommandLine'] -and $existingProc.CommandLine) {
+                    $existingCmd = [string]$existingProc.CommandLine
+                }
+                if (-not $existingCmd) {
+                    try {
+                        $cimExisting = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $($existingState.pid)" -ErrorAction SilentlyContinue
+                        if ($cimExisting -and $cimExisting.CommandLine) {
+                            $existingCmd = [string]$cimExisting.CommandLine
+                        }
+                    } catch {}
+                }
+                if ($existingCmd) {
+                    if ($existingState.PSObject.Properties['remoteTarget'] -and $existingState.remoteTarget) {
+                        if ($existingCmd.IndexOf([string]$existingState.remoteTarget, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                            $cmdMatch = $false
+                        }
+                    }
+                    if ($existingState.PSObject.Properties['mountPoint'] -and $existingState.mountPoint) {
+                        $cleanExistingMount = ([string]$existingState.mountPoint).TrimEnd('\')
+                        if ($existingCmd.IndexOf($cleanExistingMount, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                            $cmdMatch = $false
+                        }
+                    }
+                }
+
+                if ($startTimeMatch -and $cmdMatch) {
                     throw "A previous rclone mount process (PID $($existingState.pid)) is currently running for mount point '$($existingState.mountPoint)'. Use stop_drive.ps1 before remounting."
                 }
             }
@@ -416,13 +446,13 @@ if (-not $isReady) {
                 $pathMatches = [string]::Equals($normLivePath, $normExpectedPath, [System.StringComparison]::OrdinalIgnoreCase)
             }
 
-            # 3. StartTime match (< 500ms)
+            # 3. StartTime match (Exact process creation identity, preserved precision, <1ms delta)
             $startMatches = $false
             try {
                 $expectedStart = [DateTimeOffset]::Parse($startTimeIso)
                 $actualStart = [DateTimeOffset]::new($liveProc.StartTime)
                 $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
-                if ($diffMs -lt 500) {
+                if (($actualStart -eq $expectedStart) -or ($diffMs -lt 1.0)) {
                     $startMatches = $true
                 }
             } catch {}
@@ -430,15 +460,56 @@ if (-not $isReady) {
             # 4. SessionId match
             $sessionMatches = ($liveProc.SessionId -eq $currentProc.SessionId)
 
-            if ($nameMatches -and $pathMatches -and $startMatches -and $sessionMatches) {
+            # 5. Live Process Invocation & Command Line Verification
+            $cmdMatches = $false
+            $liveCmd = $null
+            if ($liveProc.PSObject.Properties['CommandLine'] -and $liveProc.CommandLine) {
+                $liveCmd = [string]$liveProc.CommandLine
+            }
+            if (-not $liveCmd) {
+                try {
+                    $cimProc = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction SilentlyContinue
+                    if ($cimProc -and $cimProc.CommandLine) {
+                        $liveCmd = [string]$cimProc.CommandLine
+                    }
+                } catch {}
+            }
+            if (-not $liveCmd) {
+                try {
+                    $wmiProc = Get-WmiObject -Class Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction SilentlyContinue
+                    if ($wmiProc -and $wmiProc.CommandLine) {
+                        $liveCmd = [string]$wmiProc.CommandLine
+                    }
+                } catch {}
+            }
+
+            if ($liveCmd -and -not [string]::IsNullOrWhiteSpace($liveCmd)) {
+                $cleanMount = $MountPoint.TrimEnd('\')
+                $hasMount = ($liveCmd -match '\bmount\b')
+                $hasRemote = ($liveCmd.IndexOf($remoteTarget, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+                $hasTarget = (($liveCmd.IndexOf($cleanMount, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) -or ($liveCmd.IndexOf($MountPoint, [System.StringComparison]::OrdinalIgnoreCase) -ge 0))
+                if ($hasMount -and $hasRemote -and $hasTarget) {
+                    $cmdMatches = $true
+                }
+            }
+
+            if ($nameMatches -and $pathMatches -and $startMatches -and $sessionMatches -and $cmdMatches) {
                 $isOwned = $true
             }
         } catch {}
 
         if ($isOwned) {
-            try {
-                Stop-Process -Id $liveProc.Id -Force -ErrorAction SilentlyContinue
-            } catch {}
+            # Re-verify process identity immediately before termination signal to prevent PID reuse race
+            $preCheck = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+            if ($preCheck) {
+                try {
+                    $preActual = [DateTimeOffset]::new($preCheck.StartTime)
+                    $expectedStart = [DateTimeOffset]::Parse($startTimeIso)
+                    if (($preActual -eq $expectedStart) -or ([math]::Abs(($preActual - $expectedStart).TotalMilliseconds) -lt 1.0)) {
+                        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+                    }
+                } catch {}
+            }
         }
     }
 

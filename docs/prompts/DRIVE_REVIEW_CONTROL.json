@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "taskId": "DRIVE-01-F03",
-  "promptVersion": 5,
+  "taskId": "DRIVE-01-F04",
+  "promptVersion": 6,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
-  "taskPromptPath": "docs/prompts/DRIVE_01_F03_GEMINI_PROMPT.md",
-  "lastReviewedCheckpoint": "DRIVE-01-F02-CHECKPOINT-01",
+  "taskPromptPath": "docs/prompts/DRIVE_01_F04_GEMINI_PROMPT.md",
+  "lastReviewedCheckpoint": "DRIVE-01-F03-CHECKPOINT-01",
   "reviewMode": "manual",
-  "note": "F02 review: F3 closed, two residual P1 cases R1/R2 remain in F1/F2. G1 not accepted; G2/G3 external blocked. Six scoped agents, manual handoff, automation paused. No agent automatically started. Use actual current HEAD for source baseline."
+  "note": "F03 review closes old seek/identity cases; only cleanup queue ownership under saturation/shutdown remains P1. G1 not accepted. Prerequisites/OAuth/folder now ready outside coding; no real mount/test MP4. Six useful scoped agents, manual handoff, automation paused."
 }

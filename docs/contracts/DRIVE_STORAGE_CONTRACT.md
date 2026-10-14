@@ -2,8 +2,9 @@
 
 **Milestone:** DRIVE-01  
 **Target:** Spring Boot Media Storage & Stream Delivery via Windows Mount  
-**Status:** DRAFT / APPROVED FOR AGENT IMPLEMENTATION  
-**Author:** Parent Orchestrator  
+**Version:** 1.2.0 (Updated: 2026-10-15 — Checkpoint DRIVE-01-F03)  
+**Status:** APPROVED TECHNICAL CONTRACT  
+**Author:** Platform Orchestration & Agent F (Integration Evidence & Docs)  
 
 ---
 
@@ -94,34 +95,42 @@ Configured in `application.yml` and overridable via environment variables:
    - Non-blocking availability checks: `DriveMediaStorageAdapter.isAvailable()` evaluates local mount point vitality synchronously without unbounded blocking.
    - Fast fail: When mount is missing or unreadable, adapter trips immediately to unavailable status, short-circuiting downstream I/O requests with HTTP 503.
    - Self-healing: As soon as the mount directory becomes readable again, requests succeed automatically without requiring application restart.
-5. **Resource Lifecycle & Asynchronous Ownership Contract (F1):**
+5. **Resource Lifecycle & Asynchronous Ownership Contract (F1 / R1):**
    - **Resource Ownership Handshake:**
      - Opening a storage channel on cloud-backed mounts involves asynchronous dispatch to a bounded worker pool (`DriveIoExecutor`).
      - To prevent resource orphaning across timeout or cancellation races, the worker and caller execute a strict ownership handshake:
        - State `PENDING`: Worker is executing `FileChannel.open(targetPath, StandardOpenOption.READ)`.
        - State `TRANSFERRED_TO_CALLER`: If worker completes before caller deadline, caller assumes exclusive ownership of the channel. The worker thread yields ownership and will NEVER close the channel.
        - State `DISOWNED_OR_TIMED_OUT`: If caller deadline expires before worker completes, caller marks the request as abandoned/timed out and returns `MediaUnavailableException` (HTTP 503).
-   - **Exactly-Once Late Close:**
-     - When a background open completes late after caller timeout (`DISOWNED_OR_TIMED_OUT`), the worker detects abandonment and immediately disposes of the newly opened `FileChannel` by calling `close()`.
-     - This closure executes **exactly once**.
-     - A successful, timely returned channel held by the caller is protected: a racing timeout handler can never close a caller-owned channel.
-     - Channel closure implementations must be idempotent to prevent race corruption.
-   - **Non-Blocking Caller Close Policy:**
-     - When the caller or Spring MVC `try-with-resources` terminates (e.g. client disconnect, broken pipe, or request completion), calling `DriveSeekableByteChannel.close()` must return promptly.
-     - **Non-blocking caller close:** The caller thread must not be held hostage or blocked indefinitely if an underlying kernel read or close is stalled.
-     - Kernel cleanup tasks (calling the underlying `delegate.close()`) are accounted for in the bounded physical worker pool (`actualOutstandingWorkers`).
+   - **Comprehensive Worker Operation Tracking (`activeWorkerOperations`):**
+     - Channel worker ownership is NOT restricted to read operations; it covers ALL in-flight operations on the channel: `read(ByteBuffer)`, `position(long)`, and `size()`.
+     - In-flight worker operations are tracked collectively via `activeWorkerOperations` (superseding the narrow `activeWorkerReads`).
+     - When `DriveSeekableByteChannel.close()` is invoked while `activeWorkerOperations > 0`, the caller thread exits immediately without blocking on kernel WinFsp IO.
+     - The active worker thread running the operation assumes deferred ownership and performs `closeDelegateSilently()` once its operation physically completes, fails, or unblocks.
+   - **Non-Blocking Caller Close Policy & Saturated Cleanup Handling:**
+     - When the caller or Spring MVC `try-with-resources` terminates (e.g. client disconnect, broken pipe, request completion, or deadline abort), calling `DriveSeekableByteChannel.close()` must return promptly.
+     - **Absolute Non-Blocking Guarantee:** The caller thread must not be held hostage or blocked indefinitely under ANY circumstance, even when an underlying kernel I/O is stalled or when the cleanup pool is saturated.
+     - When `activeWorkerOperations == 0`, closure is dispatched to the bounded cleanup pool (`executeCleanupAsync`).
+     - **No Synchronous Caller Fallback on Saturation:** Under NO circumstances may a cleanup executor rejection (saturated cleanup pool / thread queue full) cause the caller thread to fall back to a synchronous, blocking `delegate.close()` call. Direct caller close fallback is strictly prohibited because closing an underlying Windows kernel file handle / WinFsp channel can block indefinitely if an internal kernel I/O is held up.
+     - Saturated cleanup must be handled via a non-blocking fallback (such as an asynchronous daemon cleanup queue or background executor) that preserves the caller's finite deadline, while ensuring physical worker accounting (`actualOutstandingWorkers`) remains held until physical closure completes.
      - **True Capacity Accounting:** The physical worker permit (`actualOutstandingWorkers`) is NOT decremented early when the caller exits; it remains accounted for until the underlying OS/kernel delegate close operation physically returns.
      - Unbounded thread spawning or unbounded background queues are strictly prohibited; cleanup occurs within bounded concurrency limits.
+   - **Asynchronous AutoCloseable Disposal Without Caller Burden:**
+     - In `DriveIoExecutor` (`executeOpen` and generic `executeWithTimeout` returning `AutoCloseable`), caller timeout or thread interruption must NEVER trigger a blocking `ac.close()` directly on the caller thread.
+     - If the background task is still executing when the caller deadline expires, the worker thread itself executes late cleanup upon task completion (`state == TIMED_OUT`).
+     - If the resource was already instantiated when timeout/interruption occurred, closing that resource is offloaded asynchronously to ensure the caller returns immediately within its finite deadline.
+     - Exactly-once disposal is strictly guaranteed via atomic flag guards (`closedDueToTimeout`, `delegateClosed`).
+     - Resources delivered timely to the caller (`TRANSFERRED_TO_CALLER`) remain open and protected from racing timeout handlers.
    - **Detailed Lifecycle Breakdown by Operation:**
-     - `openChannel(relativePath)`: Asynchronous file open via bounded worker pool. Protected by metadata deadline (`metadataTimeoutMs`, default 3000ms). Handshake ensures either caller receives ownership or worker disposes of late handle.
-     - `read(ByteBuffer dst)`: Bounded chunk read executed via `executeRead(readTimeoutMs)`. On kernel hang, caller receives timeout exception, circuit breaker records failure, and physical worker count remains held until kernel IO physically resolves.
-     - `position()` / `position(long newPosition)`: Fast pointer adjustment. Standard filesystem file channel positions execute synchronously as in-memory file descriptor pointer adjustments.
-     - `size()`: Queried via metadata executor with strict deadline protection.
-     - `close()`: Prompt caller exit with bounded background cleanup accounting. Idempotent guard ensures `close()` executes once.
+     - `openChannel(relativePath)`: Asynchronous file open via bounded worker pool. Protected by metadata deadline (`metadataTimeoutMs`, default 3000ms). Handshake ensures either caller receives ownership or worker disposes of late handle asynchronously.
+     - `read(ByteBuffer dst)`: Tracked in `activeWorkerOperations`. Bounded chunk read executed via `executeRead(readTimeoutMs)`. On kernel hang, caller receives timeout exception, circuit breaker records failure, and physical worker count remains held until kernel IO physically resolves.
+     - `position()` / `position(long newPosition)`: Tracked in `activeWorkerOperations` when dispatched to executor. Protected by metadata deadline. On timeout, caller exits promptly, worker retains occupancy, and deferred close is triggered by worker upon completion if channel was closed.
+     - `size()`: Tracked in `activeWorkerOperations`. Queried via metadata executor with strict deadline protection. On timeout, caller exits promptly and worker executes deferred close upon completion.
+     - `close()`: Prompt caller exit under all conditions. Idempotent guard ensures `close()` executes once without caller stall.
    - **Hard Cancellation Limitations of WinFsp / Filesystem Kernel I/O:**
-     - WinFsp and the Windows NT I/O subsystem do not support safe, mid-flight "hard cancellation" of blocking kernel-level I/O operations (such as `ReadFile` or `NtReadFile` dispatched through FUSE file system drivers).
+     - WinFsp and the Windows NT I/O subsystem do not support safe, mid-flight "hard cancellation" of blocking kernel-level I/O operations (such as `ReadFile`, `SetFilePointerEx`, or `CloseHandle` dispatched through FUSE mini-filter file system drivers).
      - Java thread interruption (`Thread.interrupt()`) sets an interrupt flag but cannot force-abort a native thread blocked inside a CGO/WinFsp kernel dispatch routine without risking OS deadlocks, process instability, or driver corruption.
-     - Therefore, the system contract explicitly acknowledges this physical reality: hard cancellation is neither promised nor attempted. Instead, caller latency is guaranteed via finite deadlines, and stalled kernel operations are safely isolated within a bounded worker pool governed by a circuit breaker to protect system stability.
+     - Therefore, the system contract explicitly acknowledges this physical reality: hard cancellation is neither promised nor attempted. Instead, caller latency is guaranteed via finite deadlines, non-blocking caller close, and asynchronous disposal, while stalled kernel operations are safely isolated within a bounded worker pool governed by a circuit breaker to protect system stability.
 
 ---
 
@@ -139,32 +148,37 @@ Configured in `application.yml` and overridable via environment variables:
 3. **Status & Stop Scripts (`scripts/drive/status_drive.ps1`, `scripts/drive/stop_drive.ps1`):**
    - `status_drive.ps1`: Verifies process vitality and filesystem readability without secret leaks.
    - `stop_drive.ps1`: Validates complete process identity before signaling; terminates only helper-owned processes. Never kills arbitrary `rclone.exe` or user processes.
-4. **Process Identity & Ownership Verification Contract (F2):**
+4. **Process Identity & Ownership Verification Contract (F2 / R2):**
    - **Mandatory 9-Field Schema State:**
      Every runtime state JSON file (default: `$env:TEMP\movie-rcm-drive-mount.json`) must contain all 9 required schema fields:
      1. `pid`: Positive integer identifying the specific process ID.
      2. `processName`: Exact process name (must strictly equal `"rclone"`).
      3. `executablePath`: Fully-qualified, normalized path to `rclone.exe`.
-     4. `startTime`: ISO 8601 formatted timestamp or exact `DateTimeOffset` string.
+     4. `startTime`: Exact process creation timestamp (ISO 8601 formatted timestamp or exact `DateTimeOffset` string).
      5. `sessionId`: Windows Logon Session ID matching caller context.
      6. `mountPoint`: Validated Windows drive letter (`M:`) or directory mount point.
      7. `remoteTarget`: Exact remote name and subpath (`cinema-gdrive:DippieMedia`).
      8. `arguments`: Exact arguments array or string used during launch.
      9. `status`: Lifecycle status string (`"MOUNTING"` or `"RUNNING"`).
-   - **Strict Fail-Closed Policy on Missing or Corrupted Identity:**
-     - If ANY of the 9 required fields is missing, null, empty string, or invalid, the operation immediately **Fails Closed**.
-     - Under Fail-Closed:
+   - **Exact Process Creation Identity (Zero Loose Tolerance):**
+     - Anti-PID reuse verification strictly compares the live process creation timestamp (`Process.StartTime` / `Win32_Process.CreationDate`) against the recorded state timestamp with exact precision.
+     - Multi-second or multi-millisecond loose tolerances (such as 200ms or 500ms drift windows) are strictly prohibited.
+     - Any near-time PID reuse (e.g., an unrelated process spawned 200ms later reusing the same PID) is detected and rejected with `PID_REUSE_REJECTED`.
+   - **Mandatory Live Invocation & Mount Target Verification (`CommandLine` Match):**
+     - The presence of 9 non-empty fields in the state file alone does NOT prove ownership of a live process.
+     - Scripts MUST inspect the live process command line (`CommandLine` property via CIM/WMI `Win32_Process`) and confirm that it contains BOTH:
+       1. The exact expected `remoteTarget` (e.g., `cinema-gdrive:DippieMedia`), AND
+       2. The exact expected `mountPoint` (e.g., `M:`).
+     - If a running process matches the PID, process name (`rclone`), executable path, and session ID, but its actual live command line was launched with a different remote or mount point (e.g., `unrelated:other` on `Y:`), it is NOT helper-owned. The script must NEVER signal or terminate it.
+     - To eliminate Time-of-Check to Time-of-Use (TOCTOU) races between validation and signaling, scripts prefer validating and retaining an owned process handle directly rather than repeatedly querying unchecked PIDs.
+   - **Strict Fail-Closed Policy on Missing, Corrupted, or Unreadable Identity:**
+     - If ANY of the 9 required fields is missing, null, empty string, or invalid; OR if live process identity cannot be read (e.g., access denied, process exited during inspection, WMI query failure); OR if ANY attribute (PID, name, path, creation time, session, CommandLine target/mount) does NOT match:
+     - The operation immediately **Fails Closed**:
        - No termination signal (`Stop-Process`, `taskkill`) is ever issued.
-       - The state file is **preserved on disk** untouched (never deleted, overwritten, or assumed dead) to ensure traceability and auditability.
-       - Returns status `VERIFICATION_FAILED` or `IDENTITY_MISMATCH` with diagnostic details.
+       - The state file is **strictly preserved on disk** untouched (never deleted, overwritten, or assumed dead) to ensure traceability, forensic auditability, and safety.
+       - Returns explicit status: `VERIFICATION_FAILED`, `IDENTITY_MISMATCH`, or `LIVE_IDENTITY_UNREADABLE` with diagnostic details.
      - **No Permissive Defaults:** The system never defaults missing fields (e.g., missing `processName` is never defaulted to `"rclone"`; missing `sessionId` is never bypassed).
-     - **Anti-PID Reuse & Exact Matching:** Process validation strictly compares live process attributes against state file attributes:
-       - PID must match live process.
-       - Process name must match live process name (`rclone`).
-       - Normalized executable path must match live process path.
-       - Start time must match exact recorded process start time (rejecting multi-second or multi-millisecond loose tolerances).
-       - Session ID must match live process session.
-     - **Universal Enforcement:** This verification logic is enforced uniformly across `status_drive.ps1`, `stop_drive.ps1`, and launcher failure cleanup inside `mount_drive.ps1`.
+   - **Universal Enforcement:** This verification logic is enforced uniformly across `status_drive.ps1`, `stop_drive.ps1`, and launcher failure cleanup inside `mount_drive.ps1`.
 
 ---
 

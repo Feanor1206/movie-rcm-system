@@ -3,10 +3,12 @@
     Queries and verifies the health and operational status of the Google Drive mount.
 .DESCRIPTION
     Checks active rclone processes against state JSON with strict identity verification
-    (PID, process name, normalized executable path, sub-second StartTime tolerance,
-    and SessionId). Inspects mount target accessibility and filesystem responsiveness.
-    Enforces complete 9-field schema verification. If any identity field is missing or
-    mismatched, reports DEGRADED state with explanatory diagnostic reasons.
+    (PID, process name, normalized executable path, exact process creation StartTime
+    with preserved precision (<1ms delta), sessionId, and live process invocation
+    matching recorded remoteTarget and mountPoint). Inspects mount target accessibility
+    and filesystem responsiveness. Enforces complete 9-field schema verification.
+    If any identity field is missing, unreadable, or mismatched, reports DEGRADED state
+    with explanatory diagnostic reasons.
     Returns status: MOUNTED, NOT_MOUNTED, or DEGRADED.
     Enforces Fail-Closed posture and does NOT leak secrets or tokens.
 .PARAMETER MountPoint
@@ -364,7 +366,7 @@ try {
     $expectedStart = [DateTimeOffset]::Parse($recordedStartStr)
     $actualStart = [DateTimeOffset]::new($proc.StartTime)
     $diffMs = [math]::Abs(($actualStart - $expectedStart).TotalMilliseconds)
-    if ($diffMs -lt 500) {
+    if (($actualStart -eq $expectedStart) -or ($diffMs -lt 1.0)) {
         $startTimeMatch = $true
     }
 } catch {
@@ -438,7 +440,89 @@ if ($proc.SessionId -ne $expectedSessionId) {
     return
 }
 
-# Verification 5: Mount Target, Arguments, Status presence
+# Verification 5: Live Process Invocation & Command Line Verification
+$liveCmd = $null
+if ($proc.PSObject.Properties['CommandLine'] -and $proc.CommandLine) {
+    $liveCmd = [string]$proc.CommandLine
+}
+
+if (-not $liveCmd) {
+    try {
+        $cimProc = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $savedPid" -ErrorAction SilentlyContinue
+        if ($cimProc -and $cimProc.CommandLine) {
+            $liveCmd = [string]$cimProc.CommandLine
+        }
+    } catch {}
+}
+
+if (-not $liveCmd) {
+    try {
+        $wmiProc = Get-WmiObject -Class Win32_Process -Filter "ProcessId = $savedPid" -ErrorAction SilentlyContinue
+        if ($wmiProc -and $wmiProc.CommandLine) {
+            $liveCmd = [string]$wmiProc.CommandLine
+        }
+    } catch {}
+}
+
+if (-not $liveCmd -or [string]::IsNullOrWhiteSpace($liveCmd)) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "Unable to read process command line for PID $($savedPid). Identity unverified."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+$cleanMount = $targetMount.TrimEnd('\')
+$invocationMatch = $true
+
+if ($liveCmd -notmatch '\bmount\b') {
+    $invocationMatch = $false
+}
+if ($liveCmd.IndexOf($remoteTarget, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+    $invocationMatch = $false
+}
+if (($liveCmd.IndexOf($cleanMount, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) -and
+    ($liveCmd.IndexOf($targetMount, [System.StringComparison]::OrdinalIgnoreCase) -lt 0)) {
+    $invocationMatch = $false
+}
+
+if (-not $invocationMatch) {
+    $res = [PSCustomObject]@{
+        Timestamp      = [DateTime]::UtcNow.ToString("o")
+        Status         = "DEGRADED"
+        Reason         = "PID $($savedPid) command line '$liveCmd' does not match recorded remote target '$remoteTarget' and mount point '$targetMount'. Identity mismatch / PID reuse detected."
+        MountPoint     = $targetMount
+        StateFile      = $StateFile
+        PID            = $savedPid
+        ProcessName    = $proc.ProcessName
+        ExecutablePath = $expectedPath
+        StartTime      = $recordedStartStr
+        SessionId      = $expectedSessionId
+        RemoteTarget   = $remoteTarget
+        Arguments      = $arguments
+        StateStatus    = $stateStatus
+        ProcessAlive   = $true
+        Accessible     = $mountAccess.IsReadable
+    }
+    if ($AsJson) { $res | ConvertTo-Json -Depth 5 } else { $res }
+    return
+}
+
+# Verification 6: Mount Target, Arguments, Status presence
 if (-not $targetMount -or [string]::IsNullOrWhiteSpace($targetMount) -or
     -not $remoteTarget -or [string]::IsNullOrWhiteSpace($remoteTarget) -or
     -not $arguments -or -not $stateStatus) {

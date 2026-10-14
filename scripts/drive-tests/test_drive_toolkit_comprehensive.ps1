@@ -40,8 +40,11 @@ $statusPath    = Join-Path $toolkitDir "status_drive.ps1"
 $stopPath      = Join-Path $toolkitDir "stop_drive.ps1"
 
 if (-not $EvidencePath) {
+    $f03EvidenceDir = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01_F03\agent-e"
     $f02EvidenceDir = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01_F02\agent-e"
-    if (Test-Path -Path (Split-Path -Path $f02EvidenceDir -Parent) -PathType Container) {
+    if (Test-Path -Path (Split-Path -Path $f03EvidenceDir -Parent) -PathType Container) {
+        $EvidencePath = Join-Path $f03EvidenceDir "toolkit_test_evidence.json"
+    } elseif (Test-Path -Path (Split-Path -Path $f02EvidenceDir -Parent) -PathType Container) {
         $EvidencePath = Join-Path $f02EvidenceDir "toolkit_test_evidence.json"
     } else {
         $EvidencePath = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01\agent-e\toolkit_test_evidence.json"

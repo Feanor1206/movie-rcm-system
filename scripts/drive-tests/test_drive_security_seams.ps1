@@ -16,9 +16,23 @@
        - Tests clean state cleanup for non-existent / dead PIDs with Status = 'ALREADY_STOPPED'.
        - Tests status_drive.ps1 diagnostic reporting of DEGRADED when PID reuse is detected.
        - Tests handling of missing, empty, and corrupted state files.
+    3. Strict Process Identity Verification (Finding D2):
+       - ExecutablePath normalization & case-insensitive matching.
+       - Strict StartTime tolerance and fail-closed handling on missing fields.
+    4. Comprehensive Identity Schema Verification (Finding F2):
+       - Fail-closed rejection of missing processName, sessionId, mountPoint, remoteTarget,
+         arguments, status, and invalid PID.
+       - Reviewer reproduction of DRIVE_F01_stop_missing_identity scenario.
+    5. Exact Identity & Trustworthy Live Invocation Verification (Finding R2):
+       - Near-time PID Reuse: StartTime mismatch (200ms) strictly rejected (IDENTITY_MISMATCH / StartTimeMismatch).
+       - Wrong Invocation / Mount Mismatch: Live CommandLine differs from state remoteTarget/mountPoint
+         (e.g. mount unrelated:other Y: vs expected:media Z:) strictly rejected (IDENTITY_MISMATCH / InvocationMismatch).
+       - Legitimate helper-created process: exact match of all 9 fields + CommandLine confirmed stopped (Status: STOPPED).
+       - Unreadable live identity / CommandLine: fail-closed (VERIFICATION_FAILED / CannotReadProcessCommandLine).
+       - Reviewer reproduction of DRIVE_F02_stop_reused_identity: confirms terminationRequestedDespiteCreationAndInvocationMismatch = False.
 .OUTPUTS
     Console test execution report, exit code 0/1, and structured JSON evidence in
-    docs/reports/drive/DRIVE_01/agent-e/toolkit_test_evidence.json.
+    docs/reports/drive/DRIVE_01_F03/agent-e/toolkit_test_evidence.json.
 #>
 [CmdletBinding()]
 param(
@@ -44,8 +58,11 @@ $statusPath    = Join-Path $toolkitDir "status_drive.ps1"
 $stopPath      = Join-Path $toolkitDir "stop_drive.ps1"
 
 if (-not $EvidencePath) {
+    $f03EvidenceDir = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01_F03\agent-e"
     $f02EvidenceDir = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01_F02\agent-e"
-    if (Test-Path -Path (Split-Path -Path $f02EvidenceDir -Parent) -PathType Container) {
+    if (Test-Path -Path (Split-Path -Path $f03EvidenceDir -Parent) -PathType Container) {
+        $EvidencePath = Join-Path $f03EvidenceDir "toolkit_test_evidence.json"
+    } elseif (Test-Path -Path (Split-Path -Path $f02EvidenceDir -Parent) -PathType Container) {
         $EvidencePath = Join-Path $f02EvidenceDir "toolkit_test_evidence.json"
     } else {
         $EvidencePath = Join-Path $scriptDir "..\..\docs\reports\drive\DRIVE_01\agent-e\toolkit_test_evidence.json"
@@ -620,6 +637,7 @@ Write-Host "`n--- [SUITE 3] Strict Process Identity & Fail-Closed Verification (
 
 $global:MockProcessMap = @{}
 $global:MockStoppedPids = [System.Collections.Generic.List[int]]::new()
+$global:MockCimInstanceMap = @{}
 
 function global:Get-Process {
     [CmdletBinding()]
@@ -631,6 +649,36 @@ function global:Get-Process {
         return $global:MockProcessMap[$Id[0]]
     }
     Microsoft.PowerShell.Management\Get-Process @PSBoundParameters
+}
+
+function global:Get-CimInstance {
+    [CmdletBinding()]
+    param(
+        [string]$ClassName,
+        [string]$Filter,
+        [string]$Namespace,
+        [object]$Query
+    )
+    if ($Filter -match "ProcessId\s*=\s*(\d+)") {
+        $pidFilter = [int]$Matches[1]
+        if ($global:MockCimInstanceMap.ContainsKey($pidFilter)) {
+            return $global:MockCimInstanceMap[$pidFilter]
+        }
+        if ($global:MockProcessMap.ContainsKey($pidFilter)) {
+            $mockP = $global:MockProcessMap[$pidFilter]
+            if ($mockP.PSObject.Properties['UnreadableCommandLine'] -and $mockP.UnreadableCommandLine) {
+                return $null
+            }
+            $cmd = if ($mockP.PSObject.Properties['CommandLine'] -and $mockP.CommandLine) { [string]$mockP.CommandLine } else { $null }
+            return [pscustomobject]@{
+                CommandLine    = $cmd
+                ProcessId      = $pidFilter
+                ExecutablePath = (if ($mockP.PSObject.Properties['Path']) { $mockP.Path } else { $null })
+                Name           = (if ($mockP.PSObject.Properties['ProcessName']) { $mockP.ProcessName } else { $null })
+            }
+        }
+    }
+    Microsoft.Management.Infrastructure.CimCmdlets\Get-CimInstance @PSBoundParameters
 }
 
 function global:Stop-Process {
@@ -888,6 +936,7 @@ try {
             Path        = "C:\Expected\rclone.exe"
             StartTime   = $st6
             SessionId   = 1
+            CommandLine = "rclone.exe mount cinema-gdrive:Media Z:"
         }
         $stateContent6 = [PSCustomObject]@{
             pid            = 880006
@@ -1366,6 +1415,8 @@ try {
         $matchChildPid = 882002
         $startOk = [DateTime]::UtcNow
         $currentSession = (Get-Process -Id $PID).SessionId
+        $missingMountOk = Join-Path $d4TempDirMatch "unmounted-target"
+        $stateFileOk = Join-Path $d4TempDirMatch "state.json"
 
         function Start-Process {
             param($FilePath, $ArgumentList, $WindowStyle, [switch]$PassThru)
@@ -1385,14 +1436,12 @@ try {
             StartTime   = $startOk
             SessionId   = $currentSession
             HasExited   = $false
+            CommandLine = "rclone.exe mount cinema-gdrive:Media $missingMountOk --read-only"
         }
 
         $mountSourceOk = Get-Content -LiteralPath $mountPath -Raw -Encoding UTF8
         $escapedPreflightOk = $preflightMockOk.Replace("\", "\\")
         $mountSourceOk = $mountSourceOk.Replace('$preflightScript = Join-Path $PSScriptRoot "preflight_drive.ps1"', ('$preflightScript = "' + $escapedPreflightOk + '"'))
-
-        $missingMountOk = Join-Path $d4TempDirMatch "unmounted-target"
-        $stateFileOk = Join-Path $d4TempDirMatch "state.json"
 
         $resOk = & ([scriptblock]::Create($mountSourceOk)) -Execute -Remote "cinema-gdrive" -RemoteSubpath "Media" `
             -MountPoint $missingMountOk -StateFile $stateFileOk `
@@ -1420,8 +1469,257 @@ try {
             Remove-Item -LiteralPath $d4TempDirMatch -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
+
+    # ==============================================================================
+    # SUITE 5: Exact Identity & Trustworthy Live Invocation Verification (Finding R2)
+    # ==============================================================================
+    Write-Host "`n--- [SUITE 5] Exact Identity & Invocation Match (Finding R2) ---" -ForegroundColor Yellow
+
+    # Test 5.1: TC-R2-01 Near-time PID reuse (200ms StartTime mismatch) rejected (Status: IDENTITY_MISMATCH, Reason: StartTimeMismatch)
+    $tR2_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $r2State1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-200ms-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stR2_1 = [DateTime]::UtcNow
+        $global:MockProcessMap[883001] = [PSCustomObject]@{
+            Id          = 883001
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stR2_1.AddMilliseconds(200)
+            SessionId   = 1
+            CommandLine = "rclone.exe mount cinema-gdrive:Media Z: --read-only"
+        }
+        $stateContentR2_1 = [PSCustomObject]@{
+            pid            = 883001
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stR2_1.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:", "--read-only")
+            status         = "MOUNTED"
+        }
+        $stateContentR2_1 | ConvertTo-Json | Set-Content -Path $r2State1 -Encoding UTF8
+
+        $resR2_1 = & $stopPath -StateFile $r2State1
+        $tR2_1Sw.Stop()
+
+        $pR2_1Passed = ($resR2_1.Success -eq $false) -and `
+                       ($resR2_1.Status -eq "IDENTITY_MISMATCH") -and `
+                       ($resR2_1.VerificationReason -eq "StartTimeMismatch") -and `
+                       ($global:MockStoppedPids -notcontains 883001) -and `
+                       (Test-Path -Path $r2State1 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-R2-01" -Category "ExactIdentityR2" `
+            -Name "stop_drive rejects near-time PID reuse with 200ms StartTime mismatch (Status: IDENTITY_MISMATCH)" `
+            -Description "Confirms exact process creation identity (<1ms) prevents terminating near-time reused PID (200ms delta)" `
+            -Passed $pR2_1Passed `
+            -FailureMessage "Status: $($resR2_1.Status), Reason: $($resR2_1.VerificationReason), Stopped: $($global:MockStoppedPids -contains 883001)" `
+            -Expected "Status=IDENTITY_MISMATCH, Reason=StartTimeMismatch, ProcessKilled=False, StatePreserved=True" `
+            -Actual "Status=$($resR2_1.Status), Reason=$($resR2_1.VerificationReason), ProcessKilled=$($global:MockStoppedPids -contains 883001), StatePreserved=$(Test-Path -Path $r2State1 -PathType Leaf)" `
+            -DurationMs $tR2_1Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $r2State1) { Remove-Item -Path $r2State1 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 5.2: TC-R2-02 Wrong Invocation / Mount Mismatch rejected (Status: IDENTITY_MISMATCH, Reason: InvocationMismatch)
+    $tR2_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $r2State2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-wrongcmd-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stR2_2 = [DateTime]::UtcNow
+        $global:MockProcessMap[883002] = [PSCustomObject]@{
+            Id          = 883002
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stR2_2
+            SessionId   = 1
+            CommandLine = "rclone.exe mount unrelated:other Y:"
+        }
+        $stateContentR2_2 = [PSCustomObject]@{
+            pid            = 883002
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stR2_2.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "expected:media"
+            arguments      = @("mount", "expected:media", "Z:", "--read-only")
+            status         = "MOUNTED"
+        }
+        $stateContentR2_2 | ConvertTo-Json | Set-Content -Path $r2State2 -Encoding UTF8
+
+        $resR2_2 = & $stopPath -StateFile $r2State2
+        $tR2_2Sw.Stop()
+
+        $pR2_2Passed = ($resR2_2.Success -eq $false) -and `
+                       ($resR2_2.Status -eq "IDENTITY_MISMATCH") -and `
+                       ($resR2_2.VerificationReason -eq "InvocationMismatch") -and `
+                       ($global:MockStoppedPids -notcontains 883002) -and `
+                       (Test-Path -Path $r2State2 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-R2-02" -Category "ExactIdentityR2" `
+            -Name "stop_drive rejects process with matching PID/time/session but wrong mount invocation (Status: IDENTITY_MISMATCH)" `
+            -Description "Confirms live process running unrelated:other Y: instead of expected:media Z: is never terminated" `
+            -Passed $pR2_2Passed `
+            -FailureMessage "Status: $($resR2_2.Status), Reason: $($resR2_2.VerificationReason), Stopped: $($global:MockStoppedPids -contains 883002)" `
+            -Expected "Status=IDENTITY_MISMATCH, Reason=InvocationMismatch, ProcessKilled=False, StatePreserved=True" `
+            -Actual "Status=$($resR2_2.Status), Reason=$($resR2_2.VerificationReason), ProcessKilled=$($global:MockStoppedPids -contains 883002), StatePreserved=$(Test-Path -Path $r2State2 -PathType Leaf)" `
+            -DurationMs $tR2_2Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $r2State2) { Remove-Item -Path $r2State2 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 5.3: TC-R2-03 Legitimate helper-created process terminates cleanly (Status: STOPPED)
+    $tR2_3Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $r2State3 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-legit-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stR2_3 = [DateTime]::UtcNow
+        $global:MockProcessMap[883003] = [PSCustomObject]@{
+            Id          = 883003
+            ProcessName = "rclone"
+            Path        = "C:\Expected\rclone.exe"
+            StartTime   = $stR2_3
+            SessionId   = 1
+            CommandLine = "rclone.exe mount cinema-gdrive:Media Z: --read-only"
+        }
+        $stateContentR2_3 = [PSCustomObject]@{
+            pid            = 883003
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stR2_3.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:", "--read-only")
+            status         = "MOUNTED"
+        }
+        $stateContentR2_3 | ConvertTo-Json | Set-Content -Path $r2State3 -Encoding UTF8
+
+        $resR2_3 = & $stopPath -StateFile $r2State3
+        $tR2_3Sw.Stop()
+
+        $pR2_3Passed = ($resR2_3.Success -eq $true) -and `
+                       ($resR2_3.Status -eq "STOPPED") -and `
+                       ($global:MockStoppedPids -contains 883003) -and `
+                       (-not (Test-Path -Path $r2State3 -PathType Leaf))
+
+        Register-TestResult -TestId "TC-R2-03" -Category "ExactIdentityR2" `
+            -Name "stop_drive safely terminates legitimate helper-created process with verified identity and invocation (Status: STOPPED)" `
+            -Description "Confirms legitimate process matching all 9 fields and live mount CommandLine is stopped and state removed" `
+            -Passed $pR2_3Passed `
+            -FailureMessage "Status: $($resR2_3.Status), Stopped: $($global:MockStoppedPids -contains 883003), StateDeleted: $(-not (Test-Path -Path $r2State3 -PathType Leaf))" `
+            -Expected "Status=STOPPED, Success=True, ProcessKilled=True, StateDeleted=True" `
+            -Actual "Status=$($resR2_3.Status), Success=$($resR2_3.Success), ProcessKilled=$($global:MockStoppedPids -contains 883003), StateDeleted=$(-not (Test-Path -Path $r2State3 -PathType Leaf))" `
+            -DurationMs $tR2_3Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $r2State3) { Remove-Item -Path $r2State3 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 5.4: TC-R2-04 Unreadable Live Identity fails closed (Status: VERIFICATION_FAILED)
+    $tR2_4Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $r2State4 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-unreadable-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $stR2_4 = [DateTime]::UtcNow
+        $global:MockProcessMap[883004] = [PSCustomObject]@{
+            Id                    = 883004
+            ProcessName           = "rclone"
+            Path                  = "C:\Expected\rclone.exe"
+            StartTime             = $stR2_4
+            SessionId             = 1
+            CommandLine           = $null
+            UnreadableCommandLine = $true
+        }
+        $stateContentR2_4 = [PSCustomObject]@{
+            pid            = 883004
+            processName    = "rclone"
+            executablePath = "C:\Expected\rclone.exe"
+            startTime      = $stR2_4.ToString("o")
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "cinema-gdrive:Media"
+            arguments      = @("mount", "cinema-gdrive:Media", "Z:", "--read-only")
+            status         = "MOUNTED"
+        }
+        $stateContentR2_4 | ConvertTo-Json | Set-Content -Path $r2State4 -Encoding UTF8
+
+        $resR2_4 = & $stopPath -StateFile $r2State4
+        $tR2_4Sw.Stop()
+
+        $pR2_4Passed = ($resR2_4.Success -eq $false) -and `
+                       ($resR2_4.Status -eq "VERIFICATION_FAILED") -and `
+                       ($resR2_4.VerificationReason -match "CannotReadProcessCommandLine|UnreadableLiveIdentity") -and `
+                       ($global:MockStoppedPids -notcontains 883004) -and `
+                       (Test-Path -Path $r2State4 -PathType Leaf)
+
+        Register-TestResult -TestId "TC-R2-04" -Category "ExactIdentityR2" `
+            -Name "stop_drive fails closed when live process CommandLine is unreadable (Status: VERIFICATION_FAILED)" `
+            -Description "Confirms unreadable live command line aborts termination and preserves state file" `
+            -Passed $pR2_4Passed `
+            -FailureMessage "Status: $($resR2_4.Status), Reason: $($resR2_4.VerificationReason)" `
+            -Expected "Status=VERIFICATION_FAILED, Reason=CannotReadProcessCommandLine, StatePreserved=True" `
+            -Actual "Status=$($resR2_4.Status), Reason=$($resR2_4.VerificationReason), StatePreserved=$(Test-Path -Path $r2State4 -PathType Leaf)" `
+            -DurationMs $tR2_4Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -Path $r2State4) { Remove-Item -Path $r2State4 -Force -ErrorAction SilentlyContinue }
+    }
+
+    # Test 5.5: TC-R2-05 Reviewer Repro DRIVE_F02_stop_reused_identity Confirmation
+    $tR2_5Sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $reproR2State = Join-Path ([System.IO.Path]::GetTempPath()) "codex-drive-f02-identity-$([Guid]::NewGuid().ToString('N')).json"
+    try {
+        $reproR2Start = [DateTime]::UtcNow
+        $reproR2Pid = 987654
+
+        # Exact schema from DRIVE_F02_stop_reused_identity.ps1
+        $reviewerR2StateObj = [PSCustomObject]@{
+            pid            = $reproR2Pid
+            processName    = "rclone"
+            startTime      = $reproR2Start.ToString("o")
+            executablePath = "C:\Fixture\rclone.exe"
+            sessionId      = 1
+            mountPoint     = "Z:"
+            remoteTarget   = "expected:media"
+            arguments      = @("mount", "expected:media", "Z:", "--read-only")
+            status         = "MOUNTED"
+        }
+        $reviewerR2StateObj | ConvertTo-Json | Set-Content -LiteralPath $reproR2State -Encoding UTF8
+
+        # Mock live process matching reviewer repro: StartTime differs by 200ms and CommandLine differs
+        $global:MockProcessMap[$reproR2Pid] = [PSCustomObject]@{
+            Id          = $reproR2Pid
+            ProcessName = "rclone"
+            StartTime   = $reproR2Start.AddMilliseconds(200)
+            Path        = "C:\Fixture\rclone.exe"
+            SessionId   = 1
+            CommandLine = "rclone.exe mount unrelated:other Y:"
+        }
+
+        $reproR2Res = & $stopPath -StateFile $reproR2State -AsJson | ConvertFrom-Json
+        $tR2_5Sw.Stop()
+
+        $reproR2WasStopped = ($global:MockStoppedPids -contains $reproR2Pid)
+        $terminationRequestedDespiteCreationAndInvocationMismatch = $reproR2WasStopped
+        $reproR2StatePreserved = (Test-Path -LiteralPath $reproR2State)
+
+        $pR2_5Passed = ($reproR2Res.Success -eq $false) -and `
+                       ($reproR2Res.Status -in @("IDENTITY_MISMATCH", "PID_REUSE_REJECTED")) -and `
+                       (-not $terminationRequestedDespiteCreationAndInvocationMismatch) -and `
+                       $reproR2StatePreserved
+
+        Register-TestResult -TestId "TC-R2-05" -Category "ExactIdentityR2" `
+            -Name "Reviewer repro DRIVE_F02_stop_reused_identity confirmation" `
+            -Description "Confirms terminationRequestedDespiteCreationAndInvocationMismatch is FALSE and state file is preserved" `
+            -Passed $pR2_5Passed `
+            -FailureMessage "Success: $($reproR2Res.Success), Status: $($reproR2Res.Status), TerminationRequested: $terminationRequestedDespiteCreationAndInvocationMismatch" `
+            -Expected "Success=False, Status=IDENTITY_MISMATCH, TerminationRequested=False, StatePreserved=True" `
+            -Actual "Success=$($reproR2Res.Success), Status=$($reproR2Res.Status), TerminationRequested=$terminationRequestedDespiteCreationAndInvocationMismatch, StatePreserved=$reproR2StatePreserved" `
+            -DurationMs $tR2_5Sw.Elapsed.TotalMilliseconds
+    } finally {
+        if (Test-Path -LiteralPath $reproR2State) { Remove-Item -LiteralPath $reproR2State -Force -ErrorAction SilentlyContinue }
+    }
 } finally {
     Remove-Item -Path "function:global:Get-Process" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "function:global:Get-CimInstance" -Force -ErrorAction SilentlyContinue
     Remove-Item -Path "function:global:Stop-Process" -Force -ErrorAction SilentlyContinue
 }
 

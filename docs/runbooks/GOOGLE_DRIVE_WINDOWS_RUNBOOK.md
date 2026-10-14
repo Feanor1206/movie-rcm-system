@@ -1,6 +1,6 @@
 # HƯỚNG DẪN VẬN HÀNH GOOGLE DRIVE TRÊN WINDOWS (GOOGLE DRIVE WINDOWS RUNBOOK)
 **Tác vụ:** DRIVE-01 — Windows Operations & Google Drive Tooling Foundation  
-**Phiên bản:** 1.1.0 (Ngày cập nhật: 15/10/2026 — Kiểm định DRIVE-01-F02)  
+**Phiên bản:** 1.2.0 (Ngày cập nhật: 15/10/2026 — Kiểm định DRIVE-01-F03)  
 **Phạm vi áp dụng:** Hệ điều hành Windows 10 / Windows 11 / Windows Server x64  
 **Môi trường thực thi hỗ trợ:** Windows PowerShell 5.1 (`powershell.exe`) & PowerShell 7+ (`pwsh.exe`)  
 **Trạng thái công cụ:** Đã kiểm thử tự động đạt 100% trên cả PowerShell 5.1 và PowerShell 7 (`scripts/drive/test_drive_tooling.ps1`)
@@ -244,13 +244,15 @@ pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1
 ```
 
 **Các trạng thái trả về:**
-- **`MOUNTED`**: Tiến trình rclone chạy hợp lệ (toàn bộ 9 trường định danh trùng khớp với tiến trình sống) và ổ đĩa `M:` có thể truy cập, đọc dữ liệu bình thường.
-- **`NOT_MOUNTED`**: Không có file state hoặc tiến trình rclone đã kết thúc.
-- **`DEGRADED`**: Phát hiện một trong các tình huống bất thường:
+- **`MOUNTED`**: Tiến trình rclone chạy hợp lệ (toàn bộ 9 trường định danh trùng khớp chính xác với tiến trình sống, `CommandLine` chứa đúng remote và mount point) và ổ đĩa `M:` có thể truy cập, đọc dữ liệu bình thường.
+- **`NOT_MOUNTED`**: Không có file state hoặc tiến trình rclone đã kết thúc bình thường.
+- **`DEGRADED`**: Phát hiện một trong các tình huống bất thường (hệ thống tự động kích hoạt Fail-Closed, bảo tồn file state để kiểm tra):
   - Ổ đĩa xuất hiện nhưng không có file state quản lý (untracked mount).
   - Tiến trình đã tắt nhưng ổ đĩa chưa được gỡ (stale mount).
   - Thiếu bất kỳ trường nào trong 9 trường định danh của file state (Incomplete State Schema).
-  - PID ghi nhận trong state file đã bị chiếm bởi một tiến trình khác của hệ thống (**PID reuse detected**).
+  - Thời điểm khởi tạo tiến trình sống không khớp chính xác với timestamp ghi nhận (PID reuse detected — loại trừ tuyệt đối dung sai lỏng lẻo 200ms/500ms).
+  - Dòng lệnh thực tế (`CommandLine`) của tiến trình sống không chứa đúng mục tiêu mount (`remoteTarget`) và điểm mount (`mountPoint`).
+  - Danh tính tiến trình sống không thể truy vấn hoặc đọc được (WMI/CIM unreadable / access denied).
 
 ---
 
@@ -275,11 +277,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -Force
 ```
 
-**Cơ chế bảo vệ chống dừng nhầm tiến trình & Hợp đồng Fail-Closed:**
+**Cơ chế bảo vệ chống dừng nhầm tiến trình & Hợp đồng Fail-Closed (R2):**
 - **Bắt buộc đủ 9 trường định danh:** Script đối chiếu toàn bộ 9 trường dữ liệu của file state. Nếu thiếu bất kỳ trường nào, script lập tức kích hoạt chính sách **Fail-Closed**: từ chối gửi bất kỳ tín hiệu dừng tiến trình nào và **giữ nguyên file state trên đĩa** để phục vụ kiểm tra/truy vết.
-- **Đối chiếu danh tính chính xác (Strict Ownership Verification):** PID trong state file được đối chiếu nghiêm ngặt với tiến trình sống qua 5 thuộc tính: PID, `processName == "rclone"`, đường dẫn thực thi chuẩn hóa, thời điểm khởi động chính xác (loại trừ dung sai thời gian lỏng lẻo) và Session ID.
-- **Tuyệt đối không** sử dụng lệnh `taskkill /IM rclone.exe /F` hay dừng theo tên hàng loạt để tránh tắt nhầm các tác vụ rclone khác của người dùng trên máy.
-- Nếu PID đã bị hệ thống tái sử dụng cho tiến trình khác (PID reuse), script từ chối dừng (`PID_REUSE_REJECTED`) và phát cảnh báo an toàn.
+- **Khẳng định quy tắc so khớp chính xác thời gian khởi tạo (Exact Process Creation Identity):**
+  - Thời điểm khởi tạo tiến trình sống (`Process.StartTime` / `Win32_Process.CreationDate`) được so khớp chính xác tuyệt đối với dấu thời gian trong file state.
+  - **Triệt tiêu hoàn toàn dung sai lỏng lẻo 200ms/500ms:** Không chấp nhận bất kỳ khoảng trôi thời gian nhân tạo nào. Nếu một tiến trình khác được tạo ra sau đó (dù chỉ lệch 200ms) chiếm giữ cùng PID, script lập tức từ chối (`PID_REUSE_REJECTED`) và phát cảnh báo.
+- **Bắt buộc so khớp mục tiêu mount và dòng lệnh thực tế (`CommandLine` Match):**
+  - Việc state file có đủ 9 trường không đồng nghĩa với quyền sở hữu tiến trình. Script bắt buộc truy vấn thuộc tính `CommandLine` thực tế của tiến trình sống (qua CIM/WMI `Win32_Process`) và xác minh rằng dòng lệnh chứa đồng thời:
+    1. Đúng `remoteTarget` dự kiến (ví dụ: `cinema-gdrive:DippieMedia`), và
+    2. Đúng `mountPoint` dự kiến (ví dụ: `M:`).
+  - Nếu tiến trình sống có cùng PID, tên `rclone`, đường dẫn và session ID, nhưng dòng lệnh thực tế đang mount remote khác hoặc ổ đĩa khác (ví dụ: `unrelated:other` trên `Y:`), script từ chối gửi tín hiệu (`INVOCATION_MISMATCH`) để bảo vệ tiến trình của người dùng.
+- **Tránh race condition qua Retained Process Handle:**
+  - Script ưu tiên xác thực và nắm giữ handle của tiến trình đã kiểm định (retained owned process handle) trước khi gửi tín hiệu dừng, ngăn ngừa triệt để nguy cơ tráo đổi PID giữa lúc kiểm tra và lúc dừng (TOCTOU race).
+- **Chính sách Fail-Closed bảo tồn state file:**
+  - Nếu danh tính tiến trình không thể đọc được (WMI query thất bại, Access Denied), hoặc nếu bất kỳ thuộc tính định danh nào không khớp, hệ thống **Fail-Closed**: không bao giờ gửi tín hiệu dừng (`Stop-Process`, `taskkill`) và **giữ nguyên file state trên đĩa** để bảo tồn bằng chứng.
+- **Đồng nhất chính sách:** Quy tắc kiểm tra danh tính và Fail-Closed này được áp dụng nhất quán trên cả 3 script: `status_drive.ps1`, `stop_drive.ps1`, và dọn dẹp thất bại trong `mount_drive.ps1`.
 
 ---
 
@@ -338,6 +350,26 @@ Bộ cờ baseline kết hợp bộ ba tham số chunking:
 - `--poll-interval 15s`: Kiểm tra thay đổi trên Drive qua API Changes mỗi 15 giây.
 - `--attr-timeout 1s`: Giảm thời gian giữ thuộc tính file để phản ánh kịp thời trạng thái sẵn sàng.
 
+### 5.5. Vòng đời Kênh Dữ liệu & Giới hạn Vật lý Kernel WinFsp (IO Lifecycle & Kernel Cancellation Limitation — R1)
+
+Để bảo đảm trải nghiệm streaming mượt mà và không làm treo luồng xử lý HTTP của Spring Boot khi xảy ra sự cố mạng đám mây, kiến trúc `DriveSeekableByteChannel` và `DriveIoExecutor` thiết lập các tiêu chuẩn vận hành nghiêm ngặt:
+
+1. **Bao quát toàn bộ các thao tác kênh (`activeWorkerOperations`):**
+   - Không chỉ theo dõi các thao tác đọc chunk dữ liệu (`read`), kênh dữ liệu mở rộng giám sát toàn bộ các tác vụ bao gồm định vị con trỏ (`position(newPosition)`) và truy vấn kích thước tệp (`size()`) thông qua biến đếm tổng hợp `activeWorkerOperations`.
+   - Nếu client ngắt kết nối (client abort/disconnect) hoặc Spring MVC hoàn tất request gọi `close()` trong khi có bất kỳ worker nào đang thực thi (`activeWorkerOperations > 0`), luồng caller được **giải phóng ngay lập tức**. Quyền sở hữu và trách nhiệm dọn dẹp đóng kênh kernel được chuyển giao lại cho chính worker thread đó khi thao tác I/O kết thúc hoặc unblock.
+
+2. **Chính sách đóng kênh không làm nghẽn caller (Non-Blocking Caller Close):**
+   - Khi không có worker nào đang bận (`activeWorkerOperations == 0`), lệnh `close()` ủy thác việc đóng kênh thực tế (`delegate.close()`) cho pool dọn dẹp có giới hạn (`executeCleanupAsync`).
+   - **Xử lý bão hòa dọn dẹp (Saturated Cleanup Handling):** Trong trường hợp pool dọn dẹp bị đầy/bão hòa, hệ thống **tuyệt đối không fallback gọi `delegate.close()` đồng bộ trên luồng caller**. Việc ép luồng caller gọi hàm đóng kernel sẽ khiến caller bị treo theo kernel nếu WinFsp đang bị kẹt lock. Thay vào đó, việc đóng được xử lý ngầm không chặn caller, đồng thời biến đếm tài nguyên vật lý `actualOutstandingWorkers` vẫn được bảo lưu cho đến khi kernel đóng hoàn tất.
+
+3. **Dọn dẹp `AutoCloseable` bất đồng bộ:**
+   - Trong quá trình mở tệp (`executeOpen`) hoặc các tác vụ trả về tài nguyên đóng được, nếu xảy ra quá hạn (timeout) hoặc luồng caller bị ngắt (`Thread.interrupt()`), caller không tự mình gọi đóng kernel đồng bộ. Trách nhiệm đóng tài nguyên được xử lý bất đồng bộ, bảo đảm tính dọn dẹp chính xác một lần (**exactly-once disposal**) qua cờ nguyên tử `closedDueToTimeout`.
+
+4. **Ghi nhận trung thực giới hạn không thể hủy cứng (hard cancellation) của kernel WinFsp:**
+   - Nhân Windows NT và driver mini-filter của WinFsp **không hỗ trợ cơ chế hủy ngang cưỡng bức an toàn (hard cancellation)** đối với các lời gọi hàm I/O mức kernel (như `ReadFile`, `NtReadFile`, `SetFilePointerEx`).
+   - Lệnh ngắt luồng Java `Thread.interrupt()` chỉ bật cờ ngắt logic ở tầng JVM chứ không thể ép buộc thread native đang bị giữ trong CGO/WinFsp kernel dispatch phải dừng lại mà không gây nguy cơ hỏng trạng thái driver, rò rỉ kernel handle hoặc sập hệ điều hành (BSOD/deadlock).
+   - Vì lý do vật lý này, hệ thống bảo vệ caller bằng cách áp đặt thời hạn hữu hạn (**finite deadlines**) và chính sách đóng không nghẽn (**non-blocking close**), đồng thời cô lập các tác vụ kẹt trong pool công nhân giới hạn (`DriveIoExecutor`) và mạch ngắt tự động (**Circuit Breaker**).
+
 ---
 
 ## 6. Lưu ý về Phân tách Phiên Windows (Session Isolation)
@@ -377,12 +409,20 @@ Trên hệ điều hành Windows, các ký tự ổ đĩa mạng hoặc ổ đĩ
   1. Kiểm tra lại cờ `--vfs-read-chunk-streams 0` đã được bật để không tạo luồng tải ồ ạt.
   2. Tạo Google Cloud OAuth Client ID & Secret riêng theo hướng dẫn tại [https://rclone.org/drive/#making-your-own-client-id](https://rclone.org/drive/#making-your-own-client-id) và cập nhật qua `rclone config`.
 
-### Sự cố 4: Lỗi `VERIFICATION_FAILED` hoặc `IDENTITY_MISMATCH` khi dừng tiến trình (`stop_drive.ps1`)
-- **Nguyên nhân:** State file bị thiếu một hoặc nhiều trường trong 9 trường định danh bắt buộc (ví dụ: thiếu `sessionId`, `arguments`, `status`), hoặc PID trong state file đã bị chiếm dụng bởi tiến trình khác của hệ thống (PID reuse).
+### Sự cố 4: Lỗi `VERIFICATION_FAILED`, `IDENTITY_MISMATCH` hoặc `PID_REUSE_REJECTED` khi dừng tiến trình (`stop_drive.ps1`)
+- **Nguyên nhân:**
+  1. File state bị thiếu hoặc rỗng một trong 9 trường định danh bắt buộc.
+  2. Thời điểm khởi tạo tiến trình sống không khớp chính xác với timestamp trong state file (phát hiện PID reuse với dung sai 0ms — hệ thống loại bỏ hoàn toàn dung sai lỏng lẻo 200ms/500ms).
+  3. Dòng lệnh thực tế (`CommandLine`) của tiến trình sống không chứa đúng mục tiêu mount (`remoteTarget`) và điểm mount (`mountPoint`).
+  4. Quyền truy cập WMI/CIM bị từ chối hoặc tiến trình kết thúc giữa chừng khiến danh tính không thể đọc được (`LIVE_IDENTITY_UNREADABLE`).
 - **Khắc phục:**
-  1. Hệ thống tuân thủ chính sách **Fail-Closed**: Tuyệt đối không gửi tín hiệu kill bừa bãi và **giữ nguyên file state trên đĩa** để phục vụ kiểm tra/truy vết.
-  2. Mở file state tại `$env:TEMP\movie-rcm-drive-mount.json` để kiểm tra các trường bị thiếu hoặc sai lệch.
-  3. Sử dụng lệnh an toàn `Get-CimInstance Win32_Process -Filter "ProcessId = <PID>"` để xác định danh tính thực tế của tiến trình đang chiếm giữ PID.
+  1. Hệ thống kích hoạt chính sách **Fail-Closed**: Tuyệt đối từ chối gửi tín hiệu dừng (`Stop-Process`, `taskkill`) và **bảo tồn nguyên vẹn file state trên đĩa** để phục vụ kiểm tra và truy vết an toàn.
+  2. Mở file state tại `$env:TEMP\movie-rcm-drive-mount.json` để kiểm tra các trường dữ liệu ghi nhận.
+  3. Sử dụng lệnh CIM an toàn để tra cứu danh tính và dòng lệnh thực tế của tiến trình sống:
+     ```powershell
+     Get-CimInstance Win32_Process -Filter "ProcessId = <PID>" | Select-Object ProcessId, Name, ExecutablePath, CreationDate, CommandLine
+     ```
+  4. Đối chiếu xem tiến trình có đúng là rclone mount của Dippie Cinema hay là một tiến trình khác của hệ thống tái sử dụng lại PID.
 
 ### Sự cố 5: Lỗi mã hóa ký tự (Encoding / Parser Error) trên Windows PowerShell 5.1
 - **Nguyên nhân:** Windows PowerShell 5.1 (`powershell.exe`) chạy trên .NET Framework 4.8 và mặc định đọc tệp script theo ANSI/ASCII nếu tệp không có byte UTF-8 BOM, có thể gây ra lỗi phân tích cú pháp (`UnexpectedToken`) nếu script chứa ký tự đa byte thô.
@@ -396,6 +436,14 @@ Trên hệ điều hành Windows, các ký tự ổ đĩa mạng hoặc ổ đĩ
      ```powershell
      pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
      ```
+
+### Sự cố 6: Lỗi Quá hạn I/O Nhân WinFsp & Đảm bảo Không Nghẽn Luồng Caller (Timeout & Non-Blocking Close)
+- **Nguyên nhân:** Đường truyền mạng WAN gặp sự cố hoặc dịch vụ Google Drive phản hồi chậm khiến lời gọi kernel I/O trên WinFsp bị kẹt quá thời hạn cho phép (`readTimeoutMs` 5000ms hoặc `metadataTimeoutMs` 3000ms).
+- **Hành vi & Khắc phục:**
+  1. Spring Boot caller thread nhận ngay `MediaUnavailableException` (HTTP 503) và giải phóng kết nối HTTP client, đồng thời giải phóng permit phát media (`activeStreamCount`) trong khối `finally`.
+  2. Khi khối `try-with-resources` gọi `DriveSeekableByteChannel.close()`, caller thoát tức thì (0ms block). Biến đếm `activeWorkerOperations` ghi nhận worker đang bận và giao quyền đóng kernel delegate cho worker thread khi kernel I/O unblock.
+  3. Kể cả khi pool dọn dẹp bão hòa, hệ thống **không bao giờ fallback gọi đóng đồng bộ trên caller**.
+  4. Số lượng công nhân vật lý (`actualOutstandingWorkers`) được giữ nguyên trung thực cho đến khi tác vụ kernel thực sự chấm dứt, ngăn chặn rò rỉ hoặc quá tải luồng ngầm. Mạch ngắt (Circuit Breaker) tự động mở để bảo vệ hệ thống nếu tỷ lệ lỗi liên tiếp vượt ngưỡng.
 
 ---
 *Tài liệu được bảo trì bởi Dippie Cinema Platform Operations Team.*

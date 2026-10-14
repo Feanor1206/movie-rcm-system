@@ -28,6 +28,7 @@ public class DriveIoExecutor {
     private final AtomicInteger actualOutstandingWorkers = new AtomicInteger(0);
     private final DriveCircuitBreaker circuitBreaker;
     private final ExecutorService executor;
+    private final ThreadPoolExecutor cleanupExecutor;
 
     public DriveIoExecutor(long metadataTimeoutMs,
                            long readTimeoutMs,
@@ -56,6 +57,27 @@ public class DriveIoExecutor {
                 new SynchronousQueue<>(),
                 threadFactory,
                 new ThreadPoolExecutor.AbortPolicy()
+        );
+
+        ThreadFactory cleanupThreadFactory = new ThreadFactory() {
+            private final AtomicInteger cleanupThreadId = new AtomicInteger(0);
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "drive-io-cleanup-" + cleanupThreadId.incrementAndGet());
+                t.setDaemon(true);
+                return t;
+            }
+        };
+
+        int cleanupMaxThreads = Math.max(2, Math.min(8, this.maxWorkers));
+        this.cleanupExecutor = new ThreadPoolExecutor(
+                0,
+                cleanupMaxThreads,
+                60L,
+                TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(256),
+                cleanupThreadFactory,
+                new ThreadPoolExecutor.DiscardOldestPolicy()
         );
     }
 
@@ -98,15 +120,16 @@ public class DriveIoExecutor {
                     result = task.call();
                     resultRef.set(result);
                     if (callerTimedOut.get() && result instanceof AutoCloseable ac) {
-                        if (closedDueToTimeout.compareAndSet(false, true)) {
-                            try {
-                                ac.close();
-                            } catch (Throwable ignored) {
-                            }
-                        }
+                        closeResourceOnce(ac, closedDueToTimeout);
                     }
                     return result;
                 } finally {
+                    if (callerTimedOut.get()) {
+                        T late = resultRef.get();
+                        if (late instanceof AutoCloseable ac) {
+                            closeResourceOnce(ac, closedDueToTimeout);
+                        }
+                    }
                     // Physical worker accounting: ONLY decrements when background thread actually finishes
                     actualOutstandingWorkers.decrementAndGet();
                 }
@@ -128,12 +151,7 @@ public class DriveIoExecutor {
             circuitBreaker.recordFailure();
             T lateResult = resultRef.get();
             if (lateResult instanceof AutoCloseable ac) {
-                if (closedDueToTimeout.compareAndSet(false, true)) {
-                    try {
-                        ac.close();
-                    } catch (Throwable ignored) {
-                    }
-                }
+                executeCleanupAsync(() -> closeResourceOnce(ac, closedDueToTimeout), operationDescription);
             }
             // actualOutstandingWorkers is deliberately NOT decremented here because the kernel IO is still stuck
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive (" + operationDescription + ") vượt quá thời gian chờ (" + timeoutMs + "ms)");
@@ -159,12 +177,7 @@ public class DriveIoExecutor {
             circuitBreaker.recordFailure();
             T lateResult = resultRef.get();
             if (lateResult instanceof AutoCloseable ac) {
-                if (closedDueToTimeout.compareAndSet(false, true)) {
-                    try {
-                        ac.close();
-                    } catch (Throwable ignored) {
-                    }
-                }
+                executeCleanupAsync(() -> closeResourceOnce(ac, closedDueToTimeout), operationDescription);
             }
             Thread.currentThread().interrupt();
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive bị gián đoạn");
@@ -219,6 +232,12 @@ public class DriveIoExecutor {
                     }
                     return resource;
                 } finally {
+                    if (state.get() == OpenState.TIMED_OUT) {
+                        T res = resourceRef.get();
+                        if (res != null) {
+                            closeResourceOnce(res, closedDueToTimeout);
+                        }
+                    }
                     // Physical worker accounting: ONLY decrements when open & late close physically finish
                     actualOutstandingWorkers.decrementAndGet();
                 }
@@ -238,7 +257,9 @@ public class DriveIoExecutor {
             } else {
                 // If caller had already timed out or abandoned ownership
                 T res = resourceRef.get() != null ? resourceRef.get() : result;
-                closeResourceOnce(res, closedDueToTimeout);
+                if (res != null) {
+                    executeCleanupAsync(() -> closeResourceOnce(res, closedDueToTimeout), opName);
+                }
                 throw new MediaUnavailableException("Thao tác truy xuất Google Drive (" + opName + ") đã bị quá hạn");
             }
         } catch (TimeoutException e) {
@@ -247,7 +268,7 @@ public class DriveIoExecutor {
             state.compareAndSet(OpenState.PENDING, OpenState.TIMED_OUT);
             T res = resourceRef.get();
             if (res != null) {
-                closeResourceOnce(res, closedDueToTimeout);
+                executeCleanupAsync(() -> closeResourceOnce(res, closedDueToTimeout), opName);
             }
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive (" + opName + ") vượt quá thời gian chờ (" + timeoutMs + "ms)");
         } catch (InterruptedException e) {
@@ -257,7 +278,7 @@ public class DriveIoExecutor {
             state.compareAndSet(OpenState.PENDING, OpenState.TIMED_OUT);
             T res = resourceRef.get();
             if (res != null) {
-                closeResourceOnce(res, closedDueToTimeout);
+                executeCleanupAsync(() -> closeResourceOnce(res, closedDueToTimeout), opName);
             }
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive bị gián đoạn");
         } catch (ExecutionException e) {
@@ -288,43 +309,50 @@ public class DriveIoExecutor {
     }
 
     /**
-     * Executes non-blocking asynchronous resource cleanup in the bounded worker pool.
+     * Executes non-blocking asynchronous resource cleanup in the bounded worker pool or cleanup queue.
      * Prevents caller thread from blocking on kernel WinFsp close while accurately
-     * accounting for physical kernel worker occupancy.
+     * accounting for physical kernel worker occupancy without falling back to synchronous close.
      */
     public void executeCleanupAsync(AutoCloseable resource, String opName) {
         if (resource == null) {
             return;
         }
 
-        if (executor.isShutdown()) {
-            try {
-                resource.close();
-            } catch (Throwable ignored) {
-            }
+        if (executor.isShutdown() || cleanupExecutor.isShutdown()) {
             return;
         }
 
+        // 1. Try using main worker pool if capacity is available without saturation
         int current = actualOutstandingWorkers.incrementAndGet();
-        if (current > maxWorkers) {
+        if (current <= maxWorkers) {
+            try {
+                executor.submit(() -> {
+                    try {
+                        resource.close();
+                    } catch (Throwable ignored) {
+                    } finally {
+                        actualOutstandingWorkers.decrementAndGet();
+                    }
+                });
+                return;
+            } catch (RejectedExecutionException e) {
+                actualOutstandingWorkers.decrementAndGet();
+            }
+        } else {
             actualOutstandingWorkers.decrementAndGet();
-            circuitBreaker.recordFailure();
-            throw new MediaUnavailableException("Số lượng tác vụ truy xuất Google Drive đồng thời đã đạt giới hạn tối đa (" + maxWorkers + ")");
         }
 
+        // 2. Worker pool is saturated (at maxWorkers) or rejected. Route to bounded cleanup queue.
+        // ABSOLUTELY NEVER throw exception and NEVER block caller!
         try {
-            executor.submit(() -> {
+            cleanupExecutor.submit(() -> {
                 try {
                     resource.close();
                 } catch (Throwable ignored) {
-                } finally {
-                    actualOutstandingWorkers.decrementAndGet();
                 }
             });
-        } catch (RejectedExecutionException e) {
-            actualOutstandingWorkers.decrementAndGet();
-            circuitBreaker.recordFailure();
-            throw new MediaUnavailableException("Hàng đợi tác vụ truy xuất Google Drive đã đầy");
+        } catch (Throwable ignored) {
+            // Safe discard under total shutdown/queue full without blocking caller
         }
     }
 
@@ -362,10 +390,11 @@ public class DriveIoExecutor {
     }
 
     public boolean isShutdown() {
-        return executor.isShutdown();
+        return executor.isShutdown() || cleanupExecutor.isShutdown();
     }
 
     public void shutdown() {
         executor.shutdownNow();
+        cleanupExecutor.shutdownNow();
     }
 }

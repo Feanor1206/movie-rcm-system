@@ -24,7 +24,7 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
     private final DriveIoExecutor ioExecutor;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean delegateClosed = new AtomicBoolean(false);
-    private final AtomicInteger activeWorkerReads = new AtomicInteger(0);
+    private final AtomicInteger activeWorkerOperations = new AtomicInteger(0);
 
     public DriveSeekableByteChannel(FileChannel delegate, DriveIoExecutor ioExecutor) {
         if (delegate == null) {
@@ -49,12 +49,12 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
         try {
             return ioExecutor.executeRead(() -> {
                 ensureOpen();
-                activeWorkerReads.incrementAndGet();
+                activeWorkerOperations.incrementAndGet();
                 try {
                     return delegate.read(dst);
                 } finally {
-                    activeWorkerReads.decrementAndGet();
-                    if (closed.get()) {
+                    int remaining = activeWorkerOperations.decrementAndGet();
+                    if (remaining == 0 && closed.get()) {
                         closeDelegateSilently();
                     }
                 }
@@ -94,14 +94,40 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
     public long position() throws IOException {
         ensureOpen();
         try {
-            return delegate.position();
-        } catch (ClosedChannelException cce) {
-            throw cce;
-        } catch (IOException e) {
+            return ioExecutor.executeMetadata(() -> {
+                ensureOpen();
+                activeWorkerOperations.incrementAndGet();
+                try {
+                    return delegate.position();
+                } finally {
+                    int remaining = activeWorkerOperations.decrementAndGet();
+                    if (remaining == 0 && closed.get()) {
+                        closeDelegateSilently();
+                    }
+                }
+            });
+        } catch (MediaUnavailableException e) {
             if (closed.get()) {
                 throw new ClosedChannelException();
             }
-            throw e;
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
+            if (e.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException(e.getMessage(), e);
+        } catch (Exception e) {
+            if (closed.get()) {
+                throw new ClosedChannelException();
+            }
+            if (e.getCause() instanceof ClosedChannelException cce) {
+                throw cce;
+            }
+            if (e.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException("Lỗi đọc vị trí từ Google Drive: " + e.getMessage(), e);
         }
     }
 
@@ -114,8 +140,16 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
         try {
             return ioExecutor.executeMetadata(() -> {
                 ensureOpen();
-                delegate.position(newPosition);
-                return this;
+                activeWorkerOperations.incrementAndGet();
+                try {
+                    delegate.position(newPosition);
+                    return this;
+                } finally {
+                    int remaining = activeWorkerOperations.decrementAndGet();
+                    if (remaining == 0 && closed.get()) {
+                        closeDelegateSilently();
+                    }
+                }
             });
         } catch (MediaUnavailableException e) {
             if (closed.get()) {
@@ -148,7 +182,15 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
         try {
             return ioExecutor.executeMetadata(() -> {
                 ensureOpen();
-                return delegate.size();
+                activeWorkerOperations.incrementAndGet();
+                try {
+                    return delegate.size();
+                } finally {
+                    int remaining = activeWorkerOperations.decrementAndGet();
+                    if (remaining == 0 && closed.get()) {
+                        closeDelegateSilently();
+                    }
+                }
             });
         } catch (MediaUnavailableException e) {
             if (closed.get()) {
@@ -192,28 +234,24 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
             return;
         }
 
-        // If a worker thread is actively reading on this channel, that worker
-        // thread will close the delegate when the read completes or unblocks.
-        // The caller returns immediately without being blocked by kernel WinFsp IO.
-        if (activeWorkerReads.get() > 0) {
+        // If a worker thread is actively executing an operation (read, position, size)
+        // on this channel, that worker thread will close the delegate when the operation
+        // completes or unblocks. The caller returns immediately (<1ms) without blocking.
+        if (activeWorkerOperations.get() > 0) {
             return;
         }
 
-        // No active read in progress. Delegate closure to bounded cleanup pool.
-        closeDelegateAsyncOrDirect();
+        // No active worker operation in progress. Hand over delegate closure to bounded cleanup pool.
+        // ABSOLUTELY NEVER fall back to synchronous delegate.close() on caller thread!
+        closeDelegateAsync();
     }
 
-    private void closeDelegateAsyncOrDirect() {
+    private void closeDelegateAsync() {
         if (delegateClosed.compareAndSet(false, true)) {
             try {
                 ioExecutor.executeCleanupAsync(delegate, "closeChannel");
-            } catch (MediaUnavailableException e) {
-                // If worker pool is saturated, fall back to safe direct close
-                // (safe because activeWorkerReads is 0, so no thread is reading)
-                try {
-                    delegate.close();
-                } catch (Throwable ignored) {
-                }
+            } catch (Throwable ignored) {
+                // If anything fails, NEVER call delegate.close() synchronously on caller thread!
             }
         }
     }
@@ -237,5 +275,9 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
 
     public DriveIoExecutor getIoExecutor() {
         return ioExecutor;
+    }
+
+    public int getActiveWorkerOperations() {
+        return activeWorkerOperations.get();
     }
 }

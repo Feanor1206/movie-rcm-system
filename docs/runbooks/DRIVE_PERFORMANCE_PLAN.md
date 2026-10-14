@@ -1,8 +1,8 @@
 # KẾ HOẠCH ĐO LƯỜNG HIỆU NĂNG VÀ BÀN GIAO VẬN HÀNH GOOGLE DRIVE STREAMING (DRIVE PERFORMANCE & HANDOFF PLAN)
 
 **Nhiệm vụ:** DRIVE-01 — Google Drive Windows Integration, Tooling & Performance Plan  
-**Phiên bản:** 1.1.0 (Ngày cập nhật: 15/10/2026 — Kiểm định DRIVE-01-F02)  
-**Tác giả:** Agent F — Mapping & Performance Handoff Engineer  
+**Phiên bản:** 1.2.0 (Ngày cập nhật: 15/10/2026 — Kiểm định DRIVE-01-F03)  
+**Tác giả:** Agent F — Integration Evidence & Documentation Engineer  
 **Đối tượng áp dụng:** Kỹ sư Vận hành, Quản trị viên Hệ thống, Đội ngũ Phát triển Dippie Cinema  
 **Môi trường mục tiêu:** Windows 10 / Windows 11 x64, Spring Boot 3.4.x, Next.js 15 Standalone, Rclone + WinFsp  
 **Môi trường thực thi kịch bản:** Windows PowerShell 5.1 (`powershell.exe`) & PowerShell 7+ (`pwsh.exe`)  
@@ -74,8 +74,11 @@ Khi mount lưu trữ đám mây qua rclone VFS (Virtual File System), quyết đ
 | **Khả năng mở rộng đồng thời** | Cao, độc lập giữa các stream | Bị thắt nút cổ chai tại băng thông ghi SSD | `cache-off` tối ưu cho máy chủ tải cao |
 
 > [!NOTE]
-> **Làm rõ về cơ chế định vị ngẫu nhiên và độ trễ đám mây:**
-> Việc ứng dụng Spring Boot sử dụng `FileChannel.position(start)` loại bỏ hoàn toàn việc đọc bỏ byte tuần tự của tầng ứng dụng (application byte-discard), giúp gửi yêu cầu đọc chính xác dải byte cần thiết. Tuy nhiên, trên môi trường Google Drive thực tế, độ trễ truy xuất dải byte từ xa vẫn phụ thuộc vào Round-Trip Time (RTT) mạng và chu kỳ phản hồi của Google Drive API chứ không phải độ trễ $O(1)$ cố định tức thời.
+> **Làm rõ về cơ chế định vị ngẫu nhiên, độ trễ đám mây & Vòng đời Kênh I/O (R1):**
+> 1. **Định vị & Độ trễ WAN:** Việc ứng dụng Spring Boot sử dụng `FileChannel.position(start)` loại bỏ hoàn toàn việc đọc bỏ byte tuần tự của tầng ứng dụng (application byte-discard), giúp gửi yêu cầu đọc chính xác dải byte cần thiết. Tuy nhiên, trên môi trường Google Drive thực tế, độ trễ truy xuất dải byte từ xa vẫn phụ thuộc vào Round-Trip Time (RTT) mạng và chu kỳ phản hồi của Google Drive API chứ không phải độ trễ $O(1)$ cố định tức thời.
+> 2. **Bao quát toàn bộ thao tác kênh (`activeWorkerOperations`):** Kênh `DriveSeekableByteChannel` bao quát toàn bộ thao tác (`read`, `position`, `size`) trong quyền sở hữu worker. Nếu caller hoàn tất hoặc timeout gọi `close()`, caller được giải phóng tức thì mà không bị treo theo kernel WinFsp; worker thread đảm nhận dọn dẹp delegate khi thao tác kết thúc.
+> 3. **Chính sách đóng kênh không nghẽn & Xử lý bão hòa dọn dẹp:** Khi cleanup pool bão hòa, hệ thống tuyệt đối không chuyển gánh nặng đóng kernel về luồng caller (no direct caller fallback). Luồng caller giải phóng ngay, trong khi `actualOutstandingWorkers` bảo lưu trung thực cho đến khi kernel đóng vật lý hoàn tất.
+> 4. **Giới hạn không thể hủy cứng của WinFsp:** Kernel WinFsp không hỗ trợ hard-cancel an toàn đối với các I/O đang kẹt qua lệnh ngắt Java `Thread.interrupt()`. Do đó, hệ thống bảo vệ caller bằng finite deadlines và cô lập tác vụ kẹt trong pool công nhân giới hạn kết hợp mạch ngắt Circuit Breaker.
 
 ---
 
@@ -346,7 +349,7 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
   # PowerShell 7+:
   pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/status_drive.ps1 -MountPoint "M:"
   ```
-  *Yêu cầu:* Trạng thái trả về `"Status": "MOUNTED"` và phản hồi đọc danh mục thành công.
+  *Yêu cầu:* Trạng thái trả về `"Status": "MOUNTED"`, toàn bộ 9 trường định danh trùng khớp chính xác (so khớp creation timestamp tuyệt đối 0ms drift), `CommandLine` chứa đúng `remoteTarget` và `mountPoint`, và phản hồi đọc danh mục thành công. Bất kỳ sự sai lệch nào sẽ kích hoạt Fail-Closed báo `DEGRADED` và bảo tồn state file trên đĩa.
 - [ ] **4.3.** Đối chiếu trực tiếp tệp trên ổ ảo `M:` với manifest:
   ```powershell
   node scripts/preview_drive_media_mapping.cjs --manifest docs/fixtures/drive_media_mapping.example.json --mount M:
@@ -372,7 +375,7 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
   # Hoặc chỉ định rõ StateFile:
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1 -StateFile "$env:TEMP\movie-rcm-drive-mount.json"
   ```
-  *Yêu cầu:* Đối chiếu nghiêm ngặt 9 trường định danh tiến trình, kích hoạt Fail-Closed nếu thiếu trường hoặc phát hiện PID reuse, giữ nguyên file state trên đĩa.
+  *Yêu cầu:* Đối chiếu nghiêm ngặt 9 trường định danh tiến trình với quy tắc Exact Process Creation Identity (loại bỏ hoàn toàn dung sai lỏng lẻo 200ms/500ms), so khớp dòng lệnh thực tế (`CommandLine` chứa đúng `remoteTarget` và `mountPoint`), sử dụng retained process handle chống PID reuse race. Kích hoạt Fail-Closed từ chối gửi tín hiệu kill và bảo tồn nguyên vẹn file state trên đĩa nếu thiếu trường, danh tính unreadable hoặc không khớp.
 
 ---
 

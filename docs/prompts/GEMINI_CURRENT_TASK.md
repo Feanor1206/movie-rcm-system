@@ -1,11 +1,13 @@
-# DRIVE-01-F03 — Two residual cases, six parallel agents
+# DRIVE-01-F04 — One cleanup-pressure ownership finding
 
-taskId: DRIVE-01-F03
-promptVersion: 5
-reviewedCheckpoint: DRIVE-01-F02-CHECKPOINT-01
+taskId: DRIVE-01-F04
+promptVersion: 6
+reviewedCheckpoint: DRIVE-01-F03-CHECKPOINT-01
 
-At D:\Class\movie-rcm-system on dev, read docs/reviews/DRIVE_01_F02_REVIEW.md and execute docs/prompts/DRIVE_01_F03_GEMINI_PROMPT.md. G1 still requests changes only R1 (metadata/cleanup admission) and R2 (exact live process/mount identity). F3 PowerShell5.1 compatibility is closed. G2/G3 external blocked; M4 local accepted.
+At D:\Class\movie-rcm-system on dev, read docs/reviews/DRIVE_01_F03_REVIEW.md and execute docs/prompts/DRIVE_01_F04_GEMINI_PROMPT.md. Prior seek-timeout/identity repros are closed. Only cleanup saturation/shutdown ownership remains; G1 not accepted. Do not redo passed implementations.
 
-Use six real agents where slots permit: A IO lifecycle, B process identity, C metadata cleanup tests, D disposal/admission races, E Windows regressions, F evidence/docs. Parent announces contracts, coordinates one shared regression round and finalizes artifacts. Preserve passing work; no unrelated feature/build repetition.
+Up to six useful agents with independent files: A cleanup executor/admission, B resource handoff integration, C saturation tests, D shutdown/race tests, E independent lifecycle audit, F docs/evidence. Parent publishes ownership contract early, integrates after handoffs and runs one necessary regression round. No dropped accepted close obligations, synchronous caller-close fallback or unbounded resources.
 
-Automation paused/manual. Preserve frozen artifacts and backend/fastapi/.env.example; Codex controls/prompts/reviews/repros read-only. No real mount/install/OAuth, live DB, AI/GPU, OS settings, deploy, branch/commit/push/reset. Freeze/end turn after new artifacts for independent Codex review.
+Real prerequisites are already installed and cinema-drive OAuth read-only is complete. VideoDieppie is selected/readable but has no test MP4; no actual mount yet. Do not redo OAuth/install or access credentials. G2/G3 remain separate operational checks.
+
+Automation paused/manual. Preserve frozen artifacts and backend/fastapi/.env.example; Codex controls/prompts/reviews/repros read-only. No real mount/install/OAuth, live DB, AI/GPU, OS settings, deploy, branch/commit/push/reset. Finalize new artifacts, freeze and end turn for independent Codex review.
