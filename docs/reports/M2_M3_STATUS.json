@@ -1,13 +1,13 @@
 {
   "protocolVersion": 1,
-  "roundId": 11,
-  "promptVersion": 11,
-  "runId": "run-round11-20261014-1140",
+  "roundId": 12,
+  "promptVersion": 12,
+  "runId": "run-round12-20261014-1245",
   "milestone": "M3",
   "state": "ready_for_review",
-  "startedAt": "2026-10-14T11:15:00+07:00",
+  "startedAt": "2026-10-14T12:45:00+07:00",
   "targetDurationMinutes": 30,
-  "goal": "Gom sửa M3 findings R1–R4: CI đáng tin cậy trên dev, production seed/config policy & data preservation rollback, UX/a11y modals & touch targets, browser walkthrough multi-account UI login & cold/warm performance measurements",
-  "lastCompletedStep": "Hoàn tất toàn bộ R1–R4: 57/57 frontend tests PASS (npm test), 21/21 backend tests PASS (mvnw test), 14/14 browser walkthrough steps PASS + real 3-run perf measurements (/perf_measurements.json, screenshots ROUND_11), 0 tsc errors, Next.js build PASS, reverse patch check PASS",
-  "nextStep": "Chờ Codex nghiệm thu Milestone M3 Vòng 11 tại docs/reviews/LOOP_ROUND_11_REVIEW.md"
+  "goal": "Khép Milestone M3: giải quyết dứt điểm C1 (Compose bootstrap schema favorite_items, additive migration 02_add_favorite_items.sql, configurable env vars, production preflight, 8/8 policy tests) và C2 (PerformanceObserver LCP/CLS session window, negative/control check, cold vs warm cache protocol, CDP wire transfer accounting, First Load JS exact bytes table, ROUND_12 separate evidence)",
+  "lastCompletedStep": "Hoàn tất toàn bộ C1 & C2: 57/57 frontend tests PASS (npm test), 25/25 backend tests PASS (mvnw test), 14/14 browser walkthrough steps PASS + corrected cold/warm benchmarks (screenshots ROUND_12, perf_measurements.json), 0 tsc errors, reverse patch check PASS exit 0",
+  "nextStep": "Chờ Codex nghiệm thu Milestone M3 Vòng 12 tại docs/reviews/LOOP_ROUND_12_REVIEW.md"
 }

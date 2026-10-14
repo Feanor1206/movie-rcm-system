@@ -272,3 +272,36 @@
   6. Harness `run_browser_walkthrough.cjs` hoàn tất 14/14 bước assertions DOM/network thực tế và sinh thành công `perf_measurements.json` cùng 14 screenshots trong `ROUND_11/`.
   7. Patch `ROUND_11.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit 0.
   8. Freeze mã nguồn, bàn giao READY FOR REVIEW.
+---
+
+## Round 12 — Khép Milestone M3: Đồng Bộ Bootstrap Schema & Hiệu Chuẩn Benchmark Đo Lường
+
+- **Started At:** 2026-10-14T12:45:00+07:00
+- **Completed At:** 2026-10-14T13:15:00+07:00
+- **targetRoundId:** 12 | **promptVersion:** 12
+- **Run ID:** `run-round12-20261014-1245`
+- **Reviewed Run ID:** `run-round11-20261014-1140` (Codex Review: CHANGES REQUESTED, findings C1 & C2)
+- **Goal:**
+  1. Khắc phục C1 (Bootstrap Schema & Mandatory Config Policy):
+     - Đồng bộ file canonical bootstrap `database/schema/01_init.sql` (Compose mount) có bảng `favorite_items`, khóa ngoại ON DELETE CASCADE, unique constraint `uq_user_movie_favorite`, và indexes.
+     - Tạo additive forward migration `database/migrations/02_add_favorite_items.sql` không DROP hay overwrite data cho DB hiện hữu.
+     - Đồng bộ tên unique constraint `uq_user_movie_favorite` trên `docs/runbooks/db/schema_v1.sql`.
+     - Đồng bộ configurable `${POSTGRES_USER:-postgres}` và `${POSTGRES_DB:-movie_rcm_db}` trong `infrastructure/docker-compose.yml` giữa postgres env, healthcheck và Spring JDBC datasource URL.
+     - Thêm `ProductionConfigPreflight.java` (`BeanFactoryPostProcessor` + `EnvironmentAware`) bắt buộc khai báo `APP_JWT_SECRET` và `SPRING_DATASOURCE_PASSWORD` khi profile chứa `prod`, ném lỗi rõ tên placeholder khi thiếu. Cấu hình driver JDBC `${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}` trong `application.yml`.
+     - Cập nhật `SeedAndConfigPolicyTest.java` đạt 8 executable tests: kiểm tra policy YAML, data initializer không seed demo user, preflight failures (negative controls cho JWT secret và DB password), positive control prod YAML + test DB, canonical bootstrap `01_init.sql` -> Hibernate `ddl-auto: validate`, và additive migration trên legacy 4-table DB bảo toàn 100% dữ liệu cũ + Hibernate validate.
+  2. Khắc phục C2 (Hiệu chuẩn Đo đạc Hiệu năng, Observer Harness & Tách Biệt Bằng Chứng):
+     - Cài đặt `PerformanceObserver` cho `largest-contentful-paint` (buffered: true, không fallback sang FCP) và `layout-shift` (Session Window W3C chuẩn: max window 1s gap, 5s limit) qua CDP script tiêm trước navigation. Missing sample trả về `null`/`unavailable`. Bổ sung negative self-check `--negative-test` xác nhận observer active và phát hiện shift 0.222.
+     - Bóc tách rành mạch Cold (3 runs, cache cleared & disabled qua CDP) và Warm (3 runs, cache enabled sau priming visit). Dữ liệu mảng mẫu và tóm tắt min/max/median được phân tách độc lập (không gộp chung median).
+     - Đối chiếu dung lượng mạng truyền tải thực tế qua dây (wire transfer) bằng CDP `Network.loadingFinished` (`encodedDataLength`), phân biệt với `transferSize` và dung lượng nén/giải nén của ResourceTiming.
+     - Bổ sung điều kiện app-ready đa chiều (DOM complete, element presence, text verification) và observation window bounded (400ms).
+     - Trích xuất dung lượng JavaScript First Load chính xác từ chunk manifest của Next.js 15.1.2: Home 135.67 kB, Search 134.48 kB, Detail 136.83 kB, Profile 135.58 kB (tất cả đều $\le 140$ kB).
+     - Chạy lại toàn bộ 14 bước browser walkthrough và lưu toàn bộ screenshots cùng `perf_measurements.json` và `walkthrough_evidence.json` vào thư mục riêng `docs/reports/screenshots/ROUND_12/` (đóng băng nguyên vẹn thư mục `ROUND_11/`).
+  3. Bàn giao: Chạy toàn bộ test suites (`npm test`, `mvnw test`, `tsc --noEmit`, browser harness), tạo `ROUND_12.patch` (reverse check PASS exit 0), `ROUND_12_MANIFEST.json` (25 files có SHA256), `ROUND_12_REPORT.md`, cập nhật `M2_M3_STATUS.json` (`state: ready_for_review`).
+- **Completed:**
+  1. Frontend test suites: **57/57 tests PASS** (`npm test`).
+  2. Spring Boot backend: **25/25 tests PASS** (`mvnw test`, bao gồm 8/8 tests trong `SeedAndConfigPolicyTest`).
+  3. TypeScript `npx tsc --noEmit`: **0 errors (PASS exit code 0)**.
+  4. Negative harness self-check `node scripts/run_browser_walkthrough.cjs --negative-test`: **PASS exit code 0**.
+  5. Full browser walkthrough & benchmark: **14/14 steps PASS**, 14 screenshots trong `ROUND_12/`, cold/warm benchmark hoàn tất.
+  6. Patch `ROUND_12.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit code 0.
+  7. Freeze mã nguồn, bàn giao READY FOR REVIEW.

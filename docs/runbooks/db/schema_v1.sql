@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS favorite_items (
     movie_title VARCHAR(255) NOT NULL,
     poster_url VARCHAR(500),
     added_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_favorite_user_movie UNIQUE (user_id, movie_id),
+    CONSTRAINT uq_user_movie_favorite UNIQUE (user_id, movie_id),
     CONSTRAINT fk_favorite_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 

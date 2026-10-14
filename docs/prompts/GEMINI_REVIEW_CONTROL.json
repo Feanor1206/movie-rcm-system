@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "targetRoundId": 12,
-  "promptVersion": 12,
-  "lastReviewedRoundId": 11,
+  "targetRoundId": 13,
+  "promptVersion": 13,
+  "lastReviewedRoundId": 12,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
   "milestone": "M3",
   "reviewMode": "manual",
-  "note": "Round11 source/UI checkpoint accepted:57 tests,21 backend,tsc/build,14 browser steps pass. M3 not accepted: C1 Compose bootstrap missing favorite_items, C2 invalid LCP/CLS and cold-cache methodology. Round12 only these groups, dev/manual; no storage/AI."
+  "note": "Round12 bootstrap and corrected observer/cold-warm checkpoint reviewed. M3 not accepted: D1 exact CI command fails due mixed prod/test profiles; D2 JS budget table hardcoded. Round13 only these two verification fixes, dev/manual; no storage/AI."
 }

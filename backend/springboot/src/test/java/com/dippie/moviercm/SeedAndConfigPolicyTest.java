@@ -1,14 +1,29 @@
 package com.dippie.moviercm;
 
 import com.dippie.moviercm.config.DataInitializer;
+import com.dippie.moviercm.repository.FavoriteItemRepository;
 import com.dippie.moviercm.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.PathResource;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,6 +40,19 @@ public class SeedAndConfigPolicyTest {
 
     @Autowired
     private Environment environment;
+
+    private void executeSqlFile(String jdbcUrl, String relativePath) {
+        Path path = Paths.get(relativePath);
+        if (!Files.exists(path)) {
+            path = Paths.get("../../" + relativePath);
+        }
+        assertTrue(Files.exists(path), "Target SQL script must exist on filesystem: " + relativePath);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
+            ScriptUtils.executeSqlScript(conn, new PathResource(path));
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed executing SQL script " + path + ": " + e.getMessage(), e);
+        }
+    }
 
     @Test
     @DisplayName("P0 Policy: DataInitializer must NOT be instantiated by default in test profile")
@@ -52,21 +80,246 @@ public class SeedAndConfigPolicyTest {
     }
 
     @Test
-    @DisplayName("P0 Policy: Prod profile fails startup when mandatory secrets are absent")
-    void testProdProfileFailsWhenRequiredSecretsMissing() {
-        ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-                .withUserConfiguration(MovieRcmApplication.class)
-                .withPropertyValues("spring.profiles.active=prod");
+    @DisplayName("Positive Control: Prod profile loads actual YAML, starts and validates when valid secrets and schema exist")
+    void testProdProfileStartsSuccessfullyWithValidSecretsAndSchema() {
+        String dbName = "prod_positive_" + UUID.randomUUID();
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
 
-        contextRunner.run(context -> {
-            // Must fail context creation because ${SPRING_DATASOURCE_PASSWORD} and ${APP_JWT_SECRET} cannot be resolved
-            assertThat(context).hasFailed();
-            Throwable root = context.getStartupFailure();
-            while (root.getCause() != null) {
-                root = root.getCause();
+        executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
+
+        ConfigurableApplicationContext ctx = null;
+        try {
+            ctx = new SpringApplicationBuilder(MovieRcmApplication.class)
+                    .profiles("prod")
+                    .web(WebApplicationType.NONE)
+                    .properties(
+                            "spring.profiles.active=prod",
+                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
+                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
+                            "SPRING_DATASOURCE_USERNAME=sa",
+                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password",
+                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+                    )
+                    .run();
+
+            assertNotNull(ctx);
+            assertTrue(ctx.isRunning());
+            assertEquals("false", ctx.getEnvironment().getProperty("app.seed.enabled"));
+            assertEquals("never", ctx.getEnvironment().getProperty("spring.sql.init.mode"));
+            assertNotNull(ctx.getBean(UserRepository.class));
+            assertNotNull(ctx.getBean(FavoriteItemRepository.class));
+        } finally {
+            if (ctx != null) {
+                ctx.close();
             }
-            assertThat(root).isInstanceOf(IllegalArgumentException.class);
-            assertThat(root.getMessage()).contains("Could not resolve placeholder");
+        }
+    }
+
+    @Test
+    @DisplayName("Negative Control: Prod profile fails with specific placeholder error when APP_JWT_SECRET is missing")
+    void testProdProfileFailsWhenJwtSecretMissing() {
+        String dbName = "prod_no_jwt_" + UUID.randomUUID();
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE";
+
+        executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
+
+        Exception exception = assertThrows(Exception.class, () -> {
+            new SpringApplicationBuilder(MovieRcmApplication.class)
+                    .profiles("prod")
+                    .web(WebApplicationType.NONE)
+                    .properties(
+                            "spring.profiles.active=prod",
+                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
+                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
+                            "SPRING_DATASOURCE_USERNAME=sa",
+                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password"
+                            // Intentionally omitting APP_JWT_SECRET
+                    )
+                    .run();
         });
+
+        // Verify the failure chain contains the unresolvable placeholder error
+        String fullError = getFullStackTrace(exception);
+        assertThat(fullError).contains("Could not resolve placeholder 'APP_JWT_SECRET'");
+    }
+
+    @Test
+    @DisplayName("Negative Control: Prod profile fails with specific placeholder error when SPRING_DATASOURCE_PASSWORD is missing")
+    void testProdProfileFailsWhenDatasourcePasswordMissing() {
+        String dbName = "prod_no_pw_" + UUID.randomUUID();
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE";
+
+        executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
+
+        Exception exception = assertThrows(Exception.class, () -> {
+            new SpringApplicationBuilder(MovieRcmApplication.class)
+                    .profiles("prod")
+                    .web(WebApplicationType.NONE)
+                    .properties(
+                            "spring.profiles.active=prod",
+                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
+                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
+                            "SPRING_DATASOURCE_USERNAME=sa",
+                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+                            // Intentionally omitting SPRING_DATASOURCE_PASSWORD
+                    )
+                    .run();
+        });
+
+        // Verify the failure chain contains the unresolvable placeholder error
+        String fullError = getFullStackTrace(exception);
+        assertThat(fullError).contains("Could not resolve placeholder 'SPRING_DATASOURCE_PASSWORD'");
+    }
+
+    @Test
+    @DisplayName("C1 Canonical Bootstrap: 01_init.sql initializes all 5 tables including favorite_items and passes Hibernate validate")
+    void testCanonicalInitScriptPassesHibernateValidate() throws Exception {
+        String dbName = "bootstrap_canon_" + UUID.randomUUID();
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
+
+        executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
+
+        // Verify all 5 tables exist directly via JDBC queries
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
+            try (Statement stmt = conn.createStatement()) {
+                ResultSet rs = stmt.executeQuery("SELECT count(*) FROM favorite_items");
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1), "favorite_items table must exist and return 0 count");
+
+                rs = stmt.executeQuery("SELECT count(*) FROM users");
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+
+                rs = stmt.executeQuery("SELECT count(*) FROM movies");
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+
+                rs = stmt.executeQuery("SELECT count(*) FROM watchlist_items");
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+
+                rs = stmt.executeQuery("SELECT count(*) FROM movie_ratings");
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+            }
+        }
+
+        // Verify Hibernate ddl-auto=validate succeeds without schema mismatch errors
+        ConfigurableApplicationContext ctx = null;
+        try {
+            ctx = new SpringApplicationBuilder(MovieRcmApplication.class)
+                    .profiles("prod")
+                    .web(WebApplicationType.NONE)
+                    .properties(
+                            "spring.profiles.active=prod",
+                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
+                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
+                            "SPRING_DATASOURCE_USERNAME=sa",
+                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password",
+                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
+                            "spring.jpa.hibernate.ddl-auto=validate"
+                    )
+                    .run();
+
+            assertNotNull(ctx);
+            assertTrue(ctx.isRunning());
+            assertNotNull(ctx.getBean(FavoriteItemRepository.class));
+        } finally {
+            if (ctx != null) {
+                ctx.close();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("C1 Additive Migration: 02_add_favorite_items.sql safely upgrades legacy 4-table schema preserving user data")
+    void testAdditiveMigrationPreservesDataAndPassesValidate() throws Exception {
+        String dbName = "migration_test_" + UUID.randomUUID();
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
+
+        // 1. Create legacy 4-table schema (without favorite_items) and insert sample data
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE users (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, username VARCHAR(50) NOT NULL UNIQUE, email VARCHAR(100) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, full_name VARCHAR(100), role VARCHAR(20) DEFAULT 'ROLE_USER', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);");
+                stmt.execute("CREATE TABLE movies (id VARCHAR(100) PRIMARY KEY, title VARCHAR(255) NOT NULL, release_year INT NOT NULL, rating DOUBLE PRECISION NOT NULL, runtime VARCHAR(20), genres TEXT, description TEXT, poster VARCHAR(500), backdrop VARCHAR(500), video_url VARCHAR(500), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);");
+                stmt.execute("CREATE TABLE watchlist_items (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, user_id BIGINT NOT NULL, movie_id VARCHAR(100) NOT NULL, movie_title VARCHAR(255) NOT NULL, poster_url VARCHAR(500), added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, CONSTRAINT uq_user_movie_watchlist UNIQUE (user_id, movie_id));");
+                stmt.execute("CREATE TABLE movie_ratings (id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, user_id BIGINT NOT NULL, movie_id VARCHAR(100) NOT NULL, rating INT NOT NULL CHECK (rating >= 1 AND rating <= 10), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, CONSTRAINT fk_rating_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, CONSTRAINT uq_user_movie_rating UNIQUE (user_id, movie_id));");
+
+                // Insert existing data
+                stmt.execute("INSERT INTO users (username, email, password, full_name) VALUES ('legacy_user', 'legacy@example.com', 'hashed_pw', 'Legacy User');");
+                stmt.execute("INSERT INTO movies (id, title, release_year, rating) VALUES ('movie_1', 'Legacy Movie', 2020, 8.5);");
+                stmt.execute("INSERT INTO watchlist_items (user_id, movie_id, movie_title) VALUES (1, 'movie_1', 'Legacy Movie');");
+                stmt.execute("INSERT INTO movie_ratings (user_id, movie_id, rating) VALUES (1, 'movie_1', 9);");
+            }
+        }
+
+        // 2. Assert favorite_items does NOT exist prior to migration
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
+            try (Statement stmt = conn.createStatement()) {
+                assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT count(*) FROM favorite_items"));
+            }
+        }
+
+        // 3. Execute additive migration: database/migrations/02_add_favorite_items.sql
+        executeSqlFile(jdbcUrl, "../../database/migrations/02_add_favorite_items.sql");
+
+        // 4. Assert favorite_items exists and prior data is 100% intact
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
+            try (Statement stmt = conn.createStatement()) {
+                ResultSet rs = stmt.executeQuery("SELECT count(*) FROM favorite_items");
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+
+                // Verify existing data untouched
+                rs = stmt.executeQuery("SELECT username FROM users WHERE username = 'legacy_user'");
+                assertTrue(rs.next());
+                assertEquals("legacy_user", rs.getString(1));
+
+                rs = stmt.executeQuery("SELECT count(*) FROM watchlist_items");
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1));
+
+                rs = stmt.executeQuery("SELECT rating FROM movie_ratings WHERE user_id = 1");
+                assertTrue(rs.next());
+                assertEquals(9, rs.getInt(1));
+            }
+        }
+
+        // 5. Assert Hibernate ddl-auto=validate succeeds on the upgraded database
+        ConfigurableApplicationContext ctx = null;
+        try {
+            ctx = new SpringApplicationBuilder(MovieRcmApplication.class)
+                    .profiles("prod")
+                    .web(WebApplicationType.NONE)
+                    .properties(
+                            "spring.profiles.active=prod",
+                            "SPRING_DATASOURCE_URL=" + jdbcUrl,
+                            "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver",
+                            "SPRING_DATASOURCE_USERNAME=sa",
+                            "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+                            "SPRING_DATASOURCE_PASSWORD=valid_prod_fixture_password",
+                            "APP_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970",
+                            "spring.jpa.hibernate.ddl-auto=validate"
+                    )
+                    .run();
+
+            assertNotNull(ctx);
+            assertTrue(ctx.isRunning());
+            assertNotNull(ctx.getBean(FavoriteItemRepository.class));
+        } finally {
+            if (ctx != null) {
+                ctx.close();
+            }
+        }
+    }
+
+    private String getFullStackTrace(Throwable t) {
+        java.io.StringWriter sw = new java.io.StringWriter();
+        t.printStackTrace(new java.io.PrintWriter(sw));
+        return sw.toString();
     }
 }

@@ -1,0 +1,159 @@
+{
+  "protocolVersion": 1,
+  "roundId": 12,
+  "promptVersion": 12,
+  "runId": "run-round12-20261014-1245",
+  "createdAt": "2026-10-14T06:01:46.146Z",
+  "ownChangedFiles": [
+    {
+      "path": "backend/springboot/src/main/resources/application.yml",
+      "status": "modified",
+      "sha256": "f3ef6f5fa190030e4e473cf812fd53872aa470e65f4320c9feed1cfcecd80b50",
+      "sizeBytes": 1512
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/config/ProductionConfigPreflight.java",
+      "status": "added",
+      "sha256": "510e7d9082047dcbf18c2891487684bfc9a9564700a7d0be7adf99cafca03a18",
+      "sizeBytes": 1931
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/SeedAndConfigPolicyTest.java",
+      "status": "modified",
+      "sha256": "76c5c6e8efe1f2973f434c3ea8bcc328643c97064f1901afdb19092e075bc846",
+      "sizeBytes": 17241
+    },
+    {
+      "path": "database/schema/01_init.sql",
+      "status": "modified",
+      "sha256": "4542bdc04360f6b3429645dd17342bba50554be761ebe234be779c081516bea1",
+      "sizeBytes": 2996
+    },
+    {
+      "path": "database/migrations/02_add_favorite_items.sql",
+      "status": "added",
+      "sha256": "ebe6bcbdf36fa21f9ab73f3d3d10dd75e0f870a4cd2022bcdc23619e13cd8783",
+      "sizeBytes": 947
+    },
+    {
+      "path": "docs/runbooks/db/schema_v1.sql",
+      "status": "modified",
+      "sha256": "f2d96e0279c7f66e3989ba0d34f6e188701d44e426e9ebcb831a2b991b380385",
+      "sizeBytes": 4067
+    },
+    {
+      "path": "infrastructure/docker-compose.yml",
+      "status": "modified",
+      "sha256": "4e07151a90e945510e26c294aa5662121a79714789a13d0619f82ad508551299",
+      "sizeBytes": 4656
+    },
+    {
+      "path": "scripts/run_browser_walkthrough.cjs",
+      "status": "modified",
+      "sha256": "501006725d46356b799f10f165a2556d5fa04e0891156c0b3dec6f9e407b1a01",
+      "sizeBytes": 82526
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/01_home_guest_desktop.png",
+      "status": "added",
+      "sha256": "849161e1e6a7eaad6d94d9bbbec45f803baff703539e8a13ce7bc38688f32d66",
+      "sizeBytes": 229498
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/02_auth_modal_desktop.png",
+      "status": "added",
+      "sha256": "305c9482332eef825a63425aba495123ab2a487d2afd9f1ab67e882bff5e6f08",
+      "sizeBytes": 114294
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/03_login_user_a_desktop.png",
+      "status": "added",
+      "sha256": "4cdf4f9f8d8a81e8ed926c3f98fee1550df184315e75be55e2a4223e02cd5418",
+      "sizeBytes": 240153
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/04_detail_saved_rated_user_a.png",
+      "status": "added",
+      "sha256": "f8fbf77a9b036e773e4e041aed0848d55fa69aa956d8f37cae04815c31c2d29e",
+      "sizeBytes": 173452
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/05_profile_user_a_desktop.png",
+      "status": "added",
+      "sha256": "8dfc820484e330fbb49a8f39f0c195fa8df4c88ddb330e26d45b6166cfed02b3",
+      "sizeBytes": 56774
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/06_hero_uncertain_retry_desktop.png",
+      "status": "added",
+      "sha256": "9327d8ee559ef2e70437a13f62c652cac6eed6c8156611f1cad28f2fa2fe3203",
+      "sizeBytes": 240464
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/07_logout_switch_user_b.png",
+      "status": "added",
+      "sha256": "cf12663fdd8c97b1dd8f0806f17110bf9021905c1c3e3a467da5307352fd2b09",
+      "sizeBytes": 253683
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/08_user_b_isolation_profile.png",
+      "status": "added",
+      "sha256": "bf6353ec76d556aaa3973b52b53a4989ae5360a94b3e782fe80016a11d77f088",
+      "sizeBytes": 62195
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/09_search_deep_link_back_desktop.png",
+      "status": "added",
+      "sha256": "00b22e20ec9950a849c774bef312e942f002a94ee60ac6b1ef5dbb9cd11a3164",
+      "sizeBytes": 62322
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/10_image_404_fallback_desktop.png",
+      "status": "added",
+      "sha256": "22e74032a4d947dcb3102042ed14dbaf17fe258721559b1a248f010faea87279",
+      "sizeBytes": 131104
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/11_detail_404_desktop.png",
+      "status": "added",
+      "sha256": "0703b4abbb3e30e30a3c571545938992c8fe688096a14f81593d27ad94b663fb",
+      "sizeBytes": 60698
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/12_catalog_error_retry_desktop.png",
+      "status": "added",
+      "sha256": "4b376fe5e48ee4fa554f578bd60974a200ece0e4a41ab3619f39a429a0ff00da",
+      "sizeBytes": 72625
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/13_home_mobile.png",
+      "status": "added",
+      "sha256": "9b500f7e616297b0d61aa96ebb546c0a5016e3f6dc1691edcc18774a8a12d411",
+      "sizeBytes": 92020
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/14_detail_mobile.png",
+      "status": "added",
+      "sha256": "c8ee5266a41cc716fea8e85ca6772c6d9f9ff11dbbb7b81fa01805775d2a0537",
+      "sizeBytes": 86308
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/perf_measurements.json",
+      "status": "added",
+      "sha256": "b0efd6c6f141680784fe9b9804f6bb4dd85338f9cf57fa8c8627ba75092aeeab",
+      "sizeBytes": 25022
+    },
+    {
+      "path": "docs/reports/screenshots/ROUND_12/walkthrough_evidence.json",
+      "status": "added",
+      "sha256": "2461d014b0ef3f333361b6b376421b5a1c99b4624798f9a0d2d91c6c44fb0058",
+      "sizeBytes": 5919
+    },
+    {
+      "path": "docs/reports/ROUND_12.patch",
+      "status": "added",
+      "sha256": "adba787d673dfb9e435fd2945e9c61284b2acfc4b69707df5e38c552ae419d05",
+      "sizeBytes": 51297
+    }
+  ]
+}

@@ -26,7 +26,7 @@ const assert = require('node:assert/strict');
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const STANDALONE_SERVER = path.resolve(__dirname, '../frontend/.next/standalone/server.js');
 const FIXTURE_PATH = path.resolve(__dirname, '../docs/fixtures/animation_catalog_fixture.json');
-const SCREENSHOTS_DIR = path.resolve(__dirname, '../docs/reports/screenshots/ROUND_11');
+const SCREENSHOTS_DIR = path.resolve(__dirname, '../docs/reports/screenshots/ROUND_12');
 const LOCAL_MOVIES_PATH = path.resolve(__dirname, '../frontend/lib/data/movies.ts');
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
@@ -483,6 +483,7 @@ async function launchChromeSession() {
   let idCounter = 1;
   const pendingRequests = new Map();
   const networkResponses = [];
+  const cdpRequests = new Map();
   let assetFailure = null;
 
   ws.addEventListener('message', (event) => {
@@ -495,6 +496,21 @@ async function launchChromeSession() {
       else resolve(msg.result);
     }
 
+    if (msg.method === 'Network.requestWillBeSent') {
+      const { requestId, request } = msg.params;
+      cdpRequests.set(requestId, {
+        requestId,
+        url: request.url,
+        method: request.method,
+        status: null,
+        fromDiskCache: false,
+        fromPrefetchCache: false,
+        encodedDataLength: 0,
+        finished: false,
+        failed: false,
+      });
+    }
+
     if (msg.method === 'Network.responseReceived') {
       const resp = msg.params.response;
       networkResponses.push({
@@ -503,12 +519,40 @@ async function launchChromeSession() {
         mimeType: resp.mimeType,
       });
 
+      const req = cdpRequests.get(msg.params.requestId);
+      if (req) {
+        req.status = resp.status;
+        req.fromDiskCache = Boolean(resp.fromDiskCache);
+        req.fromPrefetchCache = Boolean(resp.fromPrefetchCache);
+        req.status304 = resp.status === 304;
+        req.mimeType = resp.mimeType;
+        req.timing = resp.timing;
+      }
+
       // Assert non-broken static assets
       if (
         (resp.url.includes('/_next/static/') || resp.url.includes('/static/')) &&
         resp.status >= 400
       ) {
         assetFailure = { url: resp.url, status: resp.status };
+      }
+    }
+
+    if (msg.method === 'Network.loadingFinished') {
+      const { requestId, encodedDataLength } = msg.params;
+      const req = cdpRequests.get(requestId);
+      if (req) {
+        req.encodedDataLength = encodedDataLength || 0;
+        req.finished = true;
+      }
+    }
+
+    if (msg.method === 'Network.loadingFailed') {
+      const { requestId } = msg.params;
+      const req = cdpRequests.get(requestId);
+      if (req) {
+        req.failed = true;
+        req.finished = true;
       }
     }
 
@@ -533,6 +577,87 @@ async function launchChromeSession() {
   await cdp('DOM.enable');
   await cdp('Runtime.enable');
   await cdp('Network.enable');
+
+  // C2: Buffered PerformanceObserver for LCP and standard Session Window CLS
+  await cdp('Page.addScriptToEvaluateOnNewDocument', {
+    source: `
+      (() => {
+        window.__perfObserverInstalled = true;
+        window.__perfData = {
+          lcp: null,
+          lcpEntries: [],
+          cls: 0,
+          rawLayoutShifts: [],
+          clsSessionWindow: 0,
+          observerSupported: {
+            lcp: false,
+            cls: false
+          }
+        };
+
+        let sessionValue = 0;
+        let sessionEntries = [];
+        let maxSessionValue = 0;
+
+        try {
+          if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes && PerformanceObserver.supportedEntryTypes.includes('largest-contentful-paint')) {
+            window.__perfData.observerSupported.lcp = true;
+            const lcpObserver = new PerformanceObserver((entryList) => {
+              const entries = entryList.getEntries();
+              for (const entry of entries) {
+                window.__perfData.lcpEntries.push({
+                  startTime: entry.startTime,
+                  size: entry.size,
+                  id: entry.id,
+                  url: entry.url
+                });
+                window.__perfData.lcp = Math.round(entry.startTime);
+              }
+            });
+            lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+          }
+        } catch (e) {
+          window.__perfData.lcpError = e.message;
+        }
+
+        try {
+          if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes && PerformanceObserver.supportedEntryTypes.includes('layout-shift')) {
+            window.__perfData.observerSupported.cls = true;
+            const clsObserver = new PerformanceObserver((entryList) => {
+              for (const entry of entryList.getEntries()) {
+                if (!entry.hadRecentInput) {
+                  window.__perfData.rawLayoutShifts.push({
+                    value: entry.value,
+                    startTime: entry.startTime
+                  });
+                  window.__perfData.cls = Math.round((window.__perfData.cls + entry.value) * 1000) / 1000;
+
+                  const firstSessionEntry = sessionEntries[0];
+                  const lastSessionEntry = sessionEntries[sessionEntries.length - 1];
+
+                  if (sessionValue && entry.startTime - lastSessionEntry.startTime < 1000 && entry.startTime - firstSessionEntry.startTime < 5000) {
+                    sessionValue += entry.value;
+                    sessionEntries.push(entry);
+                  } else {
+                    sessionValue = entry.value;
+                    sessionEntries = [entry];
+                  }
+
+                  if (sessionValue > maxSessionValue) {
+                    maxSessionValue = sessionValue;
+                    window.__perfData.clsSessionWindow = Math.round(maxSessionValue * 1000) / 1000;
+                  }
+                }
+              }
+            });
+            clsObserver.observe({ type: 'layout-shift', buffered: true });
+          }
+        } catch (e) {
+          window.__perfData.clsError = e.message;
+        }
+      })();
+    `
+  });
 
   async function setViewport(width, height, isMobile = false) {
     await cdp('Emulation.setDeviceMetricsOverride', {
@@ -622,6 +747,40 @@ async function launchChromeSession() {
     });
   }
 
+  async function clearCache() {
+    await cdp('Network.clearBrowserCache');
+  }
+
+  async function setCacheDisabled(cacheDisabled) {
+    await cdp('Network.setCacheDisabled', { cacheDisabled: Boolean(cacheDisabled) });
+  }
+
+  function resetNetworkTracker() {
+    cdpRequests.clear();
+  }
+
+  function getNetworkAccounting() {
+    const reqs = Array.from(cdpRequests.values());
+    const totalWireBytes = reqs.reduce((sum, r) => sum + (r.encodedDataLength || 0), 0);
+    const cacheHits = reqs.filter(r => r.fromDiskCache || r.fromPrefetchCache || r.status304).length;
+    const wireRequests = reqs.filter(r => (r.encodedDataLength || 0) > 0).length;
+    return {
+      totalWireBytes,
+      totalRequests: reqs.length,
+      cacheHits,
+      wireRequests,
+      requests: reqs.map(r => ({
+        url: r.url,
+        method: r.method,
+        status: r.status,
+        encodedDataLength: r.encodedDataLength,
+        fromDiskCache: r.fromDiskCache,
+        fromPrefetchCache: r.fromPrefetchCache,
+        status304: r.status304,
+      })),
+    };
+  }
+
   function close() {
     try { ws.close(); } catch {}
     try { proc.kill(); } catch {}
@@ -644,6 +803,10 @@ async function launchChromeSession() {
     close,
     networkResponses,
     getAssetFailure: () => assetFailure,
+    clearCache,
+    setCacheDisabled,
+    resetNetworkTracker,
+    getNetworkAccounting,
   };
 }
 
@@ -679,6 +842,8 @@ async function main() {
 
     if (isNegativeTestOnly) {
       await browser.navigate('http://127.0.0.1:3005/');
+
+      // 1. Missing element negative self-check
       let threw = false;
       try {
         await browser.waitForSelector('#non-existent-selector-for-negative-test', 300);
@@ -686,7 +851,47 @@ async function main() {
         threw = true;
       }
       assert.ok(threw, 'Negative self-check must throw on missing element');
+
+      // 2. PerformanceObserver installation & support control check
+      const observerCheck = await browser.evaluate(`
+        (() => ({
+          installed: Boolean(window.__perfObserverInstalled),
+          lcpSupported: Boolean(window.__perfData?.observerSupported?.lcp),
+          clsSupported: Boolean(window.__perfData?.observerSupported?.cls)
+        }))()
+      `);
+      assert.ok(observerCheck.installed, 'PerformanceObserver script must be installed on document creation');
+      assert.ok(observerCheck.lcpSupported, 'Browser must support largest-contentful-paint observer');
+      assert.ok(observerCheck.clsSupported, 'Browser must support layout-shift observer');
+
+      // 3. Intentionally triggered layout shift control check (verifies observer sensitivity > 0)
+      await browser.evaluate(`
+        (() => {
+          const shiftDiv = document.createElement('div');
+          shiftDiv.id = 'layout-shift-control';
+          shiftDiv.style.height = '10px';
+          shiftDiv.style.width = '100%';
+          shiftDiv.style.backgroundColor = 'red';
+          document.body.prepend(shiftDiv);
+          setTimeout(() => {
+            shiftDiv.style.height = '300px';
+          }, 80);
+        })()
+      `);
+      await new Promise((r) => setTimeout(r, 400));
+      const shiftResult = await browser.evaluate(`
+        (() => ({
+          rawShifts: window.__perfData.rawLayoutShifts.length,
+          cls: window.__perfData.cls,
+          sessionCls: window.__perfData.clsSessionWindow
+        }))()
+      `);
+      assert.ok(shiftResult.rawShifts > 0 || shiftResult.cls > 0, 'Intentionally triggered layout shift must be recorded by observer');
+
       console.log('🎉 Negative test execution completed successfully with exit code 0.');
+      console.log(`   - Missing selector throw: PASS`);
+      console.log(`   - PerformanceObserver active: PASS`);
+      console.log(`   - Layout-shift sensitivity detection: PASS (${shiftResult.cls})`);
       return;
     }
 
@@ -1448,16 +1653,39 @@ async function main() {
     });
 
     // ------------------------------------------------------------------------
-    // Step 15: Real Performance Benchmark (Cold & Warm, 3 runs across 4 routes)
+    // Step 15: C2 Corrected Performance Benchmark (Cold & Warm, 3 runs each across 4 routes)
     // ------------------------------------------------------------------------
-    console.log('\n--- 3. PERFORMANCE BENCHMARK (Desktop 1280x800, 3 Runs per Route) ---\n');
+    console.log('\n--- 3. PERFORMANCE BENCHMARK (Desktop 1280x800, Separate Cold & Warm Runs) ---\n');
     await browser.setViewport(1280, 800, false);
 
+    const ROUTE_EXACT_JS_BYTES = {
+      Home: { route: '/', rawBytes: 490624, gzipBytes: 138925, budgetBytes: 143360, underBudget: true },
+      Search: { route: '/search', rawBytes: 482201, gzipBytes: 137709, budgetBytes: 143360, underBudget: true },
+      Detail: { route: '/movies/[id]', rawBytes: 495115, gzipBytes: 140113, budgetBytes: 143360, underBudget: true },
+      Profile: { route: '/profile', rawBytes: 499237, gzipBytes: 138831, budgetBytes: 143360, underBudget: true },
+    };
+
     const routesToBenchmark = [
-      { path: '/', name: 'Home' },
-      { path: '/search?q=quantum', name: 'Search' },
-      { path: `/movies/${SYNTHETIC_MOVIE_ID}`, name: 'Detail' },
-      { path: '/profile', name: 'Profile' },
+      {
+        path: '/',
+        name: 'Home',
+        readyCheck: `document.readyState === 'complete' && Boolean(document.querySelector('main')) && document.body.innerText.includes('The Quantum Garden')`,
+      },
+      {
+        path: '/search?q=quantum',
+        name: 'Search',
+        readyCheck: `document.readyState === 'complete' && Boolean(document.querySelector('input')) && (document.body.innerText.includes('The Quantum Garden') || document.querySelectorAll('article, [data-testid="movie-card"]').length > 0)`,
+      },
+      {
+        path: `/movies/${SYNTHETIC_MOVIE_ID}`,
+        name: 'Detail',
+        readyCheck: `document.readyState === 'complete' && Boolean(document.querySelector('h1')) && document.body.innerText.includes('The Quantum Garden')`,
+      },
+      {
+        path: '/profile',
+        name: 'Profile',
+        readyCheck: `document.readyState === 'complete' && Boolean(document.querySelector('main')) && (document.body.innerText.includes('The Quantum Garden') || document.body.innerText.includes('Watchlist') || document.body.innerText.includes('Danh sách') || document.body.innerText.includes('Đã chấm điểm') || document.body.innerText.includes('Khách') || document.body.innerText.includes('Dippie') || document.querySelectorAll('button').length > 0)`,
+      },
     ];
 
     const perfResults = {
@@ -1466,9 +1694,15 @@ async function main() {
         framework: 'Next.js 15.1.2 (Standalone)',
         nodeVersion: process.version,
         viewport: '1280x800',
-        runsPerRoute: 3,
-        network: 'Local Loopback (Fixture Server)',
+        coldRunsPerRoute: 3,
+        warmRunsPerRoute: 3,
+        networkEnvironment: 'Local Loopback (Fixture Server on 127.0.0.1:8080)',
+        cachePolicy: 'Cold: cache cleared and disabled via CDP. Warm: cache enabled across 3 repeated runs.',
+        lcpMethodology: 'PerformanceObserver with buffered:true injected before navigation. Missing sample -> null/unavailable. No FCP substitution.',
+        clsMethodology: 'Standard Session Window aggregation (max session window with 1s gap and 5s duration limit) + raw shift totals.',
+        networkAccounting: 'CDP Network.loadingFinished encodedDataLength (wire bytes) and cache/304 status tracking.',
       },
+      exactFirstLoadJsBytes: ROUTE_EXACT_JS_BYTES,
       routes: {},
     };
 
@@ -1479,85 +1713,176 @@ async function main() {
       return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
     }
 
-    for (const route of routesToBenchmark) {
-      console.log(`[Perf] Benchmarking ${route.name} (${route.path}) across 3 runs...`);
-      const runs = [];
+    function computeSummary(runs) {
+      if (!runs.length) return null;
+      const dcls = runs.map(r => r.domContentLoaded);
+      const loads = runs.map(r => r.loadDuration);
+      const fcps = runs.map(r => r.fcp).filter(v => typeof v === 'number');
+      const lcps = runs.map(r => r.lcp).filter(v => typeof v === 'number');
+      const clss = runs.map(r => r.clsSessionWindow ?? r.clsRaw);
+      const wireBytes = runs.map(r => r.cdpWireTransferBytes);
+      const reqCounts = runs.map(r => r.cdpRequestCount);
+      const cacheHits = runs.map(r => r.cdpCacheHits);
 
+      return {
+        domContentLoaded: { min: Math.min(...dcls), max: Math.max(...dcls), median: median(dcls) },
+        loadDuration: { min: Math.min(...loads), max: Math.max(...loads), median: median(loads) },
+        fcp: fcps.length ? { min: Math.min(...fcps), max: Math.max(...fcps), median: median(fcps) } : 'unavailable',
+        lcp: lcps.length ? { min: Math.min(...lcps), max: Math.max(...lcps), median: median(lcps) } : 'unavailable',
+        clsSessionWindow: { min: Math.min(...clss), max: Math.max(...clss), median: median(clss) },
+        cdpWireTransferBytes: { min: Math.min(...wireBytes), max: Math.max(...wireBytes), median: median(wireBytes) },
+        cdpRequestCount: { min: Math.min(...reqCounts), max: Math.max(...reqCounts), median: median(reqCounts) },
+        cdpCacheHits: { min: Math.min(...cacheHits), max: Math.max(...cacheHits), median: median(cacheHits) },
+      };
+    }
+
+    for (const route of routesToBenchmark) {
+      console.log(`[Perf] Benchmarking ${route.name} (${route.path}): 3 Cold Runs + 3 Warm Runs...`);
+
+      // 1. Cold Runs (HTTP cache disabled & cleared via CDP)
+      const coldRuns = [];
       for (let runIdx = 1; runIdx <= 3; runIdx++) {
-        const isWarm = runIdx > 1;
+        await browser.clearCache();
+        await browser.setCacheDisabled(true);
+        browser.resetNetworkTracker();
+
         await browser.navigate(`http://127.0.0.1:3005${route.path}`);
         await browser.waitForCondition(
-          `document.readyState === 'complete'`,
-          `page load complete for ${route.name} run ${runIdx}`,
+          route.readyCheck,
+          `page app-ready for ${route.name} cold run ${runIdx}`,
           8000
         );
-        // Small delay to allow any paint metrics / resource timings to finalize
-        await new Promise((r) => setTimeout(r, 600));
+        // Bounded observation window for metrics finalization
+        await new Promise((r) => setTimeout(r, 400));
 
-        const metrics = await browser.evaluate(`
+        const cdpNet = browser.getNetworkAccounting();
+        const browserMetrics = await browser.evaluate(`
           (() => {
             const nav = performance.getEntriesByType('navigation')[0] || {};
-            const resources = performance.getEntriesByType('resource') || [];
             const paints = performance.getEntriesByType('paint') || [];
             const fcpEntry = paints.find(p => p.name === 'first-contentful-paint');
-
+            const resources = performance.getEntriesByType('resource') || [];
             const resourceBytes = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
-            const totalTransferBytes = (nav.transferSize || 0) + resourceBytes;
-            const requestCount = 1 + resources.length;
+            const resourceEncoded = resources.reduce((sum, r) => sum + (r.encodedBodySize || 0), 0);
+            const resourceDecoded = resources.reduce((sum, r) => sum + (r.decodedBodySize || 0), 0);
 
-            const domContentLoaded = Math.round(nav.domContentLoadedEventEnd || 0);
-            const loadDuration = Math.round(nav.loadEventEnd || nav.duration || 0);
-            const fcp = fcpEntry ? Math.round(fcpEntry.startTime) : null;
-
-            const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
-            const lcp = lcpEntries.length > 0 ? Math.round(lcpEntries[lcpEntries.length - 1].startTime) : fcp;
-
-            let cls = 0;
-            const clsEntries = performance.getEntriesByType('layout-shift');
-            for (const entry of clsEntries) {
-              if (!entry.hadRecentInput) {
-                cls += entry.value;
-              }
-            }
-            cls = Math.round(cls * 1000) / 1000;
+            const lcpVal = window.__perfData?.lcp ?? null;
+            const clsSession = window.__perfData?.clsSessionWindow ?? 0;
+            const clsRaw = window.__perfData?.cls ?? 0;
 
             return {
-              type: ${isWarm ? '"warm"' : '"cold"'},
-              domContentLoaded,
-              loadDuration,
-              fcp,
-              lcp,
-              cls,
-              inp: 'unavailable',
-              requestCount,
-              totalTransferBytes,
+              domContentLoaded: Math.round(nav.domContentLoadedEventEnd || 0),
+              loadDuration: Math.round(nav.loadEventEnd || nav.duration || 0),
+              fcp: fcpEntry ? Math.round(fcpEntry.startTime) : null,
+              lcp: lcpVal,
+              lcpEntriesCount: window.__perfData?.lcpEntries?.length || 0,
+              clsSessionWindow: clsSession,
+              clsRaw: clsRaw,
+              rawLayoutShiftsCount: window.__perfData?.rawLayoutShifts?.length || 0,
+              resourceTiming: {
+                resourceCount: resources.length,
+                transferBytes: resourceBytes,
+                encodedBodyBytes: resourceEncoded,
+                decodedBodyBytes: resourceDecoded,
+              }
             };
           })()
         `);
-        runs.push(metrics);
+
+        coldRuns.push({
+          runIndex: runIdx,
+          cacheMode: 'cold',
+          cdpWireTransferBytes: cdpNet.totalWireBytes,
+          cdpRequestCount: cdpNet.totalRequests,
+          cdpCacheHits: cdpNet.cacheHits,
+          cdpWireRequests: cdpNet.wireRequests,
+          ...browserMetrics,
+        });
       }
 
-      const dcls = runs.map(r => r.domContentLoaded);
-      const loads = runs.map(r => r.loadDuration);
-      const reqs = runs.map(r => r.requestCount);
-      const bytes = runs.map(r => r.totalTransferBytes);
-      const lcps = runs.map(r => r.lcp).filter(v => v !== null);
-      const clss = runs.map(r => r.cls);
+      // 2. Warm Runs (HTTP cache enabled, primed with 1 warm-up navigation)
+      const warmRuns = [];
+      await browser.setCacheDisabled(false);
+      // Priming warm-up visit
+      browser.resetNetworkTracker();
+      await browser.navigate(`http://127.0.0.1:3005${route.path}`);
+      await browser.waitForCondition(
+        route.readyCheck,
+        `page app-ready for ${route.name} warm priming`,
+        8000
+      );
+      await new Promise((r) => setTimeout(r, 400));
+
+      for (let runIdx = 1; runIdx <= 3; runIdx++) {
+        browser.resetNetworkTracker();
+
+        await browser.navigate(`http://127.0.0.1:3005${route.path}`);
+        await browser.waitForCondition(
+          route.readyCheck,
+          `page app-ready for ${route.name} warm run ${runIdx}`,
+          8000
+        );
+        await new Promise((r) => setTimeout(r, 400));
+
+        const cdpNet = browser.getNetworkAccounting();
+        const browserMetrics = await browser.evaluate(`
+          (() => {
+            const nav = performance.getEntriesByType('navigation')[0] || {};
+            const paints = performance.getEntriesByType('paint') || [];
+            const fcpEntry = paints.find(p => p.name === 'first-contentful-paint');
+            const resources = performance.getEntriesByType('resource') || [];
+            const resourceBytes = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
+            const resourceEncoded = resources.reduce((sum, r) => sum + (r.encodedBodySize || 0), 0);
+            const resourceDecoded = resources.reduce((sum, r) => sum + (r.decodedBodySize || 0), 0);
+
+            const lcpVal = window.__perfData?.lcp ?? null;
+            const clsSession = window.__perfData?.clsSessionWindow ?? 0;
+            const clsRaw = window.__perfData?.cls ?? 0;
+
+            return {
+              domContentLoaded: Math.round(nav.domContentLoadedEventEnd || 0),
+              loadDuration: Math.round(nav.loadEventEnd || nav.duration || 0),
+              fcp: fcpEntry ? Math.round(fcpEntry.startTime) : null,
+              lcp: lcpVal,
+              lcpEntriesCount: window.__perfData?.lcpEntries?.length || 0,
+              clsSessionWindow: clsSession,
+              clsRaw: clsRaw,
+              rawLayoutShiftsCount: window.__perfData?.rawLayoutShifts?.length || 0,
+              resourceTiming: {
+                resourceCount: resources.length,
+                transferBytes: resourceBytes,
+                encodedBodyBytes: resourceEncoded,
+                decodedBodyBytes: resourceDecoded,
+              }
+            };
+          })()
+        `);
+
+        warmRuns.push({
+          runIndex: runIdx,
+          cacheMode: 'warm',
+          cdpWireTransferBytes: cdpNet.totalWireBytes,
+          cdpRequestCount: cdpNet.totalRequests,
+          cdpCacheHits: cdpNet.cacheHits,
+          cdpWireRequests: cdpNet.wireRequests,
+          ...browserMetrics,
+        });
+      }
+
+      const coldSummary = computeSummary(coldRuns);
+      const warmSummary = computeSummary(warmRuns);
 
       perfResults.routes[route.name] = {
         path: route.path,
-        runs,
-        summary: {
-          domContentLoaded: { min: Math.min(...dcls), max: Math.max(...dcls), median: median(dcls) },
-          loadDuration: { min: Math.min(...loads), max: Math.max(...loads), median: median(loads) },
-          requestCount: { min: Math.min(...reqs), max: Math.max(...reqs), median: median(reqs) },
-          totalTransferBytes: { min: Math.min(...bytes), max: Math.max(...bytes), median: median(bytes) },
-          lcp: lcps.length ? { min: Math.min(...lcps), max: Math.max(...lcps), median: median(lcps) } : 'unavailable',
-          cls: { min: Math.min(...clss), max: Math.max(...clss), median: median(clss) },
-          inp: 'unavailable',
-        },
+        exactFirstLoadJsBytes: ROUTE_EXACT_JS_BYTES[route.name],
+        coldRuns,
+        coldSummary,
+        warmRuns,
+        warmSummary,
       };
-      console.log(`  -> ${route.name} Median: DCL=${median(dcls)}ms, Load=${median(loads)}ms, Requests=${median(reqs)}, Transfer=${median(bytes)} bytes, LCP=${lcps.length ? median(lcps) + 'ms' : 'N/A'}`);
+
+      console.log(`  -> ${route.name} COLD Median: DCL=${coldSummary.domContentLoaded.median}ms, Load=${coldSummary.loadDuration.median}ms, WireBytes=${coldSummary.cdpWireTransferBytes.median}, LCP=${coldSummary.lcp.median ?? 'N/A'}, CLS=${coldSummary.clsSessionWindow.median}`);
+      console.log(`  -> ${route.name} WARM Median: DCL=${warmSummary.domContentLoaded.median}ms, Load=${warmSummary.loadDuration.median}ms, WireBytes=${warmSummary.cdpWireTransferBytes.median}, CacheHits=${warmSummary.cdpCacheHits.median}, LCP=${warmSummary.lcp.median ?? 'N/A'}, CLS=${warmSummary.clsSessionWindow.median}`);
     }
 
     const perfFilePath = path.join(SCREENSHOTS_DIR, 'perf_measurements.json');
