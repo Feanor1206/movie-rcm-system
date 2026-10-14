@@ -1,11 +1,11 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "targetRoundId": 8,
-  "promptVersion": 8,
-  "lastReviewedRoundId": 7,
+  "targetRoundId": 9,
+  "promptVersion": 9,
+  "lastReviewedRoundId": 8,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
   "milestone": "M2",
   "reviewMode": "manual",
-  "note": "Round 7 source checkpoint accepted: D1-D3 fixed, 53 tests/typecheck/build/preview pass. Full M2 awaits UI journey and browser evidence. Round 8 verification only, manual mode; automation remains off."
+  "note": "Round 8 request changes: 54 component tests and tsc pass, but browser PNGs contradict report (missing assets/content, identical state screenshots); harness lacks assertions/auth, local-ID claim false. Round 9 fixes verification only. M2 not accepted; manual mode."
 }

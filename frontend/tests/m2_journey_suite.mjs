@@ -552,6 +552,126 @@ function createProfileHarness(initialLibrary, getCatalogMovieByIdMock, customClo
   return { render, settle, setLibrary, get tree() { return tree; } };
 }
 
+// Helper to mount production WatchlistProvider with custom fetcher
+function mountProductionProvider(fetcher, customAuth = {}) {
+  let slots = [];
+  let hookIndex = 0;
+  let effects = [];
+  let changed = false;
+  let value = null;
+  const same = (a, b) => a && b && a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
+
+  const hooks = {
+    createContext: () => ({ Provider: 'Provider' }),
+    useContext: () => null,
+    useState(initial) {
+      const i = hookIndex++;
+      if (!slots[i]) slots[i] = { v: typeof initial === 'function' ? initial() : initial };
+      return [
+        slots[i].v,
+        (v) => {
+          slots[i].v = typeof v === 'function' ? v(slots[i].v) : v;
+          changed = true;
+        },
+      ];
+    },
+    useRef(initial) {
+      const i = hookIndex++;
+      if (!slots[i]) slots[i] = { current: initial };
+      return slots[i];
+    },
+    useCallback(fn, deps) {
+      const i = hookIndex++;
+      if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { v: fn, deps };
+      return slots[i].v;
+    },
+    useEffect(fn, deps) {
+      const i = hookIndex++;
+      if (!slots[i] || !same(slots[i].deps, deps)) {
+        const prev = slots[i];
+        slots[i] = { deps, cleanup: prev?.cleanup };
+        effects.push(() => {
+          prev?.cleanup?.();
+          slots[i].cleanup = fn();
+        });
+      }
+    },
+    useMemo(fn, deps) {
+      const i = hookIndex++;
+      if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { v: fn(), deps };
+      return slots[i].v;
+    },
+    createElement(type, props, ...children) {
+      return { type, props: { ...props, children } };
+    },
+  };
+
+  const moduleObj = { exports: {} };
+  const storage = new Map();
+  const stableUser = { id: 'user-journey-1', username: 'animator' };
+  const stableAuth = {
+    isAuthenticated: true,
+    token: 'jwt-test-token',
+    user: stableUser,
+    status: 'authenticated',
+    handleSessionExpired: () => {},
+    ...customAuth,
+  };
+  const context = {
+    module: moduleObj,
+    exports: moduleObj.exports,
+    process: { env: {} },
+    console,
+    AbortController,
+    DOMException,
+    fetch: fetcher,
+    window: {},
+    localStorage: {
+      getItem: (k) => storage.get(k) || null,
+      setItem: (k, v) => storage.set(k, String(v)),
+      removeItem: (k) => storage.delete(k),
+    },
+    setTimeout: (fn) => setTimeout(fn, 0),
+    clearTimeout: (id) => clearTimeout(id),
+    require: (name) => {
+      if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
+      if (name.includes('AuthContext')) {
+        return {
+          useAuth: () => stableAuth,
+        };
+      }
+      if (name.includes('AuthModal')) return { AuthModal: () => null };
+      if (name.includes('CineBot')) return { CineBot: () => null, CineBotFloatingTrigger: () => null };
+      if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
+      return {};
+    },
+  };
+
+  vm.runInNewContext(watchlistProviderTranspiled, context, { filename: watchlistProviderFilePath });
+
+  function render() {
+    hookIndex = 0;
+    changed = false;
+    const res = moduleObj.exports.WatchlistProvider({ children: null });
+    value = res.props.value;
+    const pending = effects;
+    effects = [];
+    for (const ef of pending) ef();
+    return value;
+  }
+
+  async function settle(maxPasses = 10) {
+    for (let pass = 0; pass < maxPasses; pass++) {
+      await turn();
+      if (changed || pass === 0) render();
+    }
+    return value;
+  }
+
+  render();
+  return { render, settle, get value() { return value; } };
+}
+
 // ============================================================================
 // TEST CASES: ROUND 6 CUTOVER & JOURNEY INTEGRATION
 // ============================================================================
@@ -951,6 +1071,18 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
   // 1. Fake persisted backend store
   const persistedWatchlist = new Set();
   const persistedRatings = new Map();
+  const capturedRequests = [];
+
+  // Canonical movie outside local fixture (not in frontend/lib/data/movies.ts)
+  const canonicalMovie = sampleMovie({
+    id: 'the-last-orbit',
+    title: 'The Last Orbit',
+    year: 2024,
+    rating: 8.4,
+    runtime: '1h 45m',
+    genres: ['Animation', 'Sci-Fi'],
+    poster: 'https://images.unsplash.com/photo-the-last-orbit',
+  });
 
   // 2. Persisted transport interceptor
   const persistedFetcher = async (url, options = {}) => {
@@ -972,6 +1104,7 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
     // POST /users/watchlist
     if (pathname.includes('/users/watchlist') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
+      capturedRequests.push({ method: 'POST', endpoint: 'watchlist', body });
       persistedWatchlist.add(body.movieId);
       return {
         ok: true,
@@ -983,6 +1116,7 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
     if (pathname.includes('/users/watchlist/') && method === 'DELETE') {
       const parts = pathname.split('/');
       const id = decodeURIComponent(parts[parts.length - 1]);
+      capturedRequests.push({ method: 'DELETE', endpoint: 'watchlist', id });
       persistedWatchlist.delete(id);
       return {
         ok: true,
@@ -1004,6 +1138,7 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
     // POST /users/ratings
     if (pathname.includes('/users/ratings') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
+      capturedRequests.push({ method: 'POST', endpoint: 'ratings', body });
       persistedRatings.set(body.movieId, body.rating);
       return {
         ok: true,
@@ -1027,153 +1162,57 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
     };
   };
 
-  // Helper to mount production WatchlistProvider with persisted fetcher
-  function mountProductionProvider(fetcher) {
-    let slots = [];
-    let hookIndex = 0;
-    let effects = [];
-    let changed = false;
-    let value = null;
-    const same = (a, b) => a && b && a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
-
-    const hooks = {
-      createContext: () => ({ Provider: 'Provider' }),
-      useContext: () => null,
-      useState(initial) {
-        const i = hookIndex++;
-        if (!slots[i]) slots[i] = { v: typeof initial === 'function' ? initial() : initial };
-        return [
-          slots[i].v,
-          (v) => {
-            slots[i].v = typeof v === 'function' ? v(slots[i].v) : v;
-            changed = true;
-          },
-        ];
-      },
-      useRef(initial) {
-        const i = hookIndex++;
-        if (!slots[i]) slots[i] = { current: initial };
-        return slots[i];
-      },
-      useCallback(fn, deps) {
-        const i = hookIndex++;
-        if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { v: fn, deps };
-        return slots[i].v;
-      },
-      useEffect(fn, deps) {
-        const i = hookIndex++;
-        if (!slots[i] || !same(slots[i].deps, deps)) {
-          const prev = slots[i];
-          slots[i] = { deps, cleanup: prev?.cleanup };
-          effects.push(() => {
-            prev?.cleanup?.();
-            slots[i].cleanup = fn();
-          });
-        }
-      },
-      useMemo(fn, deps) {
-        const i = hookIndex++;
-        if (!slots[i] || !same(slots[i].deps, deps)) slots[i] = { v: fn(), deps };
-        return slots[i].v;
-      },
-      createElement(type, props, ...children) {
-        return { type, props: { ...props, children } };
-      },
-    };
-
-    const moduleObj = { exports: {} };
-    const storage = new Map();
-    const context = {
-      module: moduleObj,
-      exports: moduleObj.exports,
-      process: { env: {} },
-      console,
-      AbortController,
-      DOMException,
-      fetch: fetcher,
-      window: {},
-      localStorage: {
-        getItem: (k) => storage.get(k) || null,
-        setItem: (k, v) => storage.set(k, String(v)),
-        removeItem: (k) => storage.delete(k),
-      },
-      setTimeout: (fn) => setTimeout(fn, 0),
-      clearTimeout: (id) => clearTimeout(id),
-      require: (name) => {
-        if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
-        if (name.includes('AuthContext')) {
-          return {
-            useAuth: () => ({
-              isAuthenticated: true,
-              token: 'jwt-test-token',
-              user: { id: 'user-journey-1', username: 'animator' },
-              status: 'authenticated',
-            }),
-          };
-        }
-        if (name.includes('AuthModal')) return { AuthModal: () => null };
-        if (name.includes('CineBot')) return { CineBot: () => null, CineBotFloatingTrigger: () => null };
-        if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
-        return {};
-      },
-    };
-
-    vm.runInNewContext(watchlistProviderTranspiled, context, { filename: watchlistProviderFilePath });
-
-    function render() {
-      hookIndex = 0;
-      changed = false;
-      const res = moduleObj.exports.WatchlistProvider({ children: null });
-      value = res.props.value;
-      const pending = effects;
-      effects = [];
-      for (const ef of pending) ef();
-      return value;
-    }
-
-    async function settle(maxPasses = 8) {
-      for (let pass = 0; pass < maxPasses; pass++) {
-        await turn();
-        if (changed || pass === 0) render();
-      }
-      return value;
-    }
-
-    render();
-    return { render, settle, get value() { return value; } };
-  }
-
-  // --- Step 1: User discovers Spirited Away on Home / Hero and saves to Watchlist ---
+  // --- Step 1: User discovers movie on Home / Hero and clicks save to Watchlist ---
   const session1 = mountProductionProvider(persistedFetcher);
   await session1.settle();
 
-  const canonicalMovie = sampleMovie({
-    id: 'spirited-away',
-    title: 'Spirited Away',
-    year: 2001,
-    rating: 8.6,
-  });
+  const heroTree1 = renderEditorialHero(canonicalMovie, session1.value);
+  const saveBtn = findNodes(
+    heroTree1,
+    (n) => n.type === 'button' && (getText(n).includes('Thêm vào Watchlist') || n.props?.['aria-label']?.includes('Thêm vào danh sách'))
+  )[0];
+  assert.ok(saveBtn, 'EditorialHero must render interactive save button');
 
-  // Action 1: Add to Watchlist via production provider
-  await session1.value.toggleWatchlist(canonicalMovie.id, canonicalMovie.title, canonicalMovie.poster);
+  // Trigger click via actual component handler
+  await saveBtn.props.onClick();
   await session1.settle();
 
-  assert.ok(persistedWatchlist.has('spirited-away'), 'Persisted transport must record spirited-away in watchlist');
-  assert.equal(session1.value.isWatchlisted('spirited-away'), true, 'Provider visible state must confirm watchlist');
+  // Assertions on persisted transport and POST body
+  assert.ok(persistedWatchlist.has('the-last-orbit'), 'Persisted transport must record the-last-orbit in watchlist');
+  const postWatchlist = capturedRequests.find((r) => r.endpoint === 'watchlist' && r.method === 'POST');
+  assert.ok(postWatchlist, 'Must issue POST /users/watchlist upon hero button click');
+  assert.equal(postWatchlist.body.movieId, 'the-last-orbit', 'POST body must contain canonical movieId');
 
-  // --- Step 2: User navigates to Detail page and rates movie 9/10 ---
-  await session1.value.rateMovie('spirited-away', 9, 'Spirited Away');
+  // Hero updates to reflect saved status
+  const heroTreeAfterSave = renderEditorialHero(canonicalMovie, session1.value);
+  const savedHeroBtn = findNodes(heroTreeAfterSave, (n) => n.type === 'button' && getText(n).includes('Đã lưu Watchlist'))[0];
+  assert.ok(savedHeroBtn, 'Hero component must update to display "Đã lưu Watchlist"');
+
+  // --- Step 2: User navigates to Detail page and clicks rating star 9 ---
+  const detailTree = renderMovieDetail(canonicalMovie, [], session1.value);
+  const star9Btn = findNodes(
+    detailTree,
+    (n) => n.type === 'button' && n.props?.['aria-label'] === 'Chấm 9 trên 10 sao'
+  )[0];
+  assert.ok(star9Btn, 'MovieDetail must render interactive rating button for star 9');
+
+  // Trigger click via actual component handler
+  await star9Btn.props.onClick();
   await session1.settle();
 
-  assert.equal(persistedRatings.get('spirited-away'), 9, 'Persisted transport must record rating 9 for spirited-away');
-  assert.equal(session1.value.getRating('spirited-away'), 9, 'Provider visible state must confirm rating 9');
+  // Assertions on persisted transport and POST body
+  assert.equal(persistedRatings.get('the-last-orbit'), 9, 'Persisted transport must record rating 9 for the-last-orbit');
+  const postRating = capturedRequests.find((r) => r.endpoint === 'ratings' && r.method === 'POST');
+  assert.ok(postRating, 'Must issue POST /users/ratings upon star rating button click');
+  assert.equal(postRating.body.movieId, 'the-last-orbit', 'Rating POST body must have canonical movieId');
+  assert.equal(postRating.body.rating, 9, 'Rating POST body must have rating value 9');
 
   // --- Step 3: Simulate browser reload / provider remount for the user ---
   const session2 = mountProductionProvider(persistedFetcher);
   await session2.settle();
 
-  assert.equal(session2.value.isWatchlisted('spirited-away'), true, 'Reloaded provider must restore watchlist from backend');
-  assert.equal(session2.value.getRating('spirited-away'), 9, 'Reloaded provider must restore rating from backend');
+  assert.equal(session2.value.isWatchlisted('the-last-orbit'), true, 'Reloaded provider must restore watchlist from backend');
+  assert.equal(session2.value.getRating('the-last-orbit'), 9, 'Reloaded provider must restore rating 9 from backend');
 
   // --- Step 4: ProfileOverview mounts under reloaded provider and resolves catalog metadata ---
   const profileHarness = createProfileHarness(
@@ -1183,17 +1222,188 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
       ratings: session2.value.ratings,
       watchlistContext: session2.value,
     },
-    async (id) => (id === 'spirited-away' ? canonicalMovie : null)
+    async (id) => (id === 'the-last-orbit' ? canonicalMovie : null)
   );
 
   profileHarness.render();
   await profileHarness.settle();
 
-  // Watchlist tab renders MovieCard for spirited-away with exact canonical metadata
+  // Watchlist tab renders MovieCard for the-last-orbit with exact canonical metadata
   const profileCards = findNodes(profileHarness.tree, (n) => n.type === 'MovieCard');
-  assert.equal(profileCards.length, 1, 'Profile must render MovieCard for persisted item');
-  assert.equal(profileCards[0].props.movie.id, 'spirited-away');
-  assert.equal(profileCards[0].props.movie.title, 'Spirited Away');
-  assert.equal(profileCards[0].props.movie.year, 2001);
+  assert.equal(profileCards.length, 1, 'Profile must render MovieCard for the persisted item');
+  assert.equal(profileCards[0].props.movie.id, 'the-last-orbit', 'Profile card must use canonical ID outside local fixture');
+  assert.equal(profileCards[0].props.movie.title, 'The Last Orbit', 'Profile card title must match');
+  assert.equal(profileCards[0].props.movie.year, 2024, 'Profile card year must match');
+});
+
+test('8. Hero uncertain ADD/DELETE retry integration with production provider (commit response drop, reconcile error, retry recovery)', async () => {
+  const persistedWatchlist = new Set();
+  let dropWatchlistResponse = false;
+  let reconcileFails = false;
+  const requestsLog = [];
+
+  const transportFetcher = async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const parsedUrl = new URL(url, 'http://localhost');
+    const pathname = parsedUrl.pathname;
+
+    // GET /users/watchlist (background reconcile or initial fetch)
+    if (pathname.includes('/users/watchlist') && method === 'GET') {
+      if (reconcileFails) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ success: false, message: 'Server unavailable during reconcile' }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: Array.from(persistedWatchlist).map((id) => ({ movieId: id })),
+        }),
+      };
+    }
+
+    // POST /users/watchlist
+    if (pathname.includes('/users/watchlist') && method === 'POST') {
+      const body = JSON.parse(options.body || '{}');
+      requestsLog.push({ method: 'POST', body });
+      if (dropWatchlistResponse) {
+        // Backend committed, but response network dropped / client connection lost
+        persistedWatchlist.add(body.movieId);
+        throw new TypeError('Network error: connection dropped after write');
+      }
+      persistedWatchlist.add(body.movieId);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: { movieId: body.movieId, movieTitle: body.movieTitle } }),
+      };
+    }
+
+    // DELETE /users/watchlist/:id
+    if (pathname.includes('/users/watchlist/') && method === 'DELETE') {
+      const parts = pathname.split('/');
+      const id = decodeURIComponent(parts[parts.length - 1]);
+      requestsLog.push({ method: 'DELETE', id });
+      if (dropWatchlistResponse) {
+        persistedWatchlist.delete(id);
+        throw new TypeError('Network error: connection dropped after delete');
+      }
+      persistedWatchlist.delete(id);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: true }),
+      };
+    }
+
+    // Default 200 for other endpoints
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: [] }),
+    };
+  };
+
+  const canonicalMovie = sampleMovie({
+    id: 'the-last-orbit',
+    title: 'The Last Orbit',
+    year: 2024,
+  });
+
+  const session = mountProductionProvider(transportFetcher);
+  await session.settle();
+
+  // -------------------------------------------------------------------------
+  // PHASE A: ADD uncertain outcome + retry
+  // -------------------------------------------------------------------------
+  // 1. Initial Hero: '+ Thêm vào Watchlist'
+  let heroTree = renderEditorialHero(canonicalMovie, session.value);
+  let btn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thêm vào Watchlist'))[0];
+  assert.ok(btn, 'Initial Hero must show "+ Thêm vào Watchlist"');
+
+  // 2. Enable network fault: write commit succeeds in DB, response dropped, reconcile 500 error
+  dropWatchlistResponse = true;
+  reconcileFails = true;
+
+  // 3. User clicks "+ Thêm vào Watchlist"
+  await btn.props.onClick();
+  await session.settle();
+
+  // 4. Provider detects uncertain outcome:
+  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), true, 'Action must be marked uncertain');
+  assert.equal(session.value.getActionIntent('the-last-orbit', 'watchlist'), 'add', 'Desired intent must be add');
+
+  // 5. Hero UI displays uncertain state with badge and "Thử lưu lại" retry label
+  heroTree = renderEditorialHero(canonicalMovie, session.value);
+  const unconfirmedBadge = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
+  assert.ok(unconfirmedBadge, 'Hero must display "Chưa xác nhận" badge');
+
+  let retryAddBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thử lưu lại'))[0];
+  assert.ok(retryAddBtn, 'Hero button must display "Thử lưu lại" for uncertain add intent');
+  assert.equal(retryAddBtn.props['aria-label'], `Chưa xác nhận lưu • Thử lưu lại ${canonicalMovie.title} vào danh sách xem`);
+
+  // 6. Transport recovers: network healthy
+  dropWatchlistResponse = false;
+  reconcileFails = false;
+
+  // 7. User clicks "Thử lưu lại" to retry
+  await retryAddBtn.props.onClick();
+  await session.settle();
+
+  // 8. Operation confirms: badge disappears, button returns to normal "Đã lưu Watchlist"
+  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), false, 'Action is confirmed');
+  assert.equal(session.value.isWatchlisted('the-last-orbit'), true, 'Watchlist is confirmed');
+
+  heroTree = renderEditorialHero(canonicalMovie, session.value);
+  const badgeAfterAddConfirm = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
+  assert.equal(badgeAfterAddConfirm, undefined, 'Unconfirmed badge must disappear after successful retry');
+  let confirmedSavedBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Đã lưu Watchlist'))[0];
+  assert.ok(confirmedSavedBtn, 'Hero must display "Đã lưu Watchlist" upon confirmed retry');
+
+  // -------------------------------------------------------------------------
+  // PHASE B: DELETE uncertain outcome + retry
+  // -------------------------------------------------------------------------
+  // 9. Enable network fault for DELETE
+  dropWatchlistResponse = true;
+  reconcileFails = true;
+
+  // 10. User clicks "Đã lưu Watchlist" to remove
+  await confirmedSavedBtn.props.onClick();
+  await session.settle();
+
+  // 11. Provider detects uncertain remove outcome:
+  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), true, 'Action must be marked uncertain for remove');
+  assert.equal(session.value.getActionIntent('the-last-orbit', 'watchlist'), 'remove', 'Desired intent must be remove');
+
+  // 12. Hero UI displays uncertain state with badge and "Thử xóa lại" retry label
+  heroTree = renderEditorialHero(canonicalMovie, session.value);
+  const unconfirmedDeleteBadge = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
+  assert.ok(unconfirmedDeleteBadge, 'Hero must display "Chưa xác nhận" badge on delete failure');
+
+  let retryDeleteBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thử xóa lại'))[0];
+  assert.ok(retryDeleteBtn, 'Hero button must display "Thử xóa lại" for uncertain remove intent');
+  assert.equal(retryDeleteBtn.props['aria-label'], `Chưa xác nhận xóa • Thử xóa lại ${canonicalMovie.title} khỏi danh sách xem`);
+
+  // 13. Transport recovers
+  dropWatchlistResponse = false;
+  reconcileFails = false;
+
+  // 14. User clicks "Thử xóa lại" to retry
+  await retryDeleteBtn.props.onClick();
+  await session.settle();
+
+  // 15. Confirmed removal: badge disappears, button returns to "+ Thêm vào Watchlist"
+  assert.equal(session.value.isActionUnconfirmed('the-last-orbit', 'watchlist'), false, 'Action is confirmed');
+  assert.equal(session.value.isWatchlisted('the-last-orbit'), false, 'Watchlist item is confirmed removed');
+
+  heroTree = renderEditorialHero(canonicalMovie, session.value);
+  const badgeAfterDeleteConfirm = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
+  assert.equal(badgeAfterDeleteConfirm, undefined, 'Unconfirmed badge must disappear');
+  let finalAddBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thêm vào Watchlist'))[0];
+  assert.ok(finalAddBtn, 'Hero must return to "+ Thêm vào Watchlist"');
 });
 

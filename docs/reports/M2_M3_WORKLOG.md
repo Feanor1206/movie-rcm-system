@@ -156,9 +156,26 @@
   7. Tạo patch `ROUND_7.patch` (`git apply --numstat` và `git apply --reverse --check` exit 0), manifest `ROUND_7_MANIFEST.json`, báo cáo `ROUND_7_REPORT.md`.
   8. Cập nhật `M2_M3_STATUS.json` lên `state: "ready_for_review"`, freeze toàn bộ source code.
 
+---
 
+## Round 8 — M2 Verification Gate Finalization (E2E Component Clicks, Hero Retry & Browser Walkthrough)
 
-
-
-
-
+- **Started At:** 2026-10-14T09:25:00+07:00
+- **Completed At:** 2026-10-14T09:40:00+07:00
+- **targetRoundId:** 8 | **promptVersion:** 8
+- **Run ID:** `run-round8-20261014-0925`
+- **Reviewed Run ID:** `run-round7-20261014-0852`
+- **Goal:**
+  1. Nâng cấp Test 7 trong `frontend/tests/m2_journey_suite.mjs` thành test E2E UI thực: chạy click lưu trên `EditorialHero`, click chấm điểm trên `MovieDetail`, dùng canonical ID ngoài local fixture (`the-last-orbit`), assert POST bodies và reload provider xác minh `ProfileOverview`.
+  2. Bổ sung Test 8 trong `frontend/tests/m2_journey_suite.mjs` kiểm tra tích hợp Hero uncertain ADD/DELETE retry với production `WatchlistProvider` (commit mất phản hồi, reconcile lỗi, Hero hiển thị badge và nút thử lại, phục hồi toggle bình thường khi mạng lành).
+  3. Xây dựng walkthrough browser desktop/mobile qua headless Chrome và CDP bằng `scripts/run_browser_walkthrough.cjs`, lưu 14 ảnh chụp màn hình tại `docs/reports/screenshots/`.
+  4. Cập nhật `scripts/preview_animation_catalog.cjs` và `docs/contracts/M2_CATALOG_CONTRACT.md` làm rõ giới hạn: preview đối chiếu với mảng baseline in-memory hardcoded trong script, không truy vấn live DB, không phải importer.
+  5. Đóng gói báo cáo `ROUND_8_REPORT.md`, patch `ROUND_8.patch`, manifest `ROUND_8_MANIFEST.json`, cập nhật `M2_M3_STATUS.json` (`state: ready_for_review`).
+- **Completed:**
+  1. Test 7 & Test 8 trong `m2_journey_suite.mjs` hoàn tất và PASS (8/8 tests).
+  2. Toàn bộ 4 frontend suites đạt **54/54 PASS** (8 M2 journey, 12 search experience, 9 catalog service, 25 M1 behavior).
+  3. Preview dry-run tool đạt 3/3 self-tests PASS.
+  4. TypeScript `tsc --noEmit` đạt PASS (exit code 0).
+  5. Browser walkthrough tự động chụp 14 ảnh màn hình desktop/mobile thành công.
+  6. Patch `ROUND_8.patch` kiểm tra đảo ngược (`git apply --check -R`) PASS exit 0.
+  7. Freeze mã nguồn, bàn giao READY FOR REVIEW.

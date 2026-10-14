@@ -1,11 +1,15 @@
 /**
  * Animation Catalog Dry-Run & Preview Tool (M2 Gate Evidence)
  *
- * Simulates additive and idempotent catalog onboarding without modifying live database.
+ * Simulates additive and idempotent catalog onboarding against an in-memory hardcoded
+ * baseline fixture array (6 fiction movies from DataInitializer.java).
+ *
+ * NOTE: This tool strictly performs preview / dry-run analysis against the hardcoded baseline
+ * and candidate fixture. It is NOT an importer and does NOT connect to or modify any live database.
  * Detects ADD, SKIP, and CONFLICT actions strictly by canonical ID.
  *
  * Usage:
- *   node scripts/preview_animation_catalog.cjs           # Runs preview against default baseline
+ *   node scripts/preview_animation_catalog.cjs           # Runs preview against hardcoded baseline
  *   node scripts/preview_animation_catalog.cjs --test    # Runs automated dry-run test suite
  */
 
@@ -97,6 +101,7 @@ function runPreview(fixturePath = DEFAULT_FIXTURE_PATH, existingRecords = BASELI
   console.log(`- Provenance: ${fixture.provenance}`);
   console.log(`- Description: ${fixture.sourceDescription}`);
   console.log(`- Policy: ${fixture.policy} (additive, no overwrite, no fuzzy matching)`);
+  console.log(`- Target Comparison: Hardcoded in-memory baseline array (NOT live catalog / NOT importer)`);
   console.log(`- Baseline Records in Target: ${existingRecords.length}`);
   console.log(`- Candidate Records to Process: ${candidates.length}`);
   console.log('----------------------------------------------------------------');
