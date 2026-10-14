@@ -1,7 +1,7 @@
-# M4 local — ACCEPTED / STOP
+# DRIVE-01 — Google Drive implementation / parallel agents
 
-Codex accepted M4-F03-CHECKPOINT-01 (promptVersion3) on 2026-10-15. Read docs/reviews/M4_F03_REVIEW.md for evidence and limits. T1 and local M4 are closed; no F04 work is assigned.
+New user assignment on 2026-10-15: implement Google Drive mounted storage on Windows with multiple real Gemini agents working in parallel. Work at D:\Class\movie-rcm-system on dev. Read and execute docs/prompts/DRIVE_01_GEMINI_PROMPT.md in full; coordination is docs/prompts/DRIVE_REVIEW_CONTROL.json (taskId DRIVE-01, promptVersion1).
 
-Stop application edits and end the turn. Monitoring remains PAUSED/manual: no polling, waiting agents or automatic next milestone. Google Drive remains BLOCKED_EXTERNAL_INPUT / NOT_IMPLEMENTED; local acceptance does not certify Drive playback. Do not install/mount/OAuth, touch live DB, run AI/models/GPU, change OS settings or deploy. Further work requires a new user assignment.
+Use three subagents with separate ownership: A storage boundary, B Windows operations toolkit, C HTTP/browser verification; parent owns shared integration/config/contracts and final artifacts. Finish implementation and isolated verification even if actual OAuth/mount prerequisites are missing; label real Drive gates blocked honestly. Prepare reviewable setup commands; no installer/OAuth/mount execution in the coding checkpoint.
 
-Preserve frozen Gemini artifacts and existing changes. Codex owns review/control documents and the authorized direct-dev Git checkpoint.
+M4 local remains ACCEPTED at7c825b6; M4_REVIEW_CONTROL stays stop and is historical for this task. Preserve its frozen artifacts. Automation remains PAUSED, manual handoff only. Freeze then publish DRIVE_01 artifacts/status ready_for_review and end the turn; no polling or automatic next milestone. Do not edit Codex prompts/control/reviews, live DB, AI/FastAPI/Qwen/GPU, OS settings or deploy. No commit/push/reset/new branch. Existing backend/fastapi/.env.example is outside scope.

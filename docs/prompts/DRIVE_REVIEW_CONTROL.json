@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "command": "work",
+  "taskId": "DRIVE-01",
+  "promptVersion": 1,
+  "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
+  "taskPromptPath": "docs/prompts/DRIVE_01_GEMINI_PROMPT.md",
+  "lastReviewedCheckpoint": null,
+  "baselineCommit": "7c825b6",
+  "reviewMode": "manual",
+  "note": "User assigned Google Drive implementation with parallel Gemini agents. M4 local remains accepted and its control stays stop. Automation paused. Prepare code/tooling and isolated checks; real mount/OAuth is a separate user-interactive gate. File publication does not launch Gemini."
+}
