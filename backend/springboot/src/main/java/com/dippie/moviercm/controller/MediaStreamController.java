@@ -69,12 +69,13 @@ public class MediaStreamController {
             if (!range.isRanged()) {
                 response.setStatus(HttpServletResponse.SC_OK);
                 response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(totalLength));
-                try (InputStream in = resource.getInputStream();
+                try (java.nio.channels.SeekableByteChannel channel = mediaStreamService.openMediaChannel(asset);
                      OutputStream out = response.getOutputStream()) {
-                    byte[] buffer = new byte[BUFFER_SIZE];
-                    int bytesRead;
-                    while ((bytesRead = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, bytesRead);
+                    java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(BUFFER_SIZE);
+                    while (channel.read(buffer) != -1) {
+                        buffer.flip();
+                        out.write(buffer.array(), buffer.arrayOffset(), buffer.limit());
+                        buffer.clear();
                     }
                     out.flush();
                 }
@@ -87,22 +88,18 @@ public class MediaStreamController {
                 response.setHeader(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + totalLength);
                 response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength));
 
-                try (InputStream in = resource.getInputStream();
+                try (java.nio.channels.SeekableByteChannel channel = mediaStreamService.openMediaChannel(asset);
                      OutputStream out = response.getOutputStream()) {
-                    long skipped = in.skip(start);
-                    while (skipped < start) {
-                        long s = in.skip(start - skipped);
-                        if (s <= 0) break;
-                        skipped += s;
-                    }
-
-                    byte[] buffer = new byte[BUFFER_SIZE];
+                    channel.position(start);
+                    java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(BUFFER_SIZE);
                     long remaining = contentLength;
                     while (remaining > 0) {
-                        int toRead = (int) Math.min(buffer.length, remaining);
-                        int bytesRead = in.read(buffer, 0, toRead);
+                        buffer.clear();
+                        int toRead = (int) Math.min(buffer.capacity(), remaining);
+                        buffer.limit(toRead);
+                        int bytesRead = channel.read(buffer);
                         if (bytesRead == -1) break;
-                        out.write(buffer, 0, bytesRead);
+                        out.write(buffer.array(), buffer.arrayOffset(), bytesRead);
                         remaining -= bytesRead;
                     }
                     out.flush();

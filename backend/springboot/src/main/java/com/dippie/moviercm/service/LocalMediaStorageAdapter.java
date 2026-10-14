@@ -109,4 +109,10 @@ public class LocalMediaStorageAdapter implements MediaStorageAdapter {
             throw new MediaUnavailableException("Không thể xác định kích thước tệp media: " + relativePath);
         }
     }
+
+    @Override
+    public java.nio.channels.SeekableByteChannel openChannel(String relativePath) throws IOException {
+        Path targetPath = resolveValidatedPath(relativePath);
+        return java.nio.channels.FileChannel.open(targetPath, java.nio.file.StandardOpenOption.READ);
+    }
 }

@@ -15,4 +15,6 @@ public interface MediaStorageAdapter {
     Resource getResource(String relativePath);
 
     long getResourceLength(String relativePath);
+
+    java.nio.channels.SeekableByteChannel openChannel(String relativePath) throws java.io.IOException;
 }

@@ -1,12 +1,12 @@
 {
   "protocolVersion": 1,
   "command": "work",
-  "taskId": "DRIVE-01",
-  "promptVersion": 2,
+  "taskId": "DRIVE-01-F01",
+  "promptVersion": 3,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
-  "taskPromptPath": "docs/prompts/DRIVE_01_GEMINI_PROMPT.md",
-  "lastReviewedCheckpoint": null,
+  "taskPromptPath": "docs/prompts/DRIVE_01_F01_GEMINI_PROMPT.md",
+  "lastReviewedCheckpoint": "DRIVE-01-CHECKPOINT-01",
   "baselineCommit": "7c825b6",
   "reviewMode": "manual",
-  "note": "User prioritizes speed: six Gemini subagents A-F where slots permit. Preserve version1 A/B/C ownership and active source changes; add D/E/F on independent files. M4 remains accepted/stop. Automation paused; no chat automatically sent. Real mount/OAuth remains separate user-interactive gate."
+  "note": "Manual review requests changes for D1-D6. G1 not accepted, G2/G3 external blocked. Six scoped Gemini agents in follow-up prompt; automation remains paused. Checkpoint Git push is not acceptance or deployment."
 }

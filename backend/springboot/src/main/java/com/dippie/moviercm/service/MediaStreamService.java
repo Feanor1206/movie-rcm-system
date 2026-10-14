@@ -121,10 +121,17 @@ public class MediaStreamService {
                 .findFirst()
                 .orElse(null);
 
+        if (featureAsset != null && "drive".equalsIgnoreCase(featureAsset.getStorageProvider()) && !driveStorageAdapter.isAvailable()) {
+            throw new MediaUnavailableException("Kho lưu trữ Google Drive hiện không sẵn sàng (mount offline)");
+        }
+
         MediaAssetDto featureDto = featureAsset != null ? toDto(featureAsset) : null;
         MediaAssetDto trailerDto = null;
 
         if (trailerAsset != null) {
+            if ("drive".equalsIgnoreCase(trailerAsset.getStorageProvider()) && !driveStorageAdapter.isAvailable()) {
+                throw new MediaUnavailableException("Kho lưu trữ Google Drive hiện không sẵn sàng (mount offline)");
+            }
             trailerDto = toDto(trailerAsset);
         } else if (movie.getVideoUrl() != null && !movie.getVideoUrl().trim().isEmpty()) {
             // Backward-compatible fallback trailer
@@ -176,6 +183,11 @@ public class MediaStreamService {
     public long getResourceLength(MediaAsset asset) {
         MediaStorageAdapter adapter = getStorageAdapter(asset.getStorageProvider());
         return adapter.getResourceLength(asset.getRelativePath());
+    }
+
+    public java.nio.channels.SeekableByteChannel openMediaChannel(MediaAsset asset) throws IOException {
+        MediaStorageAdapter adapter = getStorageAdapter(asset.getStorageProvider());
+        return adapter.openChannel(asset.getRelativePath());
     }
 
     public RangeSpec parseRange(String rangeHeader, long totalLength) {

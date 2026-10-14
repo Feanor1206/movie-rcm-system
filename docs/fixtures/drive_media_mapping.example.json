@@ -1,0 +1,153 @@
+{
+  "schemaVersion": "1.0.0",
+  "storageProvider": "drive",
+  "catalogType": "animation",
+  "description": "Authoritative sample Google Drive media mapping manifest for Dippie Cinema animation catalog",
+  "generatedAt": "2026-10-15T00:00:00Z",
+  "assets": [
+    {
+      "assetId": "ast-spirited-away-2001-feature",
+      "movieId": "m-spirited-away-2001",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-spirited-away-2001/v1/feature.mp4",
+      "kind": "feature",
+      "mimeType": "video/mp4",
+      "byteLength": 524288000,
+      "durationSeconds": 7500.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-spirited-away-2001-trailer",
+      "movieId": "m-spirited-away-2001",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-spirited-away-2001/v1/trailer.mp4",
+      "kind": "trailer",
+      "mimeType": "video/mp4",
+      "byteLength": 31457280,
+      "durationSeconds": 142.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-your-name-2016-feature",
+      "movieId": "m-your-name-2016",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-your-name-2016/v1/feature.mp4",
+      "kind": "feature",
+      "mimeType": "video/mp4",
+      "byteLength": 471859200,
+      "durationSeconds": 6360.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-your-name-2016-trailer",
+      "movieId": "m-your-name-2016",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-your-name-2016/v1/trailer.mp4",
+      "kind": "trailer",
+      "mimeType": "video/mp4",
+      "byteLength": 28311552,
+      "durationSeconds": 118.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-mononoke-1997-feature",
+      "movieId": "m-mononoke-1997",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-mononoke-1997/v1/feature.mp4",
+      "kind": "feature",
+      "mimeType": "video/mp4",
+      "byteLength": 608174080,
+      "durationSeconds": 8040.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-mononoke-1997-trailer",
+      "movieId": "m-mononoke-1997",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-mononoke-1997/v1/trailer.mp4",
+      "kind": "trailer",
+      "mimeType": "video/mp4",
+      "byteLength": 33554432,
+      "durationSeconds": 135.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-isle-of-dogs-2018-feature",
+      "movieId": "m-isle-of-dogs-2018",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-isle-of-dogs-2018/v1/feature.mp4",
+      "kind": "feature",
+      "mimeType": "video/mp4",
+      "byteLength": 440401920,
+      "durationSeconds": 6060.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-isle-of-dogs-2018-trailer",
+      "movieId": "m-isle-of-dogs-2018",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-isle-of-dogs-2018/v1/trailer.mp4",
+      "kind": "trailer",
+      "mimeType": "video/mp4",
+      "byteLength": 25165824,
+      "durationSeconds": 124.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-spider-verse-2018-feature",
+      "movieId": "m-spider-verse-2018",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-spider-verse-2018/v1/feature.mp4",
+      "kind": "feature",
+      "mimeType": "video/mp4",
+      "byteLength": 545259520,
+      "durationSeconds": 7020.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-spider-verse-2018-trailer",
+      "movieId": "m-spider-verse-2018",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-spider-verse-2018/v1/trailer.mp4",
+      "kind": "trailer",
+      "mimeType": "video/mp4",
+      "byteLength": 35651584,
+      "durationSeconds": 150.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-coraline-2009-feature",
+      "movieId": "m-coraline-2009",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-coraline-2009/v1/feature.mp4",
+      "kind": "feature",
+      "mimeType": "video/mp4",
+      "byteLength": 419430400,
+      "durationSeconds": 6000.0,
+      "version": "v1",
+      "isPublic": true
+    },
+    {
+      "assetId": "ast-coraline-2009-trailer",
+      "movieId": "m-coraline-2009",
+      "storageProvider": "drive",
+      "relativePath": "movies/m-coraline-2009/v1/trailer.mp4",
+      "kind": "trailer",
+      "mimeType": "video/mp4",
+      "byteLength": 24117248,
+      "durationSeconds": 110.0,
+      "version": "v1",
+      "isPublic": true
+    }
+  ]
+}
