@@ -291,8 +291,9 @@ public class DriveCleanupQueueSaturationTest {
         managedLatches.add(mainHoldLatch);
         CountDownLatch mainStartedLatch = new CountDownLatch(MAX_WORKERS);
 
+        List<Future<?>> readFutures = new ArrayList<>();
         for (int i = 0; i < MAX_WORKERS; i++) {
-            callerPool.submit(() -> {
+            readFutures.add(callerPool.submit(() -> {
                 try {
                     executor.executeRead(() -> {
                         mainStartedLatch.countDown();
@@ -306,7 +307,7 @@ public class DriveCleanupQueueSaturationTest {
                         return 0;
                     });
                 } catch (Exception ignored) {}
-            });
+            }));
         }
         assertTrue(mainStartedLatch.await(3, TimeUnit.SECONDS), "Main workers occupied");
 
@@ -360,12 +361,19 @@ public class DriveCleanupQueueSaturationTest {
             adapter.openChannel("backpressure_test_file.bin");
         }, "Storage adapter openChannel must throw MediaUnavailableException under saturation");
 
-        // Release cleanup latch: capacity frees up
+        // Release cleanup latch and main workers: capacity frees up
         cleanupHoldLatch.countDown();
         mainHoldLatch.countDown();
 
-        boolean drained = waitForCondition(() -> executor.getPendingCleanupObligations() == 0, 3000);
-        assertTrue(drained, "Cleanup queue must drain after latch release");
+        for (Future<?> f : readFutures) {
+            f.get(3, TimeUnit.SECONDS);
+        }
+
+        boolean drained = waitForCondition(() ->
+                executor.getActualOutstandingWorkers() == 0 &&
+                executor.getPendingCleanupObligations() == 0,
+                3000);
+        assertTrue(drained, "Workers and cleanup queue must drain after latch release");
 
         // Subsequent acquireReservation() succeeds
         try (DriveResourceReservation reservation = executor.acquireReservation()) {

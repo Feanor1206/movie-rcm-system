@@ -144,12 +144,12 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
             throw new IllegalArgumentException("Vị trí đọc không hợp lệ (nhỏ hơn 0): " + newPosition);
         }
         try {
-            return ioExecutor.executeMetadata(() -> {
+            ioExecutor.executeMetadata(() -> {
                 ensureOpen();
                 activeWorkerOperations.incrementAndGet();
                 try {
                     delegate.position(newPosition);
-                    return this;
+                    return null;
                 } finally {
                     int remaining = activeWorkerOperations.decrementAndGet();
                     if (remaining == 0 && closed.get()) {
@@ -157,6 +157,7 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
                     }
                 }
             });
+            return this;
         } catch (MediaUnavailableException e) {
             if (closed.get()) {
                 throw new ClosedChannelException();

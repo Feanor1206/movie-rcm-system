@@ -24,17 +24,18 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * DRIVE-01-F07 / Finding C1 Regression & Repro Test Suite.
+ * DRIVE-01-F08 / Finding R1 Regression & Repro Test Suite.
  *
  * Verifies that:
- * 1. executeWithTimeout returning an AutoCloseable never silently drops native handles on timeout + close failure,
- *    even when lifecycle capacity is fully saturated (active + pending == capacity).
- * 2. Unreserved failed cleanups retained at saturated capacity are tracked in retainedFailedCleanups,
- *    increment failedCleanupObligations, and dynamically acquire pending permits upon retry once capacity frees up.
- * 3. Handles can be retried and recovered across shutdown without leaking handles or corrupting lifecycle counters.
- * 4. All lifecycle counters remain strictly non-negative (active >= 0, pending >= 0).
+ * 1. Resource-bounded admission: executeWithTimeout strictly requires a lifecycle reservation before opening resources.
+ *    When lifecycle capacity is saturated, it fails fast at admission with MediaUnavailableException.
+ * 2. Invariant holds at all times: retainedFailedResources.size() <= pendingCleanupObligations <= cleanupQueueCapacity.
+ *    No off-budget retained handles are ever admitted or quarantined.
+ * 3. Bounded retention within capacity: failed cleanups are charged to pendingCleanupObligations (chargesPending=true)
+ *    and can be retried and recovered across shutdown without leaking handles or corrupting lifecycle counters.
+ * 4. Scalar operations (executeMetadata, executeRead) do not consume lifecycle permits and strictly forbid AutoCloseable returns.
  */
-@DisplayName("DriveGenericMetadataReproTest - Finding C1 Generic Metadata Cleanup at Saturated Capacity")
+@DisplayName("DriveGenericMetadataReproTest - Finding R1 Resource-Bounded Lifecycle Admission")
 public class DriveGenericMetadataReproTest {
 
     private final List<DriveIoExecutor> managedExecutors = new CopyOnWriteArrayList<>();
@@ -71,8 +72,8 @@ public class DriveGenericMetadataReproTest {
     }
 
     @Test
-    @DisplayName("C1 Repro: executeWithTimeout retains failed handle at saturated capacity without silent drop")
-    void executeWithTimeoutRetainsHandleAtSaturatedCapacity() throws Exception {
+    @DisplayName("R1 Repro: executeWithTimeout fails fast at admission when capacity is saturated without opening/leaking handles")
+    void executeWithTimeoutFailsFastWhenCapacitySaturated() throws Exception {
         DriveIoExecutor executor = createExecutor(2, 1);
         DriveResourceReservation reservation = executor.acquireReservation();
         assertNotNull(reservation);
@@ -80,20 +81,68 @@ public class DriveGenericMetadataReproTest {
         assertEquals(0, executor.getPendingCleanupObligations());
 
         CountDownLatch entered = new CountDownLatch(1);
-        CountDownLatch releaseWorker = new CountDownLatch(1);
-        AtomicInteger attempts = new AtomicInteger();
         AtomicReference<Throwable> callerError = new AtomicReference<>();
+        AtomicBoolean handleCreated = new AtomicBoolean(false);
 
-        Path file = Files.createTempFile("f07-c1-test-", ".bin");
+        Thread caller = new Thread(() -> {
+            try {
+                executor.executeWithTimeout(() -> {
+                    entered.countDown();
+                    handleCreated.set(true);
+                    return (AutoCloseable) () -> {};
+                }, 100, "test-saturated-admission");
+            } catch (Throwable t) {
+                callerError.set(t);
+            }
+        });
+
+        caller.start();
+        caller.join(2000);
+        assertFalse(caller.isAlive(), "Caller thread must finish");
+
+        // Assert fail-fast admission:
+        assertInstanceOf(MediaUnavailableException.class, callerError.get(),
+                "executeWithTimeout must throw MediaUnavailableException at admission when capacity is saturated");
+        assertEquals(1, entered.getCount(), "Worker must NEVER be entered when capacity is saturated");
+        assertFalse(handleCreated.get(), "Handle must NEVER be created when admission fails");
+
+        // Invariant check: zero retained handles, strictly bounded by capacity
+        assertEquals(0, executor.getRetainedFailedResources().size());
+        assertEquals(0, executor.getPendingCleanupObligations());
+        assertEquals(1, executor.getActiveResourceReservations());
+        assertTrue(executor.getRetainedFailedResources().size() <= executor.getPendingCleanupObligations());
+        assertTrue(executor.getPendingCleanupObligations() <= 1);
+
+        reservation.release();
+        assertEquals(0, executor.getActiveResourceReservations());
+    }
+
+    @Test
+    @DisplayName("R1 Bounded: executeWithTimeout retains on-budget within capacity and bounds further admission")
+    void executeWithTimeoutRetainsOnBudgetWithinCapacity() throws Exception {
+        int capacity = 2;
+        DriveIoExecutor executor = createExecutor(2, capacity);
+
+        // Pre-acquire 1 reservation; 1 permit remains
+        DriveResourceReservation res1 = executor.acquireReservation();
+        assertEquals(1, executor.getActiveResourceReservations());
+        assertEquals(0, executor.getPendingCleanupObligations());
+
+        Path file = Files.createTempFile("f08-r1-budget-", ".bin");
         tempFiles.add(file);
         FileChannel nativeHandle = FileChannel.open(file, StandardOpenOption.READ);
+        AtomicInteger attempts = new AtomicInteger();
 
         AutoCloseable resource = () -> {
             if (attempts.incrementAndGet() == 1) {
-                throw new IOException("Simulated native close failure on attempt 1");
+                throw new IOException("Simulated close failure on attempt 1");
             }
             nativeHandle.close();
         };
+
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch releaseWorker = new CountDownLatch(1);
+        AtomicReference<Throwable> callerError = new AtomicReference<>();
 
         Thread caller = new Thread(() -> {
             try {
@@ -102,23 +151,22 @@ public class DriveGenericMetadataReproTest {
                     while (releaseWorker.getCount() != 0) {
                         try {
                             releaseWorker.await();
-                        } catch (InterruptedException ignored) {
-                        }
+                        } catch (InterruptedException ignored) {}
                     }
                     return resource;
-                }, 100, "test-metadata-failure");
+                }, 80, "resource-timeout");
             } catch (Throwable t) {
                 callerError.set(t);
             }
         });
 
         caller.start();
-        assertTrue(entered.await(3, TimeUnit.SECONDS), "Worker should enter task");
-        caller.join(3000);
+        assertTrue(entered.await(2, TimeUnit.SECONDS), "Worker should enter task within capacity");
+        caller.join(2000);
         assertFalse(caller.isAlive(), "Caller should finish after timeout");
-        assertInstanceOf(MediaUnavailableException.class, callerError.get(), "Caller should receive MediaUnavailableException");
+        assertInstanceOf(MediaUnavailableException.class, callerError.get());
 
-        // Release worker so it can attempt close on worker thread
+        // Release worker so worker thread initiates close and catches injected failure
         releaseWorker.countDown();
 
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
@@ -127,24 +175,39 @@ public class DriveGenericMetadataReproTest {
         }
         assertEquals(0, executor.getActualOutstandingWorkers());
 
-        // Assert no handle drop occurred:
-        assertEquals(1, attempts.get(), "Should have attempted close once");
-        assertTrue(nativeHandle.isOpen(), "Native handle must still be open after attempt 1 failure");
-        assertEquals(1, executor.getRetainedFailedResources().size(), "Failed cleanup must be retained in executor");
-        assertTrue(executor.hasFailedCleanup(resource), "Resource must be tracked as failed cleanup");
-        assertEquals(1, executor.getFailedCleanupObligations());
+        // Assert failure was retained ON-BUDGET with chargesPending=true:
+        assertEquals(1, attempts.get());
+        assertTrue(nativeHandle.isOpen());
+        assertEquals(1, executor.getRetainedFailedResources().size());
+        assertEquals(1, executor.getPendingCleanupObligations(), "Pending cleanup obligations must be charged 1");
+        assertEquals(1, executor.getActiveResourceReservations(), "Active reservations remain 1 (res1)");
 
-        // Invariant checks:
-        assertTrue(executor.getActiveResourceReservations() >= 0);
-        assertTrue(executor.getPendingCleanupObligations() >= 0);
+        // Mathematical invariant:
+        // retained (1) <= pending (1) <= capacity (2)
+        // total obligations: active (1) + pending (1) == 2 == capacity
+        assertEquals(capacity, executor.getActiveResourceReservations() + executor.getPendingCleanupObligations());
+        assertTrue(executor.getRetainedFailedResources().size() <= executor.getPendingCleanupObligations());
+        assertTrue(executor.getPendingCleanupObligations() <= capacity);
 
-        // Now release the initial reservation to free capacity
-        reservation.release();
+        // Now that capacity (2) is fully saturated (1 active + 1 pending),
+        // another executeWithTimeout MUST be rejected fail-fast at admission:
+        AtomicBoolean secondTaskRan = new AtomicBoolean(false);
+        assertThrows(MediaUnavailableException.class, () -> {
+            executor.executeWithTimeout(() -> {
+                secondTaskRan.set(true);
+                return (AutoCloseable) () -> {};
+            }, 100, "second-task");
+        }, "Subsequent resource admission must be rejected when active + pending == capacity");
+        assertFalse(secondTaskRan.get(), "Second task must never run");
+
+        // Release res1: active becomes 0, pending remains 1
+        res1.release();
         assertEquals(0, executor.getActiveResourceReservations());
+        assertEquals(1, executor.getPendingCleanupObligations());
 
-        // Now retry failed cleanups: should dynamically acquire pending permit and successfully close
+        // Retry the retained failure: should succeed and drain pending back to 0
         int submitted = executor.retryFailedCleanups();
-        assertEquals(1, submitted, "Should submit 1 retry task");
+        assertEquals(1, submitted);
 
         deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while ((executor.getActiveCleanupWorkers() != 0 || executor.getFailedCleanupObligations() != 0)
@@ -153,111 +216,95 @@ public class DriveGenericMetadataReproTest {
         }
 
         assertFalse(nativeHandle.isOpen(), "Native handle must be closed after successful retry");
-        assertEquals(0, executor.getRetainedFailedResources().size(), "Retained cleanups must be 0 after successful retry");
-        assertEquals(0, executor.getFailedCleanupObligations());
-        assertEquals(0, executor.getPendingCleanupObligations());
-    }
-
-    @Test
-    @DisplayName("Repeated saturated capacity + distinct late handles + close failures across shutdown and retry")
-    void repeatedSaturatedCapacityAcrossShutdownAndRetry() throws Exception {
-        int capacity = 2;
-        DriveIoExecutor executor = createExecutor(4, capacity);
-
-        // Saturate capacity with 2 active reservations
-        DriveResourceReservation res1 = executor.acquireReservation();
-        DriveResourceReservation res2 = executor.acquireReservation();
-        assertNotNull(res1);
-        assertNotNull(res2);
-        assertEquals(2, executor.getActiveResourceReservations());
-
-        int handleCount = 3;
-        List<FileChannel> nativeChannels = new ArrayList<>();
-        List<AutoCloseable> resources = new ArrayList<>();
-        List<AtomicInteger> attemptCounters = new ArrayList<>();
-
-        for (int i = 0; i < handleCount; i++) {
-            Path file = Files.createTempFile("f07-c1-multi-" + i + "-", ".bin");
-            tempFiles.add(file);
-            FileChannel fc = FileChannel.open(file, StandardOpenOption.READ);
-            nativeChannels.add(fc);
-
-            AtomicInteger attempts = new AtomicInteger();
-            attemptCounters.add(attempts);
-            AutoCloseable res = () -> {
-                if (attempts.incrementAndGet() == 1) {
-                    throw new IOException("Attempt 1 close failure");
-                }
-                fc.close();
-            };
-            resources.add(res);
-
-            CountDownLatch entered = new CountDownLatch(1);
-            CountDownLatch release = new CountDownLatch(1);
-
-            Thread caller = new Thread(() -> {
-                try {
-                    executor.executeWithTimeout(() -> {
-                        entered.countDown();
-                        while (release.getCount() != 0) {
-                            try {
-                                release.await();
-                            } catch (InterruptedException ignored) {
-                            }
-                        }
-                        return res;
-                    }, 50, "multi-timeout-" + attempts);
-                } catch (Throwable ignored) {
-                }
-            });
-
-            caller.start();
-            assertTrue(entered.await(2, TimeUnit.SECONDS));
-            caller.join(2000);
-            release.countDown();
-
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-            while (executor.getActualOutstandingWorkers() != 0 && System.nanoTime() < deadline) {
-                Thread.sleep(10);
-            }
-        }
-
-        // All 3 handles must be retained despite queue capacity being 2
-        assertEquals(3, executor.getRetainedFailedResources().size());
-        assertEquals(3, executor.getFailedCleanupObligations());
-        for (FileChannel fc : nativeChannels) {
-            assertTrue(fc.isOpen(), "All native channels must remain open");
-        }
-
-        // Initiate executor shutdown while retained cleanups exist
-        executor.shutdown();
-        assertTrue(executor.isShutdown(), "Executor must report isShutdown true");
-
-        // Release the active reservations
-        res1.release();
-        res2.release();
-        assertEquals(0, executor.getActiveResourceReservations());
-
-        // Retry failed cleanups across shutdown
-        int retried = executor.retryFailedCleanups();
-        assertTrue(retried > 0, "Retry should accept tasks even across shutdown");
-
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
-        while ((executor.getActiveCleanupWorkers() != 0 || executor.getFailedCleanupObligations() != 0)
-                && System.nanoTime() < deadline) {
-            // Keep retrying remaining ones if bounded queue filled up
-            if (executor.getFailedCleanupObligations() > 0) {
-                executor.retryFailedCleanups();
-            }
-            Thread.sleep(20);
-        }
-
-        for (FileChannel fc : nativeChannels) {
-            assertFalse(fc.isOpen(), "All native channels must be closed after retry");
-        }
         assertEquals(0, executor.getRetainedFailedResources().size());
         assertEquals(0, executor.getFailedCleanupObligations());
         assertEquals(0, executor.getPendingCleanupObligations());
+        assertEquals(0, executor.getActiveResourceReservations());
+    }
+
+    @Test
+    @DisplayName("Codex Repro Scenario: 3 sequential calls against capacity 1 cannot produce off-budget retained obligations")
+    void reproScenarioThreeCallsAgainstCapacityOneCannotLeak() throws Exception {
+        DriveIoExecutor executor = createExecutor(1, 1);
+        DriveResourceReservation permit = executor.acquireReservation();
+        assertEquals(1, executor.getActiveResourceReservations());
+        assertEquals(0, executor.getPendingCleanupObligations());
+
+        List<FileChannel> handles = new ArrayList<>();
+        try {
+            for (int i = 0; i < 3; i++) {
+                Path file = Files.createTempFile("codex-f08-budget-", ".bin");
+                tempFiles.add(file);
+                FileChannel handle = FileChannel.open(file, StandardOpenOption.READ);
+                handles.add(handle);
+
+                AtomicReference<Throwable> error = new AtomicReference<>();
+                AtomicBoolean entered = new AtomicBoolean(false);
+
+                Thread caller = new Thread(() -> {
+                    try {
+                        executor.executeWithTimeout(() -> {
+                            entered.set(true);
+                            return (AutoCloseable) () -> { throw new IOException("Injected close failure"); };
+                        }, 50, "metadata-resource");
+                    } catch (Throwable t) {
+                        error.set(t);
+                    }
+                });
+
+                caller.start();
+                caller.join(1000);
+
+                // Fail-fast at admission: MediaUnavailableException thrown BEFORE worker entry
+                assertInstanceOf(MediaUnavailableException.class, error.get(),
+                        "Call " + i + " must fail fast at admission");
+                assertFalse(entered.get(), "Worker " + i + " must never enter");
+            }
+
+            // Assert that retained obligations NEVER exceed capacity
+            int retained = executor.getRetainedFailedResources().size();
+            assertEquals(0, retained, "Retained obligations must be 0 (no off-budget quarantine)");
+            assertEquals(0, executor.getPendingCleanupObligations());
+            assertEquals(1, executor.getActiveResourceReservations());
+            assertTrue(retained <= executor.getPendingCleanupObligations());
+            assertTrue(executor.getPendingCleanupObligations() <= 1);
+        } finally {
+            for (FileChannel h : handles) {
+                h.close();
+            }
+            permit.release();
+        }
+    }
+
+    @Test
+    @DisplayName("Scalar Lane: executeMetadata and executeRead do not consume lifecycle permits and forbid AutoCloseable")
+    void scalarLaneEnforcesContract() throws Exception {
+        DriveIoExecutor executor = createExecutor(2, 1);
+
+        // Saturate lifecycle capacity with 1 reservation
+        DriveResourceReservation permit = executor.acquireReservation();
+        assertEquals(1, executor.getActiveResourceReservations());
+        assertEquals(1, executor.getCleanupQueueCapacity());
+
+        // executeMetadata (scalar) MUST succeed despite lifecycle capacity being saturated
+        String metaResult = executor.executeMetadata(() -> "metadata-ok");
+        assertEquals("metadata-ok", metaResult);
+
+        // executeRead (scalar) MUST succeed despite lifecycle capacity being saturated
+        Integer readResult = executor.executeRead(() -> 1024);
+        assertEquals(1024, readResult);
+
+        // executeScalar rejecting AutoCloseable return
+        AtomicBoolean closeCalled = new AtomicBoolean(false);
+        AutoCloseable forbiddenResource = () -> closeCalled.set(true);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            executor.executeMetadata(() -> forbiddenResource);
+        }, "executeMetadata must reject AutoCloseable return with IllegalArgumentException");
+
+        assertTrue(closeCalled.get(), "Forbidden AutoCloseable must be safely closed when rejected");
+
+        permit.release();
         assertEquals(0, executor.getActiveResourceReservations());
     }
 }

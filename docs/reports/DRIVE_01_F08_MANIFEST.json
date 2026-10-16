@@ -1,0 +1,84 @@
+{
+  "protocolVersion": 1,
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F08",
+  "checkpoint": "DRIVE-01-F08-CHECKPOINT-FINAL",
+  "timestamp": "2026-10-16T15:15:00+07:00",
+  "baseCommitSha": "c2d29c04edd58c4cc0a6e648d316285a9377384f",
+  "patchPath": "docs/reports/DRIVE_01_F08.patch",
+  "patchSizeBytes": 115440,
+  "patchSha256": "981A858C41077D76C86C2CC55DF63F81F75DD000BD0D3CB08FA18F8CCFAB7A31",
+  "totalTrackedFiles": 14,
+  "files": [
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+      "sizeBytes": 10081,
+      "sha256": "5BD2324245E13622E08C112FF4E96BDD550C28E1E4A5364A761A5968499F62F9"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+      "sizeBytes": 49385,
+      "sha256": "CA97C15FF5C8FDFBADB6D86F6C29B04F412555BBD50A49C4FE0C09B5EE9E690F"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java",
+      "sizeBytes": 11935,
+      "sha256": "712C056D58F32FF0129B7105E708C8F5335B4F9AEEDB07A77F1593C5F8CABAEC"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupQueueSaturationTest.java",
+      "sizeBytes": 36428,
+      "sha256": "A615BF4A6E210B8D7F49788A5B0E08B1A4995671D7C591C76E5C54650BADF8B0"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveGenericMetadataReproTest.java",
+      "sizeBytes": 14245,
+      "sha256": "9AB1055D101F346CDC5C117DD57AAFA5CEE5835ADA8644C06DAC3ACB503252DA"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F08_REPORT.md",
+      "sizeBytes": 12138,
+      "sha256": "A02F5C59F54A8BCB07AE7634F6E27C289A54C0785F30367D6DF17ADA3A4F98E6"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F08_STATUS.json",
+      "sizeBytes": 6321,
+      "sha256": "FD9DC72686C3467F6885B7AC4EEE2CE353F0802DD7AFE4A195FA9FEA7DF2977D"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F08/CROSS_REVIEW.md",
+      "sizeBytes": 9043,
+      "sha256": "0EB9838F4EAA44021EBBD5262BCFE8CD75EB151509F1E2DBABD739C9DCF6D10D"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F08/LIFECYCLE_MATRIX.md",
+      "sizeBytes": 4253,
+      "sha256": "FF402CDF25B4760F948356DDA61770A0E373402F397D06F173B7325C7093CE03"
+    },
+    {
+      "path": "docs/reviews/evidence/browser_verification_f08.json",
+      "sizeBytes": 2457,
+      "sha256": "AE92FEA6AEB14EF5EC064E486CFB8B63465A06A35420C8EB6FBF512E5694DA68"
+    },
+    {
+      "path": "docs/reviews/evidence/qwen_inference_f08.json",
+      "sizeBytes": 4758,
+      "sha256": "C7A3A59F84FA596E654D515C71630BA5907A94B0E8F421A9B7D26C484BA2477B"
+    },
+    {
+      "path": "scripts/start_backend_dev.ps1",
+      "sizeBytes": 4325,
+      "sha256": "FD0524F6B983232D71BF27AF092E061B8E6D662AC5220E31389C82AD0D1D7B52"
+    },
+    {
+      "path": "scripts/stop_backend_dev.ps1",
+      "sizeBytes": 3830,
+      "sha256": "4BE3D35CB682B96268DC58A4B49B4749E2FBA86E058223B8F41D1B88D142D8FC"
+    },
+    {
+      "path": "scripts/test_live_browser_f08.cjs",
+      "sizeBytes": 15198,
+      "sha256": "D63E29338334D39F887EE5908D7AE113B11F929C2D7F482B6383106EDD1B56EF"
+    }
+  ]
+}

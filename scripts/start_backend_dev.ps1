@@ -12,23 +12,20 @@ $classes = Join-Path $backendDir "target\classes"
 $cpFile = Join-Path $backendDir "target\cp.txt"
 $stateFile = Join-Path $backendDir "target\backend_dev.json"
 
-# Auto-build target classes and dependency classpath if missing
+# Resolve java home
+if (-not $env:JAVA_HOME -and (Test-Path "C:\Program Files\Java\jdk-25.0.3")) {
+    $env:JAVA_HOME = "C:\Program Files\Java\jdk-25.0.3"
+}
+
+# R2 Fix: Always run incremental compilation to prevent stale bytecode execution
+Write-Host "[start_backend_dev] Ensuring fresh bytecode via incremental compilation..."
+cmd.exe /c "cd /d `"$backendDir`" && mvnw.cmd compile dependency:build-classpath `"-Dmdep.outputFile=target/cp.txt`" -q"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to compile backend or generate classpath via mvnw."
+}
+
 if (-not (Test-Path $classes) -or -not (Test-Path $cpFile)) {
-    Write-Host "[start_backend_dev] Classes or classpath missing. Compiling and generating classpath..."
-    $mvnw = Join-Path $backendDir "mvnw.cmd"
-    if (-not $env:JAVA_HOME -and (Test-Path "C:\Program Files\Java\jdk-25.0.3")) {
-        $env:JAVA_HOME = "C:\Program Files\Java\jdk-25.0.3"
-    }
-    & $mvnw compile dependency:build-classpath "-Dmdep.outputFile=target/cp.txt" -f (Join-Path $backendDir "pom.xml")
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to compile backend or generate classpath via mvnw."
-    }
-} elseif (Test-Path (Join-Path $backendDir "src\main\resources\application.yml")) {
-    $srcRes = Join-Path $backendDir "src\main\resources\application.yml"
-    $tgtRes = Join-Path $classes "application.yml"
-    if (-not (Test-Path $tgtRes) -or (Get-Item $srcRes).LastWriteTime -gt (Get-Item $tgtRes).LastWriteTime) {
-        Copy-Item (Join-Path $backendDir "src\main\resources\*") $classes -Recurse -Force
-    }
+    throw "Build artifacts missing after compilation: $classes or $cpFile"
 }
 
 $dependencies = (Get-Content $cpFile -Raw).Trim()
@@ -57,18 +54,18 @@ $argsList = @(
     "--server.port=8080",
     "--spring.profiles.active=snapshot",
     "--app.media.drive-mount=X:",
-    "--app.media.drive-metadata-timeout-ms=15000",
-    "--app.media.drive-read-timeout-ms=15000"
+    "--app.media.drive-metadata-timeout-ms=60000",
+    "--app.media.drive-read-timeout-ms=60000"
 )
 
 # Start process and track PID / StartTime
 $proc = Start-Process -FilePath $java -ArgumentList $argsList -PassThru -NoNewWindow
-Start-Sleep -Milliseconds 500
+$startTime = $proc.StartTime
 
 $state = [PSCustomObject]@{
     PID            = $proc.Id
     ProcessName    = $proc.ProcessName
-    StartTime      = $proc.StartTime.ToString("o")
+    StartTime      = $startTime.ToString("o")
     ExecutablePath = $java
     CommandLine    = "$java $($argsList -join ' ')"
     Port           = 8080
@@ -76,7 +73,39 @@ $state = [PSCustomObject]@{
     Profile        = "snapshot"
 }
 $state | ConvertTo-Json -Depth 3 | Set-Content -Path $stateFile -Encoding UTF8
-Write-Host "[start_backend_dev] Backend started with PID $($proc.Id). State recorded at $stateFile"
+Write-Host "[start_backend_dev] Backend process spawned with PID $($proc.Id). Polling readiness endpoint..."
+
+# R2 Fix: Poll real readiness endpoint with finite deadline (30 seconds)
+$ready = $false
+$deadline = [DateTime]::UtcNow.AddSeconds(35)
+$readinessUrl = "http://127.0.0.1:8080/api/movies"
+
+while ([DateTime]::UtcNow -lt $deadline) {
+    if ($proc.HasExited) {
+        Remove-Item -Path $stateFile -Force -ErrorAction SilentlyContinue
+        throw "Backend process PID $($proc.Id) exited prematurely with exit code $($proc.ExitCode)."
+    }
+
+    try {
+        $response = Invoke-WebRequest -Uri $readinessUrl -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+        if ($response.StatusCode -eq 200) {
+            $ready = $true
+            break
+        }
+    } catch {
+        # Backend still starting up, wait and retry
+        Start-Sleep -Milliseconds 600
+    }
+}
+
+if (-not $ready) {
+    Write-Warning "[start_backend_dev] Backend did not become ready within 35s. Terminating PID $($proc.Id)..."
+    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $stateFile -Force -ErrorAction SilentlyContinue
+    throw "Readiness check timed out: Backend failed to respond on $readinessUrl within 35 seconds."
+}
+
+Write-Host "[start_backend_dev] SUCCESS: Backend verified ready on $readinessUrl (PID $($proc.Id)). State saved to $stateFile"
 
 if (-not $Background) {
     try {

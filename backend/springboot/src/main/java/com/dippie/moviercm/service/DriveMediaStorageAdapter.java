@@ -93,7 +93,7 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
         try {
             return ioExecutor.executeMetadata(() -> {
                 Path root = Paths.get(driveMountPath).toAbsolutePath().normalize();
-                return Files.exists(root) && Files.isDirectory(root) && Files.isReadable(root);
+                return Files.exists(root) && Files.isDirectory(root) && (root.toFile().canRead() || Files.isReadable(root));
             });
         } catch (Exception e) {
             return false;
@@ -138,7 +138,7 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
                 );
             }
 
-            if (!Files.exists(root) || !Files.isDirectory(root) || !Files.isReadable(root)) {
+            if (!Files.exists(root) || !Files.isDirectory(root) || (!root.toFile().canRead() && !Files.isReadable(root))) {
                 throw new MediaUnavailableException(
                         "Thư mục mount Google Drive không sẵn sàng hoặc không đọc được"
                 );
@@ -185,7 +185,8 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
                 );
             }
 
-            if (!Files.isReadable(resolved) || !Files.isReadable(realTarget)) {
+            if ((!resolved.toFile().canRead() && !Files.isReadable(resolved))
+                    || (!realTarget.toFile().canRead() && !Files.isReadable(realTarget))) {
                 throw new MediaUnavailableException(
                         "Tệp media trên Google Drive không có quyền đọc: " + relativePath
                 );
