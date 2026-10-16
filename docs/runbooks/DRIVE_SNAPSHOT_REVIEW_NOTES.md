@@ -1,4 +1,8 @@
-# F06 snapshot: WIP, read before running
+# Snapshot: WIP, read before running
+
+Latest F07 review: docs/reviews/DRIVE_01_F07_CODEX_REVIEW.md. Local Node20 frontend gates pass, but repeated generic cleanup failures still exceed the resource budget. The backend launcher can reuse stale classes and its stop script does not yet validate full process identity. Browser/reconstruction evidence remains incomplete. F07 is progress backup, not stable acceptance or deployment approval.
+
+The following notes describe the historical F06 state; F07 removes the broad shutdown snippet and adds a separate snapshot profile. Consult the latest review for current findings.
 
 F06 is saved for progress backup and is **not accepted for stable use or deployment**. Read docs/reviews/DRIVE_01_F06_CODEX_REVIEW.md for evidence and remaining fixes.
 

@@ -83,3 +83,33 @@ app:
     enabled: false
   jwt:
     secret: ${APP_JWT_SECRET}
+
+---
+# Snapshot Profile (Dedicated H2 Persistent Database for Snapshot / Demo)
+spring:
+  config:
+    activate:
+      on-profile: snapshot
+  sql:
+    init:
+      mode: always
+  datasource:
+    url: jdbc:h2:file:./data/snapshot/moviercm_snapshot_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  h2:
+    console:
+      enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+app:
+  seed:
+    enabled: true
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+

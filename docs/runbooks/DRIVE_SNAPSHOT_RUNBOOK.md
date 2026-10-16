@@ -1,6 +1,6 @@
-# DRIVE-01-F06 Usable Snapshot Runbook
+# DRIVE-01-F07 Usable Snapshot Runbook
 
-**Environment:** Windows 11 (AMD64), JDK 25.0.3, Python 3.10+ (conda `dippie-qwen`), Node.js v26.1+  
+**Environment:** Windows 11 (AMD64), JDK 25.0.3, Python 3.10+ (conda `dippie-qwen`), Node.js v20+ / v26.1+  
 **Architecture:** Next.js (:3000) $\leftrightarrow$ Spring Boot (:8080) $\leftrightarrow$ FastAPI (:8000) $\leftrightarrow$ Google Drive Mount (X:)
 
 ---
@@ -39,14 +39,14 @@ Get-Item X:\videoplayback.mp4 | Select-Object Name, Length
 ```
 
 ### Step 2: Start Spring Boot Backend (:8080)
-Start Spring Boot with the persistent demo database and drive mount configured:
+Start Spring Boot with the isolated snapshot profile (`--spring.profiles.active=snapshot`, datasource `./data/snapshot/moviercm_snapshot_db`) bound to loopback `127.0.0.1:8080`:
 ```powershell
-# From workspace root
+# From workspace root (script auto-builds missing classes/classpath and writes PID tracking)
 pwsh -File scripts/start_backend_dev.ps1
 ```
 *Health check:*
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:8080/api/movies/drive-videoplayback/media-descriptor"
+Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/movies/drive-videoplayback/media-descriptor"
 # Expected: hasFeature: true, streamUrl: "/api/media/stream/ast-drive-videoplayback"
 ```
 
@@ -68,7 +68,7 @@ Start the frontend web application:
 cd frontend
 npm run dev
 ```
-*Web Access:* Navigate browser to `http://localhost:3000`.
+*Web Access:* Navigate browser to `http://localhost:3000` (or `http://127.0.0.1:3000`).
 
 ---
 
@@ -77,7 +77,7 @@ npm run dev
 1. **Watch Google Drive Movie:**
    - Open browser at `http://localhost:3000/movies/drive-videoplayback`.
    - Click "Phát Phim Chính" (`[data-testid='play-feature-btn']`).
-   - Notice: The video stream starts playing within ~11–19s (Google Drive WAN fetch).
+   - Notice: The video stream starts playing within ~11–19s (Google Drive WAN fetch over rclone VFS).
    - Seek forward/backward: Seeking buffers in ~11–14s.
    - Note on Audio: Container is confirmed video-only DASH stream (H.264 without audio track). This is normal and expected for this file.
 
@@ -91,16 +91,22 @@ npm run dev
 ## 4. Service Shutdown Sequence
 
 When finished testing, shut down services cleanly:
-```powershell
-# 1. Stop Node / Next.js, Python / FastAPI, and Java / Spring Boot processes
-Get-Process -Name node, python, java -ErrorAction SilentlyContinue | Where-Object {
-    $_.Path -like "*movie-rcm-system*" -or $_.Path -like "*dippie-qwen*" -or $_.Path -like "*jdk-25*"
-} | Stop-Process -Force
 
-# 2. Stop Google Drive Mount safely
+### Option A: Foreground Terminals (Recommended)
+Press `Ctrl+C` in each owned foreground terminal (Next.js, FastAPI, Spring Boot).
+
+### Option B: Verified Process Identity Scripts
+```powershell
+# 1. Stop Spring Boot Backend (verifies exact recorded PID, ProcessName 'java', and StartTime)
+pwsh -File scripts/stop_backend_dev.ps1
+
+# 2. Stop Google Drive Mount safely (verifies exact rclone PID, StartTime, and arguments)
 pwsh -File scripts/drive/stop_drive.ps1
 
-# 3. Verify drive X: and ports are completely released
+# 3. Stop Next.js and FastAPI by pressing Ctrl+C in their owned foreground windows
+
+# 4. Verify drive X: and ports are completely released
 Get-PSDrive -Name X -ErrorAction SilentlyContinue
 Get-NetTCPConnection -LocalPort 3000, 8000, 8080 -ErrorAction SilentlyContinue
 ```
+*(No broad `Stop-Process` or regex name-matching is ever used, ensuring other processes and services remain untouched).*

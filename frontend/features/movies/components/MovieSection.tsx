@@ -2,7 +2,6 @@
 
 import React, { useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { MovieCard } from './MovieCard';
 
@@ -12,6 +11,8 @@ type MovieSectionProps = {
   movies: Movie[];
   exploreHref?: string;
 };
+
+const BTN_SCROLL = 'rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer';
 
 export function MovieSection({
   title,
@@ -43,16 +44,16 @@ export function MovieSection({
             <button
               onClick={() => handleScroll('left')}
               aria-label={`Cuộn ${title} sang trái`}
-              className="rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer"
+              className={BTN_SCROLL}
             >
-              <ArrowLeft size={14} />
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="m12 19-7-7 7-7M19 12H5"/></svg>
             </button>
             <button
               onClick={() => handleScroll('right')}
               aria-label={`Cuộn ${title} sang phải`}
-              className="rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer"
+              className={BTN_SCROLL}
             >
-              <ArrowRight size={14} />
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </button>
           </div>
 
@@ -61,7 +62,7 @@ export function MovieSection({
             className="flex items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-brand ml-2"
           >
             <span>Tất cả</span>
-            <ArrowUpRight size={13} />
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M7 7h10v10M7 17 17 7"/></svg>
           </Link>
         </div>
       </div>

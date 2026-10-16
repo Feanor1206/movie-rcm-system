@@ -290,24 +290,14 @@ export async function browseCatalog(
         throw new CatalogApiError('Dữ liệu phân trang thiếu mảng items bắt buộc', 502);
       }
 
-      if (typeof data.page !== 'number' || !Number.isFinite(data.page) || data.page < 0) {
-        throw new CatalogApiError('Dữ liệu phân trang thiếu hoặc sai số trang (page)', 502);
-      }
-
-      if (typeof data.size !== 'number' || !Number.isFinite(data.size) || data.size < 1) {
-        throw new CatalogApiError('Dữ liệu phân trang thiếu hoặc sai kích thước trang (size)', 502);
-      }
-
-      if (typeof data.totalElements !== 'number' || !Number.isFinite(data.totalElements) || data.totalElements < 0) {
-        throw new CatalogApiError('Dữ liệu phân trang thiếu hoặc sai tổng số phần tử (totalElements)', 502);
-      }
-
-      if (typeof data.totalPages !== 'number' || !Number.isFinite(data.totalPages) || data.totalPages < 0) {
-        throw new CatalogApiError('Dữ liệu phân trang thiếu hoặc sai tổng số trang (totalPages)', 502);
-      }
-
-      if (typeof data.hasNext !== 'boolean' || typeof data.hasPrevious !== 'boolean') {
-        throw new CatalogApiError('Dữ liệu phân trang thiếu cờ hasNext/hasPrevious', 502);
+      if (
+        typeof data.page !== 'number' || !Number.isFinite(data.page) || data.page < 0 ||
+        typeof data.size !== 'number' || !Number.isFinite(data.size) || data.size < 1 ||
+        typeof data.totalElements !== 'number' || !Number.isFinite(data.totalElements) || data.totalElements < 0 ||
+        typeof data.totalPages !== 'number' || !Number.isFinite(data.totalPages) || data.totalPages < 0 ||
+        typeof data.hasNext !== 'boolean' || typeof data.hasPrevious !== 'boolean'
+      ) {
+        throw new CatalogApiError('Dữ liệu phân trang không hợp lệ', 502);
       }
 
       const items = data.items.map(normalizeCatalogMovie);

@@ -220,12 +220,6 @@ public class DataInitializer implements CommandLineRunner {
             if (!movieRepository.existsById(m.getId())) {
                 movieRepository.save(m);
                 added++;
-            } else {
-                Movie existing = movieRepository.findById(m.getId()).orElse(null);
-                if (existing != null && (existing.getGenres() == null || !existing.getGenres().toLowerCase().contains("animation"))) {
-                    existing.setGenres("Animation," + (existing.getGenres() != null ? existing.getGenres() : ""));
-                    movieRepository.save(existing);
-                }
             }
         }
         logger.info("Đã đồng bộ kho phim. Thêm mới {} phim.", added);

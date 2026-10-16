@@ -583,8 +583,7 @@ public class DriveIoExecutor {
         while (true) {
             LifecycleState cur = lifecycle.get();
             if (cur.getTotal() >= cleanupQueueCapacity) {
-                // Capacity saturated: cannot retain off-budget.
-                // Pre-admission in executeOpen guarantees caller/worker never encounters saturated capacity.
+                recordFailedCleanup(resource, opName, new RejectedExecutionException("Cleanup submission rejected"), null, false);
                 return;
             }
             LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
@@ -626,6 +625,7 @@ public class DriveIoExecutor {
                 while (true) {
                     LifecycleState cur = lifecycle.get();
                     if (cur.getTotal() >= cleanupQueueCapacity) {
+                        recordFailedCleanup(resource, opName, closeEx, null, false);
                         break;
                     }
                     LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
@@ -646,6 +646,7 @@ public class DriveIoExecutor {
                 while (true) {
                     LifecycleState cur = lifecycle.get();
                     if (cur.getTotal() >= cleanupQueueCapacity) {
+                        recordFailedCleanup(resource, opName, t, null, false);
                         break;
                     }
                     LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
@@ -908,6 +909,11 @@ public class DriveIoExecutor {
                 failedCleanupObligations.decrementAndGet();
                 if (removed.chargesPending()) {
                     decrementPendingAndCheckShutdown();
+                } else {
+                    LifecycleState cur = lifecycle.get();
+                    if (cur.isShutdown() && cur.getTotal() == 0 && retainedFailedCleanups.isEmpty()) {
+                        cleanupExecutor.shutdown();
+                    }
                 }
                 DriveResourceReservation res = removed.getReservation();
                 if (res != null) {
@@ -967,7 +973,7 @@ public class DriveIoExecutor {
         if (!record.chargesPending()) {
             while (true) {
                 LifecycleState cur = lifecycle.get();
-                if (cur.isShutdown() || cur.getTotal() >= cleanupQueueCapacity) {
+                if (cur.getTotal() >= cleanupQueueCapacity) {
                     record.clearInFlight();
                     return false;
                 }
@@ -1059,7 +1065,7 @@ public class DriveIoExecutor {
             int newActive = Math.max(0, cur.getActive() - 1);
             LifecycleState next = new LifecycleState(newActive, cur.getPending(), cur.isShutdown());
             if (lifecycle.compareAndSet(cur, next)) {
-                if (next.isShutdown() && next.getTotal() == 0) {
+                if (next.isShutdown() && next.getTotal() == 0 && retainedFailedCleanups.isEmpty()) {
                     cleanupExecutor.shutdown();
                 }
                 break;
@@ -1073,7 +1079,7 @@ public class DriveIoExecutor {
             int newPending = Math.max(0, cur.getPending() - 1);
             LifecycleState next = new LifecycleState(cur.getActive(), newPending, cur.isShutdown());
             if (lifecycle.compareAndSet(cur, next)) {
-                if (next.isShutdown() && next.getTotal() == 0) {
+                if (next.isShutdown() && next.getTotal() == 0 && retainedFailedCleanups.isEmpty()) {
                     cleanupExecutor.shutdown();
                 }
                 break;
@@ -1091,7 +1097,7 @@ public class DriveIoExecutor {
             LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending(), true);
             if (lifecycle.compareAndSet(cur, next)) {
                 executor.shutdownNow();
-                if (next.getTotal() == 0) {
+                if (next.getTotal() == 0 && retainedFailedCleanups.isEmpty()) {
                     cleanupExecutor.shutdown();
                 }
                 break;

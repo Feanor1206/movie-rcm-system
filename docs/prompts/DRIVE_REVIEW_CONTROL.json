@@ -5,9 +5,9 @@
   "promptVersion": 9,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
   "taskPromptPath": "docs/prompts/GEMINI_CLI_INTEGRATE_04.md",
-  "lastReviewedCheckpoint": "DRIVE-01-F06-CHECKPOINT-FINAL",
+  "lastReviewedCheckpoint": "DRIVE-01-F07-CHECKPOINT-FINAL",
   "reviewMode": "manual",
-  "note": "Manual F06 Codex review completed: NOT ACCEPTED. WIP commit/push authorized. See docs/reviews/DRIVE_01_F06_CODEX_REVIEW.md. No auto CLI/build/mount; automations remain paused.",
+  "note": "Manual F07 review: WIP, not accepted. Node20 frontend build/tests/budget pass; retained-resource budget repro fails. See docs/reviews/DRIVE_01_F07_CODEX_REVIEW.md. No CLI/automation/mount. User authorized temporary commit and normal push dev.",
   "collaborationProtocol": "docs/prompts/DRIVE_COLLAB_PROTOCOL.md",
   "productionWriter": "gemini-cli:fc195a8d-5c26-4095-875b-2468fa11499a"
 }

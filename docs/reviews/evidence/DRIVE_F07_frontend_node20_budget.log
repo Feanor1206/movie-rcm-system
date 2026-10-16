@@ -1,0 +1,13 @@
+================================================================
+       NEXT.JS DYNAMIC ROUTE JS FIRST-LOAD BUDGET AUDIT         
+================================================================
+Build ID:    DkNhdATXMz4fTvgWbTUbE
+Timestamp:   2026-10-16T06:35:12.213Z
+Methodology: unique app /layout + route manifest JavaScript; raw bytes and sum of individually gzipped files; excludes CSS/polyfills/RSC/API, not HTTP wire bytes
+Budget:      143360 bytes (140 KiB)
+----------------------------------------------------------------
+/                | Raw:  490246 B | Gzip: 139105 B (135.84 KiB) | Status: ✔ PASS (10 chunks)
+/search          | Raw:  481776 B | Gzip: 137848 B (134.62 KiB) | Status: ✔ PASS (10 chunks)
+/movies/[id]     | Raw:  501213 B | Gzip: 143100 B (139.75 KiB) | Status: ✔ PASS (10 chunks)
+/profile         | Raw:  498822 B | Gzip: 138974 B (135.72 KiB) | Status: ✔ PASS (10 chunks)
+================================================================

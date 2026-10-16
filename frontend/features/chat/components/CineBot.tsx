@@ -17,12 +17,15 @@ import { useWatchlist } from '@/lib/context/WatchlistContext';
 import type { Movie } from '@/types/movie';
 
 const QUICK_PROMPTS = [
-  'Tìm 4 phim hoạt hình giống Spirited Away nhưng không có kinh dị',
-  'Gợi ý phim hoạt hình chữa lành sau năm 2000',
-  'Giữ các điều kiện trên nhưng đổi sang trước năm 2015',
-  'Tìm phim Sci-Fi vũ trụ kỳ vĩ',
-  'Top phim đánh giá cao nhất',
+  'Spirited Away',
+  'Hoạt hình sau 2000',
+  'Trước năm 2015',
+  'Sci-Fi vũ trụ',
+  'Điểm cao nhất',
 ];
+
+const BDG = 'rounded bg-zinc-900 border px-1.5 py-0.5 text-[10px]';
+const BTN_HEAD = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer';
 
 export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { isWatchlisted, toggleWatchlist } = useWatchlist();
@@ -30,7 +33,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
     {
       id: 'welcome',
       sender: 'bot',
-      text: 'Xin chào! Tôi là CineBot, trợ lý gợi ý phim hoạt hình của Dippie. Bạn có thể hỏi tôi về phim tương tự một tác phẩm yêu thích, tìm theo thể loại hoặc khoảng năm phát hành.',
+      text: 'Xin chào! Tôi là CineBot, trợ lý gợi ý phim hoạt hình Dippie.',
       timestamp: 'Vừa xong',
       followUps: QUICK_PROMPTS.slice(0, 3),
     },
@@ -155,7 +158,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       const errorMsg: ChatMessage = {
         id: `bot-err-${Date.now()}`,
         sender: 'bot',
-        text: `⚠️ ${err?.message || 'Không thể nhận phản hồi từ AI Gateway. Vui lòng thử lại sau vài giây.'}`,
+        text: `⚠️ ${err?.message || 'Lỗi kết nối AI Gateway. Thử lại sau.'}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -176,7 +179,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       {
         id: `welcome-${Date.now()}`,
         sender: 'bot',
-        text: 'Cuộc trò chuyện đã được làm mới. Bạn cần tôi tìm phim hoạt hình gì tiếp theo?',
+        text: 'Cuộc trò chuyện đã làm mới.',
         timestamp: 'Vừa xong',
         followUps: QUICK_PROMPTS.slice(0, 3),
       },
@@ -205,7 +208,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                 Trợ lý Dippie
               </span>
             </div>
-            <p className="text-[11px] text-zinc-400">Gợi ý và tìm kiếm phim hoạt hình</p>
+            <p className="text-[11px] text-zinc-400">Gợi ý phim hoạt hình</p>
           </div>
 
           <div className="flex items-center gap-1">
@@ -213,7 +216,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               onClick={resetChat}
               title="Làm mới"
               aria-label="Làm mới cuộc trò chuyện"
-              className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
+              className={BTN_HEAD}
             >
               <RotateCcw size={16} />
             </button>
@@ -221,7 +224,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               onClick={onClose}
               title="Đóng"
               aria-label="Đóng CineBot"
-              className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+              className={BTN_HEAD}
             >
               <X size={20} />
             </button>
@@ -256,31 +259,31 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               {/* Phase 23 Structured Intent Badges */}
               {msg.sender === 'bot' && msg.structuredIntent && (
                 <div className="mt-1.5 flex flex-wrap gap-1 max-w-[95%]">
-                  <span className="rounded bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 text-[10px] font-mono text-emerald-400">
+                  <span className={`${BDG} border-zinc-700 font-mono text-emerald-400`}>
                     {msg.structuredIntent.intent_type}
                   </span>
                   {msg.structuredIntent.reference_films && msg.structuredIntent.reference_films.length > 0 && (
-                    <span className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-amber-300">
+                    <span className={`${BDG} border-zinc-800 text-amber-300`}>
                       Ref: {msg.structuredIntent.reference_films.join(', ')}
                     </span>
                   )}
                   {msg.structuredIntent.include_genres && msg.structuredIntent.include_genres.length > 0 && (
-                    <span className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-sky-300">
+                    <span className={`${BDG} border-zinc-800 text-sky-300`}>
                       +{msg.structuredIntent.include_genres.join(', ')}
                     </span>
                   )}
                   {msg.structuredIntent.exclude_genres && msg.structuredIntent.exclude_genres.length > 0 && (
-                    <span className="rounded bg-zinc-900 border border-red-900/60 px-1.5 py-0.5 text-[10px] text-rose-400">
+                    <span className={`${BDG} border-red-900/60 text-rose-400`}>
                       -{msg.structuredIntent.exclude_genres.join(', ')}
                     </span>
                   )}
                   {(msg.structuredIntent.year_min || msg.structuredIntent.year_max) && (
-                    <span className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-purple-300">
+                    <span className={`${BDG} border-zinc-800 text-purple-300`}>
                       Năm: {msg.structuredIntent.year_min || '…'}–{msg.structuredIntent.year_max || 'nay'}
                     </span>
                   )}
                   {msg.structuredIntent.requested_k && (
-                    <span className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                    <span className={`${BDG} border-zinc-800 text-zinc-400`}>
                       Top {msg.structuredIntent.requested_k}
                     </span>
                   )}
@@ -384,7 +387,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
-              <span>CineBot đang suy luận trên GPU (khoảng 20-40 giây)...</span>
+              <span>CineBot đang suy luận...</span>
             </div>
           )}
 
@@ -401,7 +404,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               disabled={isTyping}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isTyping ? "CineBot đang phản hồi..." : "Nhập câu hỏi hoặc yêu cầu gợi ý..."}
+              placeholder={isTyping ? "CineBot đang phản hồi..." : "Nhập câu hỏi..."}
               className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:outline-none disabled:opacity-60"
             />
             <button
