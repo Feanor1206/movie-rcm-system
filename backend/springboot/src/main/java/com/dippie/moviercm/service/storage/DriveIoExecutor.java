@@ -5,6 +5,7 @@ import com.dippie.moviercm.exception.MediaUnavailableException;
 import com.dippie.moviercm.exception.SecurityPathTraversalException;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,7 +13,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Executes Drive IO operations with finite deadlines, bounded worker pool,
- * accurate physical worker accounting, circuit breaking, and resource ownership handshakes.
+ * accurate physical worker accounting, circuit breaking, cleanup queue admission control,
+ * and resource ownership handshakes.
  */
 public class DriveIoExecutor {
 
@@ -22,21 +24,121 @@ public class DriveIoExecutor {
         TIMED_OUT
     }
 
+    /**
+     * Immutable atomic composite state representing active reservations,
+     * pending cleanup obligations, and shutdown state in a single reference.
+     * Guarantees zero transient gap or undercount during transfers.
+     */
+    public static final class LifecycleState {
+        private final int active;
+        private final int pending;
+        private final boolean shutdown;
+
+        public LifecycleState(int active, int pending, boolean shutdown) {
+            this.active = active;
+            this.pending = pending;
+            this.shutdown = shutdown;
+        }
+
+        public int getActive() { return active; }
+        public int getPending() { return pending; }
+        public boolean isShutdown() { return shutdown; }
+        public int getTotal() { return active + pending; }
+
+        @Override
+        public String toString() {
+            return "LifecycleState[active=" + active + ", pending=" + pending + ", shutdown=" + shutdown + "]";
+        }
+    }
+
+    /**
+     * Bounded record of a failed cleanup obligation retaining the actual resource reference,
+     * failure diagnostics, and associated reservation for controlled retry.
+     */
+    public static final class RetainedFailedCleanup {
+        private final AutoCloseable resource;
+        private final String operationName;
+        private volatile Throwable cause;
+        private volatile long failedTimestamp;
+        private final DriveResourceReservation reservation;
+        private volatile boolean chargesPending;
+        private final AtomicBoolean inFlight = new AtomicBoolean(false);
+
+        public RetainedFailedCleanup(AutoCloseable resource, String operationName, Throwable cause, DriveResourceReservation reservation) {
+            this(resource, operationName, cause, reservation, reservation != null);
+        }
+
+        public RetainedFailedCleanup(AutoCloseable resource, String operationName, Throwable cause, DriveResourceReservation reservation, boolean chargesPending) {
+            this.resource = resource;
+            this.operationName = operationName;
+            this.cause = cause;
+            this.failedTimestamp = System.currentTimeMillis();
+            this.reservation = reservation;
+            this.chargesPending = chargesPending;
+        }
+
+        public boolean markInFlight() {
+            return inFlight.compareAndSet(false, true);
+        }
+
+        public void clearInFlight() {
+            inFlight.set(false);
+        }
+
+        public void updateFailure(Throwable newCause) {
+            this.cause = newCause;
+            this.failedTimestamp = System.currentTimeMillis();
+            this.inFlight.set(false);
+        }
+
+        public boolean isInFlight() { return inFlight.get(); }
+        public AutoCloseable getResource() { return resource; }
+        public String getOperationName() { return operationName; }
+        public Throwable getCause() { return cause; }
+        public long getFailedTimestamp() { return failedTimestamp; }
+        public DriveResourceReservation getReservation() { return reservation; }
+        public boolean chargesPending() { return chargesPending; }
+        public void setChargesPending(boolean chargesPending) { this.chargesPending = chargesPending; }
+    }
+
     private final long metadataTimeoutMs;
     private final long readTimeoutMs;
     private final int maxWorkers;
-    private final AtomicInteger actualOutstandingWorkers = new AtomicInteger(0);
+    private final int cleanupQueueCapacity;
     private final DriveCircuitBreaker circuitBreaker;
     private final ExecutorService executor;
     private final ThreadPoolExecutor cleanupExecutor;
 
+    // Truthful physical metric lanes & failure tracking
+    private final AtomicInteger actualOutstandingWorkers = new AtomicInteger(0);
+    private final AtomicInteger activeCleanupWorkers = new AtomicInteger(0);
+    private final AtomicInteger failedCleanupObligations = new AtomicInteger(0);
+
+    // Atomic shared lifecycle budget/state: eliminates transient undercount/gaps
+    private final AtomicReference<LifecycleState> lifecycle =
+            new AtomicReference<>(new LifecycleState(0, 0, false));
+
+    // Bounded retained failed cleanup obligations for explicit controlled retry
+    private final ConcurrentMap<AutoCloseable, RetainedFailedCleanup> retainedFailedCleanups =
+            new ConcurrentHashMap<>();
+
+    // Disposal handshake states for late-opened / timed-out resources
+    private static final int DISPOSAL_UNCLAIMED = 0;
+    private static final int DISPOSAL_CALLER_DISPATCHING = 1;
+    private static final int DISPOSAL_DISPATCH_ACCEPTED = 2;
+    private static final int DISPOSAL_DISPATCH_FAILED = 3;
+    private static final int DISPOSAL_WORKER_CLAIMED = 4;
+    private static final int DISPOSAL_RETAINED = 5;
+
     public DriveIoExecutor(long metadataTimeoutMs,
                            long readTimeoutMs,
                            int maxWorkers,
+                           int cleanupQueueCapacity,
                            DriveCircuitBreaker circuitBreaker) {
         this.metadataTimeoutMs = metadataTimeoutMs > 0 ? metadataTimeoutMs : 3000;
         this.readTimeoutMs = readTimeoutMs > 0 ? readTimeoutMs : 5000;
         this.maxWorkers = maxWorkers > 0 ? maxWorkers : 10;
+        this.cleanupQueueCapacity = cleanupQueueCapacity > 0 ? cleanupQueueCapacity : 256;
         this.circuitBreaker = circuitBreaker != null ? circuitBreaker : new DriveCircuitBreaker();
 
         ThreadFactory threadFactory = new ThreadFactory() {
@@ -71,18 +173,26 @@ public class DriveIoExecutor {
 
         int cleanupMaxThreads = Math.max(2, Math.min(8, this.maxWorkers));
         this.cleanupExecutor = new ThreadPoolExecutor(
-                0,
+                cleanupMaxThreads,
                 cleanupMaxThreads,
                 60L,
                 TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(256),
+                new LinkedBlockingQueue<>(this.cleanupQueueCapacity),
                 cleanupThreadFactory,
-                new ThreadPoolExecutor.DiscardOldestPolicy()
+                new ThreadPoolExecutor.AbortPolicy()
         );
+        this.cleanupExecutor.allowCoreThreadTimeOut(true);
+    }
+
+    public DriveIoExecutor(long metadataTimeoutMs,
+                           long readTimeoutMs,
+                           int maxWorkers,
+                           DriveCircuitBreaker circuitBreaker) {
+        this(metadataTimeoutMs, readTimeoutMs, maxWorkers, 256, circuitBreaker);
     }
 
     public DriveIoExecutor() {
-        this(3000, 5000, 10, new DriveCircuitBreaker());
+        this(3000, 5000, 10, 256, new DriveCircuitBreaker());
     }
 
     public <T> T executeMetadata(Callable<T> task) {
@@ -109,7 +219,8 @@ public class DriveIoExecutor {
 
         final AtomicBoolean callerTimedOut = new AtomicBoolean(false);
         final AtomicReference<T> resultRef = new AtomicReference<>(null);
-        final AtomicBoolean closedDueToTimeout = new AtomicBoolean(false);
+        final AtomicInteger disposalState = new AtomicInteger(DISPOSAL_UNCLAIMED);
+        final AtomicBoolean workerCompleted = new AtomicBoolean(false);
 
         // 3. Submit task to bounded worker pool
         Future<T> future;
@@ -120,18 +231,21 @@ public class DriveIoExecutor {
                     result = task.call();
                     resultRef.set(result);
                     if (callerTimedOut.get() && result instanceof AutoCloseable ac) {
-                        closeResourceOnce(ac, closedDueToTimeout);
+                        claimAndCloseResourceSafelyOnWorker(ac, operationDescription, disposalState);
                     }
                     return result;
                 } finally {
-                    if (callerTimedOut.get()) {
-                        T late = resultRef.get();
-                        if (late instanceof AutoCloseable ac) {
-                            closeResourceOnce(ac, closedDueToTimeout);
+                    try {
+                        if (callerTimedOut.get()) {
+                            T late = resultRef.get();
+                            if (late instanceof AutoCloseable ac) {
+                                claimAndCloseResourceSafelyOnWorker(ac, operationDescription, disposalState);
+                            }
                         }
+                    } finally {
+                        workerCompleted.set(true);
+                        actualOutstandingWorkers.decrementAndGet();
                     }
-                    // Physical worker accounting: ONLY decrements when background thread actually finishes
-                    actualOutstandingWorkers.decrementAndGet();
                 }
             });
         } catch (RejectedExecutionException e) {
@@ -149,11 +263,10 @@ public class DriveIoExecutor {
             callerTimedOut.set(true);
             future.cancel(true);
             circuitBreaker.recordFailure();
-            T lateResult = resultRef.get();
-            if (lateResult instanceof AutoCloseable ac) {
-                executeCleanupAsync(() -> closeResourceOnce(ac, closedDueToTimeout), operationDescription);
+            T late = resultRef.get();
+            if (late instanceof AutoCloseable ac) {
+                dispatchLateDisposal(ac, null, false, operationDescription, disposalState, workerCompleted);
             }
-            // actualOutstandingWorkers is deliberately NOT decremented here because the kernel IO is still stuck
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive (" + operationDescription + ") vượt quá thời gian chờ (" + timeoutMs + "ms)");
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
@@ -175,12 +288,28 @@ public class DriveIoExecutor {
             callerTimedOut.set(true);
             future.cancel(true);
             circuitBreaker.recordFailure();
-            T lateResult = resultRef.get();
-            if (lateResult instanceof AutoCloseable ac) {
-                executeCleanupAsync(() -> closeResourceOnce(ac, closedDueToTimeout), operationDescription);
+            T late = resultRef.get();
+            if (late instanceof AutoCloseable ac) {
+                dispatchLateDisposal(ac, null, false, operationDescription, disposalState, workerCompleted);
             }
             Thread.currentThread().interrupt();
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive bị gián đoạn");
+        }
+    }
+
+    private void claimAndCloseResourceSafelyOnWorker(
+            AutoCloseable resource,
+            String opName,
+            AtomicInteger disposalState) {
+        if (disposalState.compareAndSet(DISPOSAL_UNCLAIMED, DISPOSAL_WORKER_CLAIMED)) {
+            closeResourceSafely(resource, opName);
+            return;
+        }
+        while (disposalState.get() == DISPOSAL_CALLER_DISPATCHING) {
+            Thread.onSpinWait();
+        }
+        if (disposalState.compareAndSet(DISPOSAL_DISPATCH_FAILED, DISPOSAL_WORKER_CLAIMED)) {
+            closeResourceSafely(resource, opName);
         }
     }
 
@@ -189,7 +318,11 @@ public class DriveIoExecutor {
      * and guaranteed exactly-once disposal on timeout/abandonment.
      */
     public <T extends AutoCloseable> T executeOpen(Callable<T> openTask, long timeoutMs, String opName) throws IOException {
-        return executeOpen(openTask, timeoutMs, opName, null, null);
+        return executeOpen(openTask, timeoutMs, opName, null, null, null);
+    }
+
+    public <T extends AutoCloseable> T executeOpen(Callable<T> openTask, long timeoutMs, String opName, DriveResourceReservation reservation) throws IOException {
+        return executeOpen(openTask, timeoutMs, opName, null, null, reservation);
     }
 
     public <T extends AutoCloseable> T executeOpen(Callable<T> openTask,
@@ -197,28 +330,54 @@ public class DriveIoExecutor {
                                                    String opName,
                                                    AtomicReference<OpenState> externalStateRef,
                                                    AtomicReference<T> externalResourceRef) throws IOException {
+        return executeOpen(openTask, timeoutMs, opName, externalStateRef, externalResourceRef, null);
+    }
+
+    public <T extends AutoCloseable> T executeOpen(Callable<T> openTask,
+                                                   long timeoutMs,
+                                                   String opName,
+                                                   AtomicReference<OpenState> externalStateRef,
+                                                   AtomicReference<T> externalResourceRef,
+                                                   DriveResourceReservation reservation) throws IOException {
         // 1. Circuit breaker gate
         if (!circuitBreaker.allowExecution()) {
+            if (reservation != null && reservation.isActive()) {
+                reservation.release();
+            }
             throw new MediaUnavailableException("Dịch vụ lưu trữ Google Drive tạm thời không khả dụng (Circuit Breaker OPEN)");
         }
 
-        // 2. Strict worker capacity gate
+        // 2. Strict lifecycle admission gate: every open operation (reserved or unreserved) MUST hold a pre-admitted permit!
+        final boolean isInternalReservation = (reservation == null);
+        final DriveResourceReservation effectiveReservation;
+        try {
+            effectiveReservation = isInternalReservation ? acquireReservation() : reservation;
+        } catch (MediaUnavailableException mue) {
+            // Capacity saturated or executor shut down: open is rejected fail-fast without creating untracked resources
+            throw mue;
+        }
+
+        // 3. Strict worker capacity gate
         int current = actualOutstandingWorkers.incrementAndGet();
         if (current > maxWorkers) {
             actualOutstandingWorkers.decrementAndGet();
             circuitBreaker.recordFailure();
+            if (effectiveReservation != null && effectiveReservation.isActive()) {
+                effectiveReservation.release();
+            }
             throw new MediaUnavailableException("Số lượng tác vụ truy xuất Google Drive đồng thời đã đạt giới hạn tối đa (" + maxWorkers + ")");
         }
 
-        // 3. Ownership handshake state
+        // 4. Ownership handshake state
         final AtomicReference<OpenState> state = externalStateRef != null ? externalStateRef : new AtomicReference<>(OpenState.PENDING);
         if (state.get() == null) {
             state.set(OpenState.PENDING);
         }
         final AtomicReference<T> resourceRef = externalResourceRef != null ? externalResourceRef : new AtomicReference<>(null);
-        final AtomicBoolean closedDueToTimeout = new AtomicBoolean(false);
+        final AtomicInteger disposalState = new AtomicInteger(DISPOSAL_UNCLAIMED);
+        final AtomicBoolean workerCompleted = new AtomicBoolean(false);
 
-        // 4. Submit open task to bounded worker pool
+        // 5. Submit open task to bounded worker pool
         Future<T> future;
         try {
             future = executor.submit(() -> {
@@ -226,39 +385,57 @@ public class DriveIoExecutor {
                 try {
                     resource = openTask.call();
                     resourceRef.set(resource);
-                    // Worker checks if caller timed out
+                    // Worker checks if caller timed out / was interrupted
                     if (state.get() == OpenState.TIMED_OUT) {
-                        closeResourceOnce(resource, closedDueToTimeout);
+                        claimAndCloseOnWorker(resource, effectiveReservation, opName, disposalState);
                     }
                     return resource;
                 } finally {
-                    if (state.get() == OpenState.TIMED_OUT) {
-                        T res = resourceRef.get();
-                        if (res != null) {
-                            closeResourceOnce(res, closedDueToTimeout);
+                    try {
+                        if (state.get() == OpenState.TIMED_OUT) {
+                            T late = resourceRef.get();
+                            if (late != null) {
+                                claimAndCloseOnWorker(late, effectiveReservation, opName, disposalState);
+                            } else if (effectiveReservation != null && effectiveReservation.isActive()) {
+                                // openTask threw before producing a resource
+                                effectiveReservation.release();
+                            }
                         }
+                    } finally {
+                        workerCompleted.set(true);
+                        if (disposalState.compareAndSet(DISPOSAL_DISPATCH_FAILED, DISPOSAL_WORKER_CLAIMED)) {
+                            T late = resourceRef.get();
+                            if (late != null) {
+                                closeLateResourceOnWorker(late, effectiveReservation, opName);
+                            }
+                        }
+                        actualOutstandingWorkers.decrementAndGet();
                     }
-                    // Physical worker accounting: ONLY decrements when open & late close physically finish
-                    actualOutstandingWorkers.decrementAndGet();
                 }
             });
         } catch (RejectedExecutionException e) {
             actualOutstandingWorkers.decrementAndGet();
             circuitBreaker.recordFailure();
+            if (effectiveReservation != null && effectiveReservation.isActive()) {
+                effectiveReservation.release();
+            }
             throw new MediaUnavailableException("Hàng đợi tác vụ truy xuất Google Drive đã đầy");
         }
 
-        // 5. Await with finite deadline and handshake resolution
+        // 6. Await with finite deadline and handshake resolution
         try {
             T result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
             if (state.compareAndSet(OpenState.PENDING, OpenState.CALLER_ACQUIRED)) {
                 circuitBreaker.recordSuccess();
+                if (isInternalReservation && effectiveReservation != null && effectiveReservation.isActive()) {
+                    effectiveReservation.release();
+                }
                 return result;
             } else {
-                // If caller had already timed out or abandoned ownership
-                T res = resourceRef.get() != null ? resourceRef.get() : result;
-                if (res != null) {
-                    executeCleanupAsync(() -> closeResourceOnce(res, closedDueToTimeout), opName);
+                // If caller had already timed out or abandoned ownership:
+                T late = resourceRef.get() != null ? resourceRef.get() : result;
+                if (late != null) {
+                    dispatchLateDisposal(late, effectiveReservation, isInternalReservation, opName, disposalState, workerCompleted);
                 }
                 throw new MediaUnavailableException("Thao tác truy xuất Google Drive (" + opName + ") đã bị quá hạn");
             }
@@ -266,9 +443,9 @@ public class DriveIoExecutor {
             future.cancel(true);
             circuitBreaker.recordFailure();
             state.compareAndSet(OpenState.PENDING, OpenState.TIMED_OUT);
-            T res = resourceRef.get();
-            if (res != null) {
-                executeCleanupAsync(() -> closeResourceOnce(res, closedDueToTimeout), opName);
+            T late = resourceRef.get();
+            if (late != null) {
+                dispatchLateDisposal(late, effectiveReservation, isInternalReservation, opName, disposalState, workerCompleted);
             }
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive (" + opName + ") vượt quá thời gian chờ (" + timeoutMs + "ms)");
         } catch (InterruptedException e) {
@@ -276,12 +453,16 @@ public class DriveIoExecutor {
             Thread.currentThread().interrupt();
             circuitBreaker.recordFailure();
             state.compareAndSet(OpenState.PENDING, OpenState.TIMED_OUT);
-            T res = resourceRef.get();
-            if (res != null) {
-                executeCleanupAsync(() -> closeResourceOnce(res, closedDueToTimeout), opName);
+            T late = resourceRef.get();
+            if (late != null) {
+                dispatchLateDisposal(late, effectiveReservation, isInternalReservation, opName, disposalState, workerCompleted);
             }
             throw new MediaUnavailableException("Thao tác truy xuất Google Drive bị gián đoạn");
         } catch (ExecutionException e) {
+            state.compareAndSet(OpenState.PENDING, OpenState.TIMED_OUT);
+            if (effectiveReservation != null && effectiveReservation.isActive()) {
+                effectiveReservation.release();
+            }
             Throwable cause = e.getCause();
             if (cause instanceof SecurityPathTraversalException || cause instanceof MediaNotFoundException) {
                 throw (RuntimeException) cause;
@@ -308,33 +489,365 @@ public class DriveIoExecutor {
         return executeOpen(openTask, metadataTimeoutMs, opName);
     }
 
+    private <T extends AutoCloseable> void claimAndCloseOnWorker(
+            T resource,
+            DriveResourceReservation reservation,
+            String opName,
+            AtomicInteger disposalState) {
+        if (disposalState.compareAndSet(DISPOSAL_UNCLAIMED, DISPOSAL_WORKER_CLAIMED)) {
+            closeLateResourceOnWorker(resource, reservation, opName);
+            return;
+        }
+        // If caller is currently dispatching, spin-wait briefly for caller's dispatch to finish (<1ms)
+        while (disposalState.get() == DISPOSAL_CALLER_DISPATCHING) {
+            Thread.onSpinWait();
+        }
+        // If caller dispatch failed (rejected by cleanup executor/budget), worker claims and closes
+        if (disposalState.compareAndSet(DISPOSAL_DISPATCH_FAILED, DISPOSAL_WORKER_CLAIMED)) {
+            closeLateResourceOnWorker(resource, reservation, opName);
+        }
+    }
+
+    /**
+     * Dispatches late disposal of an open resource when the caller timed out or was interrupted.
+     * Guarantees:
+     * 1. Multi-state disposal machine eliminates TOCTOU races:
+     *    - If worker is running and caller dispatch is rejected, transitions to DISPATCH_FAILED so worker claims and closes.
+     *    - If worker already completed, caller retains failed obligation without resetting gates.
+     * 2. Unreserved cleanups only charge pending budget if total < cleanupQueueCapacity, strictly
+     *    preserving admission bounds and preventing subsequent negative pending underflow on retry.
+     * 3. Absolutely NEVER blocks the caller thread or executes synchronous close on caller thread.
+     */
+    private void dispatchLateDisposal(AutoCloseable resource,
+                                      DriveResourceReservation reservation,
+                                      boolean isInternalReservation,
+                                      String opName,
+                                      AtomicInteger disposalState,
+                                      AtomicBoolean workerCompleted) {
+        if (resource == null) {
+            return;
+        }
+        if (!disposalState.compareAndSet(DISPOSAL_UNCLAIMED, DISPOSAL_CALLER_DISPATCHING)) {
+            return;
+        }
+
+        boolean accepted = false;
+        if (reservation != null && !isInternalReservation) {
+            accepted = reservation.closeAsync(resource, opName);
+            if (accepted) {
+                disposalState.set(DISPOSAL_DISPATCH_ACCEPTED);
+            } else {
+                if (!workerCompleted.get()) {
+                    disposalState.set(DISPOSAL_DISPATCH_FAILED);
+                    if (workerCompleted.get() && disposalState.compareAndSet(DISPOSAL_DISPATCH_FAILED, DISPOSAL_RETAINED)) {
+                        reservation.transferToFailed(resource, opName, new RejectedExecutionException("Cleanup submission rejected"));
+                    }
+                } else {
+                    disposalState.set(DISPOSAL_RETAINED);
+                    reservation.transferToFailed(resource, opName, new RejectedExecutionException("Cleanup submission rejected"));
+                }
+            }
+        } else {
+            accepted = executeCleanupAsync(resource, opName);
+            if (accepted) {
+                disposalState.set(DISPOSAL_DISPATCH_ACCEPTED);
+                if (reservation != null && reservation.isActive()) {
+                    reservation.release();
+                }
+            } else {
+                if (!workerCompleted.get()) {
+                    // Worker is still actively running on background thread; signal DISPATCH_FAILED so worker claims and closes
+                    disposalState.set(DISPOSAL_DISPATCH_FAILED);
+                    // If worker completed before claiming DISPOSAL_WORKER_CLAIMED, caller retains obligation
+                    if (workerCompleted.get() && disposalState.compareAndSet(DISPOSAL_DISPATCH_FAILED, DISPOSAL_RETAINED)) {
+                        if (reservation != null && reservation.isActive()) {
+                            reservation.transferToFailed(resource, opName, new RejectedExecutionException("Cleanup submission rejected"));
+                        } else {
+                            recordUnreservedFailedCleanup(resource, opName);
+                        }
+                    }
+                } else {
+                    // Worker already exited; unreserved cleanup rejected.
+                    disposalState.set(DISPOSAL_RETAINED);
+                    if (reservation != null && reservation.isActive()) {
+                        reservation.transferToFailed(resource, opName, new RejectedExecutionException("Cleanup submission rejected"));
+                    } else {
+                        recordUnreservedFailedCleanup(resource, opName);
+                    }
+                }
+            }
+        }
+    }
+
+    private void recordUnreservedFailedCleanup(AutoCloseable resource, String opName) {
+        while (true) {
+            LifecycleState cur = lifecycle.get();
+            if (cur.getTotal() >= cleanupQueueCapacity) {
+                // Capacity saturated: cannot retain off-budget.
+                // Pre-admission in executeOpen guarantees caller/worker never encounters saturated capacity.
+                return;
+            }
+            LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
+            if (lifecycle.compareAndSet(cur, next)) {
+                recordFailedCleanup(resource, opName, new RejectedExecutionException("Cleanup submission rejected"), null, true);
+                break;
+            }
+        }
+    }
+
+    /**
+     * Closes a late-opened resource on the worker thread when the caller timed out or was interrupted.
+     * Guaranteed atomic: initiates close exactly once, charges physical worker and reservation metrics,
+     * releases reservation upon success, or transfers to a retained pending failed obligation if close throws.
+     */
+    private void closeLateResourceOnWorker(AutoCloseable resource,
+                                           DriveResourceReservation reservation,
+                                           String opName) {
+        if (resource == null) {
+            if (reservation != null && reservation.isActive()) {
+                reservation.release();
+            }
+            return;
+        }
+
+        try {
+            resource.close();
+            // Physical close succeeded: release the reservation permit
+            if (reservation != null && reservation.isActive()) {
+                reservation.release();
+            }
+        } catch (Throwable closeEx) {
+            // Physical close threw: retain ownership as pending failed obligation without double decrement!
+            if (reservation != null && reservation.isActive()) {
+                if (!reservation.transferToFailed(resource, opName, closeEx)) {
+                    recordFailedCleanup(resource, opName, closeEx, reservation, true);
+                }
+            } else {
+                while (true) {
+                    LifecycleState cur = lifecycle.get();
+                    if (cur.getTotal() >= cleanupQueueCapacity) {
+                        break;
+                    }
+                    LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
+                    if (lifecycle.compareAndSet(cur, next)) {
+                        recordFailedCleanup(resource, opName, closeEx, null, true);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    private void closeResourceSafely(AutoCloseable resource, String opName) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Throwable t) {
+                while (true) {
+                    LifecycleState cur = lifecycle.get();
+                    if (cur.getTotal() >= cleanupQueueCapacity) {
+                        break;
+                    }
+                    LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
+                    if (lifecycle.compareAndSet(cur, next)) {
+                        recordFailedCleanup(resource, opName, t, null, true);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Acquires an admission reservation permit for Google Drive resource lifecycle.
+     * Prevents unbounded resource open operations by enforcing strict capacity limits
+     * against total pending cleanup obligations and active reservations.
+     *
+     * @return an active DriveResourceReservation permit
+     * @throws MediaUnavailableException if executor is shut down or admission capacity is reached
+     */
+    public DriveResourceReservation acquireReservation() throws MediaUnavailableException {
+        while (true) {
+            LifecycleState current = lifecycle.get();
+            if (current.isShutdown()) {
+                throw new MediaUnavailableException("Dịch vụ lưu trữ Google Drive đã ngừng hoạt động (shutdown)");
+            }
+            if (current.getTotal() >= cleanupQueueCapacity) {
+                circuitBreaker.recordFailure();
+                throw new MediaUnavailableException(
+                        "Dung lượng tài nguyên Google Drive đồng thời đã đạt giới hạn tối đa (" + cleanupQueueCapacity + ")"
+                );
+            }
+            LifecycleState next = new LifecycleState(current.getActive() + 1, current.getPending(), false);
+            if (lifecycle.compareAndSet(current, next)) {
+                break;
+            }
+        }
+
+        return new DriveResourceReservation() {
+            private final AtomicBoolean active = new AtomicBoolean(true);
+            private final AtomicReference<AutoCloseable> delegateRef = new AtomicReference<>(null);
+            private final AtomicBoolean closeFailed = new AtomicBoolean(false);
+
+            @Override
+            public boolean closeAsync(AutoCloseable delegate, String opName) {
+                if (!active.compareAndSet(true, false)) {
+                    return false;
+                }
+                if (delegate == null) {
+                    decrementActiveAndCheckShutdown();
+                    return true;
+                }
+
+                delegateRef.set(delegate);
+
+                // Atomic transfer from active to pending: total budget remains constant
+                while (true) {
+                    LifecycleState cur = lifecycle.get();
+                    LifecycleState next = new LifecycleState(cur.getActive() - 1, cur.getPending() + 1, cur.isShutdown());
+                    if (lifecycle.compareAndSet(cur, next)) {
+                        break;
+                    }
+                }
+
+                try {
+                    cleanupExecutor.execute(() -> {
+                        activeCleanupWorkers.incrementAndGet();
+                        try {
+                            delegate.close();
+                            // Physical disposal success: clear obligation from pending lane
+                            decrementPendingAndCheckShutdown();
+                            closeFailed.set(false);
+                            clearRetainedFailedCleanup(delegate);
+                        } catch (Throwable t) {
+                            closeFailed.set(true);
+                            recordFailedCleanup(delegate, opName, t, this);
+                        } finally {
+                            activeCleanupWorkers.decrementAndGet();
+                        }
+                    });
+                    return true;
+                } catch (RejectedExecutionException ree) {
+                    // Revert permit transfer on rejection; caller retains ownership without blocking
+                    while (true) {
+                        LifecycleState cur = lifecycle.get();
+                        LifecycleState next = new LifecycleState(cur.getActive() + 1, cur.getPending() - 1, cur.isShutdown());
+                        if (lifecycle.compareAndSet(cur, next)) {
+                            break;
+                        }
+                    }
+                    active.set(true);
+                    delegateRef.set(null);
+                    return false;
+                }
+            }
+
+            @Override
+            public boolean transferToFailed(AutoCloseable delegate, String opName, Throwable cause) {
+                if (!active.compareAndSet(true, false)) {
+                    return false;
+                }
+                delegateRef.set(delegate);
+                closeFailed.set(true);
+                // Atomically transfer from active to pending exactly once
+                while (true) {
+                    LifecycleState cur = lifecycle.get();
+                    LifecycleState next = new LifecycleState(cur.getActive() - 1, cur.getPending() + 1, cur.isShutdown());
+                    if (lifecycle.compareAndSet(cur, next)) {
+                        break;
+                    }
+                }
+                recordFailedCleanup(delegate, opName, cause, this);
+                return true;
+            }
+
+            @Override
+            public boolean retryCleanup() {
+                if (!closeFailed.get()) {
+                    return false;
+                }
+                AutoCloseable del = delegateRef.get();
+                if (del == null) {
+                    return false;
+                }
+                return retryFailedCleanup(del);
+            }
+
+            @Override
+            public void clearFailedCleanup() {
+                closeFailed.set(false);
+            }
+
+            @Override
+            public boolean hasFailedCleanup() {
+                return closeFailed.get();
+            }
+
+            @Override
+            public void release() {
+                if (active.compareAndSet(true, false)) {
+                    decrementActiveAndCheckShutdown();
+                }
+            }
+
+            @Override
+            public boolean isActive() {
+                return active.get();
+            }
+        };
+    }
+
     /**
      * Executes non-blocking asynchronous resource cleanup in the bounded worker pool or cleanup queue.
      * Prevents caller thread from blocking on kernel WinFsp close while accurately
      * accounting for physical kernel worker occupancy without falling back to synchronous close.
+     *
+     * @param resource the resource to close asynchronously
+     * @param opName operation name for diagnostic tracking
+     * @return true if accepted into cleanup lane, false if rejected or shut down
      */
-    public void executeCleanupAsync(AutoCloseable resource, String opName) {
+    public boolean executeCleanupAsync(AutoCloseable resource, String opName) {
         if (resource == null) {
-            return;
+            return true;
         }
 
-        if (executor.isShutdown() || cleanupExecutor.isShutdown()) {
-            return;
+        if (cleanupExecutor.isShutdown()) {
+            return false;
         }
 
-        // 1. Try using main worker pool if capacity is available without saturation
+        // Reserve 1 unit of common lifecycle budget BEFORE accepting unreserved cleanup
+        while (true) {
+            LifecycleState cur = lifecycle.get();
+            if (cleanupExecutor.isShutdown()) {
+                return false;
+            }
+            if (cur.getTotal() >= cleanupQueueCapacity) {
+                return false;
+            }
+            LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
+            if (lifecycle.compareAndSet(cur, next)) {
+                break;
+            }
+        }
+
+        // Try main worker pool first if available
+        boolean submittedToMain = false;
         int current = actualOutstandingWorkers.incrementAndGet();
         if (current <= maxWorkers) {
             try {
-                executor.submit(() -> {
+                executor.execute(() -> {
                     try {
                         resource.close();
-                    } catch (Throwable ignored) {
+                        // Physical close succeeded: release the reserved pending slot
+                        decrementPendingAndCheckShutdown();
+                    } catch (Throwable t) {
+                        // Failed: pending remains charged!
+                        recordFailedCleanup(resource, opName, t, null);
                     } finally {
                         actualOutstandingWorkers.decrementAndGet();
                     }
                 });
-                return;
+                submittedToMain = true;
             } catch (RejectedExecutionException e) {
                 actualOutstandingWorkers.decrementAndGet();
             }
@@ -342,35 +855,186 @@ public class DriveIoExecutor {
             actualOutstandingWorkers.decrementAndGet();
         }
 
-        // 2. Worker pool is saturated (at maxWorkers) or rejected. Route to bounded cleanup queue.
-        // ABSOLUTELY NEVER throw exception and NEVER block caller!
-        try {
-            cleanupExecutor.submit(() -> {
-                try {
-                    resource.close();
-                } catch (Throwable ignored) {
-                }
-            });
-        } catch (Throwable ignored) {
-            // Safe discard under total shutdown/queue full without blocking caller
-        }
-    }
-
-    public void executeCleanupAsync(AutoCloseable resource) {
-        executeCleanupAsync(resource, "cleanup");
-    }
-
-    private static <T extends AutoCloseable> void closeResourceOnce(T resource, AtomicBoolean closedGate) {
-        if (resource != null && closedGate.compareAndSet(false, true)) {
+        if (!submittedToMain) {
+            // Main pool saturated or rejected. Route to dedicated cleanupExecutor tier
             try {
-                resource.close();
-            } catch (Throwable ignored) {
+                cleanupExecutor.execute(() -> {
+                    activeCleanupWorkers.incrementAndGet();
+                    try {
+                        resource.close();
+                        // Physical close succeeded: release the reserved pending slot
+                        decrementPendingAndCheckShutdown();
+                    } catch (Throwable t) {
+                        // Failed: pending remains charged!
+                        recordFailedCleanup(resource, opName, t, null);
+                    } finally {
+                        activeCleanupWorkers.decrementAndGet();
+                    }
+                });
+            } catch (Throwable t) {
+                // Both tiers rejected: release the reserved pending budget
+                decrementPendingAndCheckShutdown();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean executeCleanupAsync(AutoCloseable resource) {
+        return executeCleanupAsync(resource, "cleanup");
+    }
+
+    private void recordFailedCleanup(AutoCloseable resource, String opName, Throwable cause, DriveResourceReservation reservation) {
+        recordFailedCleanup(resource, opName, cause, reservation, true);
+    }
+
+    private void recordFailedCleanup(AutoCloseable resource, String opName, Throwable cause, DriveResourceReservation reservation, boolean chargesPending) {
+        if (resource != null) {
+            RetainedFailedCleanup existing = retainedFailedCleanups.get(resource);
+            if (existing != null) {
+                existing.updateFailure(cause);
+            } else {
+                retainedFailedCleanups.put(resource, new RetainedFailedCleanup(resource, opName, cause, reservation, chargesPending));
+                failedCleanupObligations.incrementAndGet();
+                circuitBreaker.recordFailure();
             }
         }
     }
 
+    private void clearRetainedFailedCleanup(AutoCloseable resource) {
+        if (resource != null) {
+            RetainedFailedCleanup removed = retainedFailedCleanups.remove(resource);
+            if (removed != null) {
+                failedCleanupObligations.decrementAndGet();
+                if (removed.chargesPending()) {
+                    decrementPendingAndCheckShutdown();
+                }
+                DriveResourceReservation res = removed.getReservation();
+                if (res != null) {
+                    res.clearFailedCleanup();
+                }
+            }
+        }
+    }
+
+    public boolean hasFailedCleanup(AutoCloseable resource) {
+        return resource != null && retainedFailedCleanups.containsKey(resource);
+    }
+
+    /**
+     * Retries asynchronous cleanup for a specific failed resource.
+     * Non-blocking: submits retry task to cleanup executor and returns immediately (<1ms).
+     *
+     * @param resource the failed resource to retry
+     * @return true if accepted into cleanup lane for retry, false if not found or rejected
+     */
+    public boolean retryFailedCleanup(AutoCloseable resource) {
+        if (resource == null) {
+            return false;
+        }
+        RetainedFailedCleanup record = retainedFailedCleanups.get(resource);
+        if (record == null) {
+            return false;
+        }
+        return submitRetryTask(record);
+    }
+
+    /**
+     * Retries asynchronous cleanup for all currently retained failed resources.
+     * Non-blocking: submits retry tasks to cleanup executor and returns count of submitted tasks.
+     *
+     * @return number of failed resources successfully submitted for retry
+     */
+    public int retryFailedCleanups() {
+        int submitted = 0;
+        for (RetainedFailedCleanup record : retainedFailedCleanups.values()) {
+            if (submitRetryTask(record)) {
+                submitted++;
+            }
+        }
+        return submitted;
+    }
+
+    private boolean submitRetryTask(RetainedFailedCleanup record) {
+        if (!record.markInFlight()) {
+            return false;
+        }
+
+        // If this unreserved failed cleanup was retained without charging pending budget,
+        // it must reserve 1 pending permit in lifecycle before being submitted for retry,
+        // strictly enforcing total budget (total < cleanupQueueCapacity) and preventing negative underflow.
+        boolean acquiredPending = false;
+        if (!record.chargesPending()) {
+            while (true) {
+                LifecycleState cur = lifecycle.get();
+                if (cur.isShutdown() || cur.getTotal() >= cleanupQueueCapacity) {
+                    record.clearInFlight();
+                    return false;
+                }
+                LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
+                if (lifecycle.compareAndSet(cur, next)) {
+                    acquiredPending = true;
+                    record.setChargesPending(true);
+                    break;
+                }
+            }
+        }
+
+        AutoCloseable resource = record.getResource();
+        try {
+            cleanupExecutor.execute(() -> {
+                activeCleanupWorkers.incrementAndGet();
+                try {
+                    resource.close();
+                    clearRetainedFailedCleanup(resource);
+                } catch (Throwable t) {
+                    circuitBreaker.recordFailure();
+                    record.updateFailure(t);
+                } finally {
+                    activeCleanupWorkers.decrementAndGet();
+                }
+            });
+            return true;
+        } catch (RejectedExecutionException ree) {
+            if (acquiredPending) {
+                decrementPendingAndCheckShutdown();
+                record.setChargesPending(false);
+            }
+            record.clearInFlight();
+            return false;
+        }
+    }
+
+    public List<AutoCloseable> getRetainedFailedResources() {
+        return List.copyOf(retainedFailedCleanups.keySet());
+    }
+
+    public List<RetainedFailedCleanup> getRetainedFailedRecords() {
+        return List.copyOf(retainedFailedCleanups.values());
+    }
+
     public int getActualOutstandingWorkers() {
         return actualOutstandingWorkers.get();
+    }
+
+    public int getActiveCleanupWorkers() {
+        return activeCleanupWorkers.get();
+    }
+
+    public int getPendingCleanupObligations() {
+        return lifecycle.get().getPending();
+    }
+
+    public int getActiveResourceReservations() {
+        return lifecycle.get().getActive();
+    }
+
+    public int getFailedCleanupObligations() {
+        return failedCleanupObligations.get();
+    }
+
+    public int getCleanupQueueCapacity() {
+        return cleanupQueueCapacity;
     }
 
     public int getMaxWorkers() {
@@ -389,12 +1053,49 @@ public class DriveIoExecutor {
         return readTimeoutMs;
     }
 
+    private void decrementActiveAndCheckShutdown() {
+        while (true) {
+            LifecycleState cur = lifecycle.get();
+            int newActive = Math.max(0, cur.getActive() - 1);
+            LifecycleState next = new LifecycleState(newActive, cur.getPending(), cur.isShutdown());
+            if (lifecycle.compareAndSet(cur, next)) {
+                if (next.isShutdown() && next.getTotal() == 0) {
+                    cleanupExecutor.shutdown();
+                }
+                break;
+            }
+        }
+    }
+
+    private void decrementPendingAndCheckShutdown() {
+        while (true) {
+            LifecycleState cur = lifecycle.get();
+            int newPending = Math.max(0, cur.getPending() - 1);
+            LifecycleState next = new LifecycleState(cur.getActive(), newPending, cur.isShutdown());
+            if (lifecycle.compareAndSet(cur, next)) {
+                if (next.isShutdown() && next.getTotal() == 0) {
+                    cleanupExecutor.shutdown();
+                }
+                break;
+            }
+        }
+    }
+
     public boolean isShutdown() {
-        return executor.isShutdown() || cleanupExecutor.isShutdown();
+        return lifecycle.get().isShutdown() || executor.isShutdown();
     }
 
     public void shutdown() {
-        executor.shutdownNow();
-        cleanupExecutor.shutdownNow();
+        while (true) {
+            LifecycleState cur = lifecycle.get();
+            LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending(), true);
+            if (lifecycle.compareAndSet(cur, next)) {
+                executor.shutdownNow();
+                if (next.getTotal() == 0) {
+                    cleanupExecutor.shutdown();
+                }
+                break;
+            }
+        }
     }
 }

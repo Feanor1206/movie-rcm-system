@@ -74,11 +74,15 @@ Khi mount lưu trữ đám mây qua rclone VFS (Virtual File System), quyết đ
 | **Khả năng mở rộng đồng thời** | Cao, độc lập giữa các stream | Bị thắt nút cổ chai tại băng thông ghi SSD | `cache-off` tối ưu cho máy chủ tải cao |
 
 > [!NOTE]
-> **Làm rõ về cơ chế định vị ngẫu nhiên, độ trễ đám mây & Vòng đời Kênh I/O (R1):**
+> **Làm rõ về cơ chế định vị ngẫu nhiên, độ trễ đám mây & Hợp đồng Tiếp nhận Dọn dẹp (Cleanup Admission Contract — F04 / R1):**
 > 1. **Định vị & Độ trễ WAN:** Việc ứng dụng Spring Boot sử dụng `FileChannel.position(start)` loại bỏ hoàn toàn việc đọc bỏ byte tuần tự của tầng ứng dụng (application byte-discard), giúp gửi yêu cầu đọc chính xác dải byte cần thiết. Tuy nhiên, trên môi trường Google Drive thực tế, độ trễ truy xuất dải byte từ xa vẫn phụ thuộc vào Round-Trip Time (RTT) mạng và chu kỳ phản hồi của Google Drive API chứ không phải độ trễ $O(1)$ cố định tức thời.
-> 2. **Bao quát toàn bộ thao tác kênh (`activeWorkerOperations`):** Kênh `DriveSeekableByteChannel` bao quát toàn bộ thao tác (`read`, `position`, `size`) trong quyền sở hữu worker. Nếu caller hoàn tất hoặc timeout gọi `close()`, caller được giải phóng tức thì mà không bị treo theo kernel WinFsp; worker thread đảm nhận dọn dẹp delegate khi thao tác kết thúc.
-> 3. **Chính sách đóng kênh không nghẽn & Xử lý bão hòa dọn dẹp:** Khi cleanup pool bão hòa, hệ thống tuyệt đối không chuyển gánh nặng đóng kernel về luồng caller (no direct caller fallback). Luồng caller giải phóng ngay, trong khi `actualOutstandingWorkers` bảo lưu trung thực cho đến khi kernel đóng vật lý hoàn tất.
-> 4. **Giới hạn không thể hủy cứng của WinFsp:** Kernel WinFsp không hỗ trợ hard-cancel an toàn đối với các I/O đang kẹt qua lệnh ngắt Java `Thread.interrupt()`. Do đó, hệ thống bảo vệ caller bằng finite deadlines và cô lập tác vụ kẹt trong pool công nhân giới hạn kết hợp mạch ngắt Circuit Breaker.
+> 2. **Cổng tiếp nhận tường minh & Ngân sách kết hợp (`acquireReservation()`):** Cấp phát tài nguyên (kênh dữ liệu/metadata) bắt buộc phải qua cổng tiếp nhận trước khi tạo handle hệ điều hành. Khi dung lượng kết hợp đạt trần ($\text{activeResourceReservations} + \text{pendingCleanupObligations} \ge \text{cleanupQueueCapacity}$), hệ thống fail-fast lập tức (`MediaUnavailableException`). Không bao giờ tiếp nhận một tài nguyên nếu không bảo đảm khả năng dọn dẹp.
+> 3. **Bao quát toàn bộ thao tác kênh (`activeWorkerOperations`):** Kênh `DriveSeekableByteChannel` bao quát toàn bộ thao tác (`read`, `position`, `size`) trong quyền sở hữu worker. Nếu caller hoàn tất hoặc timeout gọi `close()`, caller được giải phóng tức thì mà không bị treo theo kernel WinFsp; worker thread đảm nhận dọn dẹp delegate khi thao tác kết thúc.
+> 4. **Chính sách đóng kênh không nghẽn & Loại bỏ Discard:** Khi cleanup pool bão hòa, hệ thống tuyệt đối không chuyển gánh nặng đóng kernel về luồng caller (no direct caller fallback) và tuyệt đối cấm sử dụng `DiscardOldestPolicy`. Mọi tác vụ đóng kênh đã tiếp nhận được bảo lưu và thực thi đóng vật lý.
+> 5. **Các làn đo lường vòng đời chuẩn xác (Lifecycle Metric Lanes & Overlap):** Hệ thống tách bạch các chỉ số chính thức: (1) `actualOutstandingWorkers`, (2) `activeCleanupWorkers`, (3) `pendingCleanupObligations`, (4) `activeResourceReservations`, và (5) `failedCleanupObligations`. Các luồng worker vật lý và biến đếm nghĩa vụ vòng đời phản ánh hai góc nhìn song song và có sự giao thoa (overlap) khi tác vụ đang thực thi. Biến đếm `pendingCleanupObligations` bao quát toàn bộ các tác vụ đang chờ, các tác vụ đang đóng vật lý, và các tài nguyên đóng thất bại đang được lưu giữ chờ thử lại.
+> 6. **Ngữ nghĩa shutdown bất đồng bộ (Asynchronous Shutdown):** Lệnh `shutdown()` không đảm bảo hay chờ đợi handle kernel của WinFsp đóng xong trên luồng caller. Caller trở về tức thì để tránh bị treo theo khóa filesystem.
+> 7. **Lưu giữ nghĩa vụ thất bại & Thử lại có kiểm soát (Failed Closes & Explicit Bounded Retry):** Tài nguyên đóng thất bại được lưu giữ trong `retainedFailedCleanups` và tiếp tục chiếm dụng ngân sách `pendingCleanupObligations`. Cần gọi tường minh `retryCleanup()`, `retryFailedClose()`, hoặc `retryFailedCleanups()`. Khóa nguyên tử in-flight (`markInFlight()`) đảm bảo số lần thử lại không làm phát sinh các lệnh đóng trùng lặp, duy trì nguyên tắc đóng vật lý chính xác 1 lần (**exactly-once physical disposal**).
+> 8. **Giới hạn không thể hủy cứng của WinFsp:** Kernel WinFsp không hỗ trợ hard-cancel an toàn đối với các I/O đang kẹt qua lệnh ngắt Java `Thread.interrupt()`. Do đó, hệ thống bảo vệ caller bằng finite deadlines và cô lập tác vụ kẹt trong pool công nhân giới hạn kết hợp mạch ngắt Circuit Breaker.
 
 ---
 
@@ -365,6 +369,22 @@ Dưới đây là danh mục kiểm tra tuần tự dành cho kỹ sư vận hà
 - [ ] **5.6.** Chạy thử tải đồng thời với 2 và 3 luồng phát song song, xác nhận không xuất hiện lỗi HTTP 429 hay crash tiến trình rclone.
 - [ ] **5.7.** Xác nhận mức tiêu thụ ổ đĩa của rclone: Kiểm tra thư mục đệm rclone (`%LOCALAPPDATA%\rclone\vfs`) — xác nhận **0 byte tệp đệm media VFS** sinh ra trên SSD. Các biến động nhỏ về dung lượng tệp của OS hay application logging được ghi nhận riêng biệt.
 - [ ] **5.8.** Dừng tiến trình rclone an toàn khi hoàn tất:
+
+### 5.9. Kết quả Thực nghiệm Thực tế trên Mạng WAN Google Drive (DRIVE-01-F05 Empirical Evidence)
+
+Trong kiểm định `DRIVE-01-F05`, hệ thống đã thực hiện kết nối và phát video thực tế từ remote `cinema-drive` (folder `1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ`, tệp `videoplayback.mp4` kích thước 29.209.556 bytes) trên ổ ảo `X:` qua WinFsp và rclone. Kết quả đo lường thực tế ghi nhận như sau (`docs/reports/drive/DRIVE_01_F05/real_drive_results.json`):
+
+| Chỉ số Đo đạc | Kết quả Thực nghiệm | Nhận xét & Đánh giá |
+| :--- | :--- | :--- |
+| **HTTP HEAD Status** | HTTP 200 OK | Content-Length: 29.209.556, Accept-Ranges: bytes, phản hồi tức thì. |
+| **HTTP Range Verification** | 3 dải byte (Đầu, Giữa, Cuối) | HTTP 206 Partial Content, đối chiếu byte-for-byte khớp 100% với tệp gốc trên Drive. |
+| **Cold Startup Latency** | **12.219 ms (~12.2s)** | Bao gồm bắt tay TLS Google API, WinFsp FUSE init, nạp buffer RAM ban đầu và khởi chạy Next player. |
+| **Seek 25% Latency** | **259.6 ms** | Trúng bộ đệm RAM 32MB (`--buffer-size 32M`), khung hình giải mã ngay lập tức (presentedFrames: 35). |
+| **Seek 60% Latency** | **13.480 ms (~13.4s)** | Tua vượt ra ngoài vùng đệm RAM hiện tại, rclone thực hiện request WAN mới tới Google Drive. |
+| **Seek 94% (Near-End)** | **10.994 ms (~11.0s)** | Tua gần cuối tệp, giải mã khung hình thành công (presentedFrames: 41, mediaTime: 419.17s). |
+| **Độ phân giải & Codec** | **1920x1080 (1080p Full HD)** | Trình duyệt Chrome giải mã trực tiếp khung hình qua HTML5 Video decoder. |
+| **Giao diện Di động (375px)** | **100% pass chuẩn WCAG 2.1** | Các nút điều khiển Play/Pause, Volume, Fullscreen đều đạt kích thước tối thiểu $\ge 44 \times 44\text{ px}$. |
+| **Ghi đĩa SSD do Media** | **0 Byte** | Chế độ `--vfs-cache-mode off` bảo toàn 100% SSD, không sinh tệp cache trung gian. |
   ```powershell
   # Dừng an toàn trên Windows PowerShell 5.1:
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/drive/stop_drive.ps1

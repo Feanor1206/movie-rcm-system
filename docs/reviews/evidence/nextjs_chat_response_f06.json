@@ -1,0 +1,97 @@
+Next.js Chat Elapsed ms: 99175
+{
+  "text": "B?n mu?n t�m phim ho?t h�nh gia d�nh hay phim tuong t? nhu Shin C?u B� B�t Ch�?",
+  "recommendedMovies": [],
+  "followUps": [
+    "Gi? nguy�n nhung b? th? lo?i kinh d? di",
+    "D?i th�nh phim ph�t h�nh t? nam 2020 tr? di"
+  ],
+  "structuredIntent": {
+    "schema_version": "1.0",
+    "intent_type": "CLARIFICATION",
+    "query": {
+      "text": "Shin C?u B� B�t Ch� ho?c phim ho?t h�nh gia d�nh"
+    },
+    "reference": {
+      "text": "Shin C?u B� B�t Ch�",
+      "status": "UNRESOLVED_REFERENCE"
+    },
+    "constraints": {
+      "year_min": null,
+      "year_max": null,
+      "include_genres": [
+        "Animation",
+        "Family"
+      ],
+      "exclude_genres": []
+    },
+    "preferences": {
+      "use_personalization": null,
+      "unsupported_facets": []
+    },
+    "requested_k": null,
+    "diversify": null,
+    "clarification": {
+      "required": true,
+      "reason": "UNRESOLVED_REFERENCE_AND_CONFLICTING_CONSTRAINTS",
+      "question": "B?n mu?n t�m phim ho?t h�nh gia d�nh hay phim tuong t? nhu Shin C?u B� B�t Ch�?"
+    },
+    "no_op": false,
+    "year_min": null,
+    "year_max": null,
+    "include_genres": [
+      "Animation",
+      "Family"
+    ],
+    "exclude_genres": [],
+    "reference_films": [
+      "Shin C?u B� B�t Ch�"
+    ]
+  },
+  "pipelineStages": {
+    "nlu": {
+      "schema_version": "1.0",
+      "intent_type": "CLARIFICATION",
+      "query": {
+        "text": "Shin C?u B� B�t Ch� ho?c phim ho?t h�nh gia d�nh"
+      },
+      "reference": {
+        "text": "Shin C?u B� B�t Ch�",
+        "status": "UNRESOLVED_REFERENCE"
+      },
+      "constraints": {
+        "year_min": null,
+        "year_max": null,
+        "include_genres": [
+          "Animation",
+          "Family"
+        ],
+        "exclude_genres": []
+      },
+      "preferences": {
+        "use_personalization": null,
+        "unsupported_facets": []
+      },
+      "requested_k": null,
+      "diversify": null,
+      "clarification": {
+        "required": true,
+        "reason": "UNRESOLVED_REFERENCE_AND_CONFLICTING_CONSTRAINTS",
+        "question": "B?n mu?n t�m phim ho?t h�nh gia d�nh hay phim tuong t? nhu Shin C?u B� B�t Ch�?"
+      },
+      "no_op": false,
+      "year_min": null,
+      "year_max": null,
+      "include_genres": [
+        "Animation",
+        "Family"
+      ],
+      "exclude_genres": [],
+      "reference_films": [
+        "Shin C?u B� B�t Ch�"
+      ]
+    },
+    "candidateCount": 0,
+    "rankedCount": 0
+  }
+}

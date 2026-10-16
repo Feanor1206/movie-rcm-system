@@ -1,0 +1,160 @@
+{
+  "protocolVersion": 1,
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F06",
+  "checkpoint": "DRIVE-01-F06-CHECKPOINT-FINAL",
+  "timestamp": "2026-10-16T07:27:00+07:00",
+  "baseCommitSha": "fe55916eeb037c0369be1765b842b6063ae2bbe1",
+  "patchPath": "docs/reports/DRIVE_01_F06.patch",
+  "patchSizeBytes": 337792,
+  "patchSha256": "9B88328211867EBB7880CED12A303ED7013DFEB35B4CF3266E011CB98CBCA671",
+  "totalTrackedFiles": 27,
+  "files": [
+    {
+      "path": "backend/fastapi/services/qwen_service.py",
+      "sizeBytes": 58090,
+      "sha256": "763FF5F0AA5E1930F6DDFCE12361BE6F5B747030A9DB2D75C319A53651D869FC"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/config/DataInitializer.java",
+      "sizeBytes": 22962,
+      "sha256": "1B89C43C7EBD3874809516FE7566587EF9A63421D39123541C7BA9DA13A15980"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+      "sizeBytes": 9932,
+      "sha256": "3A085BBE9BABFDB6FBF41DB4CC11456C0A14F8AD13274C8F55A8505B4AB65505"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+      "sizeBytes": 47997,
+      "sha256": "DA43127FBE57151B84D99BCA5D7F58367347A6DC34F64CCF3345C9DC23B6D099"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveResourceReservation.java",
+      "sizeBytes": 3358,
+      "sha256": "2416CB8B76C0F17B0FDBDF0A0CA0DFFC5305B9764023C6EB2CD9D5F029B6ED67"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java",
+      "sizeBytes": 11917,
+      "sha256": "74820C98242AFC1F168887FB4D09F177B54C8A5DEE9245DF3D97C7A66DE1AE86"
+    },
+    {
+      "path": "backend/springboot/src/main/resources/application.yml",
+      "sizeBytes": 2114,
+      "sha256": "B0E6444E088C5B5B06204F6582958C13360268CB54DA192420F93EC78A8D7836"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupQueueSaturationTest.java",
+      "sizeBytes": 36137,
+      "sha256": "0F0A8E42971E7933CC3E18BAB05CD9DC6FAE9D721DF27221FEA403837C9E8DA8"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupShutdownOwnershipTest.java",
+      "sizeBytes": 30507,
+      "sha256": "1A181DA17B27027D738A9D3E801FB67102FBDA1725867B6F787A4D64E8977D48"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveLifecycleStressAuditTest.java",
+      "sizeBytes": 24165,
+      "sha256": "F9708A1D401C4579D9251153B6B16339BEB8933CA6CA40D6ADE3EC86F0AD7F21"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveUnreservedLifecycleReproTest.java",
+      "sizeBytes": 13936,
+      "sha256": "77F792688047A145FD4CB4BDE08C2268A7EE06795F9EEEE3BE32F046EA9DBF43"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/LunaDriveCleanupOpenLifecycleTest.java",
+      "sizeBytes": 58540,
+      "sha256": "ED0F71DD23EF77BAA1AB492F706324B73F6CA9AE509D76B3C32EE6493B5DC5F2"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/LunaDriveCleanupShutdownOwnershipTest.java",
+      "sizeBytes": 44014,
+      "sha256": "C049780BAA449F6F994D1FDBD3E3140C3CBF16881E3A79609D33A2E6A620B5B4"
+    },
+    {
+      "path": "backend/springboot/src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker",
+      "sizeBytes": 20,
+      "sha256": "8ECA853A5A457F17E0479B71DFBE95F2A13AFF9EEFF250261ECDC8CA9B847A6A"
+    },
+    {
+      "path": "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md",
+      "sizeBytes": 34874,
+      "sha256": "B6663294AA705DDB92B39958EBD31852BBD7EEA7D44E39120EBFFF4531EBE709"
+    },
+    {
+      "path": "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+      "sizeBytes": 42957,
+      "sha256": "94710C8E4674F0CDC90FCCC0A374F7D9FA7416A6477CEA90D908E52C7620DF0D"
+    },
+    {
+      "path": "docs/runbooks/DRIVE_SNAPSHOT_RUNBOOK.md",
+      "sizeBytes": 3852,
+      "sha256": "871924A7A7BC343A8820E1B265E3DD5EDFB5189C5D269044C7BC1554D8825C36"
+    },
+    {
+      "path": "frontend/features/chat/components/CineBot.tsx",
+      "sizeBytes": 18542,
+      "sha256": "CE5EE76D4C77EC940196E7645253477AC1A9A2A67D5BC9678A9E5686E5CD36D1"
+    },
+    {
+      "path": "frontend/lib/data/movies.ts",
+      "sizeBytes": 6303,
+      "sha256": "3D2413D64954A2B1EB32134586E2CB6E639627681534718AA2EA307848A04E18"
+    },
+    {
+      "path": "scripts/start_backend_dev.ps1",
+      "sizeBytes": 542,
+      "sha256": "90F4E8DE09F23D2D416174B691AF81FC680F12BA6F7CAD082AC3D6FC26AA2277"
+    },
+    {
+      "path": "scripts/test_live_player.cjs",
+      "sizeBytes": 2108,
+      "sha256": "D1C9EFFCFC45760CD9AC3FDB4C2DAFC5A5FA513838ECC9520901F1ED90CBEABC"
+    },
+    {
+      "path": "scripts/test_live_browser_f06.cjs",
+      "sizeBytes": 6107,
+      "sha256": "ED380A9CC0E1EE7356D5021E6217A3854F899F2348CB1214E932F30DEDFDD795"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F06_STATUS.json",
+      "sizeBytes": 5749,
+      "sha256": "EF27DB382E5A05926BC12C54E36FD7BB967E0199875D6F5EEBAE4FE6BF644B77"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F06/CROSS_REVIEW.md",
+      "sizeBytes": 7243,
+      "sha256": "FC12DA66907820EF1F81789A5774F8CBECD92E042454094C5E64EE4EB24E574F"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F06/LIFECYCLE_MATRIX.md",
+      "sizeBytes": 5985,
+      "sha256": "BECCA3CCFA95DB555E4C19F86AB904A94950E5ABB480BAEB43170A40C1D58949"
+    },
+    {
+      "path": "docs/reviews/DRIVE_F06_GEMINI_INDEPENDENT_AUDIT.md",
+      "sizeBytes": 13912,
+      "sha256": "5A55AA593943654B2F258AEE60FA3900F79C4BD3162CE143B6B4C00B38E38CFB"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F06_REPORT.md",
+      "sizeBytes": 14007,
+      "sha256": "D6827130932E3D0CA28491CE954EF3EA651206CD5C60574B1E45AC932F28E7EA"
+    }
+  ],
+  "qwenArtifactReproducibilityInventory": {
+    "baseModel": "Qwen/Qwen3-4B (HuggingFace Hub local cache models--Qwen--Qwen3-4B)",
+    "fineTunedAdapterDirectory": "ai/models/qwen3-4b-phase23-lora",
+    "adapterConfigBytes": 1146,
+    "adapterConfigSha256": "5C0BD5AF940B796CD012D8C61D5A642EDC5478491A2E4B1713BD5E48566FF0D1",
+    "adapterWeightsBytes": 132187888,
+    "adapterWeightsSha256": "9BCBE334966F2DEBAA744C919A3102C5302213F98D65825ED9E15147FF3DE130",
+    "systemPromptBytes": 852,
+    "tokenizerJsonBytes": 11422650,
+    "note": "Preexisting model weights and HuggingFace cache are referenced by checksum and excluded from patch diffs to prevent repository bloat and credential exposure."
+  }
+}

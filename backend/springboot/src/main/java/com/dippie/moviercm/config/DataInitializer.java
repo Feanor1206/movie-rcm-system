@@ -54,87 +54,181 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seedMovies() {
-        if (movieRepository.count() == 0) {
-            logger.info("Cơ sở dữ liệu phim trống. Đang tự động nạp 6 phim mẫu...");
+        logger.info("Kiểm tra và đồng bộ kho phim hoạt hình và phim Google Drive...");
 
-            List<Movie> seedMovies = List.of(
-                    Movie.builder()
-                            .id("the-last-orbit")
-                            .title("The Last Orbit")
-                            .year(2026)
-                            .rating(8.7)
-                            .runtime("2h 14m")
-                            .genres("Sci-Fi,Drama")
-                            .description("A lone astronaut discovers that the signal guiding her home may be the final memory of a world already gone.")
-                            .poster("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85")
-                            .backdrop("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1800&q=85")
-                            .videoUrl("/videos/the-last-orbit.mp4")
-                            .build(),
-                    Movie.builder()
-                            .id("afterlight")
-                            .title("Afterlight")
-                            .year(2025)
-                            .rating(8.3)
-                            .runtime("1h 58m")
-                            .genres("Drama,Mystery")
-                            .description("In a city where night never ends, a photographer follows one impossible beam of sunlight.")
-                            .poster("https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85")
-                            .backdrop("https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=1800&q=85")
-                            .videoUrl("/videos/afterlight.mp4")
-                            .build(),
-                    Movie.builder()
-                            .id("glass-horizon")
-                            .title("Glass Horizon")
-                            .year(2026)
-                            .rating(8.1)
-                            .runtime("2h 06m")
-                            .genres("Thriller,Sci-Fi")
-                            .description("A brilliant architect is asked to design a city that no one is meant to leave.")
-                            .poster("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=85")
-                            .backdrop("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=85")
-                            .videoUrl("/videos/glass-horizon.mp4")
-                            .build(),
-                    Movie.builder()
-                            .id("deep-blue")
-                            .title("Deep Blue")
-                            .year(2024)
-                            .rating(7.9)
-                            .runtime("1h 46m")
-                            .genres("Adventure,Drama")
-                            .description("Two estranged sisters cross an unmapped ocean in search of their father.")
-                            .poster("https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85")
-                            .backdrop("https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=1800&q=85")
-                            .videoUrl("/videos/deep-blue.mp4")
-                            .build(),
-                    Movie.builder()
-                            .id("quiet-places")
-                            .title("Quiet Places")
-                            .year(2025)
-                            .rating(8.5)
-                            .runtime("2h 01m")
-                            .genres("Romance,Drama")
-                            .description("A composer returns to the town she fled and finds an old song waiting for her.")
-                            .poster("https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=85")
-                            .backdrop("https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1800&q=85")
-                            .videoUrl("/videos/quiet-places.mp4")
-                            .build(),
-                    Movie.builder()
-                            .id("nocturne")
-                            .title("Nocturne")
-                            .year(2024)
-                            .rating(7.8)
-                            .runtime("1h 52m")
-                            .genres("Crime,Thriller")
-                            .description("A detective investigates a string of elegant crimes committed at midnight.")
-                            .poster("https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85")
-                            .backdrop("https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1800&q=85")
-                            .videoUrl("/videos/nocturne.mp4")
-                            .build()
-            );
+        List<Movie> seedMovies = List.of(
+                Movie.builder()
+                        .id("drive-videoplayback")
+                        .title("Shin Cậu Bé Bút Chì: Chuyến phiêu lưu kỳ thú")
+                        .year(2026)
+                        .rating(8.8)
+                        .runtime("7m 25s")
+                        .genres("Animation,Comedy,Adventure,Family")
+                        .description("Tập phim hoạt hình Shin Cậu Bé Bút Chì được phát và giải mã trực tiếp từ Google Drive storage.")
+                        .poster("https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/api/media/stream/ast-drive-videoplayback")
+                        .build(),
+                Movie.builder()
+                        .id("the-last-orbit")
+                        .title("The Last Orbit")
+                        .year(2026)
+                        .rating(8.7)
+                        .runtime("2h 14m")
+                        .genres("Animation,Sci-Fi,Drama")
+                        .description("A lone astronaut discovers that the signal guiding her home may be the final memory of a world already gone.")
+                        .poster("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/the-last-orbit.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("spirited-away")
+                        .title("Spirited Away")
+                        .year(2001)
+                        .rating(8.6)
+                        .runtime("2h 05m")
+                        .genres("Animation,Adventure,Family,Fantasy")
+                        .description("A young girl wanders into a magical bathhouse ruled by spirits and witches, where she must find the courage to free her parents.")
+                        .poster("https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/the-last-orbit.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("your-name")
+                        .title("Your Name")
+                        .year(2016)
+                        .rating(8.4)
+                        .runtime("1h 46m")
+                        .genres("Animation,Romance,Drama,Fantasy")
+                        .description("Two teenagers share a profound, magical connection upon discovering they are swapping bodies across time and space.")
+                        .poster("https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/afterlight.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("spider-verse")
+                        .title("Spider-Man: Into the Spider-Verse")
+                        .year(2018)
+                        .rating(8.4)
+                        .runtime("1h 57m")
+                        .genres("Animation,Action,Adventure,Sci-Fi")
+                        .description("Teen Miles Morales becomes the Spider-Man of his universe and crosses paths with five counterparts from other dimensions.")
+                        .poster("https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/glass-horizon.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("isle-of-dogs")
+                        .title("Isle of Dogs")
+                        .year(2018)
+                        .rating(7.8)
+                        .runtime("1h 41m")
+                        .genres("Animation,Adventure,Comedy,Drama")
+                        .description("Set in dystopian Japan, a young boy journeys to Trash Island in a stop-motion quest to rescue his exiled dog Spots.")
+                        .poster("https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/deep-blue.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("coraline")
+                        .title("Coraline")
+                        .year(2009)
+                        .rating(7.7)
+                        .runtime("1h 40m")
+                        .genres("Animation,Drama,Family,Fantasy,Horror")
+                        .description("An adventurous 11-year-old girl finds another world that is a strangely idealized version of her frustrating home, but it has sinister secrets.")
+                        .poster("https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/nocturne.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("fantasia-1940")
+                        .title("Fantasia")
+                        .year(1940)
+                        .rating(7.7)
+                        .runtime("2h 05m")
+                        .genres("Animation,Family,Fantasy,Musical")
+                        .description("A timeless collection of animated interpretations of great works of Western classical music.")
+                        .poster("https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/quiet-places.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("afterlight")
+                        .title("Afterlight")
+                        .year(2025)
+                        .rating(8.3)
+                        .runtime("1h 58m")
+                        .genres("Animation,Drama,Mystery")
+                        .description("In a city where night never ends, a photographer follows one impossible beam of sunlight.")
+                        .poster("https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/afterlight.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("glass-horizon")
+                        .title("Glass Horizon")
+                        .year(2026)
+                        .rating(8.1)
+                        .runtime("2h 06m")
+                        .genres("Animation,Thriller,Sci-Fi")
+                        .description("A brilliant architect is asked to design a city that no one is meant to leave.")
+                        .poster("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/glass-horizon.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("deep-blue")
+                        .title("Deep Blue")
+                        .year(2024)
+                        .rating(7.9)
+                        .runtime("1h 46m")
+                        .genres("Animation,Adventure,Drama")
+                        .description("Two estranged sisters cross an unmapped ocean in search of their father.")
+                        .poster("https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/deep-blue.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("quiet-places")
+                        .title("Quiet Places")
+                        .year(2025)
+                        .rating(8.5)
+                        .runtime("2h 01m")
+                        .genres("Animation,Romance,Drama")
+                        .description("A composer returns to the town she fled and finds an old song waiting for her.")
+                        .poster("https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/quiet-places.mp4")
+                        .build(),
+                Movie.builder()
+                        .id("nocturne")
+                        .title("Nocturne")
+                        .year(2024)
+                        .rating(7.8)
+                        .runtime("1h 52m")
+                        .genres("Animation,Crime,Thriller")
+                        .description("A detective investigates a string of elegant crimes committed at midnight.")
+                        .poster("https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85")
+                        .backdrop("https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1800&q=85")
+                        .videoUrl("/videos/nocturne.mp4")
+                        .build()
+        );
 
-            movieRepository.saveAll(seedMovies);
-            logger.info("Đã nạp thành công {} phim vào cơ sở dữ liệu.", seedMovies.size());
+        int added = 0;
+        for (Movie m : seedMovies) {
+            if (!movieRepository.existsById(m.getId())) {
+                movieRepository.save(m);
+                added++;
+            } else {
+                Movie existing = movieRepository.findById(m.getId()).orElse(null);
+                if (existing != null && (existing.getGenres() == null || !existing.getGenres().toLowerCase().contains("animation"))) {
+                    existing.setGenres("Animation," + (existing.getGenres() != null ? existing.getGenres() : ""));
+                    movieRepository.save(existing);
+                }
+            }
         }
+        logger.info("Đã đồng bộ kho phim. Thêm mới {} phim.", added);
     }
 
     private void seed50Users() {
@@ -236,53 +330,69 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seedMediaAssets() {
-        if (mediaAssetRepository.count() == 0) {
-            logger.info("Chưa có media assets trong CSDL. Đang tự động nạp assets mẫu cho Milestone M4...");
+        if (!mediaAssetRepository.existsById("ast-drive-videoplayback")) {
+            logger.info("Đang tự động nạp Media Asset cho Google Drive video (videoplayback.mp4)...");
+            mediaAssetRepository.save(new com.dippie.moviercm.entity.MediaAsset(
+                    "ast-drive-videoplayback",
+                    "drive-videoplayback",
+                    "feature",
+                    "drive",
+                    "videoplayback.mp4",
+                    "v1",
+                    "video/mp4",
+                    29209556L,
+                    445.8,
+                    true,
+                    true
+            ));
+        }
 
-            List<com.dippie.moviercm.entity.MediaAsset> assets = List.of(
-                    new com.dippie.moviercm.entity.MediaAsset(
-                            "ast-orbit-feat",
-                            "the-last-orbit",
-                            "feature",
-                            "local",
-                            "synthetic/feature_test.mp4",
-                            "v1",
-                            "video/mp4",
-                            137961L,
-                            10.0,
-                            true,
-                            true
-                    ),
-                    new com.dippie.moviercm.entity.MediaAsset(
-                            "ast-orbit-trl",
-                            "the-last-orbit",
-                            "trailer",
-                            "local",
-                            "synthetic/trailer_test.mp4",
-                            "v1",
-                            "video/mp4",
-                            45095L,
-                            3.0,
-                            true,
-                            true
-                    ),
-                    new com.dippie.moviercm.entity.MediaAsset(
-                            "ast-afterlight-trl",
-                            "afterlight",
-                            "trailer",
-                            "local",
-                            "synthetic/trailer_test.mp4",
-                            "v1",
-                            "video/mp4",
-                            45095L,
-                            3.0,
-                            true,
-                            true
-                    )
-            );
+        List<com.dippie.moviercm.entity.MediaAsset> assets = List.of(
+                new com.dippie.moviercm.entity.MediaAsset(
+                        "ast-orbit-feat",
+                        "the-last-orbit",
+                        "feature",
+                        "local",
+                        "synthetic/feature_test.mp4",
+                        "v1",
+                        "video/mp4",
+                        137961L,
+                        10.0,
+                        true,
+                        true
+                ),
+                new com.dippie.moviercm.entity.MediaAsset(
+                        "ast-orbit-trl",
+                        "the-last-orbit",
+                        "trailer",
+                        "local",
+                        "synthetic/trailer_test.mp4",
+                        "v1",
+                        "video/mp4",
+                        45095L,
+                        3.0,
+                        true,
+                        true
+                ),
+                new com.dippie.moviercm.entity.MediaAsset(
+                        "ast-afterlight-trl",
+                        "afterlight",
+                        "trailer",
+                        "local",
+                        "synthetic/trailer_test.mp4",
+                        "v1",
+                        "video/mp4",
+                        45095L,
+                        3.0,
+                        true,
+                        true
+                )
+        );
 
-            mediaAssetRepository.saveAll(assets);
-            logger.info("Đã nạp thành công {} media assets mẫu (The Last Orbit feature/trailer, Afterlight trailer).", assets.size());
+        for (var a : assets) {
+            if (!mediaAssetRepository.existsById(a.getId())) {
+                mediaAssetRepository.save(a);
+            }
         }
     }
 }

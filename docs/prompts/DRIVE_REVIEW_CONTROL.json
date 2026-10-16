@@ -1,11 +1,13 @@
 {
   "protocolVersion": 1,
-  "command": "work",
-  "taskId": "DRIVE-01-F04",
-  "promptVersion": 7,
+  "command": "stop",
+  "taskId": "DRIVE-01-F05",
+  "promptVersion": 9,
   "currentPromptPath": "docs/prompts/GEMINI_CURRENT_TASK.md",
-  "taskPromptPath": "docs/prompts/DRIVE_01_F04_GEMINI_PROMPT.md",
-  "lastReviewedCheckpoint": "DRIVE-01-F03-CHECKPOINT-01",
+  "taskPromptPath": "docs/prompts/GEMINI_CLI_INTEGRATE_04.md",
+  "lastReviewedCheckpoint": "DRIVE-01-F06-CHECKPOINT-FINAL",
   "reviewMode": "manual",
-  "note": "User requires internal cross-agent review -> fix -> retest -> re-review with full lifecycle matrix before F04 handoff. Preserve in-flight version6 ownership; new version7 adds mandatory review gate. User-uploaded videoplayback.mp4 verified metadata29209556 bytes in VideoDieppie. G2/G3 pending real mount/playback after G1; installation/OAuth/upload already complete. Manual handoff, automation paused."
+  "note": "Manual F06 Codex review completed: NOT ACCEPTED. WIP commit/push authorized. See docs/reviews/DRIVE_01_F06_CODEX_REVIEW.md. No auto CLI/build/mount; automations remain paused.",
+  "collaborationProtocol": "docs/prompts/DRIVE_COLLAB_PROTOCOL.md",
+  "productionWriter": "gemini-cli:fc195a8d-5c26-4095-875b-2468fa11499a"
 }

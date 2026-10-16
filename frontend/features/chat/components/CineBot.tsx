@@ -150,8 +150,15 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       };
 
       setMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lỗi nhận phản hồi:', err);
+      const errorMsg: ChatMessage = {
+        id: `bot-err-${Date.now()}`,
+        sender: 'bot',
+        text: `⚠️ ${err?.message || 'Không thể nhận phản hồi từ AI Gateway. Vui lòng thử lại sau vài giây.'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsTyping(false);
     }
@@ -357,8 +364,9 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                   {msg.followUps.map((prompt) => (
                     <button
                       key={prompt}
+                      disabled={isTyping}
                       onClick={() => handleSend(prompt)}
-                      className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer"
+                      className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {prompt}
                     </button>
@@ -370,13 +378,13 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
           {/* Typing indicator */}
           {isTyping && (
-            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-surface-muted border border-surface-border rounded-md px-3 py-1.5 w-fit">
+            <div className="flex items-center gap-2 text-xs text-zinc-300 bg-surface-muted border border-brand/40 rounded-md px-3 py-1.5 w-fit">
               <span className="flex gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
-              <span>CineBot đang tìm kiếm...</span>
+              <span>CineBot đang suy luận trên GPU (khoảng 20-40 giây)...</span>
             </div>
           )}
 
@@ -390,14 +398,15 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               ref={inputRef}
               type="text"
               value={input}
+              disabled={isTyping}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Nhập câu hỏi hoặc yêu cầu gợi ý..."
-              className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:outline-none"
+              placeholder={isTyping ? "CineBot đang phản hồi..." : "Nhập câu hỏi hoặc yêu cầu gợi ý..."}
+              className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:outline-none disabled:opacity-60"
             />
             <button
               onClick={() => handleSend()}
-              disabled={!input.trim()}
+              disabled={!input.trim() || isTyping}
               className="grid h-7 w-7 place-items-center rounded bg-brand text-zinc-950 transition hover:bg-brand-hover shadow-brand-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               aria-label="Gửi tin nhắn"
             >

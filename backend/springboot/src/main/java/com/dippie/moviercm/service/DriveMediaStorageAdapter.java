@@ -5,6 +5,7 @@ import com.dippie.moviercm.exception.MediaUnavailableException;
 import com.dippie.moviercm.exception.SecurityPathTraversalException;
 import com.dippie.moviercm.service.storage.DriveCircuitBreaker;
 import com.dippie.moviercm.service.storage.DriveIoExecutor;
+import com.dippie.moviercm.service.storage.DriveResourceReservation;
 import com.dippie.moviercm.service.storage.DriveSeekableByteChannel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -219,11 +220,19 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
     @Override
     public SeekableByteChannel openChannel(String relativePath) throws IOException {
         Path targetPath = resolveValidatedPath(relativePath);
-        FileChannel rawChannel = ioExecutor.executeOpen(
-                () -> FileChannel.open(targetPath, StandardOpenOption.READ),
-                ioExecutor.getMetadataTimeoutMs(),
-                "openChannel:" + relativePath
-        );
-        return new DriveSeekableByteChannel(rawChannel, ioExecutor);
+        DriveResourceReservation reservation = ioExecutor.acquireReservation();
+        try {
+            FileChannel rawChannel = ioExecutor.executeOpen(
+                    () -> FileChannel.open(targetPath, StandardOpenOption.READ),
+                    ioExecutor.getMetadataTimeoutMs(),
+                    "openChannel:" + relativePath,
+                    reservation
+            );
+            return new DriveSeekableByteChannel(rawChannel, ioExecutor, reservation);
+        } catch (Throwable t) {
+            // Note: executeOpen manages reservation lifecycle (releasing on fast rejection/execution failure,
+            // or retaining by worker to close late handle on timeout/interruption). Do NOT release reservation here.
+            throw t;
+        }
     }
 }

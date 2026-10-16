@@ -350,25 +350,73 @@ Bộ cờ baseline kết hợp bộ ba tham số chunking:
 - `--poll-interval 15s`: Kiểm tra thay đổi trên Drive qua API Changes mỗi 15 giây.
 - `--attr-timeout 1s`: Giảm thời gian giữ thuộc tính file để phản ánh kịp thời trạng thái sẵn sàng.
 
-### 5.5. Vòng đời Kênh Dữ liệu & Giới hạn Vật lý Kernel WinFsp (IO Lifecycle & Kernel Cancellation Limitation — R1)
+### 5.5. Vòng đời Kênh Dữ liệu & Hợp đồng Tiếp nhận Dọn dẹp (IO Lifecycle & Cleanup Admission Contract — F04 / R1)
 
-Để bảo đảm trải nghiệm streaming mượt mà và không làm treo luồng xử lý HTTP của Spring Boot khi xảy ra sự cố mạng đám mây, kiến trúc `DriveSeekableByteChannel` và `DriveIoExecutor` thiết lập các tiêu chuẩn vận hành nghiêm ngặt:
+Để bảo đảm trải nghiệm streaming mượt mà và không làm treo luồng xử lý HTTP của Spring Boot khi xảy ra sự cố mạng đám mây, kiến trúc `DriveSeekableByteChannel` và `DriveIoExecutor` thiết lập các tiêu chuẩn vận hành nghiêm ngặt theo hợp đồng tiếp nhận dọn dẹp (Cleanup Admission Contract):
 
-1. **Bao quát toàn bộ các thao tác kênh (`activeWorkerOperations`):**
-   - Không chỉ theo dõi các thao tác đọc chunk dữ liệu (`read`), kênh dữ liệu mở rộng giám sát toàn bộ các tác vụ bao gồm định vị con trỏ (`position(newPosition)`) và truy vấn kích thước tệp (`size()`) thông qua biến đếm tổng hợp `activeWorkerOperations`.
-   - Nếu client ngắt kết nối (client abort/disconnect) hoặc Spring MVC hoàn tất request gọi `close()` trong khi có bất kỳ worker nào đang thực thi (`activeWorkerOperations > 0`), luồng caller được **giải phóng ngay lập tức**. Quyền sở hữu và trách nhiệm dọn dẹp đóng kênh kernel được chuyển giao lại cho chính worker thread đó khi thao tác I/O kết thúc hoặc unblock.
+1. **Cổng tiếp nhận tài nguyên tường minh (`acquireReservation()`):**
+   - Trước khi cấp phát bất kỳ file descriptor hoặc khởi tạo kênh dữ liệu, hệ thống bắt buộc phải xin cấp quyền qua cổng tiếp nhận `acquireReservation()`.
+   - Ngân sách tiếp nhận được ràng buộc chặt chẽ bởi tổng dung lượng vòng đời: $\text{activeResourceReservations} + \text{pendingCleanupObligations} \le \text{cleanupQueueCapacity}$.
+   - Khi hệ thống đạt ngưỡng bão hòa hoặc đang trong trạng thái tắt (shutdown), yêu cầu tiếp nhận sẽ **fail-fast ngay lập tức** (`MediaUnavailableException`), tuyệt đối không tạo handle hệ điều hành rò rỉ. Không bao giờ tiếp nhận một tài nguyên nếu không đảm bảo đủ năng lực dọn dẹp nó.
 
-2. **Chính sách đóng kênh không làm nghẽn caller (Non-Blocking Caller Close):**
-   - Khi không có worker nào đang bận (`activeWorkerOperations == 0`), lệnh `close()` ủy thác việc đóng kênh thực tế (`delegate.close()`) cho pool dọn dẹp có giới hạn (`executeCleanupAsync`).
-   - **Xử lý bão hòa dọn dẹp (Saturated Cleanup Handling):** Trong trường hợp pool dọn dẹp bị đầy/bão hòa, hệ thống **tuyệt đối không fallback gọi `delegate.close()` đồng bộ trên luồng caller**. Việc ép luồng caller gọi hàm đóng kernel sẽ khiến caller bị treo theo kernel nếu WinFsp đang bị kẹt lock. Thay vào đó, việc đóng được xử lý ngầm không chặn caller, đồng thời biến đếm tài nguyên vật lý `actualOutstandingWorkers` vẫn được bảo lưu cho đến khi kernel đóng hoàn tất.
+2. **Bao quát toàn bộ các thao tác kênh (`activeWorkerOperations`):**
+   - Kênh dữ liệu giám sát toàn bộ các tác vụ bao gồm đọc dữ liệu (`read`), định vị con trỏ (`position`), và truy vấn kích thước (`size`) thông qua biến đếm tổng hợp `activeWorkerOperations`.
+   - Nếu client hủy kết nối hoặc hoàn tất request gọi `close()` trong khi có worker đang thực thi (`activeWorkerOperations > 0`), luồng caller được **giải phóng ngay lập tức**. Trách nhiệm đóng kênh kernel được chuyển giao lại cho chính worker thread đó khi thao tác I/O kết thúc hoặc unblock.
 
-3. **Dọn dẹp `AutoCloseable` bất đồng bộ:**
-   - Trong quá trình mở tệp (`executeOpen`) hoặc các tác vụ trả về tài nguyên đóng được, nếu xảy ra quá hạn (timeout) hoặc luồng caller bị ngắt (`Thread.interrupt()`), caller không tự mình gọi đóng kernel đồng bộ. Trách nhiệm đóng tài nguyên được xử lý bất đồng bộ, bảo đảm tính dọn dẹp chính xác một lần (**exactly-once disposal**) qua cờ nguyên tử `closedDueToTimeout`.
+3. **Chính sách đóng kênh không nghẽn & Loại bỏ hoàn toàn việc bỏ rơi tác vụ (No Silent Discard):**
+   - Khi không có worker nào bận (`activeWorkerOperations == 0`), lệnh `close()` ủy thác việc đóng kênh thực tế (`delegate.close()`) cho pool dọn dẹp chuyên trách (`executeCleanupAsync`).
+   - Tuyệt đối cấm sử dụng `ThreadPoolExecutor.DiscardOldestPolicy`. Mọi tác vụ dọn dẹp đã tiếp nhận bắt buộc phải được bảo lưu và thực thi đóng vật lý.
+   - Tuyệt đối không fallback gọi `delegate.close()` đồng bộ trên luồng caller khi hàng đợi bão hòa để tránh caller bị treo theo kernel lock của WinFsp.
 
-4. **Ghi nhận trung thực giới hạn không thể hủy cứng (hard cancellation) của kernel WinFsp:**
-   - Nhân Windows NT và driver mini-filter của WinFsp **không hỗ trợ cơ chế hủy ngang cưỡng bức an toàn (hard cancellation)** đối với các lời gọi hàm I/O mức kernel (như `ReadFile`, `NtReadFile`, `SetFilePointerEx`).
-   - Lệnh ngắt luồng Java `Thread.interrupt()` chỉ bật cờ ngắt logic ở tầng JVM chứ không thể ép buộc thread native đang bị giữ trong CGO/WinFsp kernel dispatch phải dừng lại mà không gây nguy cơ hỏng trạng thái driver, rò rỉ kernel handle hoặc sập hệ điều hành (BSOD/deadlock).
-   - Vì lý do vật lý này, hệ thống bảo vệ caller bằng cách áp đặt thời hạn hữu hạn (**finite deadlines**) và chính sách đóng không nghẽn (**non-blocking close**), đồng thời cô lập các tác vụ kẹt trong pool công nhân giới hạn (`DriveIoExecutor`) và mạch ngắt tự động (**Circuit Breaker**).
+4. **Các làn đo lường vòng đời chuẩn xác (Lifecycle Metric Lanes & Overlap):**
+   - Hệ thống theo dõi và công khai các chỉ số đo lường chính thức trên `DriveIoExecutor`:
+     - **Làn 1: Actual Outstanding Workers (`getActualOutstandingWorkers()`):** Số lượng luồng worker đang thực thi vật lý các thao tác I/O chính (`read`, `position`, `size`) hoặc đóng tài nguyên late-open trên background worker pool.
+     - **Làn 2: Active Physical Cleanup Workers (`getActiveCleanupWorkers()`):** Số lượng luồng dọn dẹp đang thực thi lệnh đóng vật lý `delegate.close()` trên cleanup pool.
+     - **Làn 3: Pending Cleanup Obligations (`getPendingCleanupObligations()`):** Tổng số nghĩa vụ dọn dẹp đang chờ xử lý, bao gồm các tác vụ đang xếp hàng, các tác vụ đang thực thi lệnh đóng vật lý `delegate.close()`, và các tài nguyên đóng thất bại đang được lưu giữ (quarantined) chờ thử lại.
+     - **Làn 4: Active Resource Reservations (`getActiveResourceReservations()`):** Số lượng giấy phép tài nguyên đang hoạt động (được caller nắm giữ trước khi bàn giao sang cleanup).
+     - **Làn 5: Failed Cleanup Obligations (`getFailedCleanupObligations()`):** Số lượng tài nguyên đóng vật lý thất bại đang được lưu giữ trong `retainedFailedCleanups`.
+   - **Giao thoa giữa worker vật lý và biến đếm nghĩa vụ (Physical workers overlap obligation counters):** Các luồng worker vật lý và biến đếm nghĩa vụ vòng đời không phải là các tập hợp rời rạc cộng dồn, mà phản ánh hai góc nhìn: góc nhìn tài nguyên hệ thống (luồng OS đang bận) và góc nhìn vòng đời giấy phép (active permit hoặc pending obligation). Trong khi một tác vụ I/O hoặc cleanup đang chạy, cả chỉ số worker vật lý tương ứng và chỉ số giấy phép/nghĩa vụ vòng đời đều đồng thời được ghi nhận.
+
+5. **Ngữ nghĩa tắt dịch vụ bất đồng bộ (Asynchronous Shutdown Semantics):**
+   - Lệnh `shutdown()` kích hoạt tắt các pool thực thi và từ chối mọi yêu cầu tiếp nhận mới, đồng thời cho phép các tác vụ dọn dẹp đã tiếp nhận hoàn tất trong nền.
+   - `shutdown()` **không đảm bảo và không chờ đợi các handle kernel của WinFsp đóng xong trên luồng caller** (asynchronous shutdown does not guarantee kernel handles have closed inline). Luồng gọi shutdown trở về ngay lập tức, ngăn ngừa caller bị treo theo các khóa kernel của filesystem.
+
+6. **Lưu giữ nghĩa vụ thất bại và Cơ chế Thử lại có Kiểm soát (Failed Closes Retain Capacity & Explicit Bounded Retry):**
+   - Khi một lệnh đóng vật lý `delegate.close()` ném ngoại lệ hoặc bị từ chối do áp lực hàng đợi, tài nguyên **không bị bỏ rơi âm thầm** (no silent discard/abandonment). Thay vào đó, nó được lưu giữ trong danh sách `retainedFailedCleanups` và tiếp tục chiếm dụng 1 vị trí trong `pendingCleanupObligations`.
+   - Năng lực tiếp nhận mới tiếp tục bị giới hạn để ngăn ngừa cạn kiệt tài nguyên hệ thống khi lưu trữ Drive bị lỗi mount.
+   - Caller hoặc hệ thống phục hồi phải gọi tường minh `retryCleanup()`, `retryFailedClose()`, hoặc `retryFailedCleanups()` để thử lại việc đóng vật lý.
+   - **Phân biệt giữa số lần thử lại và quyền sở hữu đóng duy nhất (Retry attempts differ from exactly-once ownership):** Mỗi tác vụ thử lại được bảo vệ bằng khóa nguyên tử in-flight (`markInFlight()`), đảm bảo rằng các lệnh thử lại đồng thời không bao giờ kích hoạt các lệnh đóng vật lý trùng lặp và tài nguyên chỉ được giải phóng chính xác một lần (**exactly-once physical disposal**).
+
+7. **Ghi nhận trung thực giới hạn không thể hủy cứng (hard cancellation) của kernel WinFsp:**
+   - Kernel WinFsp mini-filter trên Windows NT không hỗ trợ hủy cưỡng bức an toàn đối với các I/O đang kẹt mức driver. Lệnh `Thread.interrupt()` của Java không thể ép thread native dừng lại.
+   - Hệ thống bảo vệ caller bằng finite deadlines, non-blocking close, cô lập tài nguyên kẹt trong hạn ngạch cách ly (quarantine), và ngắt mạch tự động qua `DriveCircuitBreaker` mà không ảnh hưởng tới local storage adapter.
+
+### 5.6. Cải tiến Vòng đời Concurrency & Vận hành WAN (Hardened F05 Fixes)
+
+Nhằm triệt tiêu hoàn toàn các điểm nghẽn và race condition tiềm ẩn phát hiện trong kiểm định F05, hệ thống áp dụng các chuẩn hóa sau:
+
+1. **Máy trạng thái chuyển giao đơn điệu (Monotonic Disposal State Machine):**
+   - Loại bỏ cờ boolean `disposalGate` dễ bị TOCTOU race khi reset.
+   - Sử dụng máy trạng thái 6 nấc đơn điệu `AtomicInteger disposalState`: `DISPOSAL_UNCLAIMED (0)` $\to$ `DISPOSAL_CALLER_DISPATCHING (1)` $\to$ `DISPOSAL_DISPATCH_ACCEPTED (2)` \| `DISPOSAL_DISPATCH_FAILED (3)` $\to$ `DISPOSAL_WORKER_CLAIMED (4)` \| `DISPOSAL_RETAINED (5)`.
+   - Cả luồng caller (fallback CAS) và worker thread (outer `finally` guard) đều kiểm tra trạng thái trước khi thoát, bảo đảm không bao giờ bỏ rơi file descriptor unclosed trong bất kỳ tình huống timeout hoặc gián đoạn nào.
+
+2. **Bảo toàn Nghĩa vụ Đang chờ & Cấp phát Giấy phép Động (Conserved Pending Accounting):**
+   - Đóng gói cờ `volatile boolean chargesPending` trong từng bản ghi `RetainedFailedCleanup`.
+   - Khi thử lại (`submitRetryTask`), nếu tác vụ chưa chiếm permit pending (`chargesPending == false`), hệ thống tự động xin cấp thêm 1 permit trong composite budget với điều kiện nghiêm ngặt: $\text{active} + \text{pending} < \text{cleanupQueueCapacity}$.
+   - Khử hoàn toàn nguy cơ số nghĩa vụ pending bị âm (`pending < 0`) bằng điều kiện kẹp `Math.max(0, pending - 1)`.
+
+3. **Xác thực Thử lại Đóng kênh Trung thực (Truthful Channel Close Retry):**
+   - `DriveSeekableByteChannel.retryClose()` kiểm tra trực tiếp `ioExecutor.hasFailedCleanup(delegate)` trước khi đối chiếu cờ `delegateClosed`.
+   - Ngăn ngừa tình trạng báo thành công giả tạo (`return true`) khi tài nguyên thực tế vẫn đang trong trạng thái đóng thất bại.
+
+4. **Định cấu hình Thời gian chờ WAN (Configuring Finite WAN Timeouts):**
+   - Khi truy cập Google Drive thực tế qua Internet WAN, bắt tay TLS và độ trễ truy vấn metadata trên cold cache có thể dao động từ 1.5s đến 4s.
+   - Khi vận hành máy chủ sản xuất kết nối remote Drive thật, khuyến nghị khởi chạy Spring Boot với tham số timeout mở rộng:
+     ```text
+     --app.media.drive-metadata-timeout-ms=15000
+     --app.media.drive-read-timeout-ms=15000
+     ```
+   - Giá trị này bảo đảm các yêu cầu HTTP HEAD và Range không bị quá hạn sớm trong khi vẫn giữ rào chắn ngắt kết nối an toàn (finite deadline protection).
 
 ---
 

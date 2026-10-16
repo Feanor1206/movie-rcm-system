@@ -22,11 +22,12 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
 
     private final FileChannel delegate;
     private final DriveIoExecutor ioExecutor;
+    private final DriveResourceReservation reservation;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean delegateClosed = new AtomicBoolean(false);
     private final AtomicInteger activeWorkerOperations = new AtomicInteger(0);
 
-    public DriveSeekableByteChannel(FileChannel delegate, DriveIoExecutor ioExecutor) {
+    public DriveSeekableByteChannel(FileChannel delegate, DriveIoExecutor ioExecutor, DriveResourceReservation reservation) {
         if (delegate == null) {
             throw new IllegalArgumentException("FileChannel delegate cannot be null");
         }
@@ -35,6 +36,11 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
         }
         this.delegate = delegate;
         this.ioExecutor = ioExecutor;
+        this.reservation = reservation;
+    }
+
+    public DriveSeekableByteChannel(FileChannel delegate, DriveIoExecutor ioExecutor) {
+        this(delegate, ioExecutor, null);
     }
 
     private void ensureOpen() throws ClosedChannelException {
@@ -243,26 +249,69 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
 
         // No active worker operation in progress. Hand over delegate closure to bounded cleanup pool.
         // ABSOLUTELY NEVER fall back to synchronous delegate.close() on caller thread!
-        closeDelegateAsync();
+        try {
+            closeDelegateAsync();
+        } catch (IOException e) {
+            closed.set(false);
+            throw e;
+        }
     }
 
-    private void closeDelegateAsync() {
-        if (delegateClosed.compareAndSet(false, true)) {
-            try {
-                ioExecutor.executeCleanupAsync(delegate, "closeChannel");
-            } catch (Throwable ignored) {
-                // If anything fails, NEVER call delegate.close() synchronously on caller thread!
+    private void closeDelegateAsync() throws IOException {
+        if (delegateClosed.get()) {
+            return;
+        }
+
+        if (reservation != null) {
+            boolean accepted = reservation.closeAsync(delegate, "closeChannel");
+            if (accepted) {
+                delegateClosed.set(true);
+            } else {
+                delegateClosed.set(false);
+                throw new IOException("Không thể giải phóng tài nguyên: Hàng đợi cleanup đã bị từ chối");
+            }
+        } else {
+            boolean accepted = ioExecutor.executeCleanupAsync(delegate, "closeChannel");
+            if (accepted) {
+                delegateClosed.set(true);
+            } else {
+                delegateClosed.set(false);
+                throw new IOException("Không thể giải phóng tài nguyên: Hàng đợi cleanup đã bị từ chối");
             }
         }
     }
 
     private void closeDelegateSilently() {
-        if (delegateClosed.compareAndSet(false, true)) {
+        if (!delegateClosed.get()) {
             try {
-                delegate.close();
+                closeDelegateAsync();
             } catch (Throwable ignored) {
+                // If rejected, reservation/delegate remains open and accounted
             }
         }
+    }
+
+    /**
+     * Retries closing the channel delegate asynchronously if a previous close was rejected or failed.
+     * Guaranteed non-blocking: caller returns in <1ms without performing native close.
+     * Checks reservation and executor failure states before treating delegateClosed as success,
+     * ensuring retained failed physical closures can be cleanly retried via the channel wrapper.
+     *
+     * @return true if successfully accepted into cleanup lane or already cleanly closed
+     * @throws IOException if cleanup queue is saturated or rejected
+     */
+    public boolean retryClose() throws IOException {
+        if (reservation != null && reservation.hasFailedCleanup()) {
+            return reservation.retryCleanup();
+        }
+        if (ioExecutor != null && ioExecutor.hasFailedCleanup(delegate)) {
+            return ioExecutor.retryFailedCleanup(delegate);
+        }
+        if (delegateClosed.get()) {
+            return true;
+        }
+        closeDelegateAsync();
+        return delegateClosed.get();
     }
 
     public boolean isClosed() {
@@ -275,6 +324,10 @@ public class DriveSeekableByteChannel implements SeekableByteChannel {
 
     public DriveIoExecutor getIoExecutor() {
         return ioExecutor;
+    }
+
+    public DriveResourceReservation getReservation() {
+        return reservation;
     }
 
     public int getActiveWorkerOperations() {

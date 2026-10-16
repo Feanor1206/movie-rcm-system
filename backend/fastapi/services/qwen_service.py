@@ -316,7 +316,7 @@ class QwenRecommendationService:
         )
 
     @contextmanager
-    def acquire_inference_slot(self, timeout: float = 4.0):
+    def acquire_inference_slot(self, timeout: float = 90.0):
         """Giới hạn số request suy luận đồng thời trên GPU/CPU, tránh quá tải VRAM."""
         acquired = self._inference_semaphore.acquire(blocking=True, timeout=timeout)
         if not acquired:

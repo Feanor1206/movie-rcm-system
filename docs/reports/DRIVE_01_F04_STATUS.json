@@ -1,0 +1,150 @@
+{
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F04",
+  "runId": "DRIVE-01-F04-CHECKPOINT-01",
+  "promptVersion": 7,
+  "reviewedCheckpoint": "DRIVE-01-F03-CHECKPOINT-01",
+  "status": "ready_for_review",
+  "timestamp": "2026-10-15T04:20:00+07:00",
+  "reviewTarget": "Codex",
+  "sourceFrozen": true,
+  "crossReviewComplete": true,
+  "openCleanupFindings": 0,
+  "baselineCommit": "4a319b7",
+  "currentHead": "dev",
+  "summary": "Full resolution of residual finding R1 from DRIVE_01_F03_REVIEW.md across bounded cleanup queue admission gating, elimination of DiscardOldestPolicy, four distinct metric lanes, non-blocking caller close (<1ms), guaranteed drain on shutdownNow(), and hardened post-shutdown delegation (Finding E-01). Verified by internal multi-agent cross-review ledger with 0 open findings, complete 12-row lifecycle matrix PASS, 141 Spring Boot Maven tests PASS, and fresh-root browser walkthrough exit 0.",
+  "gateResults": {
+    "G1_IMPLEMENTATION": "PASS",
+    "G2_MOUNTED_DRIVE": "BLOCKED_EXTERNAL_INPUT",
+    "G3_BROWSER_DRIVE": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "findingResolutions": {
+    "R1_cleanupSaturationAndShutdownOwnership": {
+      "finding": "cleanupExecutor's DiscardOldestPolicy dropped 42 queued close tasks under 300 channel closes in DRIVE_F03_cleanup_pressure.java, leaking 42 open file descriptors. Fallback lane was not tracked in actualOutstandingWorkers. shutdownNow() dropped queued tasks without closing resources. Pre-shutdown admitted channels could leak on post-shutdown close.",
+      "resolution": "Replaced DiscardOldestPolicy with AbortPolicy and explicit pre-admission gating via DriveResourceReservation and acquireReservation(). Capacity bounded by cleanupQueueCapacity (256). Added 4 distinct metric lanes (actualOutstandingWorkers, activeCleanupWorkers, pendingCleanupObligations, activeResourceReservations). Channel close() delegates to reservation with non-blocking caller exit (<1ms) and retains ownership on rejection. shutdown() executes drain loop on all dropped tasks from shutdownNow(). Hardened Finding E-01: post-shutdown channel close directly closes delegate.",
+      "tests": "DriveCleanupQueueSaturationTest (7/7 PASS), DriveCleanupShutdownOwnershipTest (6/6 PASS across 3 runs), DriveLifecycleStressAuditTest (5/5 PASS), DriveMetadataCleanupLifecycleTest (6/6 PASS), DriveCleanupAdmissionRaceTest (8/8 PASS), full Maven suite (141/141 PASS)"
+    }
+  },
+  "crossReviewLedger": {
+    "ledgerPath": "docs/reports/drive/DRIVE_01_F04/CROSS_REVIEW.md",
+    "totalFindings": 7,
+    "openFindings": 0,
+    "closedFindings": 7,
+    "findings": [
+      { "id": "F-01", "pri": "P1", "status": "CLOSED", "owner": "Agent A", "reviewer": "Agent F / Codex R1", "desc": "Eliminate DiscardOldestPolicy and implement admission gating" },
+      { "id": "F-02", "pri": "P2", "status": "CLOSED", "owner": "Agent A", "reviewer": "Agent F / Codex R1", "desc": "Introduce 4 distinct metric lanes" },
+      { "id": "F-03", "pri": "P1", "status": "CLOSED", "owner": "Agent A", "reviewer": "Agent F / Codex R1", "desc": "Implement physical task drain on shutdown()" },
+      { "id": "F-04", "pri": "P1", "status": "CLOSED", "owner": "Agent B", "reviewer": "Agent C", "desc": "Synchronize delegateClosed with successful submission; retain ownership on reject" },
+      { "id": "F-05", "pri": "P2", "status": "CLOSED", "owner": "Agent A", "reviewer": "Agent D", "desc": "Atomic CAS winner on executeOpen timeout race" },
+      { "id": "F-06", "pri": "P2", "status": "CLOSED", "owner": "Agent A/B", "reviewer": "Agent E", "desc": "Circuit breaker trip drains in-flight reservations cleanly" },
+      { "id": "E-01", "pri": "P2", "status": "CLOSED", "owner": "Agent A", "reviewer": "Agent E", "desc": "Pre-shutdown admitted channels closed post-shutdown close delegate cleanly" }
+    ],
+    "mutualSignoffs": {
+      "agentA": { "role": "Executor Lifecycle Engineer", "status": "APPROVED" },
+      "agentB": { "role": "Channel & Adapter Integration Engineer", "status": "APPROVED" },
+      "agentC": { "role": "Saturation Test Engineer", "status": "APPROVED" },
+      "agentD": { "role": "Shutdown Test Engineer", "status": "APPROVED" },
+      "agentE": { "role": "Lifecycle Auditor", "status": "APPROVED" },
+      "agentF": { "role": "Contract & Evidence Engineer", "status": "APPROVED" }
+    }
+  },
+  "lifecycleMatrix": {
+    "matrixPath": "docs/reports/drive/DRIVE_01_F04/LIFECYCLE_MATRIX.md",
+    "totalRows": 12,
+    "rowsPassed": 12,
+    "rowsFailed": 0,
+    "rows": [
+      { "rowId": "L-01", "scenario": "Normal open / read / seek / close", "status": "PASS", "test": "DriveMediaStreamingIntegrationTest & DriveSeekableByteChannelTest" },
+      { "rowId": "L-02", "scenario": "Timeout before open finishes", "status": "PASS", "test": "DriveLateOpenLifecycleTest#testLateOpenCallerTimeoutRace_..." },
+      { "rowId": "L-03", "scenario": "Open completes at timeout boundary", "status": "PASS", "test": "DriveLateOpenLifecycleTest#testLateOpenConcurrentRaceStress_..." },
+      { "rowId": "L-04", "scenario": "Caller interrupt / cancellation", "status": "PASS", "test": "DriveCleanupAdmissionRaceTest#testLateOpenCallerInterruptionRace_..." },
+      { "rowId": "L-05", "scenario": "Blocked read / position / size", "status": "PASS", "test": "DriveSeekableByteChannelTest#testCloseDuringActiveRead_CallerDoesNotBlock" },
+      { "rowId": "L-06", "scenario": "Main pool full / cleanup idle", "status": "PASS", "test": "DriveCleanupQueueSaturationTest#testCleanupUnderMainWorkerSaturation" },
+      { "rowId": "L-07", "scenario": "Cleanup pool and queue both full", "status": "PASS", "test": "DriveCleanupQueueSaturationTest#test300HandlesCleanupSaturation_ZeroDiscard" },
+      { "rowId": "L-08", "scenario": "Submission rejected at transfer edge", "status": "PASS", "test": "DriveCleanupAdmissionRaceTest#testSaturatedCleanupAdmissionWithoutActiveRead" },
+      { "rowId": "L-09", "scenario": "Shutdown before / during / after enqueue", "status": "PASS", "test": "DriveCleanupShutdownOwnershipTest#testShutdownDrainsQueuedCleanupObligations" },
+      { "rowId": "L-10", "scenario": "Permanently blocked native close", "status": "PASS", "test": "DriveFaultIsolationTest#testLocalProviderUnaffectedByDriveQuarantine" },
+      { "rowId": "L-11", "scenario": "Recovery after latch release", "status": "PASS", "test": "DriveCleanupQueueSaturationTest#testFullRecoveryAfterLatchRelease" },
+      { "rowId": "L-12", "scenario": "Repeated cycles / overload stress", "status": "PASS", "test": "DriveCleanupAdmissionRaceTest#testRepeatedInterruptIgnoringCleanupCycles_..." }
+    ]
+  },
+  "multiAgentOwnership": {
+    "agentA_executorLifecycle": {
+      "role": "Executor Lifecycle Engineer",
+      "conversationId": "54fb4b20-73af-4039-bebd-a60177a5ebff",
+      "filesOwned": [
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveResourceReservation.java"
+      ]
+    },
+    "agentB_channelAdapterIntegration": {
+      "role": "Channel and Adapter Integration Engineer",
+      "conversationId": "adcd4afd-0c44-4495-8411-a965797e7bb7",
+      "filesOwned": [
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java"
+      ]
+    },
+    "agentC_saturationTests": {
+      "role": "Saturation Test Engineer",
+      "conversationId": "01c7f932-21cd-4366-a6e9-de5719197cb9",
+      "filesOwned": [
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupQueueSaturationTest.java",
+        "docs/reports/drive/DRIVE_01_F04/agent-c/saturation_test.log"
+      ]
+    },
+    "agentD_shutdownTests": {
+      "role": "Shutdown Test Engineer",
+      "conversationId": "bf402cd2-e9f1-43f3-8d6a-80a513e6daf6",
+      "filesOwned": [
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupShutdownOwnershipTest.java",
+        "docs/reports/drive/DRIVE_01_F04/agent-d/CROSS_REVIEW_AGENT_D.md"
+      ]
+    },
+    "agentE_lifecycleAudit": {
+      "role": "Concurrency & Lifecycle Auditor",
+      "conversationId": "e1379e3b-8cd5-4127-b8bf-6258688f96ec",
+      "filesOwned": [
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveLifecycleStressAuditTest.java",
+        "docs/reports/drive/DRIVE_01_F04/agent-e/AUDIT_REPORT_AGENT_E.md",
+        "docs/reports/drive/DRIVE_01_F04/agent-e/audit_evidence.log"
+      ]
+    },
+    "agentF_contractsAndEvidence": {
+      "role": "Contract & Evidence Engineer",
+      "conversationId": "b6fa655e-2308-433a-bbe4-ac0a8dda3e36",
+      "filesOwned": [
+        "docs/reports/drive/DRIVE_01_F04/CLEANUP_ADMISSION_CONTRACT.md",
+        "docs/reports/drive/DRIVE_01_F04/CROSS_REVIEW.md",
+        "docs/reports/drive/DRIVE_01_F04/LIFECYCLE_MATRIX.md",
+        "docs/reports/drive/DRIVE_01_F04/README.md",
+        "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+        "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md"
+      ]
+    },
+    "parent_coordinationAndArtifacts": {
+      "role": "Parent Orchestrator",
+      "filesOwned": [
+        "docs/reports/DRIVE_01_F04_REPORT.md",
+        "docs/reports/DRIVE_01_F04_STATUS.json",
+        "docs/reports/DRIVE_01_F04.patch",
+        "docs/reports/DRIVE_01_F04_MANIFEST.json",
+        "docs/reports/drive/DRIVE_01_F04/walkthrough_results.json",
+        "docs/reports/drive/DRIVE_01_F04/screenshots/"
+      ]
+    }
+  },
+  "verificationResults": {
+    "backendMavenSuite": "141/141 PASS (Exit 0)",
+    "driveCleanupQueueSaturationTest": "7/7 PASS (Exit 0)",
+    "driveCleanupShutdownOwnershipTest": "6/6 PASS (Exit 0)",
+    "driveLifecycleStressAuditTest": "5/5 PASS (Exit 0)",
+    "driveMetadataCleanupLifecycleTest": "6/6 PASS (Exit 0)",
+    "driveCleanupAdmissionRaceTest": "8/8 PASS (Exit 0)",
+    "driveLateOpenLifecycleTest": "5/5 PASS (Exit 0)",
+    "driveCleanupDeadlineTest": "3/3 PASS (Exit 0)",
+    "driveToolkitComprehensive": "28/28 PASS (Exit 0 across PS 5.1 & PS 7)",
+    "driveToolkitSecuritySeams": "35/35 PASS (Exit 0 across PS 5.1 & PS 7)",
+    "browserSmokeAndBenchmark": "PASS (Exit 0, 5 screenshots, startup TTFB 10.67ms, seek avg 23ms)"
+  }
+}

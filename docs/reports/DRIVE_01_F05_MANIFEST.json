@@ -1,0 +1,138 @@
+{
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F05",
+  "generatedAt": "2026-10-15T22:03:52.0103106Z",
+  "totalFiles": 26,
+  "files": [
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+      "bytes": 9932,
+      "sha256": "3a085bbe9babfdb6fbf41db4cc11456c0a14f8ad13274c8f55a8505b4ab65505"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+      "bytes": 46054,
+      "sha256": "57065d5e8cee9033173954c0b52bdfae8e0f3ddfae3d761878186d5d64dd0a68"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveResourceReservation.java",
+      "bytes": 3358,
+      "sha256": "2416cb8b76c0f17b0fdbdf0a0ca0dffc5305b9764023c6eb2cd9d5f029b6ed67"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java",
+      "bytes": 11917,
+      "sha256": "74820c98242afc1f168887fb4d09f177b54c8a5dee9245df3d97c7a66de1ae86"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupQueueSaturationTest.java",
+      "bytes": 36137,
+      "sha256": "0f0a8e42971e7933cc3e18bab05cd9dc6fae9d721df27221fea403837c9e8da8"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupShutdownOwnershipTest.java",
+      "bytes": 30507,
+      "sha256": "1a181da17b27027d738a9d3e801fb67102fbda1725867b6f787a4d64e8977d48"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveLifecycleStressAuditTest.java",
+      "bytes": 24165,
+      "sha256": "f9708a1d401c4579d9251153b6b16339beb8933ca6ca40d6ade3ec86f0ad7f21"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/LunaDriveCleanupOpenLifecycleTest.java",
+      "bytes": 58529,
+      "sha256": "a86a9572fdc2d68f83b77abc8b3d1def3ea9d3019da48aa1d14acdc01127200d"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/LunaDriveCleanupShutdownOwnershipTest.java",
+      "bytes": 44014,
+      "sha256": "c049780baa449f6f994d1fdbd3e3140c3cbf16881e3a79609d33a2e6a620b5b4"
+    },
+    {
+      "path": "backend/springboot/src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker",
+      "bytes": 20,
+      "sha256": "8eca853a5a457f17e0479b71dfbe95f2a13aff9eeff250261ecdc8ca9b847a6a"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F05_REPORT.md",
+      "bytes": 9775,
+      "sha256": "979eefd423aa10650dacd7d1b02776f9e858e8d8162004bf5cf128b3c6ac1e94"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F05_STATUS.json",
+      "bytes": 5225,
+      "sha256": "36d2671b1fcd6cbc6ed94b36278ab10f97d295409b04d9c5aa65f78f23cac514"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F05.patch",
+      "bytes": 175906,
+      "sha256": "ee6909f671e42ac90320d13564d5ddc0619820c820a3b1c3610887d92b645d7f"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F05/CROSS_REVIEW.md",
+      "bytes": 4441,
+      "sha256": "115b7daada61da9869745af5c5ebb3ea0bfb38426c79e641eb8088ad8199048c"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F05/LIFECYCLE_MATRIX.md",
+      "bytes": 3989,
+      "sha256": "c263ef9a5aab5e2a7d09d0276b5723403ec9a0e0856ecd6cc923761f2bd0fc3b"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F05/README.md",
+      "bytes": 2308,
+      "sha256": "1b5823123eb4f440aa1d143d10a64599b04b1aa1232dae8cd2e6a6a71f7864de"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F05/real_drive_results.json",
+      "bytes": 2361,
+      "sha256": "f9d524588a12468f938d460271e0842832324599de5a7750d72d66874875a933"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F05/real_drive_spring.log",
+      "bytes": 8660,
+      "sha256": "e7d29c1bcd91972083df02dd33e63eaced03c03c79395767b1b5712f0cee24b0"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F05/screenshots/01_actual_drive_playback.png",
+      "bytes": 782611,
+      "sha256": "fb53231fbc3827ab1be3a2c76119e56e452ce768dea1b9fad9ef24bc1d587d12"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F05/screenshots/02_actual_drive_mobile.png",
+      "bytes": 68609,
+      "sha256": "69c1bb1f17f9f17f36f6536ead5ee17342af22810dba498c6ecec5ac8fd94e89"
+    },
+    {
+      "path": "docs/reports/drive/GEMINI_FULL_BACKEND_TEST_RUN_F05.log",
+      "bytes": 75055,
+      "sha256": "60e87d5df797a90d29118b4ed9dd350cd8e1c4bf221dfc567aa40e608aa3494f"
+    },
+    {
+      "path": "docs/reports/drive/GEMINI_DRIVE_REGRESSION_TEST_RUN_F05.log",
+      "bytes": 17905,
+      "sha256": "f4d488c57fb0702146d76c16b4beaa61838a9c83cb58500244d1aa54f3796ecf"
+    },
+    {
+      "path": "docs/reports/drive/GEMINI_AUTH_TEST_RUN_F05.log",
+      "bytes": 10730,
+      "sha256": "ca8f2ab9873ebcbe05f559dd35585d20548a883ad8947198742087239e530875"
+    },
+    {
+      "path": "docs/reports/drive/GEMINI_FOCUSED_TEST_RUN_F05.log",
+      "bytes": 3752,
+      "sha256": "32882f50e3f26a14ee27d19f4d93cc21c0f72255bff6e4b05db068f53a408f5b"
+    },
+    {
+      "path": "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md",
+      "bytes": 34874,
+      "sha256": "b6663294aa705ddb92b39958ebd31852bbd7eea7d44e39120ebfff4531ebe709"
+    },
+    {
+      "path": "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+      "bytes": 42957,
+      "sha256": "94710c8e4674f0cdc90fccc0a374f7d9fa7416a6477cea90d908e52c7620df0d"
+    }
+  ]
+}

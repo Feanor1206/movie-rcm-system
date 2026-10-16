@@ -4,12 +4,24 @@ const image = (id: string, width = 800) => `https://images.unsplash.com/${id}?au
 
 export const movies: Movie[] = [
   {
+    id: 'drive-videoplayback',
+    title: 'Shin Cậu Bé Bút Chì: Chuyến phiêu lưu kỳ thú',
+    year: 2026,
+    rating: 8.8,
+    runtime: '7m 25s',
+    genres: ['Animation', 'Comedy', 'Adventure', 'Family'],
+    description: 'Tập phim hoạt hình Shin Cậu Bé Bút Chì được phát và giải mã trực tiếp từ Google Drive storage.',
+    poster: image('photo-1534447677768-be436bb09401', 600),
+    backdrop: image('photo-1534447677768-be436bb09401', 1800),
+    videoUrl: '/api/media/stream/ast-drive-videoplayback',
+  },
+  {
     id: 'the-last-orbit',
     title: 'The Last Orbit',
     year: 2026,
     rating: 8.7,
     runtime: '2h 14m',
-    genres: ['Sci-Fi', 'Drama'],
+    genres: ['Animation', 'Sci-Fi', 'Drama'],
     description: 'A lone astronaut discovers that the signal guiding her home may be the final memory of a world already gone.',
     poster: image('photo-1446776811953-b23d57bd21aa', 600),
     backdrop: image('photo-1446776811953-b23d57bd21aa', 1800),
