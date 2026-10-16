@@ -307,4 +307,104 @@ public class DriveGenericMetadataReproTest {
         permit.release();
         assertEquals(0, executor.getActiveResourceReservations());
     }
+
+    @Test
+    @DisplayName("R1 Bounded: executeScalar retains failed cleanup and chains exception when AutoCloseable close throws")
+    void scalarLaneRetainsFailedCleanupWhenCloseThrows() throws Exception {
+        DriveIoExecutor executor = createExecutor(2, 1);
+
+        // Pre-saturate lifecycle capacity
+        DriveResourceReservation permit = executor.acquireReservation();
+        assertEquals(1, executor.getActiveResourceReservations());
+
+        AtomicInteger closeAttempts = new AtomicInteger();
+        AutoCloseable failingResource = () -> {
+            if (closeAttempts.incrementAndGet() == 1) {
+                throw new IOException("Simulated close failure in scalar lane");
+            }
+        };
+
+        IllegalArgumentException iae = assertThrows(IllegalArgumentException.class, () -> {
+            executor.executeMetadata(() -> failingResource);
+        }, "executeMetadata must reject AutoCloseable return with IllegalArgumentException");
+
+        assertNotNull(iae.getCause(), "Close failure must be chained as cause");
+        assertInstanceOf(IOException.class, iae.getCause());
+        assertEquals("Simulated close failure in scalar lane", iae.getCause().getMessage());
+
+        // Invariant check: resource retained, not lost!
+        assertEquals(1, closeAttempts.get());
+        assertTrue(executor.hasFailedCleanup(failingResource), "Failed resource must be retained in executor");
+        assertEquals(1, executor.getRetainedFailedResources().size());
+        assertEquals(failingResource, executor.getRetainedFailedResources().get(0));
+
+        // Retry cleanup should succeed on second attempt
+        boolean retried = executor.retryFailedCleanup(failingResource);
+        assertTrue(retried, "Retry must be accepted");
+
+        // Wait for retry completion
+        long deadline = System.currentTimeMillis() + 1000;
+        while (System.currentTimeMillis() < deadline && executor.hasFailedCleanup(failingResource)) {
+            Thread.sleep(10);
+        }
+
+        assertEquals(2, closeAttempts.get());
+        assertFalse(executor.hasFailedCleanup(failingResource));
+        assertEquals(0, executor.getRetainedFailedResources().size());
+
+        permit.release();
+        assertEquals(0, executor.getActiveResourceReservations());
+    }
+
+    @Test
+    @DisplayName("REC-01 Bounded Ownership: repeated saturation and failed scalar close strictly bounds retained handles")
+    void scalarLaneEnforcesStrictBoundUnderRepeatedSaturationAndFailedClose() throws Exception {
+        int capacity = 2;
+        DriveIoExecutor executor = createExecutor(4, capacity);
+
+        List<AtomicInteger> closeAttempts = new ArrayList<>();
+        List<AutoCloseable> resources = new ArrayList<>();
+
+        for (int i = 0; i < capacity; i++) {
+            AtomicInteger attempts = new AtomicInteger();
+            closeAttempts.add(attempts);
+            AutoCloseable res = () -> {
+                if (attempts.incrementAndGet() == 1) {
+                    throw new IOException("Injected close failure");
+                }
+            };
+            resources.add(res);
+
+            assertThrows(IllegalArgumentException.class, () -> {
+                executor.executeMetadata(() -> res);
+            });
+        }
+
+        assertEquals(capacity, executor.getRetainedFailedResources().size());
+        assertTrue(executor.getRetainedFailedResources().size() <= executor.getCleanupQueueCapacity());
+
+        AtomicInteger extraTasksRun = new AtomicInteger(0);
+        for (int i = 0; i < 5; i++) {
+            assertThrows(MediaUnavailableException.class, () -> {
+                executor.executeMetadata(() -> {
+                    extraTasksRun.incrementAndGet();
+                    return "should-not-run";
+                });
+            }, "Calls must fail fast when retained cleanups saturate capacity");
+        }
+
+        assertEquals(0, extraTasksRun.get(), "No additional tasks permitted when capacity is full");
+        assertEquals(capacity, executor.getRetainedFailedResources().size(), "Retained cleanups cannot exceed capacity");
+
+        executor.retryFailedCleanups();
+        long deadline = System.currentTimeMillis() + 2000;
+        while (System.currentTimeMillis() < deadline && !executor.getRetainedFailedResources().isEmpty()) {
+            Thread.sleep(10);
+        }
+
+        assertEquals(0, executor.getRetainedFailedResources().size(), "All failed cleanups must be recovered");
+
+        String afterRecovery = executor.executeMetadata(() -> "recovered-ok");
+        assertEquals("recovered-ok", afterRecovery);
+    }
 }

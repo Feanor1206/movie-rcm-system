@@ -83,6 +83,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/movies/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()
+                .requestMatchers("/api/admin/catalog/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                 .requestMatchers(HttpMethod.HEAD, "/api/media/**").permitAll()

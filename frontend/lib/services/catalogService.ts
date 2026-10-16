@@ -383,3 +383,361 @@ export async function getCatalogMovieById(
     options
   );
 }
+
+// =============================================================================
+// CATALOG-01 ANIMATION CATALOG CONTRACT & API METHODS
+// =============================================================================
+
+export interface CatalogValidationError {
+  path: string;
+  code: string;
+  message: string;
+}
+
+export interface CatalogValidationResult {
+  valid: boolean;
+  packageId?: string;
+  revision?: number;
+  contentHash?: string;
+  toCreate: number;
+  toUpdate: number;
+  unchanged: number;
+  conflicts: number;
+  errors: CatalogValidationError[];
+}
+
+export interface CatalogImportResponse {
+  success: boolean;
+  importId: string;
+  packageId: string;
+  revision: number;
+  contentHash: string;
+  importedAt: string;
+  counts: Record<string, number>;
+  indexStatus: string;
+  message: string;
+}
+
+export interface CatalogSeriesSummary {
+  id: string;
+  title: string;
+  originalTitle?: string;
+  synopsis?: string;
+  primaryLanguage?: string;
+  releaseYearStart?: number;
+  releaseYearEnd?: number;
+  releaseStatus?: string;
+  genreIds?: string;
+  keywords?: string;
+  themes?: string;
+  creators?: string;
+  studios?: string;
+  characterIds?: string;
+}
+
+export interface CatalogSeason {
+  id: string;
+  seriesId: string;
+  number?: number;
+  seasonNumber: number;
+  title: string;
+  synopsis?: string;
+  episodeCount?: number;
+}
+
+export interface CatalogEpisode {
+  id: string;
+  seriesId: string;
+  seasonId?: string;
+  number?: number;
+  episodeNumber: number;
+  title: string;
+  synopsis?: string;
+  airDate?: string;
+  durationMs?: number;
+  plotFacts?: string;
+  keywords?: string;
+  themes?: string;
+  primaryMediaAssetId?: string;
+}
+
+export interface CatalogSegment {
+  id: string;
+  episodeId: string;
+  position: number;
+  title: string;
+  synopsis?: string;
+  episodeStartMs?: number;
+  episodeEndMs?: number;
+  plotFacts?: string;
+}
+
+export interface CatalogScene {
+  id: string;
+  episodeId: string;
+  mediaAssetId?: string;
+  startMs: number;
+  endMs: number;
+  title?: string;
+  summary?: string;
+  visualDescription?: string;
+  keywords?: string;
+  themes?: string;
+}
+
+export interface CatalogMediaAsset {
+  id: string;
+  contentType: string;
+  role: string;
+  storageProvider: string;
+  storageKey?: string;
+  relativePath?: string;
+  driveFolderId?: string;
+  driveFileId?: string;
+  durationMs?: number;
+  coverageJson?: string;
+}
+
+export interface CatalogSnapshot {
+  id: string;
+  snapshotVersion: number;
+  contentHash: string;
+  totalItems: number;
+  status: 'PENDING' | 'SYNCING' | 'READY' | 'BLOCKED' | 'SYNC_FAILED' | string;
+  errorMessage?: string;
+  retryCount?: number;
+  createdAt?: string;
+  completedAt?: string;
+  updatedAt?: string;
+}
+
+export interface CatalogSeriesResponse {
+  series: CatalogSeriesSummary;
+  seasons: CatalogSeason[];
+  episodes: CatalogEpisode[];
+}
+
+export interface CatalogEpisodeResponse {
+  episode: CatalogEpisode;
+  segments: CatalogSegment[];
+  mediaAssets: CatalogMediaAsset[];
+  scenes: CatalogScene[];
+}
+
+export interface CatalogSearchResult {
+  id: string;
+  type: 'series' | 'episode' | 'segment' | 'scene' | string;
+  title: string;
+  parentTitle?: string;
+  seriesId?: string;
+  episodeId?: string;
+  mediaAssetId?: string;
+  startMs?: number;
+  endMs?: number;
+  snippet?: string;
+}
+
+function getAuthHeader(): Record<string, string> {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('dippie_auth_token') || localStorage.getItem('token');
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+  }
+  return {};
+}
+
+/**
+ * Validate an external animation catalog JSON payload (dry-run preview).
+ */
+export async function validateCatalogPackage(
+  payload: any,
+  baseUrl = SPRINGBOOT_API
+): Promise<CatalogValidationResult> {
+  const url = `${baseUrl}/admin/catalog/validate`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json();
+  return json;
+}
+
+/**
+ * Atomically commit and import an animation catalog JSON package into the database.
+ */
+export async function importCatalogPackage(
+  payload: any,
+  baseUrl = SPRINGBOOT_API
+): Promise<CatalogImportResponse> {
+  const url = `${baseUrl}/admin/catalog/import`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let errBody: any;
+    try {
+      errBody = await res.json();
+    } catch {
+      // non-JSON
+    }
+    throw new CatalogApiError(
+      errBody?.message || `Lỗi khi nhập dữ liệu catalog (HTTP ${res.status})`,
+      res.status,
+      errBody
+    );
+  }
+
+  return await res.json();
+}
+
+/**
+ * Fetch catalog packages import history.
+ */
+export async function getImportHistory(
+  baseUrl = SPRINGBOOT_API,
+  signal?: AbortSignal
+): Promise<any[]> {
+  const url = `${baseUrl}/admin/catalog/history`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeader(),
+    },
+    signal,
+  });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+/**
+ * Fetch catalog sync snapshots history and status.
+ */
+export async function getCatalogSnapshots(
+  baseUrl = SPRINGBOOT_API,
+  signal?: AbortSignal
+): Promise<CatalogSnapshot[]> {
+  const url = `${baseUrl}/admin/catalog/snapshots`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeader(),
+    },
+    signal,
+  });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+/**
+ * Retry an outbox catalog snapshot sync.
+ */
+export async function retryCatalogSnapshot(
+  snapshotId: string,
+  baseUrl = SPRINGBOOT_API
+): Promise<CatalogSnapshot> {
+  const url = `${baseUrl}/admin/catalog/snapshots/${encodeURIComponent(snapshotId)}/retry`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeader(),
+    },
+  });
+  if (!res.ok) {
+    throw new CatalogApiError(`Không thể thử lại snapshot (${res.status})`, res.status);
+  }
+  return await res.json();
+}
+
+/**
+ * Fetch all imported animation series.
+ */
+export async function getCatalogSeriesList(
+  baseUrl = SPRINGBOOT_API,
+  signal?: AbortSignal
+): Promise<CatalogSeriesSummary[]> {
+  const url = `${baseUrl}/catalog/series`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+/**
+ * Fetch series detail with seasons and episodes.
+ */
+export async function getCatalogSeriesDetail(
+  id: string,
+  baseUrl = SPRINGBOOT_API,
+  signal?: AbortSignal
+): Promise<CatalogSeriesResponse | null> {
+  const url = `${baseUrl}/catalog/series/${encodeURIComponent(id)}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new CatalogApiError(`Lỗi xem chi tiết bộ phim (${res.status})`, res.status);
+  }
+  return await res.json();
+}
+
+/**
+ * Fetch episode detail with segments, media assets, and scenes.
+ */
+export async function getCatalogEpisodeDetail(
+  id: string,
+  baseUrl = SPRINGBOOT_API,
+  signal?: AbortSignal
+): Promise<CatalogEpisodeResponse | null> {
+  const url = `${baseUrl}/catalog/episodes/${encodeURIComponent(id)}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new CatalogApiError(`Lỗi xem chi tiết tập phim (${res.status})`, res.status);
+  }
+  return await res.json();
+}
+
+/**
+ * Search animation catalog across series, episodes, segments, and scenes.
+ */
+export async function searchAnimationCatalog(
+  q: string,
+  baseUrl = SPRINGBOOT_API,
+  signal?: AbortSignal
+): Promise<CatalogSearchResult[]> {
+  const url = `${baseUrl}/catalog/search?q=${encodeURIComponent(q.trim())}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+

@@ -61,18 +61,20 @@ public class DriveIoExecutor {
         private volatile Throwable cause;
         private volatile long failedTimestamp;
         private final DriveResourceReservation reservation;
+        private final boolean chargesPending;
         private final AtomicBoolean inFlight = new AtomicBoolean(false);
 
         public RetainedFailedCleanup(AutoCloseable resource, String operationName, Throwable cause, DriveResourceReservation reservation) {
+            this(resource, operationName, cause, reservation, true);
+        }
+
+        public RetainedFailedCleanup(AutoCloseable resource, String operationName, Throwable cause, DriveResourceReservation reservation, boolean chargesPending) {
             this.resource = resource;
             this.operationName = operationName;
             this.cause = cause;
             this.failedTimestamp = System.currentTimeMillis();
             this.reservation = reservation;
-        }
-
-        public RetainedFailedCleanup(AutoCloseable resource, String operationName, Throwable cause, DriveResourceReservation reservation, boolean chargesPending) {
-            this(resource, operationName, cause, reservation);
+            this.chargesPending = chargesPending;
         }
 
         public boolean markInFlight() {
@@ -95,8 +97,7 @@ public class DriveIoExecutor {
         public Throwable getCause() { return cause; }
         public long getFailedTimestamp() { return failedTimestamp; }
         public DriveResourceReservation getReservation() { return reservation; }
-        public boolean chargesPending() { return true; }
-        public void setChargesPending(boolean chargesPending) { }
+        public boolean chargesPending() { return chargesPending; }
     }
 
     private final long metadataTimeoutMs;
@@ -210,6 +211,12 @@ public class DriveIoExecutor {
             throw new MediaUnavailableException("Dịch vụ lưu trữ Google Drive tạm thời không khả dụng (Circuit Breaker OPEN)");
         }
 
+        if (retainedFailedCleanups.size() >= cleanupQueueCapacity) {
+            circuitBreaker.recordFailure();
+            throw new MediaUnavailableException("Hàng đợi giải phóng tài nguyên Google Drive đã đầy ("
+                    + cleanupQueueCapacity + " tài nguyên lỗi đang chờ giải phóng)");
+        }
+
         int current = actualOutstandingWorkers.incrementAndGet();
         if (current > maxWorkers) {
             actualOutstandingWorkers.decrementAndGet();
@@ -225,7 +232,24 @@ public class DriveIoExecutor {
                     if (result instanceof AutoCloseable ac) {
                         try {
                             ac.close();
-                        } catch (Throwable ignored) {}
+                        } catch (Throwable closeEx) {
+                            // Close failed: acquire pending permit if capacity allows and retain failed cleanup
+                            boolean acquiredPending = false;
+                            while (true) {
+                                LifecycleState cur = lifecycle.get();
+                                if (cur.isShutdown() || cur.getTotal() >= cleanupQueueCapacity) {
+                                    break;
+                                }
+                                LifecycleState next = new LifecycleState(cur.getActive(), cur.getPending() + 1, cur.isShutdown());
+                                if (lifecycle.compareAndSet(cur, next)) {
+                                    acquiredPending = true;
+                                    break;
+                                }
+                            }
+                            recordFailedCleanup(ac, operationDescription, closeEx, null, acquiredPending);
+                            throw new IllegalArgumentException(
+                                    "Thao tác vô hướng (scalar) không được phép trả về tài nguyên AutoCloseable: " + operationDescription, closeEx);
+                        }
                         throw new IllegalArgumentException("Thao tác vô hướng (scalar) không được phép trả về tài nguyên AutoCloseable: " + operationDescription);
                     }
                     return result;
@@ -932,12 +956,23 @@ public class DriveIoExecutor {
     }
 
     private void recordFailedCleanup(AutoCloseable resource, String opName, Throwable cause, DriveResourceReservation reservation) {
+        recordFailedCleanup(resource, opName, cause, reservation, true);
+    }
+
+    private void recordFailedCleanup(AutoCloseable resource, String opName, Throwable cause, DriveResourceReservation reservation, boolean chargesPending) {
         if (resource != null) {
             RetainedFailedCleanup existing = retainedFailedCleanups.get(resource);
             if (existing != null) {
                 existing.updateFailure(cause);
             } else {
-                retainedFailedCleanups.put(resource, new RetainedFailedCleanup(resource, opName, cause, reservation));
+                if (retainedFailedCleanups.size() >= cleanupQueueCapacity) {
+                    if (chargesPending) {
+                        decrementPendingAndCheckShutdown();
+                    }
+                    circuitBreaker.recordFailure();
+                    return;
+                }
+                retainedFailedCleanups.put(resource, new RetainedFailedCleanup(resource, opName, cause, reservation, chargesPending));
                 failedCleanupObligations.incrementAndGet();
                 circuitBreaker.recordFailure();
             }
@@ -949,7 +984,9 @@ public class DriveIoExecutor {
             RetainedFailedCleanup removed = retainedFailedCleanups.remove(resource);
             if (removed != null) {
                 failedCleanupObligations.decrementAndGet();
-                decrementPendingAndCheckShutdown();
+                if (removed.chargesPending()) {
+                    decrementPendingAndCheckShutdown();
+                }
                 DriveResourceReservation res = removed.getReservation();
                 if (res != null) {
                     res.clearFailedCleanup();

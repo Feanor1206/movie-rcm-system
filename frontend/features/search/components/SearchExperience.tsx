@@ -12,9 +12,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  Sparkles,
+  Film,
+  Play,
 } from 'lucide-react';
+import Link from 'next/link';
 import { MovieCard } from '@/features/movies/components/MovieCard';
-import { browseCatalog, type PageResponse } from '@/lib/services/catalogService';
+import {
+  browseCatalog,
+  searchAnimationCatalog,
+  type PageResponse,
+  type CatalogSearchResult,
+} from '@/lib/services/catalogService';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
@@ -229,9 +238,29 @@ export function SearchExperience() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
+  const [animationResults, setAnimationResults] = useState<CatalogSearchResult[]>([]);
 
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Fetch from animation catalog when query is present
+  useEffect(() => {
+    if (!urlQuery.trim()) {
+      setAnimationResults([]);
+      return;
+    }
+    let active = true;
+    searchAnimationCatalog(urlQuery)
+      .then((res) => {
+        if (active) setAnimationResults(res);
+      })
+      .catch(() => {
+        if (active) setAnimationResults([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [urlQuery]);
 
   // S2: Data is only considered CURRENT if snapshot key matches current params key
   const isCurrentData = dataSnapshot !== null && dataSnapshot.key === currentParamsKey;
@@ -495,6 +524,69 @@ export function SearchExperience() {
 
       {/* Main Results Section */}
       <section className="mt-8">
+        {/* Animation Catalog v1 Results Section */}
+        {animationResults.length > 0 && (
+          <div className="mb-8 rounded-xl border border-brand/30 bg-surface p-5 shadow-sm">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-brand" />
+                <h3 className="text-sm font-bold text-white">
+                  Kết quả từ Danh Mục Hoạt Hình dippie.catalog.v1 ({animationResults.length})
+                </h3>
+              </div>
+              <span className="text-xs text-zinc-400">Bộ, tập, phân cảnh và truyện ngắn</span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {animationResults.map((item) => {
+                const baseSeriesId = item.seriesId || (item.type === 'series' ? item.id : '');
+                const params = new URLSearchParams();
+                if (item.episodeId) params.set('episode', item.episodeId);
+                else if (item.type === 'episode') params.set('episode', item.id);
+                if (item.type === 'scene') params.set('scene', item.id);
+                if (item.mediaAssetId) params.set('asset', item.mediaAssetId);
+                if (item.startMs !== undefined && item.startMs !== null) {
+                  params.set('t', String(item.startMs));
+                }
+                const queryString = params.toString();
+                const targetUrl = `/series/${encodeURIComponent(baseSeriesId || item.id)}${queryString ? `?${queryString}` : ''}`;
+                return (
+                  <Link
+                    key={`${item.type}_${item.id}`}
+                    href={targetUrl}
+                    className="flex flex-col justify-between rounded-lg border border-surface-border bg-surface-elevated p-3 transition-colors hover:border-brand/40 hover:bg-surface-hover/80"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand uppercase border border-brand/20">
+                          {item.type}
+                        </span>
+                        {item.startMs !== undefined && item.startMs !== null && (
+                          <span className="font-mono text-[10px] text-zinc-400">
+                            {Math.floor(item.startMs / 60000)}:
+                            {Math.floor((item.startMs % 60000) / 1000).toString().padStart(2, '0')}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="mt-2 text-xs font-bold text-white line-clamp-1">{item.title}</h4>
+                      {item.parentTitle && (
+                        <p className="text-[11px] text-zinc-400 italic line-clamp-1">{item.parentTitle}</p>
+                      )}
+                      {item.snippet && (
+                        <p className="mt-1.5 text-[11px] text-zinc-300 line-clamp-2">{item.snippet}</p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-end text-[11px] font-semibold text-brand">
+                      <span>Xem chi tiết →</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Error State */}
         {error ? (
           <div className="flex flex-col items-center justify-center rounded-lg border border-red-500/30 bg-red-950/20 px-6 py-12 text-center">

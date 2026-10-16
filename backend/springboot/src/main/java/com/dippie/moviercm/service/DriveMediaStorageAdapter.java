@@ -221,18 +221,41 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
     @Override
     public SeekableByteChannel openChannel(String relativePath) throws IOException {
         Path targetPath = resolveValidatedPath(relativePath);
+        return openChannelForPath(targetPath);
+    }
+
+    public Resource getResourceForPath(Path targetPath) {
+        Resource resource = new FileSystemResource(targetPath);
+        if (!resource.exists() || !resource.isReadable()) {
+            throw new MediaUnavailableException("Không thể mở luồng đọc cho tệp media: " + targetPath);
+        }
+        return resource;
+    }
+
+    public long getResourceLengthForPath(Path targetPath) {
+        return ioExecutor.executeMetadata(() -> {
+            try {
+                return Files.size(targetPath);
+            } catch (IOException e) {
+                throw new MediaUnavailableException("Không thể xác định kích thước tệp media: " + targetPath);
+            }
+        });
+    }
+
+    public SeekableByteChannel openChannelForPath(Path targetPath) throws IOException {
+        if (!Files.exists(targetPath) || !Files.isRegularFile(targetPath)) {
+            throw new MediaNotFoundException("Không tìm thấy tệp media trên Google Drive: " + targetPath);
+        }
         DriveResourceReservation reservation = ioExecutor.acquireReservation();
         try {
             FileChannel rawChannel = ioExecutor.executeOpen(
                     () -> FileChannel.open(targetPath, StandardOpenOption.READ),
                     ioExecutor.getMetadataTimeoutMs(),
-                    "openChannel:" + relativePath,
+                    "openChannel:" + targetPath.getFileName(),
                     reservation
             );
             return new DriveSeekableByteChannel(rawChannel, ioExecutor, reservation);
         } catch (Throwable t) {
-            // Note: executeOpen manages reservation lifecycle (releasing on fast rejection/execution failure,
-            // or retaining by worker to close late handle on timeout/interruption). Do NOT release reservation here.
             throw t;
         }
     }

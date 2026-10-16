@@ -1,0 +1,338 @@
+{
+  "version": "CATALOG-01-F02",
+  "timestamp": "2026-10-16T16:18:06Z",
+  "baseline_commit": "c2d29c04edd58c4cc0a6e648d316285a9377384f",
+  "total_files": 66,
+  "files": [
+    {
+      "path": "backend/fastapi/main.py",
+      "sha256": "91e07d817359a9b1a58efaacfe4b68f7532a5bba46ca966e0bec690346070abb",
+      "bytes": 11327
+    },
+    {
+      "path": "backend/fastapi/schemas.py",
+      "sha256": "073dcd42fb3d882f5db1ad4e1dd9e47bad4bd246bd40261c8b43f0b448991d85",
+      "bytes": 4725
+    },
+    {
+      "path": "backend/fastapi/services/ai_pipeline.py",
+      "sha256": "7172c7c2ccb486354d81f3ff683b4d5c19b254c2a7e643cc22dbbce5c0d9efa3",
+      "bytes": 24508
+    },
+    {
+      "path": "backend/fastapi/services/canonical_importer.py",
+      "sha256": "ab8fe92f0c59b279a879d52581f5a6f2bd92f70cd06cc35c359c69e3237e86b7",
+      "bytes": 8199
+    },
+    {
+      "path": "backend/fastapi/services/catalog_sync.py",
+      "sha256": "94aa6ee0fac711bce417a1484a2c627633f1d481fda59673e592920e3b8ebca2",
+      "bytes": 25250
+    },
+    {
+      "path": "backend/fastapi/services/hybrid_retrieval.py",
+      "sha256": "0a5b876ac48d0645d2a5f0196ffd935a4ba0bdf0794fcc8d46a8552b821251fe",
+      "bytes": 26662
+    },
+    {
+      "path": "backend/fastapi/tests/test_catalog_retrieval.py",
+      "sha256": "13c4326692893bf636080c6c7cfec698acd3309d07e89e1c9e726bc3340fafd3",
+      "bytes": 26835
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/config/SecurityConfig.java",
+      "sha256": "a60bca92fc7f8bc8d2e2f13dfc26c8355156cf312a6752026b0aee1980d81d77",
+      "bytes": 5209
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/config/StorageKeyConfig.java",
+      "sha256": "5e59bcf4209e3d6c6b60f07dba44805800cdaa4bb34745664309ec020e47adbc",
+      "bytes": 5336
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/controller/AdminCatalogController.java",
+      "sha256": "335da0c0e50b84e680b5c0cec5ed333ff7356b3b2c4078af86dd804d4c34eea8",
+      "bytes": 2931
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/controller/CatalogController.java",
+      "sha256": "cbf8998413146e5267adc8e1276223b8cbf04206b36c9d43d5f5d7b84c1c1dfe",
+      "bytes": 1658
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/catalog/CatalogEpisodeResponse.java",
+      "sha256": "e0e091b82eec4f87424d069045f9801dbdf4f766952fac711e19f71d2d6a5cf4",
+      "bytes": 1497
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/catalog/CatalogImportResponse.java",
+      "sha256": "389baed919f0b25fe98745ee415485c0e7392f8e72c314a6923386a1a7ef90dc",
+      "bytes": 1744
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/catalog/CatalogSearchResult.java",
+      "sha256": "26974db0ce2aef89b7ee82d1db4fb26050c936da43555ff3e388f1b6978da1e9",
+      "bytes": 2235
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/catalog/CatalogSeriesResponse.java",
+      "sha256": "70952d6e30db5de5bd62d9afcae3a0689daedb4a4c13f1d7dad7f9d2e4edac9b",
+      "bytes": 1092
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/catalog/CatalogValidationError.java",
+      "sha256": "7e8cfdc1e030882ea07bc00ec82d981994d67ea2a40b67de94846d9b7f1f8ca3",
+      "bytes": 702
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/catalog/CatalogValidationResult.java",
+      "sha256": "7395bbb2295b3a997f4c940447af51973fb8bd83a131133f646119f67ef4af71",
+      "bytes": 1851
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogAttributeScale.java",
+      "sha256": "ce06cbd82778b2e2aa52ec96c9ce57559bce0272d7e98dfe9c4f4212731fc42e",
+      "bytes": 2960
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogCharacter.java",
+      "sha256": "2d47adfabd583aa4f13bde04eb44ba6c748d25c16307e4629a4fd7c868b8a82d",
+      "bytes": 3613
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogEpisode.java",
+      "sha256": "40da401e3c0f9b7b3c344df6ac1099fa6013da11ef3c53c418344a1e89cf212f",
+      "bytes": 6591
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogGenre.java",
+      "sha256": "36ca5cd916f028c7c68f1ea6210340cf6f4d76501ec68a4bd9e31ab468c6a54d",
+      "bytes": 2699
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogMediaAsset.java",
+      "sha256": "a9502461f8eeb239907629a9c233e989d49fab4e45d5d40e2236a6e47ed497dd",
+      "bytes": 5915
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogPackage.java",
+      "sha256": "209acdf181038ed09ca5016c40ab29e54e7c60312dc8edfc1a4fb59e59b2072f",
+      "bytes": 3876
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogScene.java",
+      "sha256": "7a24aae7ed7084427ed87adef54663fea8a63c615299ac98074b939475970fd1",
+      "bytes": 5351
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogSeason.java",
+      "sha256": "387a99358ee6cefe378bfe743f26d93e0a0792961ec9d6b2b32963d256a53e5e",
+      "bytes": 3441
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogSegment.java",
+      "sha256": "5ce5fa0bffd1343a95d65535fecd28c0a40df2862643a80bf5fc1055a20f2b35",
+      "bytes": 4830
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogSeries.java",
+      "sha256": "49cea3cf532e223f970d8e38042a6eb4620d7e3518fd87b2e328da5392bc7c69",
+      "bytes": 6821
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogSnapshot.java",
+      "sha256": "792f61b9bffffa0fe45b679e9430bae1b97b89c8b0ff1467b3442391ba1451e8",
+      "bytes": 2903
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogSource.java",
+      "sha256": "ceae3eabca2f14ac7b665b5a5ff05e3f2a77e73909869622a7bdc3156cbdd0bb",
+      "bytes": 2402
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/catalog/CatalogTextTrack.java",
+      "sha256": "1c0bc6c49b47df4b2530067f34385e2e86f3281ff5878baf786faf88975bf068",
+      "bytes": 3485
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/entity/MediaAsset.java",
+      "sha256": "1b883c6a90521c1adfabadad315bf88bf8feeccc38e57e03d9186d9696d5b447",
+      "bytes": 4954
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/exception/CatalogConflictException.java",
+      "sha256": "f9f0ac81642c703fa2018d17fcc08ab538ffea6f816086108e3bd3846bb85350",
+      "bytes": 336
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogAttributeScaleRepository.java",
+      "sha256": "d8cd383d82e7515c0aaec11f9c2bd0b827ba97c7f0bf0ee4ae95c9e248824c5e",
+      "bytes": 345
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogCharacterRepository.java",
+      "sha256": "70ce5c0e090bfaaf933205b0ed132171c926ea88689ddd691cb5979f8805c704",
+      "bytes": 750
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogEpisodeRepository.java",
+      "sha256": "a7b1d937be49f5f66d50402866ac5d57ca8c9e744282ca4d5db23fdef1616fb9",
+      "bytes": 945
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogGenreRepository.java",
+      "sha256": "13d4238b78dc72f889d2588f852c656c8ff2ce41cba812c7e487413ee1aef033",
+      "bytes": 318
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogMediaAssetRepository.java",
+      "sha256": "8697126cc11560364510d72c69884952aedf5053e80a221bf81e9e66a7291b07",
+      "bytes": 406
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogPackageRepository.java",
+      "sha256": "689b5c6927f4a740aa37cfd5742ffdef99882d180c42855904ec33908a46806f",
+      "bytes": 417
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogSceneRepository.java",
+      "sha256": "a0d104a25b18ed60abb68799844330abd844027108ebce1e4c006cb79db4005d",
+      "bytes": 1008
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogSeasonRepository.java",
+      "sha256": "5efef111805471aeb8e8356b264404bb2f9696247623d286f2ae847104be893c",
+      "bytes": 418
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogSegmentRepository.java",
+      "sha256": "bb7f04f4dff56c52ec0250a6aa67515a547d69a976f1b82b8ec952008ed43a4b",
+      "bytes": 874
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogSeriesRepository.java",
+      "sha256": "86a78fbe13c8f776a8925f0cba5e1b1b3222a6f26741880fd9ce3383870ecd4c",
+      "bytes": 863
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogSnapshotRepository.java",
+      "sha256": "1903a4d914fb4068e5765a99b2319d3dad82b0f7b49dd33b78a1ad984f28d394",
+      "bytes": 537
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogSourceRepository.java",
+      "sha256": "10cb37b87bb283e851d978e593a4da08edbe5d5f9b36ea25c3d7b144e5e98443",
+      "bytes": 321
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/catalog/CatalogTextTrackRepository.java",
+      "sha256": "c18c998948d2c0a7a4d294a1046a49533b48a6e8b35bcb9b75c16b27eb7d7645",
+      "bytes": 422
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/catalog/CatalogImportService.java",
+      "sha256": "7d66395d39e8500eec624b865de19da8a8433285a77a4651022a6d9489b77738",
+      "bytes": 59185
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/catalog/CatalogQueryService.java",
+      "sha256": "ba7e02ceca1a5c5ce497a552cc908bc30221ec5d0d1c16caa5b55ec0a07d9bc0",
+      "bytes": 17347
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/catalog/CatalogSyncWorker.java",
+      "sha256": "031456c275761268336453a38ff1de569d7ff9b6e50fd7dbddcb55b55f07ce1d",
+      "bytes": 8970
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/catalog/CatalogValidator.java",
+      "sha256": "e670c20764e3d36b90e629f56c15f8f0a56376487781489b1d800465251c9006",
+      "bytes": 42493
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java",
+      "sha256": "39e023be33609c567d9134c897cde357f4723eda291a69b027bf7d7188cddefd",
+      "bytes": 18923
+    },
+    {
+      "path": "backend/springboot/src/main/resources/contracts/dippie.catalog.v1.schema.json",
+      "sha256": "23fde047475f1149225f628756a1cbcd5dda4314a38969659a48f400b7f44395",
+      "bytes": 56415
+    },
+    {
+      "path": "backend/springboot/src/main/resources/schema.sql",
+      "sha256": "df57a3144e00b2fe849305919f7dfc69cb167381ba68f85268105f884346bf7a",
+      "bytes": 12827
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/service/catalog/CatalogImportServiceTest.java",
+      "sha256": "633ba0fd1144976adf21045ede7e2c69f1e199cd2c76645f916da8958a77bb7c",
+      "bytes": 7153
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/service/catalog/CatalogValidatorTest.java",
+      "sha256": "a814d53d1a835a66ee28a6824980140648ffb084026bc6a6bd0e2e246cda8edf",
+      "bytes": 6417
+    },
+    {
+      "path": "docs/contracts/animation-catalog-v1/catalog.blank.json",
+      "sha256": "8ed01d97b49885b767cf8c92d58fb5eef36033017d0524af3ba8d56e78b8cd85",
+      "bytes": 551
+    },
+    {
+      "path": "docs/contracts/animation-catalog-v1/catalog.example.json",
+      "sha256": "fb895307ed43792ff91afa0d26ae9fbe120fddabd3f89d776a4e8e2a5965e624",
+      "bytes": 18433
+    },
+    {
+      "path": "docs/contracts/animation-catalog-v1/dippie.catalog.v1.schema.json",
+      "sha256": "23fde047475f1149225f628756a1cbcd5dda4314a38969659a48f400b7f44395",
+      "bytes": 56415
+    },
+    {
+      "path": "docs/contracts/animation-catalog-v1/README.md",
+      "sha256": "8b323740df16d5f428308e0a697d518efed57dc04c0eecb8c4fd32ed6537dec5",
+      "bytes": 11445
+    },
+    {
+      "path": "docs/contracts/animation-catalog-v1/validate_catalog.py",
+      "sha256": "e2180d0a24d9522382028b4df7b8c737c0afc7513690de9db4d0fa06bccf5229",
+      "bytes": 10461
+    },
+    {
+      "path": "docs/runbooks/CATALOG_IMPORT.md",
+      "sha256": "074c778c6bb1b38e773fec9ed4a98e6375af8842e3c6ade6b966aabb1b15902b",
+      "bytes": 12453
+    },
+    {
+      "path": "frontend/app/admin/import/page.tsx",
+      "sha256": "c05e2bca1d80509cf2b0b8f7afc9cd447c75ffe1698f73679b44cd6a3d2a8d34",
+      "bytes": 10297
+    },
+    {
+      "path": "frontend/app/api/chat/route.ts",
+      "sha256": "bb7a40de0e24876a5c390c292ce0dcd7e620de745b213506cae49fe63cbd04f2",
+      "bytes": 1887
+    },
+    {
+      "path": "frontend/components/layout/Navbar.tsx",
+      "sha256": "76e61445ab4a8d955519d3965211d5a1fd6fd10804e3f51fd27062ce5b9fb510",
+      "bytes": 10204
+    },
+    {
+      "path": "frontend/features/admin/components/CatalogImportModal.tsx",
+      "sha256": "c11f22c2b45d7b9db4c019f18668bb7906c58f2347d65e65b226e8e074778d90",
+      "bytes": 14204
+    },
+    {
+      "path": "frontend/features/search/components/SearchExperience.tsx",
+      "sha256": "37369ee6218bbdb2f298e520e9ad67e62c4fc54826b9c8a530583f2f0ebcfa41",
+      "bytes": 27005
+    },
+    {
+      "path": "frontend/lib/services/catalogService.ts",
+      "sha256": "7186999df997d8e3756cca529d8f40320341c92a085039a66de9a4c6371ded36",
+      "bytes": 19833
+    }
+  ]
+}

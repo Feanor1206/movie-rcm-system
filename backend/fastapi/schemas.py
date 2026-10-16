@@ -11,15 +11,59 @@ class ChatMessageItem(BaseModel):
 class MovieItem(BaseModel):
     id: str
     title: str
-    year: int
-    rating: float
-    runtime: str
-    genres: List[str]
-    description: str
+    year: int = 0
+    rating: float = 8.0
+    runtime: str = "N/A"
+    genres: List[str] = []
+    description: str = ""
     poster: Optional[str] = None
     backdrop: Optional[str] = None
     videoUrl: Optional[str] = None
     matchPercentage: Optional[int] = None
+    # Multi-level catalog hierarchy fields (series, episode, segment, scene)
+    item_type: Optional[str] = Field(default="movie", description="series, episode, segment, scene, movie")
+    series_id: Optional[str] = None
+    season_id: Optional[str] = None
+    episode_id: Optional[str] = None
+    segment_id: Optional[str] = None
+    episode_number: Optional[int] = None
+    air_date: Optional[str] = None
+    duration_ms: Optional[int] = None
+    start_ms: Optional[int] = None
+    end_ms: Optional[int] = None
+    primary_media_asset_id: Optional[str] = None
+    media_asset_id: Optional[str] = None
+    aliases: Optional[List[str]] = None
+    characters: Optional[List[str]] = None
+    plot_facts: Optional[List[str]] = None
+    keywords: Optional[List[str]] = None
+    themes: Optional[List[str]] = None
+    visual_summary: Optional[str] = None
+    dialogue_summary: Optional[str] = None
+    sound_events: Optional[List[str]] = None
+    series_title: Optional[str] = None
+    episode_title: Optional[str] = None
+    comparative_attributes: Optional[Dict[str, Any]] = None
+    diagnostics: Optional[Dict[str, Any]] = None
+
+
+class IndexSyncRequest(BaseModel):
+    catalog: Optional[Dict[str, Any]] = None
+    generation: Optional[int] = None
+    content_hash: Optional[str] = None
+    reload_from_disk: Optional[bool] = False
+    force_rebuild: Optional[bool] = False
+
+
+class IndexSyncResponse(BaseModel):
+    status: str
+    message: str
+    generation: Optional[int] = None
+    item_counts: Dict[str, int] = {}
+    content_hash: Optional[str] = None
+    index_ready: bool = True
+
+
 
 
 class ChatRequest(BaseModel):

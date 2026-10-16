@@ -1,0 +1,38 @@
+{
+  "java": {
+    "worker": [
+      {
+        "snapshot_file_exists": true,
+        "status": "BLOCKED",
+        "expected_not_ready": true,
+        "case": "no_token_no_index_ack"
+      },
+      {
+        "snapshot_file_exists": false,
+        "status": "SYNC_FAILED",
+        "expected_not_ready": true,
+        "case": "disk_write_fails_no_token"
+      }
+    ],
+    "anonymous_search_results": []
+  },
+  "sync_race": {
+    "generation_after_both": 2,
+    "final_series_titles": [
+      "newer"
+    ],
+    "expected_series_title": "newer",
+    "scope": "unmodified production sync function AST; real CatalogSyncManager; fake encoder/index and local auth request; no HTTP/model"
+  },
+  "index_rebuild": {
+    "documents_after_replace": [
+      "current_B"
+    ],
+    "documents_after_empty": [],
+    "expected_after_replace": [
+      "current_B"
+    ],
+    "expected_after_empty": [],
+    "scope": "production HybridMovieIndex with fake encoder, no disk/model/network"
+  }
+}

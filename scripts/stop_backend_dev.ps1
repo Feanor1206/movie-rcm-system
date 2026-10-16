@@ -17,49 +17,95 @@ if (-not (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinu
 }
 
 $state = Get-Content -Path $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json
-$targetPid = [int]$state.PID
-$expectedStartTime = [DateTime]::Parse($state.StartTime)
-$expectedExe = [string]$state.ExecutablePath
 
-# R3 Fix: Inspect live process through WMI/CIM for canonical executable, start time, and command line
-$cimProc = Get-CimInstance Win32_Process -Filter "ProcessId = $targetPid" -ErrorAction SilentlyContinue
-if (-not $cimProc) {
-    Write-Host "[stop_backend_dev] Process with PID $targetPid is no longer running."
-    Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
+# 1. State file complete non-empty identity validation (fail-closed)
+if ($null -eq $state.PID -or [int]$state.PID -le 0) {
+    Write-Warning "[stop_backend_dev] INVALID_STATE: State file missing valid PID. Aborting fail-closed without signaling."
+    return
+}
+if ([string]::IsNullOrWhiteSpace($state.StartTime)) {
+    Write-Warning "[stop_backend_dev] INVALID_STATE: State file missing required StartTime. Aborting fail-closed without signaling."
+    return
+}
+if ([string]::IsNullOrWhiteSpace($state.ExecutablePath)) {
+    Write-Warning "[stop_backend_dev] INVALID_STATE: State file missing required ExecutablePath. Aborting fail-closed without signaling."
     return
 }
 
-# 1. Process Name verification
+$targetPid = [int]$state.PID
+try {
+    $expectedStartTime = [DateTime]::Parse($state.StartTime)
+} catch {
+    Write-Warning "[stop_backend_dev] INVALID_STATE: State file StartTime is invalid: $($state.StartTime). Aborting fail-closed without signaling."
+    return
+}
+$expectedExe = [string]$state.ExecutablePath
+
+# 2. Inspect live process through WMI/CIM
+$cimProc = Get-CimInstance Win32_Process -Filter "ProcessId = $targetPid" -ErrorAction SilentlyContinue
+if (-not $cimProc) {
+    Write-Host "[stop_backend_dev] Process with PID $targetPid is no longer running."
+    if (Test-Path -Path $StateFile) {
+        try {
+            $cur = Get-Content -Path $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($cur.PID -eq $targetPid) {
+                Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
+            }
+        } catch {}
+    }
+    return
+}
+
+# 3. Live process complete non-empty identity validation (fail-closed)
+if ([string]::IsNullOrWhiteSpace($cimProc.Name)) {
+    Write-Warning "[stop_backend_dev] IDENTITY_INCOMPLETE: Live process PID $targetPid has empty Name. Aborting fail-closed without signaling."
+    return
+}
+if ([string]::IsNullOrWhiteSpace($cimProc.ExecutablePath)) {
+    Write-Warning "[stop_backend_dev] IDENTITY_INCOMPLETE: Live process PID $targetPid has empty ExecutablePath. Aborting fail-closed without signaling."
+    return
+}
+if ([string]::IsNullOrWhiteSpace($cimProc.CommandLine)) {
+    Write-Warning "[stop_backend_dev] IDENTITY_INCOMPLETE: Live process PID $targetPid has empty CommandLine. Aborting fail-closed without signaling."
+    return
+}
+if ($null -eq $cimProc.CreationDate) {
+    Write-Warning "[stop_backend_dev] IDENTITY_INCOMPLETE: Live process PID $targetPid has null CreationDate. Aborting fail-closed without signaling."
+    return
+}
+
+# 4. Process Name verification
 $procName = $cimProc.Name.ToLowerInvariant()
 if ($procName -ne "java.exe" -and $procName -ne "java") {
-    throw "[stop_backend_dev] IDENTITY_MISMATCH: Live process PID $targetPid name is '$($cimProc.Name)', expected 'java.exe'. Aborting fail-closed without signaling."
+    Write-Warning "[stop_backend_dev] IDENTITY_MISMATCH: Live process PID $targetPid name is '$($cimProc.Name)', expected 'java.exe'. Aborting fail-closed without signaling."
+    return
 }
 
-# 2. Executable Path verification (case-insensitive canonical comparison)
-if ($expectedExe -and $cimProc.ExecutablePath) {
-    $canonicalLiveExe = [System.IO.Path]::GetFullPath($cimProc.ExecutablePath).ToLowerInvariant()
-    $canonicalExpectedExe = [System.IO.Path]::GetFullPath($expectedExe).ToLowerInvariant()
-    if ($canonicalLiveExe -ne $canonicalExpectedExe) {
-        throw "[stop_backend_dev] IDENTITY_MISMATCH: Live process PID $targetPid executable path '$canonicalLiveExe' does not match recorded executable '$canonicalExpectedExe'. Aborting fail-closed without signaling."
-    }
+# 5. Executable Path verification (case-insensitive canonical comparison)
+$canonicalLiveExe = [System.IO.Path]::GetFullPath($cimProc.ExecutablePath).ToLowerInvariant()
+$canonicalExpectedExe = [System.IO.Path]::GetFullPath($expectedExe).ToLowerInvariant()
+if ($canonicalLiveExe -ne $canonicalExpectedExe) {
+    Write-Warning "[stop_backend_dev] IDENTITY_MISMATCH: Live process PID $targetPid executable path '$canonicalLiveExe' does not match recorded executable '$canonicalExpectedExe'. Aborting fail-closed without signaling."
+    return
 }
 
-# 3. CommandLine argument verification (must contain expected application and profile)
+# 6. CommandLine argument verification (must contain expected application and snapshot profile)
 $cmdLine = [string]$cimProc.CommandLine
 if (-not $cmdLine.Contains("MovieRcmApplication") -or -not $cmdLine.Contains("snapshot")) {
-    throw "[stop_backend_dev] IDENTITY_MISMATCH: Live process PID $targetPid CommandLine does not contain expected application or profile markers. CommandLine: '$cmdLine'. Aborting fail-closed without signaling."
+    Write-Warning "[stop_backend_dev] IDENTITY_MISMATCH: Live process PID $targetPid CommandLine does not contain expected application or profile markers. CommandLine: '$cmdLine'. Aborting fail-closed without signaling."
+    return
 }
 
-# 4. StartTime / CreationDate verification (within 3 seconds tolerance)
-if ($cimProc.CreationDate) {
-    $liveCreationDate = $cimProc.CreationDate.ToUniversalTime()
-    $expectedUtc = $expectedStartTime.ToUniversalTime()
-    $timeDelta = [Math]::Abs(($liveCreationDate - $expectedUtc).TotalSeconds)
-    if ($timeDelta -gt 3.0) {
-        throw "[stop_backend_dev] IDENTITY_MISMATCH: PID $targetPid CreationDate ($liveCreationDate) does not match recorded StartTime ($expectedUtc, delta $timeDelta s). Aborting fail-closed without signaling."
-    }
+# 7. StartTime / CreationDate verification (within 3 seconds tolerance)
+$liveCreationDate = $cimProc.CreationDate.ToUniversalTime()
+$expectedUtc = $expectedStartTime.ToUniversalTime()
+$timeDelta = [Math]::Abs(($liveCreationDate - $expectedUtc).TotalSeconds)
+if ($timeDelta -gt 3.0) {
+    Write-Warning "[stop_backend_dev] IDENTITY_MISMATCH: PID $targetPid CreationDate ($liveCreationDate) does not match recorded StartTime ($expectedUtc, delta $timeDelta s). Aborting fail-closed without signaling."
+    return
 }
 
+# 8. Hold verified process instance for signaling
 Write-Host "[stop_backend_dev] Verified process identity for PID $targetPid ($procName). Stopping process..."
 try {
     Stop-Process -Id $targetPid -Force -ErrorAction SilentlyContinue
@@ -76,7 +122,15 @@ while ([DateTime]::UtcNow -lt $deadline) {
 
 if (-not (Get-CimInstance Win32_Process -Filter "ProcessId = $targetPid" -ErrorAction SilentlyContinue)) {
     Write-Host "[stop_backend_dev] SUCCESS: Process PID $targetPid stopped successfully."
-    Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
+    # Guard state removal against new-start races: only remove if PID still matches
+    if (Test-Path -Path $StateFile) {
+        try {
+            $curState = Get-Content -Path $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($curState.PID -eq $targetPid) {
+                Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
+            }
+        } catch {}
+    }
 } else {
-    throw "[stop_backend_dev] FAILED: Process PID $targetPid could not be stopped within 10 seconds."
+    Write-Warning "[stop_backend_dev] FAILED: Process PID $targetPid could not be stopped within 10 seconds."
 }

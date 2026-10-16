@@ -1,0 +1,14 @@
+{
+  "scene_file_timestamp": {
+    "input_ms": 90000,
+    "expected_seconds": 90,
+    "actual_seconds": 150,
+    "reason": "Production handleSeekScene passes file-timeline scene.startMs to logical-to-file helper"
+  },
+  "unknown_logical_offset": {
+    "input_ms": 30000,
+    "expected": "unresolved; do not seek",
+    "actual_seconds": 90
+  },
+  "scope": "production helper transpiled in isolation; not browser decoder evidence"
+}

@@ -1,0 +1,8 @@
+{
+  "manifest_files_verified": 28,
+  "drift_during_review": [],
+  "contract_zip_byte_comparison": "all 5 entries match",
+  "reverse_patch_check": "exit 0; no patch applied",
+  "review": "docs/reviews/CATALOG_01_F01_REVIEW.md",
+  "full_maven_frontend_gpu_http_browser_drive_tests": "not run by reviewer"
+}

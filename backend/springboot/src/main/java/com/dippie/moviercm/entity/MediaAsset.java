@@ -32,6 +32,9 @@ public class MediaAsset {
     @Column(name = "storage_provider", nullable = false, length = 30)
     private String storageProvider = "local";
 
+    @Column(name = "storage_key", length = 100)
+    private String storageKey;
+
     @Column(name = "relative_path", nullable = false, length = 500)
     private String relativePath;
 
@@ -115,6 +118,14 @@ public class MediaAsset {
         return relativePath;
     }
 
+    public String getStorageKey() {
+        return storageKey;
+    }
+
+    public void setStorageKey(String storageKey) {
+        this.storageKey = storageKey;
+    }
+
     public void setRelativePath(String relativePath) {
         this.relativePath = relativePath;
     }
@@ -153,6 +164,10 @@ public class MediaAsset {
 
     public Boolean getPublic() {
         return isPublic;
+    }
+
+    public Boolean isPublic() {
+        return isPublic != null && isPublic;
     }
 
     public void setPublic(Boolean aPublic) {

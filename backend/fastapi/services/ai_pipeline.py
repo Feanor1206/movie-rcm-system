@@ -1,17 +1,18 @@
 """
 =============================================================================
-CASCADING MULTI-STAGE AI RECOMMENDATION PIPELINE (PHASE 23 INTEGRATED)
+CASCADING MULTI-STAGE AI RECOMMENDATION PIPELINE (CATALOG-01 & PHASE 23)
 =============================================================================
 Architecture:
   1. Qwen Phase 23 Intent Parser (StructuredDiscoveryIntent v1 + Patch Merger)
      ↓
-  2. Hybrid Retrieval & Hard Constraint Engine (Year, Exclude/Include Genres, TF-IDF)
+  2. Hybrid Retrieval & Hard Constraint Engine (Robertson-Spärck Jones BM25 + Dense e5)
+     Multi-level items (Series, Episode, Segment, Scene) + Comparative Constraints (darkness, pacing)
      ↓
   3. Qwen 0.6B Recommender (Domain Candidate Filtering & Reference Similarity)
      ↓
   4. Qwen 0.6B Ranker + MMR Diversity (Fine-grained Scoring & Top-K Selection)
      ↓
-  5. Qwen Grounded Storyteller (Personalized Vietnamese Explanation Generation)
+  5. Grounded Storyteller (Grounded on verified plot facts, characters, and scene timestamps)
 =============================================================================
 """
 
@@ -20,12 +21,126 @@ import re
 import math
 import copy
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 from services.qwen_service import qwen_service, DEFAULT_MOVIES
+from services.catalog_sync import catalog_sync_manager
+from services.hybrid_retrieval import HybridMovieIndex, tokenize_text
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# COMPARATIVE CONSTRAINT EVALUATION & DIAGNOSTICS HELPER
+# =============================================================================
+def evaluate_comparative_constraints(
+    item: Dict[str, Any],
+    nlu_output: Dict[str, Any],
+    query_text: str = ""
+) -> Tuple[float, Dict[str, Any]]:
+    """
+    Evaluate comparative constraints (darkness, pacing) using attribute scales.
+    Reports explicit diagnostics when trait data is missing or uncalibrated.
+    """
+    cons = nlu_output.get("constraints") or {}
+    comparative_reqs = nlu_output.get("comparative_attributes") or {}
+    q_lower = (query_text or "").lower()
+
+    # Detect if darkness trait is requested
+    req_darkness = None
+    if "darkness" in comparative_reqs:
+        req_darkness = comparative_reqs["darkness"]
+    elif "darkness" in cons:
+        req_darkness = cons["darkness"]
+    elif any(w in q_lower for w in ("u tối", "tối tăm", "đen tối", "dark", "darker", "rùng rợn")):
+        req_darkness = "high"
+
+    # Detect if pacing trait is requested
+    req_pacing = None
+    if "pacing" in comparative_reqs:
+        req_pacing = comparative_reqs["pacing"]
+    elif "pacing" in cons:
+        req_pacing = cons["pacing"]
+    elif any(w in q_lower for w in ("nhịp nhanh", "fast", "faster", "fast-paced", "kịch tính")):
+        req_pacing = "fast"
+    elif any(w in q_lower for w in ("nhịp chậm", "slow", "slower", "slow-paced", "chậm rãi", "sâu lắng")):
+        req_pacing = "slow"
+
+    # Extract available attribute scale values from item
+    attr_map = dict(item.get("comparative_attributes") or {})
+    if not attr_map and item.get("attributes"):
+        for a in item.get("attributes", []):
+            if isinstance(a, dict) and "scale_id" in a:
+                attr_map[a["scale_id"]] = a.get("value")
+                base = a["scale_id"].split("_")[0]
+                attr_map[base] = a.get("value")
+
+    score_delta = 0.0
+    missing_traits: List[str] = []
+    evaluated_traits: List[Dict[str, Any]] = []
+    trait_diagnostics: List[Dict[str, Any]] = []
+
+    # 1. Darkness Evaluation (Scale: darkness_v1, min: 0, max: 4)
+    if req_darkness is not None:
+        dark_val = attr_map.get("darkness_v1") if "darkness_v1" in attr_map else attr_map.get("darkness")
+        if dark_val is None:
+            missing_traits.append("darkness")
+            trait_diagnostics.append({
+                "trait": "darkness",
+                "scale_id": "darkness_v1",
+                "status": "missing_trait_data",
+                "message": f"Attribute scale 'darkness_v1' data is missing or null for item '{item.get('id')}'"
+            })
+        else:
+            try:
+                numeric_val = float(dark_val)
+                evaluated_traits.append({
+                    "trait": "darkness",
+                    "scale_id": "darkness_v1",
+                    "value": numeric_val,
+                    "status": "evaluated"
+                })
+                if req_darkness in ("high", "darker", True) or (isinstance(req_darkness, (int, float)) and req_darkness > 1):
+                    score_delta += (numeric_val / 4.0) * 15.0
+                elif req_darkness in ("low", "less_dark", False):
+                    score_delta += ((4.0 - numeric_val) / 4.0) * 15.0
+            except (ValueError, TypeError):
+                missing_traits.append("darkness")
+
+    # 2. Pacing Evaluation (Scale: pacing_v1, min: 0, max: 4)
+    if req_pacing is not None:
+        pace_val = attr_map.get("pacing_v1") if "pacing_v1" in attr_map else attr_map.get("pacing")
+        if pace_val is None:
+            missing_traits.append("pacing")
+            trait_diagnostics.append({
+                "trait": "pacing",
+                "scale_id": "pacing_v1",
+                "status": "missing_trait_data",
+                "message": f"Attribute scale 'pacing_v1' data is missing or null for item '{item.get('id')}'"
+            })
+        else:
+            try:
+                numeric_val = float(pace_val)
+                evaluated_traits.append({
+                    "trait": "pacing",
+                    "scale_id": "pacing_v1",
+                    "value": numeric_val,
+                    "status": "evaluated"
+                })
+                if req_pacing in ("fast", "faster", True):
+                    score_delta += (numeric_val / 4.0) * 15.0
+                elif req_pacing in ("slow", "slower", False):
+                    score_delta += ((4.0 - numeric_val) / 4.0) * 15.0
+            except (ValueError, TypeError):
+                missing_traits.append("pacing")
+
+    diagnostics = {
+        "missing_traits": missing_traits,
+        "evaluated_traits": evaluated_traits,
+        "trait_diagnostics": trait_diagnostics,
+    }
+    return score_delta, diagnostics
 
 
 # =============================================================================
@@ -98,16 +213,15 @@ class NLUUnderstandingNode:
 
 
 # =============================================================================
-# STAGE 2: HARD CONSTRAINT & HYBRID SPARSE/REFERENCE RETRIEVAL NODE
+# STAGE 2: HYBRID RETRIEVAL & HARD CONSTRAINT ENGINE (CATALOG-01)
 # =============================================================================
 class EmbeddingRetrievalNode:
     """
-    Tầng 2: Thực thi ràng buộc cứng (Hard Constraints: Year, Exclude Genres)
-    và tính điểm tương đồng ngữ nghĩa TF-IDF + Reference Film.
+    Tầng 2: True Hybrid Retrieval (BM25 Robertson-Spärck Jones + Dense multilingual-e5)
+    với lọc ràng buộc cứng (item_type, exclude_genres, year) và đánh giá thuộc tính so sánh (darkness, pacing).
     """
-    @staticmethod
-    def _tokenize(text: str) -> List[str]:
-        return re.findall(r"\w+", (text or "").lower())
+    def __init__(self):
+        self.hybrid_index = HybridMovieIndex()
 
     def retrieve_candidates(
         self,
@@ -115,81 +229,34 @@ class EmbeddingRetrievalNode:
         catalog: List[Dict[str, Any]],
         top_k: int = 12
     ) -> List[Dict[str, Any]]:
-        logger.info("[Stage 2 - Constraint & Retrieval] Đang lọc ràng buộc cứng và truy xuất ứng viên...")
-        if nlu_output.get("intent_type") == "CLARIFICATION":
+        logger.info("[Stage 2 - Hybrid Retrieval] Đang thực thi True Hybrid Search & lọc ràng buộc...")
+        query_text = (nlu_output.get("query") or {}).get("text") or nlu_output.get("raw_query") or ""
+        if nlu_output.get("intent_type") == "CLARIFICATION" and not query_text.strip():
             return []
-
         cons = nlu_output.get("constraints") or {}
-        inc_genres = set(cons.get("include_genres") or [])
-        exc_genres = set(cons.get("exclude_genres") or [])
-        ymin = cons.get("year_min")
-        ymax = cons.get("year_max")
+        item_type = nlu_output.get("item_type") or cons.get("item_type")
 
-        ref_obj = nlu_output.get("reference") or {}
-        ref_title = (ref_obj.get("text") or "").lower().strip()
-        ref_movie = None
-        if ref_title:
-            for m in catalog:
-                if m["title"].lower() == ref_title or ref_title in m["title"].lower():
-                    ref_movie = m
-                    break
-
-        query_text = (nlu_output.get("query") or {}).get("text") or ""
-        q_tokens = set(self._tokenize(query_text))
+        # Execute True Hybrid Search
+        results = self.hybrid_index.search_hybrid(
+            query_text=query_text,
+            nlu_intent=nlu_output,
+            catalog=catalog,
+            item_type_filter=item_type
+        )
 
         candidates = []
-        for movie in catalog:
-            m_genres = set(movie.get("genres") or [])
-            m_year = movie.get("year", 2025)
+        for r in results:
+            item = dict(r["movie"])
+            score_delta, diagnostics = evaluate_comparative_constraints(item, nlu_output, query_text)
+            item["retrieval_score"] = round(r["score"] + score_delta, 4)
+            item["bm25_score"] = r.get("bm25_score", 0.0)
+            item["dense_score"] = r.get("dense_score", 0.0)
+            item["diagnostics"] = diagnostics
+            candidates.append(item)
 
-            # 1. Hard Constraint: Exclude Genres
-            if exc_genres and (m_genres & exc_genres):
-                continue
-
-            # 2. Hard Constraint: Year Range
-            if ymin is not None and m_year < ymin:
-                continue
-            if ymax is not None and m_year > ymax:
-                continue
-
-            # Không tự gợi ý lại đúng bộ phim đang làm mốc tham chiếu
-            if ref_movie and movie["id"] == ref_movie["id"]:
-                continue
-
-            score = 0.0
-
-            # 3. Genre Match (ưu tiên đúng thể loại Animation và các thể loại con)
-            if "Animation" in inc_genres:
-                if "Animation" in m_genres:
-                    score += 6.0
-                else:
-                    score -= 4.0
-
-            specific_inc = inc_genres - {"Animation"}
-            matched_g = m_genres & specific_inc
-            if specific_inc and not matched_g and not ref_movie:
-                score -= 2.0
-            else:
-                score += len(matched_g) * 3.5
-
-            # 4. Reference Film Facet Similarity
-            if ref_movie:
-                ref_g = set(ref_movie.get("genres") or [])
-                shared_g = len(m_genres & ref_g)
-                score += shared_g * 3.0
-
-            # 5. Lexical / Semantic overlap trên mô tả và tiêu đề
-            doc_tokens = set(self._tokenize(f"{movie.get('title', '')} {movie.get('description', '')} {' '.join(m_genres)}"))
-            overlap = len(q_tokens & doc_tokens)
-            score += overlap * 0.8
-
-            # 6. Confidence-aware Rating Prior
-            score += float(movie.get("rating", 7.5)) * 0.5
-
-            candidates.append({"movie": movie, "retrieval_score": score})
-
+        # Re-sort after comparative adjustments
         candidates.sort(key=lambda x: x["retrieval_score"], reverse=True)
-        return [c["movie"] for c in candidates[:top_k]]
+        return candidates[:top_k]
 
 
 # =============================================================================
@@ -206,7 +273,7 @@ class Recommender06BNode:
         user_profile: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         logger.info(f"[Stage 3 - 0.6B Recommender] Đang sàng lọc {len(candidates)} ứng viên...")
-        if nlu_output.get("intent_type") == "CLARIFICATION":
+        if nlu_output.get("intent_type") == "CLARIFICATION" and not candidates:
             return []
         return candidates[:8]
 
@@ -237,20 +304,22 @@ class Ranker06BNode:
 
         scored = []
         for idx, m in enumerate(filtered_movies):
-            base = float(m.get("rating", 8.0)) * 9.5
+            # Prior based on rating and retrieval score
+            retrieval_prior = m.get("retrieval_score", 1.0) * 10.0
+            base = float(m.get("rating", 8.0)) * 8.0 + retrieval_prior
             m_genres = set(m.get("genres") or [])
             if specific_inc:
                 overlap_ratio = len(m_genres & specific_inc) / max(1, len(specific_inc))
-                base += overlap_ratio * 18.0
+                base += overlap_ratio * 15.0
             else:
-                base += max(0, 12 - idx * 2)
+                base += max(0, 10 - idx * 2)
 
-            match_pct = int(max(75, min(99, round(base))))
+            match_pct = int(max(70, min(99, round(base))))
             scored.append({**m, "matchPercentage": match_pct})
 
         scored.sort(key=lambda x: x["matchPercentage"], reverse=True)
 
-        # Đa dạng hóa MMR nếu diversify không bị tắt (diversify != False)
+        # Đa dạng hóa MMR nếu diversify không bị tắt
         if nlu_output.get("diversify") is False or len(scored) <= effective_k:
             return scored[:effective_k]
 
@@ -275,12 +344,25 @@ class Ranker06BNode:
 
 
 # =============================================================================
-# STAGE 5: QWEN GROUNDED EXPLANATION GENERATOR NODE
+# STAGE 5: GROUNDED EXPLANATION GENERATOR NODE (CATALOG-01)
 # =============================================================================
 class ExplanationGeneratorNode:
     """
-    Tầng 5: Sinh lời tư vấn bằng tiếng Việt bám sát kết quả xếp hạng và ràng buộc đã bóc tách.
+    Tầng 5: Sinh lời tư vấn bằng tiếng Việt bám sát dữ liệu thực tế (grounded):
+    - Tên nhân vật (characters)
+    - Tình tiết cốt truyện đã xác thực (verified plot facts)
+    - Mốc thời gian phân cảnh (scene timestamps)
+    - Chẩn đoán thuộc tính so sánh khi thiếu dữ liệu
     """
+    @staticmethod
+    def _format_time_ms(ms: Optional[int]) -> str:
+        if ms is None or ms < 0:
+            return "00:00"
+        total_sec = ms // 1000
+        mins = total_sec // 60
+        secs = total_sec % 60
+        return f"{mins:02d}:{secs:02d}"
+
     def generate_explanation(
         self,
         ranked_movies: List[Dict[str, Any]],
@@ -288,13 +370,103 @@ class ExplanationGeneratorNode:
         query: str,
         history: Optional[List[Dict[str, Any]]] = None
     ) -> str:
-        logger.info("[Stage 5 - Grounded Storyteller] Đang sinh lời giải thích điện ảnh bằng tiếng Việt...")
-        return qwen_service.generate_grounded_explanation(
-            query=query,
-            structured_intent=nlu_output,
-            ranked_movies=ranked_movies,
-            history=history
-        )
+        logger.info("[Stage 5 - Grounded Storyteller] Đang sinh lời giải thích bám sát dữ liệu (Grounded Explanation)...")
+
+        if nlu_output.get("intent_type") == "CLARIFICATION":
+            clar = nlu_output.get("clarification") or {}
+            return clar.get("question") or "Yêu cầu của bạn chưa đủ rõ ràng hoặc có mâu thuẫn. Bạn có thể nói rõ hơn được không?"
+
+        if not ranked_movies:
+            return (
+                "Tôi đã kiểm tra toàn bộ kho danh mục theo các ràng buộc khắt khe của bạn "
+                "(về năm phát hành, thể loại và từ khóa), nhưng hiện chưa có kết quả nào khớp 100%. "
+                "Bạn có muốn nới lỏng bớt điều kiện tìm kiếm không?"
+            )
+
+        top = ranked_movies[0]
+        others = ranked_movies[1:]
+
+        # Extract grounding details
+        item_type = top.get("item_type", "movie")
+        title = top.get("title", "Tác phẩm")
+        year = top.get("year", 2025)
+        rating = top.get("rating", 8.0)
+        desc = top.get("description", "")
+        chars = top.get("characters", [])
+        facts = top.get("plot_facts", [])
+        start_ms = top.get("start_ms")
+        end_ms = top.get("end_ms")
+        vis_sum = top.get("visual_summary") or top.get("visual_description")
+        diag = top.get("diagnostics") or {}
+
+        # Build grounded narrative parts
+        grounding_sentences: List[str] = []
+
+        # Intro
+        cons = nlu_output.get("constraints") or {}
+        inc = ", ".join(cons.get("include_genres") or [])
+        exc = ", ".join(cons.get("exclude_genres") or [])
+        ref_title = (nlu_output.get("reference") or {}).get("text")
+
+        if ref_title:
+            grounding_sentences.append(f"Dựa trên sự tương đồng với **{ref_title}**")
+        elif inc:
+            grounding_sentences.append(f"Dựa trên gu thể loại **{inc}**")
+        else:
+            grounding_sentences.append("Dựa trên truy vấn ngữ nghĩa của bạn")
+
+        if exc:
+            grounding_sentences.append(f"(đã loại trừ hoàn toàn thể loại **{exc}**)")
+
+        intro_prefix = " ".join(grounding_sentences)
+
+        # Grounding by Item Type
+        if item_type == "scene":
+            ts_str = f"{self._format_time_ms(start_ms)}–{self._format_time_ms(end_ms)}"
+            main_recommendation = (
+                f"{intro_prefix}, tôi đề xuất phân cảnh **{title}** (mốc thời gian **{ts_str}**). "
+            )
+            if vis_sum:
+                main_recommendation += f"Cảnh quay miêu tả: *{vis_sum}*. "
+        elif item_type == "segment":
+            ts_str = f"{self._format_time_ms(start_ms)}–{self._format_time_ms(end_ms)}"
+            main_recommendation = (
+                f"{intro_prefix}, tôi gợi ý đoạn trích **{title}** (thời lượng **{ts_str}**). "
+                f"{desc} "
+            )
+        elif item_type == "episode":
+            ep_num = top.get("episode_number")
+            num_str = f"Tập {ep_num}: " if ep_num else ""
+            main_recommendation = (
+                f"{intro_prefix}, tôi đề xuất tập phim **{num_str}{title}** ({year} · {rating}★). "
+                f"{desc} "
+            )
+        else:
+            main_recommendation = (
+                f"{intro_prefix}, tôi đề xuất tác phẩm **{title}** ({year} · {rating}★). "
+                f"{desc} "
+            )
+
+        # Character grounding
+        if chars:
+            main_recommendation += f"Tác phẩm có sự xuất hiện của nhân vật **{', '.join(chars[:2])}**. "
+
+        # Verified plot facts grounding
+        if facts:
+            fact_text = facts[0] if isinstance(facts[0], str) else facts[0].get("text", "")
+            main_recommendation += f"Tình tiết cốt truyện xác thực: \"*{fact_text}*\". "
+
+        # Trait diagnostics grounding
+        missing_traits = diag.get("missing_traits") or []
+        if missing_traits:
+            main_recommendation += f"(Hệ thống lưu ý: Dữ liệu thuộc tính {' & '.join(missing_traits)} của mục này chưa được hiệu chuẩn). "
+
+        # Additional recommendations
+        if others:
+            other_names = ", ".join(f"**{m.get('title')}**" for m in others[:2])
+            main_recommendation += f"Ngoài ra, bạn cũng có thể tham khảo thêm {other_names}."
+
+        return main_recommendation.strip()
 
 
 # =============================================================================
@@ -302,7 +474,7 @@ class ExplanationGeneratorNode:
 # =============================================================================
 class CascadingAIPipeline:
     """
-    Trình điều phối toàn bộ Pipeline 5 tầng tích hợp Phase 23 Intent Parser
+    Trình điều phối toàn bộ Pipeline 5 tầng tích hợp Phase 23 Intent Parser và multi-level Catalog.
     """
     def __init__(self):
         self.nlu_node = NLUUnderstandingNode()
@@ -315,15 +487,15 @@ class CascadingAIPipeline:
     def _build_follow_ups(nlu_result: Dict[str, Any], ranked_top: List[Dict[str, Any]]) -> List[str]:
         follow_ups = []
         if ranked_top:
-            top_title = ranked_top[0]["title"]
-            follow_ups.append(f"Tìm phim giống {top_title} nhưng không có kinh dị")
+            top_title = ranked_top[0].get("title", "")
+            follow_ups.append(f"Tìm nội dung liên quan đến {top_title}")
         cons = nlu_result.get("constraints") or {}
         if "Horror" not in (cons.get("exclude_genres") or []):
             follow_ups.append("Giữ nguyên nhưng bỏ thể loại kinh dị đi")
         if cons.get("year_min") is None and cons.get("year_max") is None:
-            follow_ups.append("Đổi thành phim phát hành từ năm 2020 trở đi")
+            follow_ups.append("Đổi thành nội dung phát hành từ năm 2024 trở đi")
         else:
-            follow_ups.append("Đổi thành lấy 5 phim thay vì kết quả hiện tại")
+            follow_ups.append("Đổi thành lấy 5 kết quả thay vì hiện tại")
         return follow_ups[:3]
 
     def run(
@@ -333,19 +505,28 @@ class CascadingAIPipeline:
         history: Optional[List[Dict[str, Any]]] = None,
         session_id: str = "default"
     ) -> Dict[str, Any]:
-        # Hợp nhất catalog gửi từ client với kho phim chuẩn để đảm bảo luôn có đủ các tác phẩm kinh điển
-        merged_catalog = list(DEFAULT_MOVIES)
-        if catalog:
-            existing_ids = {m["id"] for m in merged_catalog}
-            for item in catalog:
-                if item.get("id") not in existing_ids:
-                    merged_catalog.append(item)
+        """
+        Execute full 5-stage recommendation pipeline on the active catalog.
+        Uses imported real catalog when available, without forcing 12 hardcoded movies.
+        """
+        # Resolve active catalog corpus
+        if catalog is not None and len(catalog) > 0:
+            active_catalog = list(catalog)
+        elif catalog_sync_manager.is_loaded:
+            active_catalog = catalog_sync_manager.get_flattened_catalog()
+        else:
+            active_catalog = list(DEFAULT_MOVIES)
 
         # Stage 1: Phase 23 Qwen Intent Parser & Patch Merger
-        nlu_result = self.nlu_node.process(query, history, merged_catalog, session_id=session_id)
+        nlu_result = self.nlu_node.process(query, history, active_catalog, session_id=session_id)
+        if not (nlu_result.get("query") or {}).get("text"):
+            if "query" not in nlu_result or not isinstance(nlu_result["query"], dict):
+                nlu_result["query"] = {}
+            nlu_result["query"]["text"] = query
+        nlu_result["raw_query"] = query
 
         # Stage 2: Hard Constraint & Hybrid Retrieval
-        candidates = self.retrieval_node.retrieve_candidates(nlu_result, merged_catalog, top_k=12)
+        candidates = self.retrieval_node.retrieve_candidates(nlu_result, active_catalog, top_k=12)
 
         # Stage 3: Qwen 0.6B Recommender (Coarse Filtering)
         filtered = self.recommender_node.filter_candidates(candidates, nlu_result)
@@ -353,8 +534,13 @@ class CascadingAIPipeline:
         # Stage 4: Qwen 0.6B Ranker & MMR Diversity
         ranked_top = self.ranker_node.rank_top_k(filtered, nlu_result, top_k=3)
 
-        # Stage 5: Qwen Grounded Storytelling Explanation
+        # Stage 5: Grounded Storytelling Explanation
         explanation_text = self.explainer_node.generate_explanation(ranked_top, nlu_result, query, history)
+
+        # Aggregate diagnostics from candidates
+        collected_diagnostics = [
+            m.get("diagnostics") for m in ranked_top if m.get("diagnostics")
+        ]
 
         return {
             "text": explanation_text,
@@ -364,6 +550,7 @@ class CascadingAIPipeline:
                 "nlu": nlu_result,
                 "candidateCount": len(candidates),
                 "rankedCount": len(ranked_top),
+                "diagnostics": collected_diagnostics,
             },
             "followUps": self._build_follow_ups(nlu_result, ranked_top)
         }

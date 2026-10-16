@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         query: queryText,
         messages: messages || [{ role: 'user', content: queryText }],
-        availableMovies: movies,
+        availableMovies: body.availableMovies,
       }),
     });
 

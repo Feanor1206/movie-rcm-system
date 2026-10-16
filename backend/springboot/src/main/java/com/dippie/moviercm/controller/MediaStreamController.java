@@ -33,12 +33,16 @@ public class MediaStreamController {
         MediaAsset asset = mediaStreamService.getMediaAsset(assetId);
         long length = mediaStreamService.getResourceLength(asset);
 
+        CacheControl cacheControl = asset.isPublic()
+                ? CacheControl.maxAge(3600, java.util.concurrent.TimeUnit.SECONDS).cachePublic()
+                : CacheControl.noStore().noCache().mustRevalidate().cachePrivate();
+
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(asset.getMimeType()))
                 .contentLength(length)
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .eTag(asset.getId() + "-" + asset.getVersion())
-                .cacheControl(CacheControl.maxAge(3600, java.util.concurrent.TimeUnit.SECONDS).cachePublic())
+                .cacheControl(cacheControl)
                 .build();
     }
 
@@ -72,7 +76,10 @@ public class MediaStreamController {
 
                 response.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
                 response.setHeader(HttpHeaders.ETAG, "\"" + asset.getId() + "-" + asset.getVersion() + "\"");
-                response.setHeader(HttpHeaders.CACHE_CONTROL, "public, max-age=3600");
+                String cacheControlHeader = asset.isPublic()
+                        ? "public, max-age=3600"
+                        : "private, no-cache, no-store, must-revalidate";
+                response.setHeader(HttpHeaders.CACHE_CONTROL, cacheControlHeader);
                 response.setContentType(asset.getMimeType());
 
                 if (!range.isRanged()) {

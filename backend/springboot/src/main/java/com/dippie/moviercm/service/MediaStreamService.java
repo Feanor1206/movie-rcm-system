@@ -1,5 +1,6 @@
 package com.dippie.moviercm.service;
 
+import com.dippie.moviercm.config.StorageKeyConfig;
 import com.dippie.moviercm.dto.MediaAssetDto;
 import com.dippie.moviercm.dto.MediaDescriptorResponse;
 import com.dippie.moviercm.entity.MediaAsset;
@@ -9,6 +10,7 @@ import com.dippie.moviercm.exception.MediaNotFoundException;
 import com.dippie.moviercm.exception.MediaUnavailableException;
 import com.dippie.moviercm.repository.MediaAssetRepository;
 import com.dippie.moviercm.repository.MovieRepository;
+import com.dippie.moviercm.repository.catalog.CatalogMediaAssetRepository;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -27,6 +30,8 @@ public class MediaStreamService {
     private final MediaAssetRepository mediaAssetRepository;
     private final LocalMediaStorageAdapter localStorageAdapter;
     private final DriveMediaStorageAdapter driveStorageAdapter;
+    private final StorageKeyConfig storageKeyConfig;
+    private final CatalogMediaAssetRepository catalogMediaAssetRepository;
 
     // Local stream bulkhead permits
     private final AtomicInteger activeStreamCount = new AtomicInteger(0);
@@ -64,12 +69,16 @@ public class MediaStreamService {
                               MediaAssetRepository mediaAssetRepository,
                               LocalMediaStorageAdapter localStorageAdapter,
                               DriveMediaStorageAdapter driveStorageAdapter,
+                              @Autowired(required = false) StorageKeyConfig storageKeyConfig,
+                              @Autowired(required = false) CatalogMediaAssetRepository catalogMediaAssetRepository,
                               @Value("${app.media.max-concurrent-streams:10}") int maxConcurrentStreams,
                               @Value("${app.media.max-concurrent-drive-streams:5}") int maxConcurrentDriveStreams) {
         this.movieRepository = movieRepository;
         this.mediaAssetRepository = mediaAssetRepository;
         this.localStorageAdapter = localStorageAdapter;
         this.driveStorageAdapter = driveStorageAdapter;
+        this.storageKeyConfig = storageKeyConfig;
+        this.catalogMediaAssetRepository = catalogMediaAssetRepository;
         this.maxConcurrentStreams = maxConcurrentStreams > 0 ? maxConcurrentStreams : 10;
         this.maxConcurrentDriveStreams = maxConcurrentDriveStreams > 0 ? maxConcurrentDriveStreams : 5;
     }
@@ -78,15 +87,24 @@ public class MediaStreamService {
                               MediaAssetRepository mediaAssetRepository,
                               LocalMediaStorageAdapter localStorageAdapter,
                               DriveMediaStorageAdapter driveStorageAdapter,
+                              int maxConcurrentStreams,
+                              int maxConcurrentDriveStreams) {
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, null, null, maxConcurrentStreams, maxConcurrentDriveStreams);
+    }
+
+    public MediaStreamService(MovieRepository movieRepository,
+                              MediaAssetRepository mediaAssetRepository,
+                              LocalMediaStorageAdapter localStorageAdapter,
+                              DriveMediaStorageAdapter driveStorageAdapter,
                               int maxConcurrentStreams) {
-        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, maxConcurrentStreams, 5);
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, null, null, maxConcurrentStreams, 5);
     }
 
     public MediaStreamService(MovieRepository movieRepository,
                               MediaAssetRepository mediaAssetRepository,
                               LocalMediaStorageAdapter localStorageAdapter,
                               DriveMediaStorageAdapter driveStorageAdapter) {
-        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, 10, 5);
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, null, null, 10, 5);
     }
 
     // --- Bulkhead Permit Management: Local ---
@@ -247,8 +265,28 @@ public class MediaStreamService {
     public MediaAsset getMediaAsset(String assetId) {
         MediaAsset asset = mediaAssetRepository.findByIdAndIsAvailableTrue(assetId)
                 .orElseThrow(() -> new MediaNotFoundException("Không tìm thấy tài nguyên media: " + assetId));
-        if (!Boolean.TRUE.equals(asset.getPublic())) {
+        if (Boolean.TRUE.equals(asset.getPublic())) {
+            return asset;
+        }
+
+        // Allow playback for non-public assets if user is authenticated (and admin if private)
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAuthenticated = auth != null && auth.isAuthenticated()
+                && !(auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
+
+        if (!isAuthenticated) {
             throw new MediaNotFoundException("Không tìm thấy tài nguyên media: " + assetId);
+        }
+
+        if (catalogMediaAssetRepository != null) {
+            Optional<com.dippie.moviercm.entity.catalog.CatalogMediaAsset> cAsset = catalogMediaAssetRepository.findById(assetId);
+            if (cAsset.isPresent() && "private".equalsIgnoreCase(cAsset.get().getAccessPolicy())) {
+                boolean isAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                if (!isAdmin) {
+                    throw new MediaNotFoundException("Không tìm thấy tài nguyên media: " + assetId);
+                }
+            }
         }
         return asset;
     }
@@ -264,16 +302,48 @@ public class MediaStreamService {
     }
 
     public Resource getMediaResource(MediaAsset asset) {
+        if (storageKeyConfig != null && asset.getStorageKey() != null && !asset.getStorageKey().isBlank()) {
+            java.nio.file.Path targetPath = storageKeyConfig.resolvePath(asset.getStorageProvider(), asset.getStorageKey(), asset.getRelativePath());
+            if ("drive".equalsIgnoreCase(asset.getStorageProvider()) && driveStorageAdapter != null) {
+                return driveStorageAdapter.getResourceForPath(targetPath);
+            }
+            Resource resource = new org.springframework.core.io.FileSystemResource(targetPath);
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new MediaUnavailableException("Không thể mở luồng đọc cho tệp media: " + asset.getRelativePath());
+            }
+            return resource;
+        }
         MediaStorageAdapter adapter = getStorageAdapter(asset.getStorageProvider());
         return adapter.getResource(asset.getRelativePath());
     }
 
     public long getResourceLength(MediaAsset asset) {
+        if (storageKeyConfig != null && asset.getStorageKey() != null && !asset.getStorageKey().isBlank()) {
+            java.nio.file.Path targetPath = storageKeyConfig.resolvePath(asset.getStorageProvider(), asset.getStorageKey(), asset.getRelativePath());
+            if ("drive".equalsIgnoreCase(asset.getStorageProvider()) && driveStorageAdapter != null) {
+                return driveStorageAdapter.getResourceLengthForPath(targetPath);
+            }
+            try {
+                return java.nio.file.Files.size(targetPath);
+            } catch (IOException e) {
+                throw new MediaUnavailableException("Không thể xác định kích thước tệp media: " + asset.getRelativePath());
+            }
+        }
         MediaStorageAdapter adapter = getStorageAdapter(asset.getStorageProvider());
         return adapter.getResourceLength(asset.getRelativePath());
     }
 
     public java.nio.channels.SeekableByteChannel openMediaChannel(MediaAsset asset) throws IOException {
+        if (storageKeyConfig != null && asset.getStorageKey() != null && !asset.getStorageKey().isBlank()) {
+            java.nio.file.Path targetPath = storageKeyConfig.resolvePath(asset.getStorageProvider(), asset.getStorageKey(), asset.getRelativePath());
+            if ("drive".equalsIgnoreCase(asset.getStorageProvider()) && driveStorageAdapter != null) {
+                return driveStorageAdapter.openChannelForPath(targetPath);
+            }
+            if (!java.nio.file.Files.exists(targetPath) || !java.nio.file.Files.isRegularFile(targetPath)) {
+                throw new MediaNotFoundException("Không tìm thấy tệp media: " + asset.getRelativePath());
+            }
+            return java.nio.channels.FileChannel.open(targetPath, java.nio.file.StandardOpenOption.READ);
+        }
         MediaStorageAdapter adapter = getStorageAdapter(asset.getStorageProvider());
         return adapter.openChannel(asset.getRelativePath());
     }

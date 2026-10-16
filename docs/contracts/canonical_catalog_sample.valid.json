@@ -1,0 +1,306 @@
+{
+  "schema_version": "1.0",
+  "created_at": "2026-10-16T18:00:00Z",
+  "description": "Dippie Cinema Canonical Animation Movie Bundle (Golden Reference Catalog)",
+  "movies": [
+    {
+      "id": "spirited-away",
+      "title": "Spirited Away",
+      "aliases": [
+        "Sen to Chihiro no Kamikakushi",
+        "Vùng Đất Linh Hồn",
+        "Sen và Chihiro ở thế giới bí ẩn"
+      ],
+      "year": 2001,
+      "runtime_minutes": 125,
+      "rating": 8.6,
+      "genres": [
+        "Animation",
+        "Adventure",
+        "Fantasy",
+        "Family"
+      ],
+      "synopsis": "Trong chuyến chuyển nhà về vùng ngoại ô cùng cha mẹ, cô bé Chihiro 10 tuổi bướng bỉnh vô tình bước vào một công viên giải trí bỏ hoang - thực chất là thế giới linh hồn kỳ bí do phù thủy Yubaba cai quản. Sau khi cha mẹ bị biến thành heo vì ăn thức ăn của thần linh, Chihiro phải làm việc tại nhà tắm công cộng cho các vị thần để tìm cách cứu cha mẹ và trở về thế giới loài người.",
+      "language": "ja",
+      "poster_url": "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=85",
+      "backdrop_url": "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1800&q=85",
+      "provenance": {
+        "verification_status": "human_verified",
+        "source": "Studio Ghibli Official Archive & Editorial Curator",
+        "model_id": null,
+        "verified_by": "curator-senior-01",
+        "verified_at": "2026-10-16T12:00:00Z"
+      },
+      "verified_facts": {
+        "plot_facts": [
+          "Bố mẹ của Chihiro ăn đồ cúng của thần linh và bị biến thành heo.",
+          "Chihiro đổi tên thành Sen để làm việc tại nhà tắm công cộng của phù thủy Yubaba.",
+          "Chihiro giúp đỡ Vô Diện (No-Face) và Rồng Haku nhớ lại tên thật của mình (sông Kohaku)."
+        ],
+        "characters": [
+          "Chihiro Ogino (Sen)",
+          "Haku (Nigihayami Kohakunushi)",
+          "Phù thủy Yubaba",
+          "Vô Diện (No-Face)",
+          "Bác Kamaji"
+        ],
+        "themes": [
+          "Trưởng thành và độc lập",
+          "Bảo vệ môi trường và thiên nhiên",
+          "Lòng dũng cảm và lòng vị tha",
+          "Giữ gìn bản sắc và tên gọi cá nhân"
+        ],
+        "keywords": [
+          "thế giới linh hồn",
+          "nhà tắm thần linh",
+          "bố mẹ biến thành lợn",
+          "chuyến tàu trên biển",
+          "vô diện",
+          "rồng trắng"
+        ]
+      },
+      "comparative_attributes": {
+        "scale_version": "v1.0-normalized-0-1",
+        "darkness": 0.35,
+        "pacing": 0.45,
+        "provenance": "human_annotated"
+      },
+      "media_assets": [
+        {
+          "asset_id": "ast-drive-videoplayback",
+          "asset_type": "feature_video",
+          "storage_backend": "google_drive",
+          "relative_path": null,
+          "drive_file_id": "1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ",
+          "container_format": "mp4",
+          "available": true
+        }
+      ],
+      "scene_segments": [
+        {
+          "start_seconds": 60.0,
+          "end_seconds": 240.0,
+          "title": "Bố mẹ lạc vào quán ăn thần linh",
+          "description": "Chihiro cảnh báo bố mẹ không nên ăn thức ăn không người trông coi, nhưng bố mẹ không nghe và biến thành heo khi trời chập tối.",
+          "transcript": "Mẹ ơi, chúng ta quay lại đi! Chỗ này có gì đó rất lạ..."
+        }
+      ]
+    },
+    {
+      "id": "coraline",
+      "title": "Coraline",
+      "aliases": [
+        "Cô Bé Coraline",
+        "Cánh Cửa Bí Mật"
+      ],
+      "year": 2009,
+      "runtime_minutes": 100,
+      "rating": 7.7,
+      "genres": [
+        "Animation",
+        "Fantasy",
+        "Horror",
+        "Mystery"
+      ],
+      "synopsis": "Cô bé Coraline 11 tuổi khám phá ra một cánh cửa bí mật dẫn tới một thế giới khác dường như hoàn hảo hơn nơi ở hiện tại. Tuy nhiên, thế giới này ẩn giấu âm mưu đen tối của người Mẹ Khác muốn khâu cúc áo vào mắt cô bé để cướp đi linh hồn.",
+      "language": "en",
+      "poster_url": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=85",
+      "backdrop_url": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1800&q=85",
+      "provenance": {
+        "verification_status": "human_verified",
+        "source": "Laika Studios & Editorial Review",
+        "model_id": null,
+        "verified_by": "curator-senior-01",
+        "verified_at": "2026-10-16T12:00:00Z"
+      },
+      "verified_facts": {
+        "plot_facts": [
+          "Coraline tìm thấy một cánh cửa nhỏ bị dán giấy tường che khuất trong ngôi nhà Pink Palace.",
+          "Mẹ Khác có đôi mắt làm bằng cúc áo màu đen và dụ dỗ Coraline ở lại vĩnh viễn.",
+          "Coraline phải giải đố để tìm lại mắt của những đứa trẻ đã bị cướp linh hồn."
+        ],
+        "characters": [
+          "Coraline Jones",
+          "Mẹ Khác (The Beldam)",
+          "Wybie Lovat",
+          "Chú mèo đen"
+        ],
+        "themes": [
+          "Cẩn trọng với những điều quá hoàn hảo",
+          "Lòng dũng cảm của trẻ thơ đối đầu cái ác",
+          "Mối quan hệ gia đình thực tế"
+        ],
+        "keywords": [
+          "mắt cúc áo",
+          "cánh cửa bí mật",
+          "thế giới song song rùng rợn",
+          "búp bê ma thuật",
+          "kinh dị thiếu nhi"
+        ]
+      },
+      "comparative_attributes": {
+        "scale_version": "v1.0-normalized-0-1",
+        "darkness": 0.85,
+        "pacing": 0.60,
+        "provenance": "human_annotated"
+      },
+      "media_assets": [
+        {
+          "asset_id": "ast-local-coraline",
+          "asset_type": "trailer",
+          "storage_backend": "local",
+          "relative_path": "/videos/nocturne.mp4",
+          "drive_file_id": null,
+          "container_format": "mp4",
+          "available": true
+        }
+      ],
+      "scene_segments": []
+    },
+    {
+      "id": "spider-verse",
+      "title": "Spider-Man: Into the Spider-Verse",
+      "aliases": [
+        "Người Nhện: Vũ Trụ Mới",
+        "Into the Spider-Verse"
+      ],
+      "year": 2018,
+      "runtime_minutes": 117,
+      "rating": 8.4,
+      "genres": [
+        "Animation",
+        "Action",
+        "Adventure",
+        "Sci-Fi"
+      ],
+      "synopsis": "Cậu thiếu niên Miles Morales tại Brooklyn trở thành Người Nhện sau khi bị nhện phóng xạ cắn, và bất ngờ hội ngộ năm phiên bản Người Nhện đến từ các chiều không gian khác nhau để cùng ngăn chặn thảm họa sụp đổ thực tại do Kingpin gây ra.",
+      "language": "en",
+      "poster_url": "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=600&q=85",
+      "backdrop_url": "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=1800&q=85",
+      "provenance": {
+        "verification_status": "human_verified",
+        "source": "Sony Pictures Animation Editorial",
+        "model_id": null,
+        "verified_by": "curator-senior-02",
+        "verified_at": "2026-10-16T12:00:00Z"
+      },
+      "verified_facts": {
+        "plot_facts": [
+          "Miles Morales chứng kiến cái chết của Peter Parker vũ trụ của mình.",
+          "Máy gia tốc hạt của Kingpin kéo Người Nhện từ các chiều không gian khác đến Brooklyn.",
+          "Miles học được bước nhảy niềm tin (leap of faith) và làm chủ năng lượng tàng hình và nọc độc điện."
+        ],
+        "characters": [
+          "Miles Morales",
+          "Peter B. Parker",
+          "Gwen Stacy (Spider-Woman)",
+          "Kingpin (Wilson Fisk)",
+          "Prowler (Bác Aaron)"
+        ],
+        "themes": [
+          "Bất kỳ ai cũng có thể đeo mặt nạ người hùng",
+          "Bước nhảy niềm tin và vượt qua mất mát",
+          "Sự đa dạng và tình đoàn kết"
+        ],
+        "keywords": [
+          "đa vũ trụ",
+          "bước nhảy niềm tin",
+          "truyện tranh sống động",
+          "người nhện brooklyn",
+          "hip-hop soundtrack"
+        ]
+      },
+      "comparative_attributes": {
+        "scale_version": "v1.0-normalized-0-1",
+        "darkness": 0.40,
+        "pacing": 0.90,
+        "provenance": "human_annotated"
+      },
+      "media_assets": [
+        {
+          "asset_id": "ast-local-spider-verse",
+          "asset_type": "trailer",
+          "storage_backend": "local",
+          "relative_path": "/videos/glass-horizon.mp4",
+          "drive_file_id": null,
+          "container_format": "mp4",
+          "available": true
+        }
+      ],
+      "scene_segments": []
+    },
+    {
+      "id": "isle-of-dogs",
+      "title": "Isle of Dogs",
+      "aliases": [
+        "Đảo Chó",
+        "Isle of Dogs Wes Anderson"
+      ],
+      "year": 2018,
+      "runtime_minutes": 101,
+      "rating": 7.8,
+      "genres": [
+        "Animation",
+        "Adventure",
+        "Comedy",
+        "Drama"
+      ],
+      "synopsis": "Tại Nhật Bản tương lai, dịch cúm chó bùng phát khiến thị xã Megasaki trục xuất toàn bộ loài chó ra Đảo Rác. Cậu bé Atari 12 tuổi tự lái máy bay mini đến đảo để tìm kiếm chú chó trung thành Spots của mình, cùng sự giúp đỡ của đàn chó hoang nghĩa hiệp.",
+      "language": "en",
+      "poster_url": "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=600&q=85",
+      "backdrop_url": "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1800&q=85",
+      "provenance": {
+        "verification_status": "human_verified",
+        "source": "Fox Searchlight Pictures Archive",
+        "model_id": null,
+        "verified_by": "curator-senior-02",
+        "verified_at": "2026-10-16T12:00:00Z"
+      },
+      "verified_facts": {
+        "plot_facts": [
+          "Thị trưởng Kobayashi ban hành lệnh lưu đày loài chó ra Đảo Rác.",
+          "Atari hạ cánh khẩn cấp trên Đảo Rác và kết bạn với đàn chó do Chief dẫn đầu.",
+          "Nhóm học sinh phát hiện thuốc giải cúm chó bị chính quyền che giấu."
+        ],
+        "characters": [
+          "Atari Kobayashi",
+          "Chief (chó hoang)",
+          "Rex",
+          "King",
+          "Spots",
+          "Tracy Walker"
+        ],
+        "themes": [
+          "Tình bạn gắn kết giữa con người và loài vật",
+          "Chống độc tài và phân biệt đối xử",
+          "Nghệ thuật stop-motion phong cách Wes Anderson"
+        ],
+        "keywords": [
+          "đảo rác",
+          "chó trung thành",
+          "stop-motion",
+          "nhật bản tương lai",
+          "hài châm biếm"
+        ]
+      },
+      "comparative_attributes": {
+        "scale_version": "v1.0-normalized-0-1",
+        "darkness": 0.45,
+        "pacing": 0.55,
+        "provenance": "human_annotated"
+      },
+      "media_assets": [
+        {
+          "asset_id": "ast-local-isle-of-dogs",
+          "asset_type": "trailer",
+          "storage_backend": "local",
+          "relative_path": "/videos/deep-blue.mp4",
+          "drive_file_id": null,
+          "container_format": "mp4",
+          "available": true
+        }
+      ],
+      "scene_segments": []
+    }
+  ]
+}

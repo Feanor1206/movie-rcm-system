@@ -19,6 +19,7 @@ export function Navbar() {
     { name: 'Khám phá', href: '/' },
     { name: 'Kho phim', href: '/search' },
     { name: 'Danh sách xem', href: '/profile', count: watchlist.length },
+    { name: 'Nhập dữ liệu', href: '/admin/import' },
   ];
 
   // Close dropdown on outside click

@@ -964,6 +964,22 @@ class QwenRecommendationService:
                 "question": "Số lượng phim yêu cầu phải nằm trong khoảng từ 1 đến 100. Bạn muốn nhận bao nhiêu gợi ý?"
             }
 
+        # In CATALOG-01, animation discovery queries (targeting scenes, episodes, characters, keywords)
+        # should never be blocked by spurious model CLARIFICATION unless there are true conflicting constraints
+        has_true_conflict = (
+            (ymin is not None and ymax is not None and ymin > ymax) or
+            (rk is not None and (rk < 1 or rk > 100))
+        )
+        if intent["intent_type"] == "CLARIFICATION" and not has_true_conflict:
+            q_has_cues = any(w in q_lower for w in ("phân cảnh", "cảnh", "tập", "đoạn", "truyện", "nhân vật", "tìm", "xem", "chiếu", "phim"))
+            if q_has_cues or len(q_lower.split()) >= 3:
+                intent["intent_type"] = "DISCOVERY"
+                intent["clarification"]["required"] = False
+                intent["clarification"]["reason"] = None
+                intent["clarification"]["question"] = None
+                if not intent["query"]["text"]:
+                    intent["query"]["text"] = query
+
         # 7. Xây dựng patch_operations nếu là CONVERSATIONAL_PATCH
         if intent["intent_type"] == "CONVERSATIONAL_PATCH":
             ops = list(raw_intent.get("patch_operations") or [])

@@ -1,0 +1,94 @@
+{
+  "task": "CATALOG-01-F01",
+  "base_commit": "c2d29c04edd58c4cc0a6e648d316285a9377384f",
+  "branch": "dev",
+  "contract": "dippie.catalog.v1",
+  "contract_preserved": true,
+  "status": "READY_FOR_HANDOVER",
+  "completed_at": "2026-10-16T22:05:00+07:00",
+  "findings": {
+    "C1": {
+      "title": "Admin Catalog Controller Open & Index Sync Endpoint Security",
+      "status": "CLOSED",
+      "resolution": "Applied ROLE_ADMIN requirement via SecurityConfig and @PreAuthorize. Secured FastAPI /api/index/sync with X-Service-Token header and removed arbitrary file path sync.",
+      "tests": ["test_12_fastapi_endpoints_sync_and_serve_real_catalog"]
+    },
+    "C2": {
+      "title": "Missing Storage Key Server Mapping & Path Traversal / Drive Resolution",
+      "status": "CLOSED",
+      "resolution": "Implemented StorageKeyConfig with strict allowlist. Resolved Windows path containment and unmounted drive safety without crash.",
+      "tests": ["testPathTraversalRejected", "testImportCommitSuccess"]
+    },
+    "C3": {
+      "title": "Partial JSON Schema Draft 2020-12 Engine in Java",
+      "status": "CLOSED",
+      "resolution": "Implemented complete two-step validation: Draft 2020-12 structural/type rules followed by relational/semantic validation matching validate_catalog.py.",
+      "tests": ["CatalogValidatorTest (all 9 tests)", "CATALOG_01_contract_probe.py"]
+    },
+    "C4": {
+      "title": "Under-specified Relational DDL & Missing Tables / Columns",
+      "status": "CLOSED",
+      "resolution": "Updated schema.sql with complete 12 entity tables, raw_json CLOB preservation, opt_lock_version BIGINT, and catalog_snapshots outbox table.",
+      "tests": ["CatalogImportServiceTest (all 6 tests)"]
+    },
+    "C5": {
+      "title": "Contract Probe Failures on Valid Schemas",
+      "status": "CLOSED",
+      "resolution": "Enhanced CatalogValidator and CatalogSyncManager to handle multilingual alias objects, unknown segment timestamps, and nested properties without false positives.",
+      "tests": ["CATALOG_01_contract_probe.py (8/8 cases matched)"]
+    },
+    "C6": {
+      "title": "Preview / Dry-Run Diff Calculation and Revision Conflict Detection",
+      "status": "CLOSED",
+      "resolution": "Implemented validateAndPreview() computing SHA-256 and diff counts. Enforced revision conflict policy (rejecting lower revisions, detecting same-rev hash conflicts).",
+      "tests": ["testDryRunPreview", "testLowerRevisionRejected", "testSameRevisionDifferentContentConflict", "testHigherRevisionUpdate"]
+    },
+    "C7": {
+      "title": "Transaction Isolation, Optimistic Locking, and Outbox Snapshot Recording",
+      "status": "CLOSED",
+      "resolution": "Implemented atomic transactional import across all 12 JPA repositories, @Version optimistic locking, and catalog_snapshots outbox persistence.",
+      "tests": ["testImportCommitSuccess", "testIdempotentReimport"]
+    },
+    "C8": {
+      "title": "Web Catalog Deep Linking, Race Condition, Click Trap & Accessibility",
+      "status": "CLOSED",
+      "resolution": "Added deep link parsing (?episode=&scene=&asset=&t=), AbortController & generation counter on episode switch, multi-asset scene seek, removed click trap, added keyboard accessibility.",
+      "tests": ["npx tsc --noEmit"]
+    },
+    "C9": {
+      "title": "FastAPI Hybrid Index Ingestion & Grounded Explanations",
+      "status": "CLOSED",
+      "resolution": "Implemented 4-level catalog flattening, BM25 + multilingual-e5 hybrid indexing, and grounded Stage 5 explanations with timestamps and plot facts.",
+      "tests": ["test_catalog_retrieval.py (all 12 tests)"]
+    },
+    "C10": {
+      "title": "Verification Artifacts, Runbook Update, and Snapshot Integrity",
+      "status": "CLOSED",
+      "resolution": "Updated docs/runbooks/CATALOG_IMPORT.md, published field mapping matrix, resolution report, status, manifest, and cross review.",
+      "tests": ["Full test suite execution verified"]
+    }
+  },
+  "test_metrics": {
+    "spring_boot": {
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "errors": 0
+    },
+    "fastapi": {
+      "total": 12,
+      "passed": 12,
+      "failed": 0,
+      "errors": 0
+    },
+    "contract_probe": {
+      "total_cases": 8,
+      "matched_cases": 8,
+      "exceptions": 0
+    },
+    "frontend_typescript": {
+      "errors": 0,
+      "status": "SUCCESS"
+    }
+  }
+}
