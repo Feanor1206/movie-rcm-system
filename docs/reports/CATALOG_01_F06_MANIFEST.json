@@ -1,0 +1,78 @@
+{
+  "checkpointId": "CATALOG-01-F06-CHECKPOINT-01",
+  "timestamp": "2026-10-17T13:43:40+07:00",
+  "files": {
+    "docs/reports/CATALOG_01_F06_REPORT.md": {
+      "sha256": "6e59af73a533ac9c7fa46cb15bbe6912bdc842ae29a89918e82ef7d24b43bb4d",
+      "bytes": 24128
+    },
+    "docs/reports/CATALOG_01_F06_PRODUCT_ACCEPTANCE.md": {
+      "sha256": "f58e11b9593b72823d2ecbf7715e692f10e5921a65e60dc44ade8b3aea9c7ce0",
+      "bytes": 4059
+    },
+    "docs/reviews/CATALOG_01_F06_CROSS_REVIEW.md": {
+      "sha256": "517326730a9b72453f109959b3c3b9e4eb10512dfc2623c6e83ba1c1049252bd",
+      "bytes": 6669
+    },
+    "docs/reports/CATALOG_01_F06_STATUS.json": {
+      "sha256": "cd2b637ec50a6aaa1eeb44d37c0ce4fd57142e64269c83add437353111b96c16",
+      "bytes": 3233
+    },
+    "docs/reports/CATALOG_01_F06.patch": {
+      "sha256": "a7b1771e16d4faee7a6770232c2e10f6c9b2d18b7e49f3826f6854068cb2dfd8",
+      "bytes": 137607
+    },
+    "docs/reviews/evidence/CATALOG_01_F06_rehearsal.json": {
+      "sha256": "7b0eccd99a9267bd0ba7ff14145b313fbda939f9d5e33041fe7727cc95c933a8",
+      "bytes": 794
+    },
+    "scripts/rehearsal_f06_production_stack.py": {
+      "sha256": "7c623e82de77dec8226f3900b42692e32d690b6beb82c9c5cf36fe508e7c1103",
+      "bytes": 24669
+    },
+    "docs/fixtures/rehearsal_catalog.json": {
+      "sha256": "7ca7554cbfc793ea3ec3823605755d38ca98319d9c527ea78d2080abc4a434f4",
+      "bytes": 34821
+    },
+    "docs/runbooks/CATALOG_IMPORT.md": {
+      "sha256": "4a645763af21d1a59a509fcfde9d4f2dc2fe6e3f84ae359c1f581798cf21c7ed",
+      "bytes": 21604
+    },
+    "backend/fastapi/main.py": {
+      "sha256": "8cfb9dd9ce78ef7d123043b92cc0073cf69344fdbd3ae01dbe5e97514dd89f8e",
+      "bytes": 18183
+    },
+    "backend/springboot/src/main/java/com/dippie/moviercm/config/DataInitializer.java": {
+      "sha256": "efbedfd7219f0e5d976030c11109fe89d4cc16db6c0ea1a6da793a272ede8f95",
+      "bytes": 23865
+    },
+    "backend/springboot/src/main/java/com/dippie/moviercm/service/catalog/CatalogSyncWorker.java": {
+      "sha256": "89dd9752404f1c1138ec929695151e1224e3066d0e5c7cea9f61eb9ad4b80cce",
+      "bytes": 13291
+    },
+    "frontend/lib/services/catalogService.ts": {
+      "sha256": "ef5aea8bc577e246bff51354d26fe5f5d38c8a114c75ae09b5391256d32f7f33",
+      "bytes": 21391
+    },
+    "docs/contracts/animation-catalog-v1/dippie.catalog.v1.schema.json": {
+      "sha256": "23fde047475f1149225f628756a1cbcd5dda4314a38969659a48f400b7f44395",
+      "bytes": 56415
+    },
+    "docs/contracts/animation-catalog-v1/catalog.example.json": {
+      "sha256": "fb895307ed43792ff91afa0d26ae9fbe120fddabd3f89d776a4e8e2a5965e624",
+      "bytes": 18433
+    },
+    "docs/contracts/animation-catalog-v1/catalog.blank.json": {
+      "sha256": "8ed01d97b49885b767cf8c92d58fb5eef36033017d0524af3ba8d56e78b8cd85",
+      "bytes": 551
+    },
+    "docs/contracts/animation-catalog-v1/validate_catalog.py": {
+      "sha256": "e2180d0a24d9522382028b4df7b8c737c0afc7513690de9db4d0fa06bccf5229",
+      "bytes": 10461
+    },
+    "docs/contracts/animation-catalog-v1/README.md": {
+      "sha256": "8b323740df16d5f428308e0a697d518efed57dc04c0eecb8c4fd32ed6537dec5",
+      "bytes": 11445
+    }
+  }
+}

@@ -90,8 +90,9 @@ public class StorageKeyConfig {
             throw new SecurityPathTraversalException("Đường dẫn giải quyết vượt ra ngoài storage root cho phép: " + storageKey);
         }
 
-        // Ancestor symlink / junction containment verification (G5)
-        if (Files.exists(resolved)) {
+        // Ancestor symlink / junction containment verification (G5, H4)
+        // Only perform blocking disk checks on local storage; Drive disk I/O is bounded inside DriveMediaStorageAdapter
+        if (!"drive".equalsIgnoreCase(root.provider()) && Files.exists(resolved)) {
             try {
                 Path realTarget = resolved.toRealPath();
                 Path realRoot = root.rootPath().toRealPath();

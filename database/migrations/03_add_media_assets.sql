@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS media_assets (
     movie_id VARCHAR(100) NOT NULL,
     kind VARCHAR(20) NOT NULL,
     storage_provider VARCHAR(30) NOT NULL DEFAULT 'local',
+    storage_key VARCHAR(100),
     relative_path VARCHAR(500) NOT NULL,
     version VARCHAR(50) NOT NULL DEFAULT 'v1',
     mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',

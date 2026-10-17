@@ -30,7 +30,7 @@ import {
   CatalogScene,
   CatalogMediaAsset,
 } from '@/lib/services/catalogService';
-import { resolveStreamUrl } from '@/lib/services/mediaService';
+import { resolveStreamUrl, requestPlaybackGrant, getStoredAuthToken } from '@/lib/services/mediaService';
 
 const formatDuration = (ms?: number) => {
   if (!ms || ms <= 0) return '00:00';
@@ -53,40 +53,56 @@ interface CoverageEntry {
 function resolveFileTimestamp(
   logicalMs: number,
   asset?: CatalogMediaAsset | null,
-  segmentId?: string | null
-): number {
-  if (!asset?.coverageJson) {
-    return Math.max(0, logicalMs / 1000);
+  segmentId?: string | null,
+  episodeId?: string | null
+): number | null {
+  if (!asset?.coverageJson || typeof logicalMs !== 'number' || isNaN(logicalMs)) {
+    return null;
   }
   try {
     const coverageList: CoverageEntry[] = JSON.parse(asset.coverageJson);
-    if (Array.isArray(coverageList) && coverageList.length > 0) {
-      if (segmentId) {
-        const segCov = coverageList.find((c) => c.segment_id === segmentId);
-        if (segCov && typeof segCov.source_in_ms === 'number') {
-          const epIn = typeof segCov.episode_in_ms === 'number' ? segCov.episode_in_ms : 0;
-          const delta = Math.max(0, logicalMs - epIn);
-          return Math.max(0, (segCov.source_in_ms + delta) / 1000);
+    if (!Array.isArray(coverageList) || coverageList.length === 0) {
+      return null;
+    }
+
+    const relevantCoverage = episodeId
+      ? coverageList.filter((c) => !c.episode_id || c.episode_id === episodeId)
+      : coverageList;
+
+    if (segmentId) {
+      const segCov = relevantCoverage.find((c) => c.segment_id === segmentId);
+      if (segCov && typeof segCov.source_in_ms === 'number') {
+        if (typeof segCov.episode_in_ms !== 'number' || isNaN(segCov.episode_in_ms)) {
+          return null;
         }
-      }
-      const match = coverageList.find((c) => {
-        const epIn = typeof c.episode_in_ms === 'number' ? c.episode_in_ms : 0;
-        const dur =
-          typeof c.source_out_ms === 'number' && typeof c.source_in_ms === 'number'
-            ? c.source_out_ms - c.source_in_ms
-            : Infinity;
-        return logicalMs >= epIn && logicalMs <= epIn + dur;
-      });
-      if (match && typeof match.source_in_ms === 'number') {
-        const epIn = typeof match.episode_in_ms === 'number' ? match.episode_in_ms : 0;
-        const delta = Math.max(0, logicalMs - epIn);
-        return Math.max(0, (match.source_in_ms + delta) / 1000);
+        const delta = logicalMs - segCov.episode_in_ms;
+        if (delta < 0) return null;
+        return (segCov.source_in_ms + delta) / 1000;
       }
     }
+
+    const validEntries = relevantCoverage.filter(
+      (c) => typeof c.source_in_ms === 'number' && typeof c.episode_in_ms === 'number'
+    );
+
+    const matches = validEntries.filter((c) => {
+      const epIn = c.episode_in_ms as number;
+      const dur =
+        typeof c.source_out_ms === 'number' && typeof c.source_in_ms === 'number'
+          ? c.source_out_ms - c.source_in_ms
+          : Infinity;
+      return logicalMs >= epIn && logicalMs <= epIn + dur;
+    });
+
+    if (matches.length === 1) {
+      const match = matches[0];
+      const delta = logicalMs - (match.episode_in_ms as number);
+      return ((match.source_in_ms as number) + delta) / 1000;
+    }
   } catch {
-    // fallback
+    return null;
   }
-  return Math.max(0, logicalMs / 1000);
+  return null;
 }
 
 export default function SeriesDetailPage() {
@@ -230,11 +246,16 @@ export default function SeriesDetailPage() {
             initialDeepLinkHandledRef.current = true;
             let seekSec: number | null = null;
             if (targetTimeMs && !isNaN(Number(targetTimeMs))) {
-              seekSec = resolveFileTimestamp(Number(targetTimeMs), assetToSelect);
+              const isFile = searchParams.get('timeline') === 'file' || searchParams.get('timescale') === 'file';
+              if (isFile) {
+                seekSec = Number(targetTimeMs) / 1000;
+              } else {
+                seekSec = resolveFileTimestamp(Number(targetTimeMs), assetToSelect, undefined, detail.episode.id);
+              }
             } else if (targetSceneId && detail.scenes) {
               const sc = detail.scenes.find((s) => s.id === targetSceneId);
               if (sc) {
-                seekSec = resolveFileTimestamp(sc.startMs, assetToSelect);
+                seekSec = sc.startMs / 1000;
                 setActiveSceneId(sc.id);
               }
             }
@@ -265,22 +286,62 @@ export default function SeriesDetailPage() {
     };
   }, [selectedEpisode?.id, targetAssetId, targetSceneId, targetTimeMs, seriesId]);
 
-  // Video stream URL resolution
-  const streamUrl = selectedAsset?.id
-    ? resolveStreamUrl(`/api/media/stream/${selectedAsset.id}`)
-    : '';
+  // Video stream URL resolution with short-lived playback grant for protected media (H4)
+  const [streamUrl, setStreamUrl] = useState<string>('');
 
-  // Seek video to specific scene & switch asset with strict identity guard (F6, G6)
+  useEffect(() => {
+    if (!selectedAsset?.id) {
+      setStreamUrl('');
+      return;
+    }
+    const currentAssetId = selectedAsset.id;
+    const defaultUrl = resolveStreamUrl(`/api/media/stream/${currentAssetId}`);
+    const token = getStoredAuthToken();
+    const isProtected = selectedAsset.accessPolicy && selectedAsset.accessPolicy !== 'public';
+
+    if (token || isProtected) {
+      const ac = new AbortController();
+      requestPlaybackGrant(currentAssetId, ac.signal)
+        .then((grant) => {
+          if (ac.signal.aborted) return;
+          if (grant?.streamUrl) {
+            setPlaybackWarning(null);
+            setStreamUrl(grant.streamUrl);
+          } else if (isProtected) {
+            setStreamUrl('');
+            setPlaybackWarning('Video được bảo vệ (authenticated/private). Vui lòng đăng nhập với tài khoản có quyền để xem video.');
+          } else {
+            setStreamUrl(defaultUrl);
+          }
+        })
+        .catch(() => {
+          if (ac.signal.aborted) return;
+          if (isProtected) {
+            setStreamUrl('');
+            setPlaybackWarning('Không thể lấy quyền phát video bảo vệ. Vui lòng thử lại sau.');
+          } else {
+            setStreamUrl(defaultUrl);
+          }
+        });
+      return () => {
+        ac.abort();
+      };
+    } else {
+      setStreamUrl(defaultUrl);
+    }
+  }, [selectedAsset?.id, selectedAsset?.accessPolicy]);
+
+  // Seek video to specific scene & switch asset with strict identity guard (F6, G6, H3)
   const handleSeekScene = (scene: CatalogScene) => {
     setPlaybackWarning(null);
     const currentEpId = selectedEpisode?.id || '';
     const currentGen = ++playGenRef.current;
+    const targetSec = scene.startMs / 1000; // Scene start_ms is file timeline directly (H3)
 
     // Check if scene requires switching media asset
     if (scene.mediaAssetId && episodeDetail?.mediaAssets && selectedAsset?.id !== scene.mediaAssetId) {
       const matchingAsset = episodeDetail.mediaAssets.find((a) => a.id === scene.mediaAssetId);
       if (matchingAsset) {
-        const targetSec = resolveFileTimestamp(scene.startMs, matchingAsset);
         pendingSeekRef.current = {
           seriesId: String(seriesId),
           episodeId: currentEpId,
@@ -301,7 +362,6 @@ export default function SeriesDetailPage() {
       }
     }
 
-    const targetSec = resolveFileTimestamp(scene.startMs, selectedAsset);
     setActiveSceneId(scene.id);
 
     // Same asset: apply seek directly if metadata ready, otherwise queue
@@ -324,12 +384,21 @@ export default function SeriesDetailPage() {
     }
   };
 
-  // Seek video to specific segment (truyện ngắn / phân đoạn) via coverage timestamp
+  // Seek video to specific segment (truyện ngắn / phân đoạn) via coverage timestamp (H3)
   const handleSeekSegment = (segment: CatalogSegment) => {
     setPlaybackWarning(null);
     setActiveSegmentId(segment.id);
-    const rawMs = segment.episodeStartMs ?? 0;
-    const targetSec = resolveFileTimestamp(rawMs, selectedAsset, segment.id);
+    if (typeof segment.episodeStartMs !== 'number' || isNaN(segment.episodeStartMs)) {
+      setPlaybackWarning(`Phân đoạn [${segment.title || segment.id}] chưa xác định thời điểm bắt đầu (episode_start_ms = null).`);
+      return;
+    }
+    const targetSec = resolveFileTimestamp(segment.episodeStartMs, selectedAsset, segment.id, selectedEpisode?.id);
+    if (targetSec === null) {
+      setPlaybackWarning(
+        `Không thể tua: Mốc thời gian phân đoạn chưa xác định hoặc không có coverage tương ứng trên tệp video đang phát.`
+      );
+      return;
+    }
     const currentEpId = selectedEpisode?.id || '';
     const currentGen = ++playGenRef.current;
 
@@ -516,6 +585,7 @@ export default function SeriesDetailPage() {
             {streamUrl ? (
               <video
                 ref={videoRef}
+                data-testid="series-video-player"
                 src={streamUrl}
                 controls
                 playsInline
@@ -565,6 +635,8 @@ export default function SeriesDetailPage() {
                   {episodeDetail.mediaAssets.map((asset) => (
                     <button
                       key={asset.id}
+                      data-testid="media-asset-button"
+                      data-asset-id={asset.id}
                       onClick={() => setSelectedAsset(asset)}
                       className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer border ${
                         selectedAsset?.id === asset.id
@@ -603,6 +675,7 @@ export default function SeriesDetailPage() {
                   return (
                     <div
                       key={seg.id}
+                      data-segment-id={seg.id}
                       role="button"
                       tabIndex={0}
                       onClick={() => handleSeekSegment(seg)}
@@ -665,6 +738,7 @@ export default function SeriesDetailPage() {
                   return (
                     <div
                       key={scene.id}
+                      data-scene-id={scene.id}
                       role="button"
                       tabIndex={0}
                       onClick={() => handleSeekScene(scene)}
@@ -733,6 +807,7 @@ export default function SeriesDetailPage() {
                 return (
                   <button
                     key={ep.id}
+                    data-episode-id={ep.id}
                     onClick={() => setSelectedEpisode(ep)}
                     className={`flex w-full items-start justify-between gap-3 rounded-lg p-3 text-left transition-colors cursor-pointer border ${
                       isSelected

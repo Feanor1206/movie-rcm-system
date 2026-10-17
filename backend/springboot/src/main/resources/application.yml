@@ -27,6 +27,11 @@ app:
     drive-max-io-workers: ${APP_MEDIA_DRIVE_MAX_IO_WORKERS:10}
     drive-circuit-failure-threshold: ${APP_MEDIA_DRIVE_CIRCUIT_FAILURE_THRESHOLD:5}
     drive-circuit-cooldown-ms: ${APP_MEDIA_DRIVE_CIRCUIT_COOLDOWN_MS:10000}
+  catalog:
+    sync-url: ${APP_CATALOG_SYNC_URL:http://localhost:8000/api/index/sync}
+    sync-token: ${CATALOG_SYNC_TOKEN:${FASTAPI_SYNC_SECRET:}}
+    snapshot-path: ${APP_CATALOG_SNAPSHOT_PATH:./data/catalog/committed_catalog_snapshot.json}
+    sync-timeout-seconds: ${APP_CATALOG_SYNC_TIMEOUT_SECONDS:60}
 
 ---
 # Development Profile (H2 Persistent File Database)

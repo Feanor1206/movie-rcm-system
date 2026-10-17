@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from dotenv import load_dotenv
 
 from schemas import (
@@ -32,7 +32,14 @@ from services.qwen_service import (
     ModelOutputParseError,
 )
 from services.ai_pipeline import cascading_pipeline, DEFAULT_MOVIES
-from services.catalog_sync import catalog_sync_manager
+from services.catalog_sync import (
+    catalog_sync_manager,
+    CatalogSyncManager,
+    AcceptedSnapshot,
+    get_accepted_snapshot,
+    set_accepted_snapshot
+)
+
 
 load_dotenv()
 
@@ -46,10 +53,34 @@ logger = logging.getLogger("fastapi_app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Đang khởi động FastAPI Cascading AI Recommendation Gateway (Phase 23 & CATALOG-01)...")
-    try:
-        catalog_sync_manager.load_default_catalog()
-    except Exception as e:
-        logger.warning(f"Chưa thể tự động nạp catalog mặc định: {e}")
+    # Single source of accepted state (F3/F08 R1, F09): Only load default catalog when no accepted state was recovered
+    active_gen = globals().get("_current_sync_generation", 0)
+    current_snap = get_accepted_snapshot()
+    if (current_snap is None or not getattr(current_snap, "is_ready", False)) and active_gen == 0:
+        try:
+            default_manager = CatalogSyncManager()
+            loaded = default_manager.load_default_catalog()
+            if loaded:
+                flattened = default_manager.get_flattened_catalog()
+                active_idx = getattr(cascading_pipeline.retrieval_node, "hybrid_index", None) if hasattr(cascading_pipeline, "retrieval_node") else None
+                if flattened and active_idx and hasattr(active_idx, "build_from_catalog"):
+                    active_idx.build_from_catalog(flattened, save_to_disk=False)
+                default_snap = AcceptedSnapshot(
+                    generation=0,
+                    content_hash=default_manager.content_hash,
+                    catalog_manager=default_manager,
+                    hybrid_index=active_idx,
+                    payload=getattr(default_manager, "_raw_catalog", None),
+                )
+                set_accepted_snapshot(default_snap)
+                globals()["_current_sync_generation"] = 0
+                globals()["_current_sync_hash"] = default_manager.content_hash
+                logger.info("[Startup] Đã nạp và lập chỉ mục catalog mặc định (generation=0, chưa có accepted state).")
+        except Exception as e:
+            logger.warning(f"Chưa thể tự động nạp catalog mặc định: {e}")
+    else:
+        logger.info(f"[Startup] Đã phục hồi accepted catalog (generation={active_gen}), bỏ qua load_default_catalog.")
+
     try:
         qwen_service.load_model()
     except Exception as e:
@@ -150,32 +181,60 @@ FASTAPI_SYNC_SECRET = os.environ.get("CATALOG_SYNC_TOKEN", os.environ.get("FASTA
 _publish_lock = threading.Lock()
 _current_sync_generation: int = 0
 _current_sync_hash: str = ""
-_active_catalog_payload: Optional[Dict[str, Any]] = None
-
-SYNC_STATE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "indices" / "catalog_sync_state.json"
-
-
-def _save_sync_state(generation: int, content_hash: str):
-    try:
-        SYNC_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = SYNC_STATE_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"generation": generation, "content_hash": content_hash}), encoding="utf-8")
-        tmp.replace(SYNC_STATE_PATH)
-    except Exception as e:
-        logger.warning(f"Không thể lưu sync state: {e}")
+_env_sync_path = os.environ.get("SYNC_STATE_PATH")
+SYNC_STATE_PATH = Path(_env_sync_path) if _env_sync_path else (
+    Path(__file__).resolve().parent.parent.parent / "data" / "indices" / "catalog_sync_state.json"
+)
 
 
-def _load_sync_state():
+def _save_sync_state(generation: int, content_hash: str, payload: Optional[Dict[str, Any]] = None):
+    SYNC_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    state_data: Dict[str, Any] = {
+        "generation": generation,
+        "content_hash": content_hash,
+    }
+    if payload is not None:
+        state_data["catalog"] = payload
+    tmp = SYNC_STATE_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(SYNC_STATE_PATH)
+
+
+def _load_sync_state() -> Tuple[int, str, Optional[Dict[str, Any]]]:
     try:
         if SYNC_STATE_PATH.exists():
             data = json.loads(SYNC_STATE_PATH.read_text(encoding="utf-8"))
-            return int(data.get("generation", 0)), str(data.get("content_hash", ""))
+            gen = int(data.get("generation", 0))
+            chash = str(data.get("content_hash", ""))
+            cat = data.get("catalog")
+            return gen, chash, cat
     except Exception as e:
         logger.warning(f"Không thể nạp sync state: {e}")
-    return 0, ""
+    return 0, "", None
 
 
-_current_sync_generation, _current_sync_hash = _load_sync_state()
+_current_sync_generation, _current_sync_hash, _loaded_cat = _load_sync_state()
+if _loaded_cat:
+    _active_catalog_payload = _loaded_cat
+    try:
+        recovered_manager = CatalogSyncManager()
+        recovered_manager.load_from_payload(_loaded_cat, include_draft=False, include_private=False)
+        flattened = recovered_manager.get_flattened_catalog()
+        active_idx = getattr(cascading_pipeline.retrieval_node, "hybrid_index", None) if hasattr(cascading_pipeline, "retrieval_node") else None
+        if flattened and active_idx and hasattr(active_idx, "build_from_catalog"):
+            active_idx.build_from_catalog(flattened, save_to_disk=False)
+        init_snap = AcceptedSnapshot(
+            generation=_current_sync_generation,
+            content_hash=_current_sync_hash,
+            catalog_manager=recovered_manager,
+            hybrid_index=active_idx,
+            payload=_loaded_cat,
+        )
+        set_accepted_snapshot(init_snap)
+        logger.info(f"[Startup] Đã phục hồi catalog snapshot nhất quán: gen={_current_sync_generation}, hash={_current_sync_hash}")
+    except Exception as e:
+        logger.warning(f"[Startup] Không thể nạp lại catalog snapshot từ state: {e}")
+
 
 
 @app.post("/api/index/sync", response_model=IndexSyncResponse)
@@ -184,10 +243,9 @@ def sync_index(
     request: Optional[IndexSyncRequest] = None
 ):
     """
-    Đồng bộ chỉ mục truy xuất với catalog dữ liệu thực tế (C1/F1/F2/G2).
+    Đồng bộ chỉ mục truy xuất với catalog dữ liệu thực tế (C1/F1/F2/G2/H2).
     Yêu cầu xác thực qua token dịch vụ (header X-Service-Token hoặc Bearer Authorization).
-    Chỉ chấp nhận payload catalog hoặc nạp lại từ snapshot đĩa đã cam kết.
-    Thực thi fail-closed khi thiếu cấu hình secret và chống stale generation.
+    Thực hiện qua candidate manager và chỉ publish atomic khi toàn bộ validation, hash check và index build thành công.
     """
     if not FASTAPI_SYNC_SECRET:
         raise HTTPException(
@@ -214,10 +272,7 @@ def sync_index(
         publish_lock = threading.Lock()
         globals()["_publish_lock"] = publish_lock
 
-    active_hash = globals().get("_current_sync_hash", "")
-    active_payload = globals().get("_active_catalog_payload", None)
-
-    # 1. Early stale check
+    # 1. Early stale check (before building candidate)
     if req_gen is not None:
         if req_gen < _current_sync_generation:
             logger.warning(
@@ -228,25 +283,26 @@ def sync_index(
                 message=f"Bỏ qua snapshot stale: generation {req_gen} < {_current_sync_generation}",
                 generation=_current_sync_generation,
                 item_counts=catalog_sync_manager.item_counts,
-                content_hash=active_hash or catalog_sync_manager.content_hash,
+                content_hash=globals().get("_current_sync_hash", "") or catalog_sync_manager.content_hash,
                 index_ready=True
             )
 
     try:
-        # 2. Load payload or default snapshot
+        # 2. Build candidate manager isolated from active global catalog_sync_manager (H2)
+        candidate_manager = catalog_sync_manager.__class__()
         if req_catalog:
-            counts = catalog_sync_manager.load_from_payload(req_catalog, include_draft=False, include_private=False)
-            computed_hash = catalog_sync_manager.content_hash
+            counts = candidate_manager.load_from_payload(req_catalog, include_draft=False, include_private=False)
+            computed_hash = candidate_manager.content_hash
             msg = f"Đã đồng bộ thành công catalog từ payload ({counts['total']} mục)."
         else:
-            loaded = catalog_sync_manager.load_default_catalog(include_draft=False, include_private=False)
+            loaded = candidate_manager.load_default_catalog(include_draft=False, include_private=False)
             if not loaded:
                 raise HTTPException(status_code=404, detail="Không tìm thấy tệp catalog snapshot hợp lệ trên đĩa để đồng bộ.")
-            counts = catalog_sync_manager.item_counts
-            computed_hash = catalog_sync_manager.content_hash
+            counts = candidate_manager.item_counts
+            computed_hash = candidate_manager.content_hash
             msg = f"Đã tải lại danh mục từ snapshot thành công ({counts['total']} mục)."
 
-        # 3. Verify content hash if declared by caller
+        # 3. Verify content hash BEFORE acquiring publish lock and BEFORE modifying active state (H1, H2)
         if req_hash and str(req_hash).strip():
             if str(req_hash).strip().lower() != computed_hash.lower():
                 raise HTTPException(
@@ -254,26 +310,24 @@ def sync_index(
                     detail=f"Mã băm không khớp: khai báo {req_hash} != tính toán {computed_hash}"
                 )
 
-        # 4. Compare-and-Swap Publication under lock (G2)
+        # 4. Compare-and-Swap Publication under lock (H2)
         with publish_lock:
             active_hash = globals().get("_current_sync_hash", "")
-            active_payload = globals().get("_active_catalog_payload", None)
+            active_gen = globals().get("_current_sync_generation", _current_sync_generation)
             if req_gen is not None:
-                if req_gen < _current_sync_generation:
+                if req_gen < active_gen:
                     logger.warning(
-                        f"[IndexSync] Phát hiện thế hệ cũ sau khi load: incoming={req_gen} < current={_current_sync_generation}. Phục hồi snapshot hiện hành."
+                        f"[IndexSync] Phát hiện thế hệ cũ sau khi chuẩn bị candidate: incoming={req_gen} < current={active_gen}."
                     )
-                    if active_payload is not None:
-                        catalog_sync_manager.load_from_payload(active_payload, include_draft=False, include_private=False)
                     return IndexSyncResponse(
                         status="SKIPPED",
-                        message=f"Bỏ qua snapshot stale: generation {req_gen} < {_current_sync_generation}",
-                        generation=_current_sync_generation,
+                        message=f"Bỏ qua snapshot stale: generation {req_gen} < {active_gen}",
+                        generation=active_gen,
                         item_counts=catalog_sync_manager.item_counts,
                         content_hash=active_hash or catalog_sync_manager.content_hash,
                         index_ready=True
                     )
-                elif req_gen == _current_sync_generation and _current_sync_generation > 0:
+                elif req_gen == active_gen and active_gen > 0:
                     if active_hash and computed_hash.lower() != active_hash.lower():
                         raise HTTPException(
                             status_code=409,
@@ -282,15 +336,63 @@ def sync_index(
                     return IndexSyncResponse(
                         status="UNCHANGED",
                         message="Snapshot đã được đồng bộ với cùng generation và nội dung.",
-                        generation=_current_sync_generation,
+                        generation=active_gen,
                         item_counts=counts,
                         content_hash=active_hash or computed_hash,
                         index_ready=True
                     )
 
-            # Rebuild index atomically
-            flattened = catalog_sync_manager.get_flattened_catalog()
-            cascading_pipeline.retrieval_node.hybrid_index.build_from_catalog(flattened, save_to_disk=True)
+            # 5. Build candidate index FIRST on an isolated instance before touching disk or active state (S1, F1)
+            flattened = candidate_manager.get_flattened_catalog()
+            active_index = cascading_pipeline.retrieval_node.hybrid_index
+
+            candidate_index = None
+            if hasattr(active_index, "build_from_catalog"):
+                try:
+                    candidate_index = active_index.__class__()
+                    for k, v in active_index.__dict__.items():
+                        if k not in ("documents", "embeddings", "bm25", "metadata_index", "is_ready", "titles"):
+                            setattr(candidate_index, k, v)
+                except Exception:
+                    from services.hybrid_retrieval import HybridMovieIndex
+                    candidate_index = HybridMovieIndex()
+                if hasattr(active_index, "encoder"):
+                    candidate_index.encoder = active_index.encoder
+                if hasattr(active_index, "index_path"):
+                    candidate_index.index_path = active_index.index_path
+                candidate_index.build_from_catalog(flattened, save_to_disk=False)
+
+            # 6. Only after candidate index build succeeds, save durable state to disk (S1, F1)
+            if req_gen is not None:
+                if "_save_sync_state" in globals():
+                    globals()["_save_sync_state"](req_gen, computed_hash, req_catalog)
+
+            # 7. Atomic publication via AcceptedSnapshot single reference swap (CATALOG-01-F08 R1)
+            target_index = candidate_index if candidate_index is not None else active_index
+            snap_cls = globals().get("AcceptedSnapshot")
+            if snap_cls is None:
+                from services.catalog_sync import AcceptedSnapshot as snap_cls
+            set_snap_fn = globals().get("set_accepted_snapshot")
+            if set_snap_fn is None:
+                from services.catalog_sync import set_accepted_snapshot as set_snap_fn
+
+            new_snapshot = snap_cls(
+                generation=req_gen if req_gen is not None else active_gen,
+                content_hash=computed_hash,
+                catalog_manager=candidate_manager,
+                hybrid_index=target_index,
+                payload=req_catalog,
+            )
+
+            # Atomic reference swap under publish_lock:
+            # - In-flight readers continue querying their captured snapshot without disruption or mixed state.
+            # - New readers immediately acquire new_snapshot.
+            set_snap_fn(new_snapshot)
+
+
+            # Synchronize active pipeline reference in lockstep (single pointer swap)
+            cascading_pipeline.retrieval_node.hybrid_index = target_index
+
 
             if req_gen is not None:
                 _current_sync_generation = req_gen
@@ -298,13 +400,12 @@ def sync_index(
                 globals()["_current_sync_hash"] = computed_hash
                 if req_catalog:
                     globals()["_active_catalog_payload"] = req_catalog
-                if "_save_sync_state" in globals():
-                    globals()["_save_sync_state"](_current_sync_generation, computed_hash)
+
 
         return IndexSyncResponse(
             status="success",
             message=msg,
-            generation=_current_sync_generation,
+            generation=globals().get("_current_sync_generation", _current_sync_generation),
             item_counts=counts,
             content_hash=computed_hash,
             index_ready=True
@@ -330,12 +431,14 @@ def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=400, detail="Thiếu trường 'query' hoặc 'messages'")
 
     available_movies = [m.model_dump() for m in request.availableMovies] if request.availableMovies else None
+    snap = get_accepted_snapshot()
 
     result = cascading_pipeline.run(
         query=query,
         catalog=available_movies,
         history=request.messages,
-        session_id=request.sessionId or "default"
+        session_id=request.sessionId or "default",
+        snapshot=snap
     )
 
     return ChatResponse(
@@ -357,11 +460,13 @@ def discover_endpoint(request: DiscoverRequest):
         raise HTTPException(status_code=400, detail="Thiếu trường 'query'")
 
     available_movies = [m.model_dump() for m in request.availableMovies] if request.availableMovies else None
+    snap = get_accepted_snapshot()
 
     result = cascading_pipeline.run(
         query=request.query,
         catalog=available_movies,
-        session_id=request.sessionId or "default"
+        session_id=request.sessionId or "default",
+        snapshot=snap
     )
 
     return DiscoverResponse(
@@ -385,9 +490,13 @@ def recommend_endpoint(request: RecommendRequest):
         query_parts.append(f"tâm trạng {request.mood}")
     synth_query = " ".join(query_parts) if query_parts else "gợi ý phim điểm cao nhất"
 
-    active_cat = catalog_sync_manager.get_flattened_catalog() if catalog_sync_manager.is_loaded else DEFAULT_MOVIES
-    result = cascading_pipeline.run(query=synth_query, catalog=active_cat)
+    snap = get_accepted_snapshot()
+    active_cat = snap.get_flattened_catalog() if (snap and getattr(snap, "is_ready", False)) else (
+        catalog_sync_manager.get_flattened_catalog() if catalog_sync_manager.is_loaded else DEFAULT_MOVIES
+    )
+    result = cascading_pipeline.run(query=synth_query, catalog=active_cat, snapshot=snap)
     matched = result.get("recommendedMovies", [])[: request.limit]
+
 
     return RecommendResponse(
         recommendedMovies=matched or active_cat[: request.limit],

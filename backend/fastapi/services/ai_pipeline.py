@@ -227,7 +227,8 @@ class EmbeddingRetrievalNode:
         self,
         nlu_output: Dict[str, Any],
         catalog: List[Dict[str, Any]],
-        top_k: int = 12
+        top_k: int = 12,
+        hybrid_index: Optional[Any] = None
     ) -> List[Dict[str, Any]]:
         logger.info("[Stage 2 - Hybrid Retrieval] Đang thực thi True Hybrid Search & lọc ràng buộc...")
         query_text = (nlu_output.get("query") or {}).get("text") or nlu_output.get("raw_query") or ""
@@ -236,13 +237,15 @@ class EmbeddingRetrievalNode:
         cons = nlu_output.get("constraints") or {}
         item_type = nlu_output.get("item_type") or cons.get("item_type")
 
-        # Execute True Hybrid Search
-        results = self.hybrid_index.search_hybrid(
+        # Execute True Hybrid Search on provided snapshot index or instance index
+        active_idx = hybrid_index if hybrid_index is not None else self.hybrid_index
+        results = active_idx.search_hybrid(
             query_text=query_text,
             nlu_intent=nlu_output,
             catalog=catalog,
             item_type_filter=item_type
         )
+
 
         candidates = []
         for r in results:
@@ -503,15 +506,21 @@ class CascadingAIPipeline:
         query: str,
         catalog: Optional[List[Dict[str, Any]]] = None,
         history: Optional[List[Dict[str, Any]]] = None,
-        session_id: str = "default"
+        session_id: str = "default",
+        snapshot: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Execute full 5-stage recommendation pipeline on the active catalog.
-        Uses imported real catalog when available, without forcing 12 hardcoded movies.
+        Captures and uses AcceptedSnapshot for thread-safe consistency (CATALOG-01-F08 R1).
         """
-        # Resolve active catalog corpus
+        from services.catalog_sync import get_accepted_snapshot
+        current_snap = snapshot if snapshot is not None else get_accepted_snapshot()
+
+        # Resolve active catalog corpus from captured snapshot
         if catalog is not None and len(catalog) > 0:
             active_catalog = list(catalog)
+        elif current_snap is not None and getattr(current_snap, "is_ready", False):
+            active_catalog = current_snap.get_flattened_catalog()
         elif catalog_sync_manager.is_loaded:
             active_catalog = catalog_sync_manager.get_flattened_catalog()
         else:
@@ -525,14 +534,18 @@ class CascadingAIPipeline:
             nlu_result["query"]["text"] = query
         nlu_result["raw_query"] = query
 
-        # Stage 2: Hard Constraint & Hybrid Retrieval
-        candidates = self.retrieval_node.retrieve_candidates(nlu_result, active_catalog, top_k=12)
+        # Stage 2: Hard Constraint & Hybrid Retrieval using snapshot's index
+        target_index = getattr(current_snap, "hybrid_index", None) if current_snap is not None else None
+        candidates = self.retrieval_node.retrieve_candidates(
+            nlu_result, active_catalog, top_k=12, hybrid_index=target_index
+        )
 
         # Stage 3: Qwen 0.6B Recommender (Coarse Filtering)
         filtered = self.recommender_node.filter_candidates(candidates, nlu_result)
 
         # Stage 4: Qwen 0.6B Ranker & MMR Diversity
         ranked_top = self.ranker_node.rank_top_k(filtered, nlu_result, top_k=3)
+
 
         # Stage 5: Grounded Storytelling Explanation
         explanation_text = self.explainer_node.generate_explanation(ranked_top, nlu_result, query, history)

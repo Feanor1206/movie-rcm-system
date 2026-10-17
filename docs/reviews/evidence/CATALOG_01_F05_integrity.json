@@ -1,0 +1,8 @@
+{
+  "probe_file": "docs/reviews/repro/CATALOG_01_F05_rehearsal.py",
+  "evidence_file": "docs/reviews/evidence/CATALOG_01_F05_probe.json",
+  "probe_sha256": "2a89e2907403449560d6ed00df2330fa3f8a5c742a5b94360fb2288a3db34f3a",
+  "evidence_sha256": "b6c4c29b3190c5846b72846155f132c0a9b6edfb30f56cf1b4e902118c0cf949",
+  "checkpoint": "CATALOG-01-F05-CHECKPOINT-01",
+  "all_checks_passed": true
+}

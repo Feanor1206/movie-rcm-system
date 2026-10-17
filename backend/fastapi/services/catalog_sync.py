@@ -16,6 +16,9 @@ import os
 import json
 import logging
 import hashlib
+import time
+import threading
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union
 
@@ -23,10 +26,14 @@ logger = logging.getLogger("moviercm.catalog_sync")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
-DEFAULT_CATALOG_PATHS = [
-    Path(__file__).resolve().parent.parent.parent.parent / "data" / "catalog" / "committed_catalog_snapshot.json",
-    Path(__file__).resolve().parent.parent.parent.parent / "data" / "catalog" / "imported_catalog.json",
-]
+
+_custom_default_path = os.environ.get("DEFAULT_CATALOG_PATH") or os.environ.get("CATALOG_SNAPSHOT_PATH")
+DEFAULT_CATALOG_PATHS = (
+    [Path(_custom_default_path)] if _custom_default_path else [
+        Path(__file__).resolve().parent.parent.parent.parent / "data" / "catalog" / "committed_catalog_snapshot.json",
+        Path(__file__).resolve().parent.parent.parent.parent / "data" / "catalog" / "imported_catalog.json",
+    ]
+)
 
 DEMO_CATALOG_PATH = Path(__file__).resolve().parent.parent.parent.parent / "docs" / "contracts" / "animation-catalog-v1" / "catalog.example.json"
 
@@ -135,10 +142,25 @@ class CatalogSyncManager:
     def get_item_by_id(self, item_id: str) -> Dict[str, Any]:
         return self._items_by_id.get(item_id, {})
 
+    def copy_from(self, other: "CatalogSyncManager") -> None:
+        """Atomically copy state from candidate manager (H2)."""
+        self._raw_catalog = other._raw_catalog
+        self._flattened_items = list(other._flattened_items)
+        self._items_by_id = dict(other._items_by_id)
+        self._item_counts = dict(other._item_counts)
+        self._content_hash = other._content_hash
+        self._is_loaded = other._is_loaded
+
+    def clone(self) -> "CatalogSyncManager":
+        """Return an isolated independent copy of this catalog manager (F09 R1)."""
+        new_mgr = self.__class__()
+        new_mgr.copy_from(self)
+        return new_mgr
+
     @staticmethod
     def compute_hash(payload: Dict[str, Any]) -> str:
-        """Compute stable SHA-256 hash of catalog payload."""
-        serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        """Compute stable canonical SHA-256 hash of catalog payload (H1)."""
+        serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     def load_from_payload(
@@ -618,3 +640,58 @@ class CatalogSyncManager:
 
 # Global singleton instance
 catalog_sync_manager = CatalogSyncManager()
+
+
+@dataclass(frozen=True)
+class AcceptedSnapshot:
+    """Immutable accepted catalog & retrieval snapshot (CATALOG-01-F08 R1, F09).
+    Guarantees readers capture a single atomic snapshot of catalog manager,
+    hybrid index, generation, and content hash across entire query execution."""
+    generation: int
+    content_hash: str
+    catalog_manager: CatalogSyncManager
+    hybrid_index: Any
+    payload: Optional[Dict[str, Any]] = None
+    created_at: float = field(default_factory=time.time)
+
+    def __post_init__(self):
+        # Guarantee manager ownership (F09 R1):
+        # Snapshot must own an isolated CatalogSyncManager instance and never share
+        # the mutable compatibility singleton catalog_sync_manager, preventing subsequent
+        # publications from mutating retained reader snapshots.
+        mgr = getattr(self, "catalog_manager", None)
+        if mgr is not None and mgr is catalog_sync_manager:
+            isolated = mgr.clone() if hasattr(mgr, "clone") else mgr.__class__()
+            if not hasattr(mgr, "clone") and hasattr(isolated, "copy_from"):
+                isolated.copy_from(mgr)
+            object.__setattr__(self, "catalog_manager", isolated)
+
+    @property
+    def is_ready(self) -> bool:
+        return self.generation > 0 and getattr(self.catalog_manager, "is_loaded", False)
+
+    def get_flattened_catalog(self) -> List[Dict[str, Any]]:
+        return self.catalog_manager.get_flattened_catalog()
+
+    def get_item_by_id(self, item_id: str) -> Dict[str, Any]:
+        return self.catalog_manager.get_item_by_id(item_id)
+
+
+_current_snapshot: Optional[AcceptedSnapshot] = None
+_snapshot_lock = threading.Lock()
+
+
+def get_accepted_snapshot() -> Optional[AcceptedSnapshot]:
+    """Capture a reference to the active accepted catalog snapshot."""
+    return _current_snapshot
+
+
+def set_accepted_snapshot(snapshot: AcceptedSnapshot) -> None:
+    """Atomically update the active accepted snapshot reference under lock."""
+    global _current_snapshot
+    with _snapshot_lock:
+        _current_snapshot = snapshot
+        if hasattr(catalog_sync_manager, "copy_from") and hasattr(snapshot, "catalog_manager"):
+            if catalog_sync_manager is not snapshot.catalog_manager:
+                catalog_sync_manager.copy_from(snapshot.catalog_manager)
+

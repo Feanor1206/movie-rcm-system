@@ -41,14 +41,17 @@ public class CatalogSyncWorker {
     private final CatalogSnapshotRepository snapshotRepository;
     private final CatalogQueryService queryService;
 
-    @Value("${app.catalog.sync-url:http://localhost:8000/api/index/sync}")
+    @Value("${app.catalog.sync-url:${APP_CATALOG_SYNC_URL:http://localhost:8000/api/index/sync}}")
     private String syncUrl;
 
-    @Value("${app.catalog.sync-token:}")
+    @Value("${app.catalog.sync-token:${CATALOG_SYNC_TOKEN:${FASTAPI_SYNC_SECRET:}}}")
     private String syncToken;
 
-    @Value("${app.catalog.snapshot-path:./data/catalog/committed_catalog_snapshot.json}")
+    @Value("${app.catalog.snapshot-path:${APP_CATALOG_SNAPSHOT_PATH:./data/catalog/committed_catalog_snapshot.json}}")
     private String snapshotPath;
+
+    @Value("${app.catalog.sync-timeout-seconds:${APP_CATALOG_SYNC_TIMEOUT_SECONDS:60}}")
+    private int syncTimeoutSeconds = 60;
 
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
 
@@ -169,7 +172,7 @@ public class CatalogSyncWorker {
                     .header("Content-Type", "application/json")
                     .header("X-Service-Token", syncToken.trim())
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
-                    .timeout(Duration.ofSeconds(15))
+                    .timeout(Duration.ofSeconds(syncTimeoutSeconds))
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));

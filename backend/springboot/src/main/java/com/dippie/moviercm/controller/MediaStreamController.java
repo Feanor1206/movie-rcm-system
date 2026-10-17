@@ -10,10 +10,17 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import com.dippie.moviercm.security.JwtUtils;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/media")
@@ -23,9 +30,39 @@ public class MediaStreamController {
     private static final int BUFFER_SIZE = 64 * 1024; // 64 KiB bounded buffer
 
     private final MediaStreamService mediaStreamService;
+    private final JwtUtils jwtUtils;
 
     public MediaStreamController(MediaStreamService mediaStreamService) {
+        this(mediaStreamService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public MediaStreamController(MediaStreamService mediaStreamService, @org.springframework.beans.factory.annotation.Autowired(required = false) JwtUtils jwtUtils) {
         this.mediaStreamService = mediaStreamService;
+        this.jwtUtils = jwtUtils;
+    }
+
+    @PostMapping("/grant/{assetId}")
+    public ResponseEntity<Map<String, Object>> requestPlaybackGrant(@PathVariable String assetId) {
+        MediaAsset asset = mediaStreamService.getMediaAsset(assetId);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAuthenticated = auth != null && auth.isAuthenticated()
+                && !(auth instanceof AnonymousAuthenticationToken);
+
+        String username = isAuthenticated ? auth.getName() : "anonymous";
+        String role = isAuthenticated
+                ? auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).findFirst().orElse("ROLE_USER")
+                : "ROLE_ANONYMOUS";
+
+        long validityMs = 300_000L; // 5 minutes (H4)
+        String grantToken = jwtUtils.generatePlaybackGrant(assetId, username, role, validityMs);
+
+        return ResponseEntity.ok(Map.of(
+                "assetId", assetId,
+                "grant", grantToken,
+                "streamUrl", "/api/media/stream/" + assetId + "?grant=" + grantToken,
+                "expiresIn", 300
+        ));
     }
 
     @RequestMapping(value = "/stream/{assetId}", method = RequestMethod.HEAD)

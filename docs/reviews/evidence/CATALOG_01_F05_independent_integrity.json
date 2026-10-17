@@ -1,0 +1,7 @@
+{
+  "manifest_files": 121,
+  "drift_during_review": [],
+  "contract_zip": "5/5 identical",
+  "review": "docs/reviews/CATALOG_01_F05_REVIEW.md",
+  "verification": "offline source probes, not production HTTP/browser/restart"
+}

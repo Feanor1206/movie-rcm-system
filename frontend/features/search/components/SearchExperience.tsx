@@ -392,6 +392,7 @@ export function SearchExperience() {
         <div className="relative flex max-w-2xl items-center rounded-md border border-surface-border bg-surface px-3.5 py-3 shadow-lg focus-within:border-brand">
           <Search className="text-zinc-400 shrink-0" size={18} />
           <input
+            data-testid="search-query-input"
             autoFocus
             type="text"
             value={inputValue}
@@ -554,6 +555,9 @@ export function SearchExperience() {
                   <Link
                     key={`${item.type}_${item.id}`}
                     href={targetUrl}
+                    data-testid="search-result-card"
+                    data-result-id={item.id}
+                    data-result-type={item.type}
                     className="flex flex-col justify-between rounded-lg border border-surface-border bg-surface-elevated p-3 transition-colors hover:border-brand/40 hover:bg-surface-hover/80"
                   >
                     <div>

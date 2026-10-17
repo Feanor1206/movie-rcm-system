@@ -1,0 +1,13 @@
+{
+  "manifest_entries_verified": 42,
+  "tracked_paths": 47,
+  "drift": [],
+  "contract_zip_identical_files": 5,
+  "patch_reverse_check_exit": 0,
+  "ownership_tests": 5,
+  "matrix_scenarios": 12,
+  "frontend_tests": 83,
+  "typescript_exit": 0,
+  "retained_snapshot_mutated": false,
+  "release_level": "usable_preview"
+}

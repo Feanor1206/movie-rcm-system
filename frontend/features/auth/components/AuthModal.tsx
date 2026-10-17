@@ -225,6 +225,7 @@ export function AuthModal() {
               <User size={15} className="text-zinc-500 mr-2 shrink-0" />
               <input
                 ref={isLogin ? firstInputRef : undefined}
+                data-testid="login-username-input"
                 type="text"
                 required
                 disabled={isSubmitting}
@@ -265,6 +266,7 @@ export function AuthModal() {
             <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
               <Lock size={15} className="text-zinc-500 mr-2 shrink-0" />
               <input
+                data-testid="login-password-input"
                 type="password"
                 required
                 disabled={isSubmitting}
@@ -278,10 +280,12 @@ export function AuthModal() {
           </div>
 
           <button
+            data-testid="login-submit-button"
             type="submit"
             disabled={isSubmitting}
             className="btn-primary w-full justify-center py-2.5 text-xs sm:text-sm font-bold shadow-brand-sm disabled:opacity-50 cursor-pointer"
           >
+
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <Loader2 size={15} className="animate-spin" /> Đang xử lý...

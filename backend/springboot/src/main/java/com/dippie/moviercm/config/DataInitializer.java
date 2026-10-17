@@ -226,12 +226,34 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seed50Users() {
+        if (!userRepository.existsByUsername("admin")) {
+            userRepository.save(User.builder()
+                    .username("admin")
+                    .email("admin@dippie.com")
+                    .fullName("System Administrator")
+                    .password(passwordEncoder.encode("password123"))
+                    .role(Role.ROLE_ADMIN)
+                    .build());
+            logger.info("[DataInitializer] Đã khởi tạo tài khoản quản trị mặc định: admin / password123 (ROLE_ADMIN)");
+        }
+        if (!userRepository.existsByUsername("user")) {
+            userRepository.save(User.builder()
+                    .username("user")
+                    .email("user@dippie.com")
+                    .fullName("Standard User")
+                    .password(passwordEncoder.encode("password123"))
+                    .role(Role.ROLE_USER)
+                    .build());
+            logger.info("[DataInitializer] Đã khởi tạo tài khoản người dùng mặc định: user / password123 (ROLE_USER)");
+        }
         if (userRepository.count() < 10) {
             logger.info("Đang tự động nạp 50 tài khoản người dùng và dữ liệu tương tác mẫu...");
             String defaultPassword = passwordEncoder.encode("password123");
 
             String[][] usersData = {
+                    {"admin", "admin@dippie.com", "System Admin", "ROLE_ADMIN"},
                     {"alex", "alex@dippie.com", "Alex Morgan", "ROLE_ADMIN"},
+                    {"user", "user@dippie.com", "Standard User", "ROLE_USER"},
                     {"linh_dan", "linhdan@gmail.com", "Nguyễn Linh Đan", "ROLE_USER"},
                     {"minh_tri", "minhtri.tran@gmail.com", "Trần Minh Trí", "ROLE_USER"},
                     {"duc_anh", "ducanh.le@yahoo.com", "Lê Đức Anh", "ROLE_USER"},
@@ -285,13 +307,15 @@ public class DataInitializer implements CommandLineRunner {
 
             List<User> userList = new ArrayList<>();
             for (String[] u : usersData) {
-                userList.add(User.builder()
-                        .username(u[0])
-                        .email(u[1])
-                        .fullName(u[2])
-                        .password(defaultPassword)
-                        .role(u[3].equals("ROLE_ADMIN") ? Role.ROLE_ADMIN : Role.ROLE_USER)
-                        .build());
+                if (!userRepository.existsByUsername(u[0])) {
+                    userList.add(User.builder()
+                            .username(u[0])
+                            .email(u[1])
+                            .fullName(u[2])
+                            .password(defaultPassword)
+                            .role(u[3].equals("ROLE_ADMIN") ? Role.ROLE_ADMIN : Role.ROLE_USER)
+                            .build());
+                }
             }
 
             List<User> savedUsers = userRepository.saveAll(userList);

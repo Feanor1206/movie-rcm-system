@@ -82,7 +82,12 @@ public class JwtUtils {
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(authToken);
+            Claims claims = Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(authToken).getPayload();
+            Object type = claims.get("type");
+            if ("playback_grant".equals(type) || "playback".equals(claims.get("purpose"))) {
+                logger.warn("Rejecting playback grant presented as general access token");
+                return false;
+            }
             return true;
         } catch (MalformedJwtException e) {
             logger.error("Token JWT khong hop le: {}", e.getMessage());
@@ -104,5 +109,54 @@ public class JwtUtils {
             logger.error("Token validation error: {}", e.getMessage());
         }
         return false;
+    }
+
+    public String generatePlaybackGrant(String assetId, String username, String role, long validityMs) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("assetId", assetId);
+        claims.put("role", role);
+        claims.put("type", "playback_grant");
+        claims.put("purpose", "playback");
+        return Jwts.builder()
+                .claims(claims)
+                .subject(username)
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + validityMs))
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
+                .compact();
+    }
+
+    public boolean validatePlaybackGrant(String token, String assetId) {
+        try {
+            Claims claims = extractAllClaims(token);
+            if (!"playback_grant".equals(claims.get("type"))) {
+                return false;
+            }
+            if (assetId == null || !assetId.equals(claims.get("assetId"))) {
+                return false;
+            }
+            return !isTokenExpired(token);
+        } catch (Exception e) {
+            logger.debug("Playback grant invalid: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public String getRoleFromPlaybackGrant(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return (String) claims.get("role");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public String getAssetIdFromPlaybackGrant(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return (String) claims.get("assetId");
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

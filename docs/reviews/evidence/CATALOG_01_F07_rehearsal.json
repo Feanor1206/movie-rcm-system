@@ -1,0 +1,43 @@
+{
+  "status": "PASSED",
+  "commit": "d620bfc634b3c424a847408f0dc6e02626439f45",
+  "jar_sha256": "55b006764f962dc4f0f1771f01c660a7aaf55ac41d5206850118781e8036aefe",
+  "fixture_sha256": "13a1f35e22ca0edeefda1a47f264ff2cc0b04095fff1be01d733d3fd11273e13",
+  "gates": {
+    "admin_login": "PASS",
+    "catalog_validation": "PASS",
+    "catalog_import": "PASS",
+    "outbox_sync_ready": "PASS",
+    "catalog_search": "PASS",
+    "streaming_security_matrix": "PASS",
+    "browser_video_playback_and_seek": "PASS",
+    "google_drive_gate": "PASS",
+    "restart_recovery_1": "PASS",
+    "restart_recovery_2": "PASS"
+  },
+  "evidence": {
+    "snapshot": {
+      "id": "snap_1792223134429_pkg_rehearsal_01_g1",
+      "snapshotVersion": 1,
+      "contentHash": "a876afe0522f95baf546b45d92209ecd3928ea51015af4c19d466df180910b53",
+      "totalItems": 25,
+      "status": "READY",
+      "errorMessage": null,
+      "retryCount": 0,
+      "createdAt": "2026-10-17T14:45:34.429257",
+      "completedAt": "2026-10-17T14:46:09.028998",
+      "updatedAt": "2026-10-17T14:45:34.448141"
+    },
+    "google_drive": {
+      "mounted": true,
+      "items": [
+        "jadooss1",
+        "jadooss3",
+        "jadooss4",
+        "jadooss6"
+      ],
+      "test_file": "Anh sẽ mua cho em tất cả những gì em muốn ăn. ⧸ Xin Chào Jadoo [2ykw6ZxTb8o].mp4",
+      "bytes": 1024
+    }
+  }
+}

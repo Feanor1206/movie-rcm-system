@@ -1,0 +1,12 @@
+{
+  "manifest": {
+    "count": 18,
+    "drift": []
+  },
+  "patch_paths": {
+    "count": 28,
+    "drift": []
+  },
+  "contract_zip_identical_files": 5,
+  "patch_reverse_check_exit": 0
+}

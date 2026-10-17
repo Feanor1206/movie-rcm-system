@@ -1,0 +1,34 @@
+{
+  "status": "PASSED",
+  "checkpoint": "CATALOG-01-F08-CHECKPOINT-01",
+  "r1_publication_atomic_snapshot": {
+    "pre_swap_reader_generation": 1,
+    "pre_swap_reader_manager_titles": [
+      "accepted-A",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "pre_swap_reader_index_titles": [
+      "accepted-A",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "pre_swap_mixed_snapshot_seen": false,
+    "post_swap_reader_generation": 2,
+    "post_swap_reader_manager_titles": [
+      "next-B",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "post_swap_reader_index_titles": [
+      "next-B",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "post_swap_pure_b_seen": true,
+    "atomic_pointer_swap_verified": true
+  },
+  "r1_durable_failure_isolation": {
+    "durable_failure_caught": true,
+    "active_generation_preserved": 2,
+    "rejected_candidate_leaked": false,
+    "active_snapshot_intact": true
+  },
+  "scope": "Production sync/index AST, immutable AcceptedSnapshot, atomic pointer swap, thread scheduling barrier. No HTTP/model/GPU."
+}

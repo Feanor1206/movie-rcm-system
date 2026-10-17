@@ -303,9 +303,10 @@ public class MediaStreamService {
 
     public Resource getMediaResource(MediaAsset asset) {
         if (storageKeyConfig != null && asset.getStorageKey() != null && !asset.getStorageKey().isBlank()) {
+            StorageKeyConfig.StorageRoot root = storageKeyConfig.getRoot(asset.getStorageProvider(), asset.getStorageKey());
             java.nio.file.Path targetPath = storageKeyConfig.resolvePath(asset.getStorageProvider(), asset.getStorageKey(), asset.getRelativePath());
             if ("drive".equalsIgnoreCase(asset.getStorageProvider()) && driveStorageAdapter != null) {
-                return driveStorageAdapter.getResourceForPath(targetPath);
+                return driveStorageAdapter.getResourceForPath(root.rootPath(), targetPath);
             }
             Resource resource = new org.springframework.core.io.FileSystemResource(targetPath);
             if (!resource.exists() || !resource.isReadable()) {
@@ -319,9 +320,10 @@ public class MediaStreamService {
 
     public long getResourceLength(MediaAsset asset) {
         if (storageKeyConfig != null && asset.getStorageKey() != null && !asset.getStorageKey().isBlank()) {
+            StorageKeyConfig.StorageRoot root = storageKeyConfig.getRoot(asset.getStorageProvider(), asset.getStorageKey());
             java.nio.file.Path targetPath = storageKeyConfig.resolvePath(asset.getStorageProvider(), asset.getStorageKey(), asset.getRelativePath());
             if ("drive".equalsIgnoreCase(asset.getStorageProvider()) && driveStorageAdapter != null) {
-                return driveStorageAdapter.getResourceLengthForPath(targetPath);
+                return driveStorageAdapter.getResourceLengthForPath(root.rootPath(), targetPath);
             }
             try {
                 return java.nio.file.Files.size(targetPath);
@@ -335,9 +337,10 @@ public class MediaStreamService {
 
     public java.nio.channels.SeekableByteChannel openMediaChannel(MediaAsset asset) throws IOException {
         if (storageKeyConfig != null && asset.getStorageKey() != null && !asset.getStorageKey().isBlank()) {
+            StorageKeyConfig.StorageRoot root = storageKeyConfig.getRoot(asset.getStorageProvider(), asset.getStorageKey());
             java.nio.file.Path targetPath = storageKeyConfig.resolvePath(asset.getStorageProvider(), asset.getStorageKey(), asset.getRelativePath());
             if ("drive".equalsIgnoreCase(asset.getStorageProvider()) && driveStorageAdapter != null) {
-                return driveStorageAdapter.openChannelForPath(targetPath);
+                return driveStorageAdapter.openChannelForPath(root.rootPath(), targetPath);
             }
             if (!java.nio.file.Files.exists(targetPath) || !java.nio.file.Files.isRegularFile(targetPath)) {
                 throw new MediaNotFoundException("Không tìm thấy tệp media: " + asset.getRelativePath());

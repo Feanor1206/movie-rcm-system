@@ -1,0 +1,1476 @@
+{
+  "schema_version": "dippie.catalog.v1",
+  "package": {
+    "id": "pkg_rehearsal_01",
+    "revision": 1,
+    "created_at": "2026-10-16T00:00:00Z",
+    "default_language": "vi",
+    "import_mode": "upsert",
+    "reference_scope": "self_contained",
+    "description": "Rehearsal catalog for full production stack validation."
+  },
+  "genres": [
+    {
+      "id": "animation",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hoạt hình"
+        },
+        {
+          "language": "en",
+          "text": "Animation"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "sci-fi",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Khoa học viễn tưởng"
+        },
+        {
+          "language": "en",
+          "text": "Sci-Fi"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "comedy",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hài"
+        },
+        {
+          "language": "en",
+          "text": "Comedy"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "action",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hành động"
+        },
+        {
+          "language": "en",
+          "text": "Action"
+        }
+      ],
+      "aliases": []
+    }
+  ],
+  "attribute_scales": [
+    {
+      "id": "darkness_v1",
+      "name": "Mức u tối",
+      "definition": "Thang đo mức độ đen tối/u ám từ 0 đến 4.",
+      "minimum": 0,
+      "maximum": 4,
+      "levels": [
+        {
+          "value": 0,
+          "meaning": "Tươi sáng"
+        },
+        {
+          "value": 1,
+          "meaning": "Nhẹ"
+        },
+        {
+          "value": 2,
+          "meaning": "Vừa"
+        },
+        {
+          "value": 3,
+          "meaning": "Nặng"
+        },
+        {
+          "value": 4,
+          "meaning": "Rất u tối"
+        }
+      ],
+      "version": "1.0",
+      "source_ids": [
+        "src_rehearsal_01"
+      ]
+    },
+    {
+      "id": "pacing_v1",
+      "name": "Nhịp kể",
+      "definition": "Thang đo nhịp kể chuyện từ 0 đến 4.",
+      "minimum": 0,
+      "maximum": 4,
+      "levels": [
+        {
+          "value": 0,
+          "meaning": "Rất chậm"
+        },
+        {
+          "value": 1,
+          "meaning": "Chậm"
+        },
+        {
+          "value": 2,
+          "meaning": "Vừa"
+        },
+        {
+          "value": 3,
+          "meaning": "Nhanh"
+        },
+        {
+          "value": 4,
+          "meaning": "Rất dồn dập"
+        }
+      ],
+      "version": "1.0",
+      "source_ids": [
+        "src_rehearsal_01"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "src_rehearsal_01",
+      "kind": "manual",
+      "title": "Nguồn kiểm thử Rehearsal Dippie",
+      "url": null,
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": null,
+      "note": "Nguồn chính xác cho kiểm thử nghiệm thu toàn bộ hệ thống."
+    }
+  ],
+  "series": [
+    {
+      "id": "ser_rehearsal_01",
+      "title": "Biên Niên Sử Thần Tốc",
+      "original_title": "Fast Runner Chronicles",
+      "primary_language": "vi",
+      "aliases": [
+        {
+          "text": "Bao The Swift",
+          "language": "en",
+          "kind": "romanized"
+        },
+        {
+          "text": "Fast Runner",
+          "language": "en",
+          "kind": "translated"
+        }
+      ],
+      "translations": [],
+      "synopsis": "Hành trình thám hiểm không gian vũ trụ và vượt qua thử thách bão cát của Bảo Thần Tốc.",
+      "genre_ids": [
+        "animation",
+        "sci-fi",
+        "action"
+      ],
+      "keywords": ["vũ trụ", "sao hỏa", "thần tốc"],
+      "themes": ["tình bạn", "khám phá"],
+      "origin_countries": ["VN"],
+      "original_languages": ["vi"],
+      "release_year_start": 2026,
+      "release_year_end": 2026,
+      "release_status": "finished",
+      "creators": [],
+      "studios": [],
+      "networks": [],
+      "character_ids": [
+        "char_rehearsal_bao",
+        "char_rehearsal_chi"
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 1,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Độ u tối nhẹ"
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 4,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Nhịp kể dồn dập"
+          }
+        }
+      ],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": 7,
+        "rating_system": "VN-BB",
+        "classification": "P",
+        "warnings": [],
+        "source_ids": ["src_rehearsal_01"]
+      },
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Series sẵn sàng công chiếu"
+        }
+      }
+    },
+    {
+      "id": "ser_rehearsal_02",
+      "title": "Học Viện Thám Tử Nhí",
+      "original_title": "Junior Detective Academy",
+      "primary_language": "vi",
+      "aliases": [
+        {
+          "text": "Detective Nam",
+          "language": "en",
+          "kind": "romanized"
+        }
+      ],
+      "translations": [],
+      "synopsis": "Những vụ án bí ẩn và hài hước tại trường học được giải mã bởi thám tử Nam.",
+      "genre_ids": [
+        "animation",
+        "comedy"
+      ],
+      "keywords": ["trường học", "thám tử", "hài hước"],
+      "themes": ["trí tuệ", "hài hước"],
+      "origin_countries": ["VN"],
+      "original_languages": ["vi"],
+      "release_year_start": 2025,
+      "release_year_end": 2025,
+      "release_status": "finished",
+      "creators": [],
+      "studios": [],
+      "networks": [],
+      "character_ids": [
+        "char_rehearsal_nam"
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 0,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Tươi sáng"
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 2,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Nhịp kể vừa phải"
+          }
+        }
+      ],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Series sẵn sàng công chiếu"
+        }
+      }
+    }
+  ],
+  "seasons": [
+    {
+      "id": "sea_rehearsal_01_01",
+      "series_id": "ser_rehearsal_01",
+      "number": 1,
+      "title": "Mùa 1: Khởi Hành Đến Sao Hỏa",
+      "kind": "regular",
+      "synopsis": "Phần một câu chuyện Bảo Thần Tốc bắt đầu nhiệm vụ không gian.",
+      "translations": [],
+      "release_year_start": 2026,
+      "release_year_end": 2026,
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Season 1 ready"
+        }
+      }
+    },
+    {
+      "id": "sea_rehearsal_02_01",
+      "series_id": "ser_rehearsal_02",
+      "number": 1,
+      "title": "Mùa 1: Khóa Tân Binh",
+      "kind": "regular",
+      "synopsis": "Những ngày đầu tiên của thám tử Nam tại trường học.",
+      "translations": [],
+      "release_year_start": 2025,
+      "release_year_end": 2025,
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Season 1 ready"
+        }
+      }
+    }
+  ],
+  "episodes": [
+    {
+      "id": "ep_rehearsal_01_01",
+      "series_id": "ser_rehearsal_01",
+      "season_id": "sea_rehearsal_01_01",
+      "number": 1,
+      "production_code": "EP-01",
+      "title": "Cú Nhảy Sao Hỏa",
+      "original_title": "Mars Jump",
+      "aliases": [
+        {
+          "text": "Tập 1 Cú Nhảy Sao Hỏa",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": "2026-01-01",
+      "duration_ms": 120000,
+      "orders": [
+        {
+          "scheme": "broadcast",
+          "position": 1,
+          "display_label": "Tập 1"
+        }
+      ],
+      "synopsis": "Bảo Thần Tốc và Chi Công Nghệ lái chiếc xe địa hình vượt qua hẻm núi sao Hỏa.",
+      "genre_ids": [
+        "animation",
+        "sci-fi",
+        "action"
+      ],
+      "keywords": [
+        "hẻm núi",
+        "sao hỏa",
+        "xe địa hình"
+      ],
+      "themes": [
+        "dũng cảm"
+      ],
+      "character_ids": [
+        "char_rehearsal_bao",
+        "char_rehearsal_chi"
+      ],
+      "plot_facts": [
+        {
+          "id": "fact_rehearsal_01",
+          "text": "Bảo Thần Tốc kích hoạt động cơ phản lực để xe phóng qua bờ vực sâu.",
+          "language": "vi",
+          "character_ids": ["char_rehearsal_bao"],
+          "spoiler_level": "mild",
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Plot fact ground truth"
+          }
+        }
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 1,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Độ u tối nhẹ"
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 4,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Nhịp kể dồn dập"
+          }
+        }
+      ],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": 7,
+        "rating_system": "VN-BB",
+        "classification": "P",
+        "warnings": [],
+        "source_ids": ["src_rehearsal_01"]
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Tập 1 sẵn sàng"
+        }
+      }
+    },
+    {
+      "id": "ep_rehearsal_01_02",
+      "series_id": "ser_rehearsal_01",
+      "season_id": "sea_rehearsal_01_01",
+      "number": 2,
+      "production_code": "EP-02",
+      "title": "Căn Cứ Bị Bỏ Hoang",
+      "original_title": "Abandoned Base",
+      "aliases": [
+        {
+          "text": "Tập 2 Căn Cứ",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": "2026-01-08",
+      "duration_ms": 120000,
+      "orders": [
+        {
+          "scheme": "broadcast",
+          "position": 2,
+          "display_label": "Tập 2"
+        }
+      ],
+      "synopsis": "Bảo và Chi khám phá trạm nghiên cứu ngầm dưới lòng đất đỏ sao Hỏa.",
+      "genre_ids": [
+        "animation",
+        "sci-fi"
+      ],
+      "keywords": [
+        "căn cứ",
+        "bí ẩn"
+      ],
+      "themes": [
+        "thám hiểm"
+      ],
+      "character_ids": [
+        "char_rehearsal_bao",
+        "char_rehearsal_chi"
+      ],
+      "plot_facts": [],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 2,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Độ u tối vừa"
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 2,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Nhịp kể vừa phải"
+          }
+        }
+      ],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": 7,
+        "rating_system": "VN-BB",
+        "classification": "P",
+        "warnings": [],
+        "source_ids": ["src_rehearsal_01"]
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Tập 2 sẵn sàng"
+        }
+      }
+    },
+    {
+      "id": "ep_rehearsal_02_01",
+      "series_id": "ser_rehearsal_02",
+      "season_id": "sea_rehearsal_02_01",
+      "number": 1,
+      "production_code": "DET-01",
+      "title": "Vụ Án Bánh Kem Mất Tích",
+      "original_title": "Case of the Missing Cake",
+      "aliases": [
+        {
+          "text": "Vụ Án Bánh Kem",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": "2025-05-01",
+      "duration_ms": 45000,
+      "orders": [
+        {
+          "scheme": "broadcast",
+          "position": 1,
+          "display_label": "Tập 1"
+        }
+      ],
+      "synopsis": "Thám tử Nam phá án chiếc bánh kem biến mất trong giờ ra chơi.",
+      "genre_ids": [
+        "animation",
+        "comedy"
+      ],
+      "keywords": [
+        "bánh kem",
+        "thám tử",
+        "lớp học"
+      ],
+      "themes": [
+        "hài hước"
+      ],
+      "character_ids": [
+        "char_rehearsal_nam"
+      ],
+      "plot_facts": [],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 0,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Tươi sáng"
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 3,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Nhanh"
+          }
+        }
+      ],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Tập 1 thám tử sẵn sàng"
+        }
+      }
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_rehearsal_01_01a",
+      "episode_id": "ep_rehearsal_01_01",
+      "position": 1,
+      "title": "Phân đoạn Vượt Bão Cát",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "synopsis": "Bảo và Chi điều khiển xe vượt qua cơn bão cát khổng lồ hướng về hẻm núi.",
+      "episode_start_ms": 0,
+      "episode_end_ms": 60000,
+      "character_ids": [
+        "char_rehearsal_bao",
+        "char_rehearsal_chi"
+      ],
+      "keywords": [
+        "bão cát",
+        "hẻm núi"
+      ],
+      "themes": [
+        "hành động"
+      ],
+      "plot_facts": [],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 1,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Nhẹ"
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 4,
+          "provenance": {
+            "source_ids": ["src_rehearsal_01"],
+            "origin": "manual",
+            "verification": "human_verified",
+            "confidence": 1.0,
+            "annotator": "QA Team",
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": "2026-10-16T00:00:00Z",
+            "note": "Dồn dập"
+          }
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Segment ready"
+        }
+      }
+    }
+  ],
+  "characters": [
+    {
+      "id": "char_rehearsal_bao",
+      "series_ids": [
+        "ser_rehearsal_01"
+      ],
+      "name": "Bảo Thần Tốc",
+      "aliases": [
+        {
+          "text": "Tiểu Bảo",
+          "language": "vi",
+          "kind": "alternate"
+        },
+        {
+          "text": "Bao The Swift",
+          "language": "en",
+          "kind": "romanized"
+        }
+      ],
+      "description": "Cậu bé tài ba điều khiển xe thám hiểm không gian với tốc độ siêu phàm.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Character ready"
+        }
+      }
+    },
+    {
+      "id": "char_rehearsal_chi",
+      "series_ids": [
+        "ser_rehearsal_01"
+      ],
+      "name": "Chi Công Nghệ",
+      "aliases": [
+        {
+          "text": "Kỹ Sư Chi",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": "Kỹ sư công nghệ thông minh, phụ trách định vị và động cơ tàu thám hiểm.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Character ready"
+        }
+      }
+    },
+    {
+      "id": "char_rehearsal_nam",
+      "series_ids": [
+        "ser_rehearsal_02"
+      ],
+      "name": "Nam Kính Lúp",
+      "aliases": [
+        {
+          "text": "Detective Nam",
+          "language": "en",
+          "kind": "romanized"
+        }
+      ],
+      "description": "Cậu bé thám tử lanh lợi với chiếc kính lúp luôn tìm ra manh mối.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Character ready"
+        }
+      }
+    }
+  ],
+  "media_assets": [
+    {
+      "id": "asset_feature_01",
+      "content_type": "video",
+      "role": "feature",
+      "edition_label": null,
+      "spoken_languages": ["vi"],
+      "embedded_subtitle_languages": [],
+      "storage": {
+        "provider": "local",
+        "storage_key": "animation_local",
+        "relative_path": "synthetic/feature_test.mp4",
+        "drive_folder_id": null,
+        "drive_file_id": null
+      },
+      "size_bytes": 5584465,
+      "sha256": null,
+      "duration_ms": 120000,
+      "technical": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "frame_rate": {
+          "numerator": 24,
+          "denominator": 1
+        },
+        "variable_frame_rate": false,
+        "bitrate_bps": 1000000,
+        "has_audio": true,
+        "audio_streams": []
+      },
+      "coverage": [
+        {
+          "episode_id": "ep_rehearsal_01_01",
+          "segment_id": "seg_rehearsal_01_01a",
+          "sequence": 1,
+          "source_in_ms": 10000,
+          "source_out_ms": 110000,
+          "episode_in_ms": 0,
+          "scope": "full_episode"
+        }
+      ],
+      "related_asset_id": null,
+      "access_policy": "public",
+      "enabled": true,
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Public feature video asset"
+        }
+      }
+    },
+    {
+      "id": "asset_feature_02",
+      "content_type": "video",
+      "role": "feature",
+      "edition_label": null,
+      "spoken_languages": ["vi"],
+      "embedded_subtitle_languages": [],
+      "storage": {
+        "provider": "local",
+        "storage_key": "animation_local",
+        "relative_path": "synthetic/feature_test.mp4",
+        "drive_folder_id": null,
+        "drive_file_id": null
+      },
+      "size_bytes": 5584465,
+      "sha256": null,
+      "duration_ms": 120000,
+      "technical": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "frame_rate": {
+          "numerator": 24,
+          "denominator": 1
+        },
+        "variable_frame_rate": false,
+        "bitrate_bps": 1000000,
+        "has_audio": true,
+        "audio_streams": []
+      },
+      "coverage": [
+        {
+          "episode_id": "ep_rehearsal_01_02",
+          "segment_id": null,
+          "sequence": 1,
+          "source_in_ms": 0,
+          "source_out_ms": 120000,
+          "episode_in_ms": 0,
+          "scope": "full_episode"
+        }
+      ],
+      "related_asset_id": null,
+      "access_policy": "authenticated",
+      "enabled": true,
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Authenticated feature video asset"
+        }
+      }
+    },
+    {
+      "id": "asset_rehearsal_drive",
+      "content_type": "video",
+      "role": "feature",
+      "edition_label": null,
+      "spoken_languages": ["vi"],
+      "embedded_subtitle_languages": [],
+      "storage": {
+        "provider": "drive",
+        "storage_key": "animation_drive",
+        "relative_path": "jadooss1/Anh sẽ mua cho em tất cả những gì em muốn ăn. ⧸ Xin Chào Jadoo [2ykw6ZxTb8o].mp4",
+        "drive_folder_id": "1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ",
+        "drive_file_id": null
+      },
+      "size_bytes": 339074277,
+      "sha256": null,
+      "duration_ms": 660000,
+      "technical": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "frame_rate": {
+          "numerator": 24,
+          "denominator": 1
+        },
+        "variable_frame_rate": false,
+        "bitrate_bps": 4000000,
+        "has_audio": true,
+        "audio_streams": []
+      },
+      "coverage": [
+        {
+          "episode_id": "ep_rehearsal_01_01",
+          "segment_id": null,
+          "sequence": 2,
+          "source_in_ms": 0,
+          "source_out_ms": 120000,
+          "episode_in_ms": 0,
+          "scope": "full_episode"
+        }
+      ],
+      "related_asset_id": null,
+      "access_policy": "public",
+      "enabled": true,
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Real Google Drive video asset"
+        }
+      }
+    },
+    {
+      "id": "asset_feature_03",
+      "content_type": "video",
+      "role": "feature",
+      "edition_label": null,
+      "spoken_languages": ["vi"],
+      "embedded_subtitle_languages": [],
+      "storage": {
+        "provider": "local",
+        "storage_key": "animation_local",
+        "relative_path": "synthetic/trailer_test.mp4",
+        "drive_folder_id": null,
+        "drive_file_id": null
+      },
+      "size_bytes": 2242578,
+      "sha256": null,
+      "duration_ms": 45000,
+      "technical": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "frame_rate": {
+          "numerator": 24,
+          "denominator": 1
+        },
+        "variable_frame_rate": false,
+        "bitrate_bps": 500000,
+        "has_audio": true,
+        "audio_streams": []
+      },
+      "coverage": [
+        {
+          "episode_id": "ep_rehearsal_02_01",
+          "segment_id": null,
+          "sequence": 2,
+          "source_in_ms": 0,
+          "source_out_ms": 45000,
+          "episode_in_ms": 0,
+          "scope": "full_episode"
+        }
+      ],
+      "related_asset_id": null,
+      "access_policy": "authenticated",
+      "enabled": true,
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Second authenticated feature video asset"
+        }
+      }
+    },
+    {
+      "id": "asset_trailer_01",
+      "content_type": "video",
+      "role": "trailer",
+      "edition_label": null,
+      "spoken_languages": ["vi"],
+      "embedded_subtitle_languages": [],
+      "storage": {
+        "provider": "local",
+        "storage_key": "animation_local",
+        "relative_path": "synthetic/trailer_test.mp4",
+        "drive_folder_id": null,
+        "drive_file_id": null
+      },
+      "size_bytes": 2242578,
+      "sha256": null,
+      "duration_ms": 45000,
+      "technical": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "frame_rate": {
+          "numerator": 24,
+          "denominator": 1
+        },
+        "variable_frame_rate": false,
+        "bitrate_bps": 500000,
+        "has_audio": true,
+        "audio_streams": []
+      },
+      "coverage": [
+        {
+          "episode_id": "ep_rehearsal_02_01",
+          "segment_id": null,
+          "sequence": 1,
+          "source_in_ms": 0,
+          "source_out_ms": 45000,
+          "episode_in_ms": 0,
+          "scope": "full_episode"
+        }
+      ],
+      "related_asset_id": null,
+      "access_policy": "public",
+      "enabled": true,
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Public trailer video asset"
+        }
+      }
+    }
+  ],
+  "text_tracks": [
+    {
+      "id": "track_rehearsal_01_vi",
+      "media_asset_id": "asset_feature_01",
+      "kind": "subtitle",
+      "language": "vi",
+      "format": "inline",
+      "external_file": null,
+      "cues": [
+        {
+          "id": "cue_rehearsal_01",
+          "start_ms": 15000,
+          "end_ms": 25000,
+          "text": "Bão cát sao Hỏa đang tới rất gần! Tăng tốc lên!",
+          "speaker_character_ids": [
+            "char_rehearsal_bao"
+          ],
+          "confidence": 1.0
+        }
+      ],
+      "provenance": {
+        "source_ids": [
+          "src_rehearsal_01"
+        ],
+        "origin": "manual",
+        "verification": "human_verified",
+        "confidence": 1.0,
+        "annotator": "QA Team",
+        "tool_or_model": null,
+        "tool_revision": null,
+        "annotated_at": "2026-10-16T00:00:00Z",
+        "note": "Subtitle track"
+      },
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Track ready"
+        }
+      }
+    }
+  ],
+  "scenes": [
+    {
+      "id": "scene_rehearsal_canyon",
+      "episode_id": "ep_rehearsal_01_01",
+      "segment_id": "seg_rehearsal_01_01a",
+      "media_asset_id": "asset_feature_01",
+      "start_ms": 15000,
+      "end_ms": 30000,
+      "title": "Cú Nhảy Vực Thẳm Sao Hỏa",
+      "summary": "Chiếc xe địa hình phóng qua hẻm núi khi bão cát ập đến.",
+      "visual_description": "Bảo kích hoạt động cơ phản lực phóng xe vượt qua hẻm núi đá đỏ hiểm trở.",
+      "character_ids": [
+        "char_rehearsal_bao",
+        "char_rehearsal_chi"
+      ],
+      "keywords": [
+        "nhảy vực",
+        "đá đỏ",
+        "hẻm núi",
+        "sao hỏa"
+      ],
+      "themes": [
+        "hành động",
+        "sinh tồn"
+      ],
+      "visual_tags": [
+        "hẻm núi",
+        "sao hỏa",
+        "xe địa hình"
+      ],
+      "sound_events": [
+        "tiếng động cơ gầm vang"
+      ],
+      "transcript_cue_ids": [
+        "cue_rehearsal_01"
+      ],
+      "spoiler_level": "mild",
+      "provenance": {
+        "source_ids": [
+          "src_rehearsal_01"
+        ],
+        "origin": "manual",
+        "verification": "human_verified",
+        "confidence": 1.0,
+        "annotator": "QA Team",
+        "tool_or_model": null,
+        "tool_revision": null,
+        "annotated_at": "2026-10-16T00:00:00Z",
+        "note": "Rehearsal scene ground truth"
+      },
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Scene ready"
+        }
+      }
+    },
+    {
+      "id": "scene_rehearsal_base_secret",
+      "episode_id": "ep_rehearsal_01_02",
+      "segment_id": null,
+      "media_asset_id": "asset_feature_02",
+      "start_ms": 20000,
+      "end_ms": 35000,
+      "title": "Mật Mã Căn Cứ Ngầm",
+      "summary": "Bảo và Chi giải mã ổ khóa điện tử tại trạm nghiên cứu ngầm.",
+      "visual_description": "Ánh đèn xanh quét qua bảng điều khiển khi mã khóa bí mật được giải thành công.",
+      "character_ids": [
+        "char_rehearsal_bao",
+        "char_rehearsal_chi"
+      ],
+      "keywords": [
+        "căn cứ ngầm",
+        "mật mã",
+        "bảng điều khiển"
+      ],
+      "themes": [
+        "thám hiểm",
+        "khoa học"
+      ],
+      "visual_tags": [
+        "bảng điều khiển",
+        "ánh sáng xanh"
+      ],
+      "sound_events": [
+        "tiếng bíp xác nhận"
+      ],
+      "transcript_cue_ids": [],
+      "spoiler_level": "mild",
+      "provenance": {
+        "source_ids": [
+          "src_rehearsal_01"
+        ],
+        "origin": "manual",
+        "verification": "human_verified",
+        "confidence": 1.0,
+        "annotator": "QA Team",
+        "tool_or_model": null,
+        "tool_revision": null,
+        "annotated_at": "2026-10-16T00:00:00Z",
+        "note": "Protected scene in second episode"
+      },
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_rehearsal_01"
+          ],
+          "origin": "manual",
+          "verification": "human_verified",
+          "confidence": 1.0,
+          "annotator": "QA Team",
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-10-16T00:00:00Z",
+          "note": "Scene ready"
+        }
+      }
+    }
+  ]
+}

@@ -218,3 +218,58 @@ export async function getMediaDescriptor(
     }
   }
 }
+
+export interface PlaybackGrantResponse {
+  assetId: string;
+  grant: string;
+  streamUrl: string;
+  expiresIn: number;
+}
+
+export function getStoredAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return (
+    localStorage.getItem('dippie_auth_token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('auth_token') ||
+    null
+  );
+}
+
+/**
+ * Requests a short-lived playback grant token for browser <video> player (H4, R1, R2).
+ * Allows protected (authenticated / private) media streaming without exposing JWT in URL.
+ */
+export async function requestPlaybackGrant(
+  assetId: string,
+  signal?: AbortSignal
+): Promise<PlaybackGrantResponse | null> {
+  if (!assetId) return null;
+  const token = getStoredAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const res = await fetch(`${SPRINGBOOT_API}/media/grant/${assetId}`, {
+      method: 'POST',
+      headers,
+      signal,
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const data = await res.json();
+    return {
+      assetId: data.assetId,
+      grant: data.grant,
+      streamUrl: resolveStreamUrl(data.streamUrl),
+      expiresIn: data.expiresIn,
+    };
+  } catch {
+    return null;
+  }
+}

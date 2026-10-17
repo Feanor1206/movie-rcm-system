@@ -1,0 +1,85 @@
+{
+  "checkpointId": "CATALOG-01-F06-CHECKPOINT-01",
+  "timestamp": "2026-10-17T13:43:00+07:00",
+  "baselineCommit": "d620bfc634b3c424a847408f0dc6e02626439f45",
+  "branch": "dev",
+  "overallStatus": "PASSED",
+  "findingsStatus": {
+    "S1": { "status": "CLOSED", "summary": "Atomic Candidate Build, Rollback on Error & Dynamic State Path" },
+    "S2": { "status": "CLOSED", "summary": "Config Sync Secret, Admin Bootstrap & Frontend Auth Header Forwarding" },
+    "S3": { "status": "CLOSED", "summary": "Real Production-Stack Rehearsal on Isolated Ports" },
+    "R1": { "status": "CLOSED", "summary": "Playback grant rejected as Bearer token" },
+    "R2": { "status": "CLOSED", "summary": "Playback grant bound strictly to asset" },
+    "R3": { "status": "CLOSED", "summary": "Fail-closed 404 on unauthenticated/unauthorized media stream" },
+    "R4": { "status": "CLOSED", "summary": "Path traversal containment in DriveMediaStorageAdapter" },
+    "R5": { "status": "CLOSED", "summary": "Stable numeric hashing across integer and float types" },
+    "R6": { "status": "CLOSED", "summary": "Outbox worker recovery of interrupted SYNCING snapshots on startup" },
+    "H1_H5": { "status": "CLOSED", "summary": "Seek identity tuple, HTTP Range 206, and Real Outbox HTTP sync" },
+    "G1_G6": { "status": "CLOSED", "summary": "Admin import UI, transactional DB schema, relational consistency" },
+    "F1_F8": { "status": "CLOSED", "summary": "Draft 2020-12 JSON Schema compliance and validation baseline" }
+  },
+  "testSuites": {
+    "springBootMaven": {
+      "command": ".\\mvnw.cmd test",
+      "total": 178,
+      "passed": 178,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "status": "PASS"
+    },
+    "fastApiPytest": {
+      "command": "pytest -v tests/test_catalog_retrieval.py",
+      "total": 12,
+      "passed": 12,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "frontendVitest": {
+      "command": "npm run test",
+      "total": 83,
+      "passed": 83,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "frontendTypeScript": {
+      "command": "npx tsc --noEmit",
+      "errors": 0,
+      "status": "PASS"
+    },
+    "contractValidation": {
+      "command": "python docs/contracts/animation-catalog-v1/validate_catalog.py docs/fixtures/rehearsal_catalog.json",
+      "status": "VALID",
+      "schemaErrors": 0
+    },
+    "independentProbes": {
+      "f04IndependentProbe": "PASS",
+      "f05IndependentProbe": "PASS"
+    },
+    "productionStackRehearsal": {
+      "script": "scripts/rehearsal_f06_production_stack.py",
+      "status": "PASSED",
+      "ports": {
+        "fastapi": 8008,
+        "springboot": 8088
+      },
+      "gates": {
+        "admin_login": "PASS",
+        "catalog_validation": "PASS",
+        "catalog_import": "PASS",
+        "outbox_sync_ready": "PASS",
+        "catalog_search": "PASS",
+        "streaming_security_matrix": "PASS",
+        "timestamp_seek_range": "PASS",
+        "restart_recovery": "PASS"
+      },
+      "evidencePath": "docs/reviews/evidence/CATALOG_01_F06_rehearsal.json"
+    }
+  },
+  "contractIntegrity": {
+    "directory": "docs/contracts/animation-catalog-v1/",
+    "totalFiles": 5,
+    "modifiedFiles": 0,
+    "status": "UNTOUCHED_VERIFIED"
+  }
+}

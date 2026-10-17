@@ -548,6 +548,18 @@ class TestCatalogRetrievalSuite(unittest.TestCase):
     def test_12_fastapi_endpoints_sync_and_serve_real_catalog(self):
         import main
         old_secret = main.FASTAPI_SYNC_SECRET
+        old_gen = getattr(main, "_current_sync_generation", 0)
+        old_hash = getattr(main, "_current_sync_hash", "")
+        old_state_content = None
+        if hasattr(main, "SYNC_STATE_PATH") and main.SYNC_STATE_PATH.exists():
+            try:
+                old_state_content = main.SYNC_STATE_PATH.read_text(encoding="utf-8")
+            except Exception:
+                old_state_content = None
+
+        main._current_sync_generation = 0
+        main._current_sync_hash = ""
+
         try:
             # 1a. Missing configuration fail-closed check (503)
             main.FASTAPI_SYNC_SECRET = ""
@@ -587,6 +599,16 @@ class TestCatalogRetrievalSuite(unittest.TestCase):
             self.assertEqual(stale_resp.json()["status"], "SKIPPED")
         finally:
             main.FASTAPI_SYNC_SECRET = old_secret
+            main._current_sync_generation = old_gen
+            main._current_sync_hash = old_hash
+            if hasattr(main, "SYNC_STATE_PATH"):
+                if old_state_content is not None:
+                    main.SYNC_STATE_PATH.write_text(old_state_content, encoding="utf-8")
+                elif main.SYNC_STATE_PATH.exists():
+                    try:
+                        main.SYNC_STATE_PATH.unlink()
+                    except Exception:
+                        pass
 
         # 2. POST /api/chat with real catalog query
         chat_resp = self.client.post("/api/chat", json={

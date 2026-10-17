@@ -110,10 +110,100 @@ public class CatalogImportService {
         return hexString.toString();
     }
 
+    public static String formatDouble(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) return "null";
+        if (d == 0.0) {
+            return (Double.doubleToRawLongBits(d) == Double.doubleToRawLongBits(-0.0)) ? "-0.0" : "0.0";
+        }
+        String s = Double.toString(d);
+        int eIdx = s.indexOf('E');
+        if (eIdx == -1) {
+            return s;
+        }
+        String mantissa = s.substring(0, eIdx);
+        int exp = Integer.parseInt(s.substring(eIdx + 1));
+        boolean negative = mantissa.startsWith("-");
+        String absM = negative ? mantissa.substring(1) : mantissa;
+
+        if (exp >= -4 && exp < 0) {
+            int dot = absM.indexOf('.');
+            String digits = (dot != -1) ? absM.substring(0, dot) + absM.substring(dot + 1) : absM;
+            while (digits.endsWith("0")) {
+                digits = digits.substring(0, digits.length() - 1);
+            }
+            int leadingZeros = -exp - 1;
+            StringBuilder sb = new StringBuilder();
+            if (negative) sb.append("-");
+            sb.append("0.");
+            for (int i = 0; i < leadingZeros; i++) sb.append("0");
+            sb.append(digits);
+            return sb.toString();
+        } else if (exp >= 0 && exp < 16) {
+            java.math.BigDecimal bd = java.math.BigDecimal.valueOf(d);
+            String plain = bd.toPlainString();
+            if (!plain.contains(".")) {
+                plain += ".0";
+            }
+            return plain;
+        }
+
+        if (absM.endsWith(".0")) {
+            absM = absM.substring(0, absM.length() - 2);
+        }
+        int absExp = Math.abs(exp);
+        String expSign = exp >= 0 ? "+" : "-";
+        String expStr = (absExp < 10 ? "0" : "") + absExp;
+        return (negative ? "-" : "") + absM + "e" + expSign + expStr;
+    }
+
+    public static JsonNode sortJsonNode(JsonNode node) {
+        if (node == null) return null;
+        if (node.isDouble() || node.isFloat()) {
+            return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.rawValueNode(
+                new com.fasterxml.jackson.databind.util.RawValue(formatDouble(node.asDouble()))
+            );
+        }
+        if (node.isObject()) {
+            com.fasterxml.jackson.databind.node.ObjectNode objectNode = (com.fasterxml.jackson.databind.node.ObjectNode) node;
+            List<String> fieldNames = new ArrayList<>();
+            objectNode.fieldNames().forEachRemaining(fieldNames::add);
+            Collections.sort(fieldNames);
+            com.fasterxml.jackson.databind.node.ObjectNode sorted = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            for (String field : fieldNames) {
+                sorted.set(field, sortJsonNode(objectNode.get(field)));
+            }
+            return sorted;
+        } else if (node.isArray()) {
+            com.fasterxml.jackson.databind.node.ArrayNode arrayNode = (com.fasterxml.jackson.databind.node.ArrayNode) node;
+            com.fasterxml.jackson.databind.node.ArrayNode sorted = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+            for (JsonNode elem : arrayNode) {
+                sorted.add(sortJsonNode(elem));
+            }
+            return sorted;
+        }
+        return node;
+    }
+
     public static String computeSha256(String input) {
         try {
+            if (input == null) return "";
+            String trimmed = input.trim();
+            byte[] bytesToHash;
+            if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    JsonNode root = mapper.readTree(trimmed);
+                    JsonNode sorted = sortJsonNode(root);
+                    String canonicalJson = mapper.writeValueAsString(sorted);
+                    bytesToHash = canonicalJson.getBytes(StandardCharsets.UTF_8);
+                } catch (Exception parseEx) {
+                    bytesToHash = input.getBytes(StandardCharsets.UTF_8);
+                }
+            } else {
+                bytesToHash = input.getBytes(StandardCharsets.UTF_8);
+            }
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(bytesToHash);
             return bytesToHex(hash);
         } catch (Exception e) {
             throw new RuntimeException("Lỗi tính SHA-256: " + e.getMessage(), e);

@@ -317,9 +317,10 @@ public class SeedAndConfigPolicyTest {
             }
         }
 
-        // 3. Execute additive migrations: 02_add_favorite_items.sql and 03_add_media_assets.sql
+        // 3. Execute additive migrations: 02_add_favorite_items.sql, 03_add_media_assets.sql, 04_add_catalog_tables.sql
         executeSqlFile(jdbcUrl, "../../database/migrations/02_add_favorite_items.sql");
         executeSqlFile(jdbcUrl, "../../database/migrations/03_add_media_assets.sql");
+        executeSqlFile(jdbcUrl, "../../database/migrations/04_add_catalog_tables.sql");
 
         // 4. Assert favorite_items & media_assets exist and prior data is 100% intact
         try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {

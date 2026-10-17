@@ -224,16 +224,50 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
         return openChannelForPath(targetPath);
     }
 
-    public Resource getResourceForPath(Path targetPath) {
-        Resource resource = new FileSystemResource(targetPath);
-        if (!resource.exists() || !resource.isReadable()) {
-            throw new MediaUnavailableException("Không thể mở luồng đọc cho tệp media: " + targetPath);
+    public void validateRealContainment(Path rootPath, Path targetPath) {
+        if (targetPath == null) return;
+        Path effectiveRoot = rootPath;
+        if (effectiveRoot == null && driveMountPath != null && !driveMountPath.isBlank()) {
+            effectiveRoot = Paths.get(driveMountPath).toAbsolutePath().normalize();
         }
-        return resource;
+        if (effectiveRoot != null) {
+            Path normTarget = targetPath.normalize().toAbsolutePath();
+            Path normRoot = effectiveRoot.normalize().toAbsolutePath();
+            if (!normTarget.startsWith(normRoot)) {
+                throw new SecurityPathTraversalException("Đường dẫn media nằm ngoài thư mục lưu trữ media hợp lệ: " + targetPath);
+            }
+            if (Files.exists(normTarget)) {
+                try {
+                    Path realRoot = normRoot.toRealPath();
+                    Path realTarget = normTarget.toRealPath();
+                    if (!realTarget.startsWith(realRoot)) {
+                        throw new SecurityPathTraversalException("Phát hiện liên kết tượng trưng (symlink) trỏ ra ngoài Drive root: " + targetPath);
+                    }
+                } catch (IOException e) {
+                    throw new MediaUnavailableException("Không thể xác minh tính an toàn của tệp media: " + e.getMessage());
+                }
+            }
+        }
     }
 
-    public long getResourceLengthForPath(Path targetPath) {
+    public Resource getResourceForPath(Path rootPath, Path targetPath) {
         return ioExecutor.executeMetadata(() -> {
+            validateRealContainment(rootPath, targetPath);
+            Resource resource = new FileSystemResource(targetPath);
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new MediaUnavailableException("Không thể mở luồng đọc cho tệp media: " + targetPath);
+            }
+            return resource;
+        });
+    }
+
+    public Resource getResourceForPath(Path targetPath) {
+        return getResourceForPath(null, targetPath);
+    }
+
+    public long getResourceLengthForPath(Path rootPath, Path targetPath) {
+        return ioExecutor.executeMetadata(() -> {
+            validateRealContainment(rootPath, targetPath);
             try {
                 return Files.size(targetPath);
             } catch (IOException e) {
@@ -242,10 +276,18 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
         });
     }
 
-    public SeekableByteChannel openChannelForPath(Path targetPath) throws IOException {
-        if (!Files.exists(targetPath) || !Files.isRegularFile(targetPath)) {
-            throw new MediaNotFoundException("Không tìm thấy tệp media trên Google Drive: " + targetPath);
-        }
+    public long getResourceLengthForPath(Path targetPath) {
+        return getResourceLengthForPath(null, targetPath);
+    }
+
+    public SeekableByteChannel openChannelForPath(Path rootPath, Path targetPath) throws IOException {
+        ioExecutor.executeMetadata(() -> {
+            validateRealContainment(rootPath, targetPath);
+            if (!Files.exists(targetPath) || !Files.isRegularFile(targetPath)) {
+                throw new MediaNotFoundException("Không tìm thấy tệp media trên Google Drive: " + targetPath);
+            }
+            return true;
+        });
         DriveResourceReservation reservation = ioExecutor.acquireReservation();
         try {
             FileChannel rawChannel = ioExecutor.executeOpen(
@@ -258,5 +300,9 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
         } catch (Throwable t) {
             throw t;
         }
+    }
+
+    public SeekableByteChannel openChannelForPath(Path targetPath) throws IOException {
+        return openChannelForPath(null, targetPath);
     }
 }

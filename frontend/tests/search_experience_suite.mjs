@@ -204,7 +204,10 @@ function createSearchHarness(initialUrl = '', browseMock) {
         };
       }
       if (mod.includes('catalogService')) {
-        return { browseCatalog: browseMock };
+        return {
+          browseCatalog: browseMock,
+          searchAnimationCatalog: async () => [],
+        };
       }
       if (mod.includes('WatchlistContext')) {
         return { useWatchlist: () => ({ openChat: () => {} }) };

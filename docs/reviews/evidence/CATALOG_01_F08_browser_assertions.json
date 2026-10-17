@@ -1,0 +1,28 @@
+{
+  "status": "PASSED",
+  "timestamp": "2026-10-17T09:29:49.717Z",
+  "frontendPort": 3008,
+  "cdpPort": 9228,
+  "assertions": {
+    "ui_form_login": true,
+    "ui_catalog_import": true,
+    "ui_search_and_navigation": true,
+    "public_playback_advance": true,
+    "pause_resume_controls": true,
+    "scene_direct_seek_15s": true,
+    "three_timeline_seeks": true,
+    "protected_episode2_playback_and_seek": true,
+    "google_drive_browser_playback": true,
+    "fail_closed_negative_control": true
+  },
+  "measurements": {
+    "public_video_dimensions": "1280x720",
+    "public_video_decoded_frames": 4,
+    "public_playback_advance_sec": 1.1684189999999999,
+    "scene_seek_actual_sec": 16.418946,
+    "ep2_protected_scene_seek_sec": 21.355332,
+    "google_drive_video_dimensions": "1920x1080",
+    "google_drive_seek_sec": 60,
+    "screenshot_path": "D:\\Class\\movie-rcm-system\\docs\\reviews\\evidence\\live_rehearsal_f08_player.png"
+  }
+}

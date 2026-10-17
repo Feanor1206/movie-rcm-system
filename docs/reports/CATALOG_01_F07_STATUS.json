@@ -1,0 +1,116 @@
+{
+  "checkpointId": "CATALOG-01-F07-CHECKPOINT-01",
+  "timestamp": "2026-10-17T14:48:00+07:00",
+  "baselineCommit": "d620bfc634b3c424a847408f0dc6e02626439f45",
+  "branch": "dev",
+  "overallStatus": "PASSED",
+  "findingsStatus": {
+    "F1": {
+      "status": "CLOSED",
+      "summary": "Atomic Candidate Build & Rollback Isolation: Candidate index builds on an isolated instance; durable state is saved only after candidate build succeeds; atomic pointer swap guarantees rejected candidates never leak into active index."
+    },
+    "F2": {
+      "status": "CLOSED",
+      "summary": "Contract Scene Timestamp Semantics & Browser Automation: In dippie.catalog.v1, scenes.start_ms is directly in file timeline (seek to scene.start_ms / 1000 without adding coverage offset). Real browser automation via Chrome CDP verifies decoded frames, pause/resume, 15.0s scene seek, 3 sequential seeks, episode 2 switch with grant token, and protected scene seek."
+    },
+    "F3": {
+      "status": "CLOSED",
+      "summary": "Single Source of Accepted State on Recovery: FastAPI lifespan checks if accepted state was recovered before attempting to load default catalog snapshot; default catalog only loads when no accepted state exists."
+    },
+    "F4": {
+      "status": "CLOSED",
+      "summary": "Hermetic Production-Stack Rehearsal Identity & Isolation: Live services on isolated ports (8008, 8088, 3008, 9228); grant strictly bound and rejected on second real protected asset (asset_feature_03); double restart verification; processes terminated strictly by PID."
+    },
+    "GoogleDriveGate": {
+      "status": "PASS",
+      "summary": "Read-only rclone mount of cinema-drive to X: with folder ID 1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ; verified directory listing, read 1,024 bytes header of real Jadoo MP4 (339 MB), and clean unmount."
+    }
+  },
+  "testSuites": {
+    "atomicConcurrencyMatrix": {
+      "command": "pytest -v tests/test_f07_atomic_concurrency_matrix.py",
+      "scenarios": 10,
+      "passed": 10,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "fastApiPytest": {
+      "command": "pytest -v backend/fastapi/tests/test_catalog_retrieval.py",
+      "total": 12,
+      "passed": 12,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "springBootMavenSeedAndConfig": {
+      "command": ".\\mvnw.cmd test -Dtest=SeedAndConfigPolicyTest",
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "springBootMavenMediaStreaming": {
+      "command": ".\\mvnw.cmd test -Dtest=MediaStreamingIntegrationTest",
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "frontendVitest": {
+      "command": "npm run test",
+      "total": 83,
+      "passed": 83,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "frontendTypeScript": {
+      "command": "npx tsc --noEmit",
+      "errors": 0,
+      "status": "PASS"
+    },
+    "frontendNextBuild": {
+      "command": "npm run build",
+      "errors": 0,
+      "status": "PASS"
+    },
+    "contractValidation": {
+      "command": "python docs/contracts/animation-catalog-v1/validate_catalog.py docs/fixtures/rehearsal_catalog.json",
+      "status": "VALID",
+      "schemaErrors": 0
+    },
+    "independentProbes": {
+      "f04IndependentProbe": "PASS",
+      "f05IndependentProbe": "PASS",
+      "f06IndependentProbe": "PASS"
+    },
+    "productionStackRehearsal": {
+      "script": "scripts/rehearsal_f07_production_stack.py",
+      "status": "PASSED",
+      "ports": {
+        "fastapi": 8008,
+        "springboot": 8088,
+        "frontend": 3008,
+        "cdp": 9228
+      },
+      "gates": {
+        "admin_login": "PASS",
+        "catalog_validation": "PASS",
+        "catalog_import": "PASS",
+        "outbox_sync_ready": "PASS",
+        "catalog_search": "PASS",
+        "streaming_security_matrix": "PASS",
+        "browser_video_playback_and_seek": "PASS",
+        "google_drive_gate": "PASS",
+        "restart_recovery_1": "PASS",
+        "restart_recovery_2": "PASS"
+      },
+      "evidencePath": "docs/reviews/evidence/CATALOG_01_F07_rehearsal.json",
+      "screenshotPath": "docs/reviews/evidence/live_rehearsal_f07_player.png"
+    }
+  },
+  "contractIntegrity": {
+    "directory": "docs/contracts/animation-catalog-v1/",
+    "totalFiles": 5,
+    "modifiedFiles": 0,
+    "status": "UNTOUCHED_VERIFIED"
+  }
+}

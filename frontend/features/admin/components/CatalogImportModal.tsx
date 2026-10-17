@@ -200,6 +200,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
             }}
             placeholder='Dán nội dung JSON tuân thủ schema dippie.catalog.v1 vào đây...'
             rows={8}
+            data-testid="catalog-json-textarea"
             className="w-full rounded-lg border border-surface-border bg-surface p-3 font-mono text-xs text-zinc-200 placeholder-zinc-500 focus:border-brand focus:outline-none"
           />
         </div>
@@ -214,6 +215,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
         {/* Actions Bar */}
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <button
+            data-testid="catalog-validate-button"
             type="button"
             onClick={handleValidate}
             disabled={isValidating || !jsonInput.trim()}
@@ -233,6 +235,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
           </button>
 
           <button
+            data-testid="catalog-import-button"
             type="button"
             onClick={handleImport}
             disabled={
@@ -242,6 +245,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
             }
             className="btn-primary flex items-center gap-2 text-xs font-bold disabled:opacity-50"
           >
+
             {isImporting ? (
               <>
                 <Loader2 size={14} className="animate-spin text-zinc-950" />
@@ -258,15 +262,15 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
         {/* Validation Preview Panel */}
         {validationResult && (
-          <div className="mt-4 rounded-xl border border-surface-border bg-surface p-4">
+          <div data-testid="catalog-validation-panel" className="mt-4 rounded-xl border border-surface-border bg-surface p-4">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
                 {validationResult.valid ? (
-                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                  <span data-testid="catalog-validation-status" className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
                     <CheckCircle2 size={14} /> Gói hợp lệ
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-400 border border-red-500/30">
+                  <span data-testid="catalog-validation-status" className="flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-400 border border-red-500/30">
                     <XCircle size={14} /> Gói không hợp lệ ({validationResult.errors.length} lỗi)
                   </span>
                 )}
@@ -282,6 +286,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
                 </span>
               )}
             </div>
+
 
             {/* Diffs Counters */}
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -336,7 +341,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
         {/* Import Error */}
         {importError && (
-          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+          <div data-testid="catalog-import-error" className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
             <XCircle size={16} className="shrink-0" />
             <span>{importError}</span>
           </div>
@@ -344,8 +349,9 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
         {/* Import Success Panel */}
         {importResult && (
-          <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <div data-testid="catalog-import-success-panel" className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
             <div className="flex items-center gap-2 text-emerald-400">
+
               <CheckCircle2 size={18} />
               <h3 className="text-sm font-bold">Nhập dữ liệu thành công!</h3>
             </div>

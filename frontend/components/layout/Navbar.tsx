@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Menu, Search, User, X, LogOut, Bookmark, UserCheck } from 'lucide-react';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { useAuth } from '@/lib/context/AuthContext';
+import { AuthModal } from '@/features/auth/components/AuthModal';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -101,6 +102,7 @@ export function Navbar() {
           {isAuthenticated && user ? (
             <div className="relative" ref={dropdownRef}>
               <button
+                data-testid="nav-user-dropdown-button"
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer"
               >
@@ -111,6 +113,7 @@ export function Navbar() {
                   {user.fullName || user.username}
                 </span>
               </button>
+
 
               {/* Dropdown Menu */}
               {userDropdownOpen && (
@@ -153,11 +156,13 @@ export function Navbar() {
             </div>
           ) : (
             <button
+              data-testid="nav-login-button"
               onClick={() => openAuthModal('login')}
               className="rounded-md bg-surface border border-surface-border px-3 py-1.5 text-xs font-semibold text-zinc-100 hover:border-brand hover:bg-brand hover:text-zinc-950 transition-all cursor-pointer shadow-sm hover:shadow-brand-sm"
             >
               Đăng nhập
             </button>
+
           )}
         </div>
 
@@ -235,6 +240,9 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Global Authentication Modal */}
+      <AuthModal />
     </header>
   );
 }

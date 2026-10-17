@@ -496,6 +496,7 @@ export interface CatalogMediaAsset {
   driveFileId?: string;
   durationMs?: number;
   coverageJson?: string;
+  accessPolicy?: 'public' | 'authenticated' | 'private' | string;
 }
 
 export interface CatalogSnapshot {
@@ -673,7 +674,10 @@ export async function getCatalogSeriesList(
   const url = `${baseUrl}/catalog/series`;
   const res = await fetch(url, {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeader(),
+    },
     signal,
   });
   if (!res.ok) return [];
@@ -691,7 +695,10 @@ export async function getCatalogSeriesDetail(
   const url = `${baseUrl}/catalog/series/${encodeURIComponent(id)}`;
   const res = await fetch(url, {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeader(),
+    },
     signal,
   });
   if (res.status === 404) return null;
@@ -712,7 +719,10 @@ export async function getCatalogEpisodeDetail(
   const url = `${baseUrl}/catalog/episodes/${encodeURIComponent(id)}`;
   const res = await fetch(url, {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeader(),
+    },
     signal,
   });
   if (res.status === 404) return null;
@@ -733,7 +743,10 @@ export async function searchAnimationCatalog(
   const url = `${baseUrl}/catalog/search?q=${encodeURIComponent(q.trim())}`;
   const res = await fetch(url, {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeader(),
+    },
     signal,
   });
   if (!res.ok) return [];

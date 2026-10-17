@@ -49,6 +49,42 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else if (request.getRequestURI().startsWith("/api/media/stream/")) {
+                // Playback grant authentication for browser <video> player (R1, H4)
+                // Strictly limited to GET and HEAD requests on /api/media/stream/{assetId}
+                String method = request.getMethod();
+                if ("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method)) {
+                    String grant = request.getParameter("grant");
+                    if (StringUtils.hasText(grant)) {
+                        String path = request.getRequestURI();
+                        String assetId = path.substring("/api/media/stream/".length());
+                        if (assetId.contains("/")) {
+                            assetId = assetId.substring(0, assetId.indexOf("/"));
+                        }
+                        if (StringUtils.hasText(assetId) && jwtUtils.validatePlaybackGrant(grant, assetId)) {
+                            String username = jwtUtils.getUserNameFromJwtToken(grant);
+                            UserDetails userDetails = null;
+                            try {
+                                userDetails = userDetailsService.loadUserByUsername(username);
+                            } catch (Exception e) {
+                                logger.warn("Playback grant rejected: user lookup failed for {}", username);
+                                userDetails = null;
+                            }
+                            if (userDetails != null && userDetails.isEnabled() && userDetails.isAccountNonLocked()) {
+                                UsernamePasswordAuthenticationToken authentication =
+                                        new UsernamePasswordAuthenticationToken(
+                                                userDetails,
+                                                null,
+                                                userDetails.getAuthorities()
+                                        );
+                                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                                SecurityContextHolder.getContext().setAuthentication(authentication);
+                            } else {
+                                logger.warn("Playback grant rejected: user is missing, disabled, or locked: {}", username);
+                            }
+                        }
+                    }
+                }
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e.getMessage());

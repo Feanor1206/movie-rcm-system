@@ -1,0 +1,98 @@
+{
+  "golden_vector_hashes": {
+    "vectors_tested": 10,
+    "all_matched": true,
+    "details": {
+      "v01_scientific_small": {
+        "python_hash": "b9e20bc6712fb4cb50f2fd202db7b1f3fcfdf4c57f0d69bb9fb7dfd87299c123",
+        "java_hash": "b9e20bc6712fb4cb50f2fd202db7b1f3fcfdf4c57f0d69bb9fb7dfd87299c123",
+        "matched": true
+      },
+      "v02_scientific_large": {
+        "python_hash": "26e481b7f45704a928e0395d80bf7871f41dc3a2f2b8dc034231f87ed23afc31",
+        "java_hash": "26e481b7f45704a928e0395d80bf7871f41dc3a2f2b8dc034231f87ed23afc31",
+        "matched": true
+      },
+      "v03_negative_zero": {
+        "python_hash": "e18ffce8eebff18b769815cac8e82a4c0b2864cdbfb4451c96a05f2c9e3bed94",
+        "java_hash": "e18ffce8eebff18b769815cac8e82a4c0b2864cdbfb4451c96a05f2c9e3bed94",
+        "matched": true
+      },
+      "v04_sub_normal_decimal": {
+        "python_hash": "adf26499d67255e46604f294b6fb0e27559fc2b8c9965ce47fd75f9d3ee58f56",
+        "java_hash": "adf26499d67255e46604f294b6fb0e27559fc2b8c9965ce47fd75f9d3ee58f56",
+        "matched": true
+      },
+      "v05_standard_decimal": {
+        "python_hash": "d123a24c300d73d960bc2ece6520096d3f7513aa9062d62e906d6ac104f20fa6",
+        "java_hash": "d123a24c300d73d960bc2ece6520096d3f7513aa9062d62e906d6ac104f20fa6",
+        "matched": true
+      },
+      "v06_vietnamese_diacritics_unicode": {
+        "python_hash": "b4d5db626ceb66243288e9c1470143b65c1fd73cf04aac5ca4ef69828e4b5715",
+        "java_hash": "b4d5db626ceb66243288e9c1470143b65c1fd73cf04aac5ca4ef69828e4b5715",
+        "matched": true
+      },
+      "v07_unsorted_nested_keys": {
+        "python_hash": "f2a84524b9e44658b60a0f7773bfbb6a2409ad3f4e22b71259cd2f519d1e2f7e",
+        "java_hash": "f2a84524b9e44658b60a0f7773bfbb6a2409ad3f4e22b71259cd2f519d1e2f7e",
+        "matched": true
+      },
+      "v08_empty_and_zero": {
+        "python_hash": "87856e5f2bc65e21a444d7e03f33788f8078c8d76ade4ee30d2589d7f1b1ce67",
+        "java_hash": "87856e5f2bc65e21a444d7e03f33788f8078c8d76ade4ee30d2589d7f1b1ce67",
+        "matched": true
+      },
+      "v09_mini_catalog": {
+        "python_hash": "43b543a6db546f2ee12a3be2b24ddc2b3adc525966744b9dcab7043ce449dd0b",
+        "java_hash": "43b543a6db546f2ee12a3be2b24ddc2b3adc525966744b9dcab7043ce449dd0b",
+        "matched": true
+      },
+      "v10_full_catalog_example": {
+        "python_hash": "b3445e0d33d0c1cf7540287eac98d77419a28484bd9823a15f3da94e28c50d31",
+        "java_hash": "b3445e0d33d0c1cf7540287eac98d77419a28484bd9823a15f3da94e28c50d31",
+        "matched": true
+      }
+    }
+  },
+  "playback_grant_matrix": {
+    "all_passed": true,
+    "details": {
+      "bound_grant_valid_for_A": true,
+      "bound_grant_valid_for_B": true,
+      "expired_grant_rejected": true,
+      "stream_A_with_query_param_authenticated": true,
+      "stream_A_with_head_method_authenticated": true,
+      "stream_A_with_post_method_rejected": true,
+      "stream_B_with_grant_A_query_param_rejected": true,
+      "grant_as_bearer_authenticates_admin_endpoint": true,
+      "grant_as_bearer_authenticates_other_asset": true,
+      "grant_as_bearer_authenticates_same_asset": true,
+      "disabled_user_grant_rejected": true
+    }
+  },
+  "candidate_isolation_and_rollback": {
+    "all_passed": true,
+    "gen1_status": "success",
+    "bad_hash_http_status": 400,
+    "hash_isolation_verified": true,
+    "durable_failure_http_status": 500,
+    "durable_isolation_verified": true,
+    "forward_gen2_committed": true
+  },
+  "product_acceptance_flows": {
+    "all_passed": true,
+    "details": {
+      "P1_contract_validation": true,
+      "P2_canonical_sync_hash": true,
+      "P3_search_and_timeline_separation": true,
+      "P4_playback_grant_protection": true,
+      "P5_restart_recovery": true
+    }
+  },
+  "summary": {
+    "checkpoint": "CATALOG-01-F05-CHECKPOINT-01",
+    "overall_status": "PASSED",
+    "all_checks_passed": true
+  }
+}
