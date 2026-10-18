@@ -36,6 +36,9 @@ param(
     [string]$RemoteSubpath = "DippieMedia",
 
     [Parameter(Mandatory = $false)]
+    [string]$DriveRootFolderId,
+
+    [Parameter(Mandatory = $false)]
     [string]$MountPoint = "M:",
 
     [Parameter(Mandatory = $false)]
@@ -133,6 +136,10 @@ if (-not $effectiveRemote) {
     $effectiveRemote = "cinema-gdrive:"
 }
 
+if ($DriveRootFolderId -and ($RemoteSubpath -eq "DippieMedia") -and (-not $PSBoundParameters.ContainsKey('RemoteSubpath'))) {
+    $RemoteSubpath = ""
+}
+
 $remoteTarget = ""
 if ($effectiveRemote.EndsWith(":")) {
     if ($RemoteSubpath) {
@@ -190,7 +197,11 @@ if ($isDryRun) {
         $rcloneCmd = $RclonePath
     }
 
-    $rawArgPreview = @("mount", $remoteTarget, $MountPoint) + $baselineFlags
+    $rawArgPreview = @("mount")
+    if ($DriveRootFolderId) {
+        $rawArgPreview += @("--drive-root-folder-id", $DriveRootFolderId)
+    }
+    $rawArgPreview += @($remoteTarget, $MountPoint) + $baselineFlags
     if ($ConfigPath) {
         $rawArgPreview += @("--config", $ConfigPath)
     }
@@ -207,6 +218,7 @@ if ($isDryRun) {
         IsExecute           = $false
         Remote              = $effectiveRemote
         RemoteSubpath       = $RemoteSubpath
+        DriveRootFolderId   = $DriveRootFolderId
         RemoteTarget        = $remoteTarget
         MountPoint          = $MountPoint
         BaselineFlags       = $baselineFlags
@@ -311,7 +323,12 @@ if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
 
 # 3. Assemble arguments for rclone mount
 $rawMountArgs = @(
-    "mount",
+    "mount"
+)
+if ($DriveRootFolderId) {
+    $rawMountArgs += @("--drive-root-folder-id", $DriveRootFolderId)
+}
+$rawMountArgs += @(
     $remoteTarget,
     $MountPoint,
     "--read-only",
@@ -348,13 +365,14 @@ $procName = try { $proc.ProcessName } catch { "rclone" }
 if (-not $procName) { $procName = "rclone" }
 
 $stateRecord = [PSCustomObject]@{
-    pid            = $proc.Id
-    processName    = $procName
-    startTime      = $startTimeIso
-    executablePath = $rcloneExe
-    mountPoint     = $MountPoint
-    remoteTarget   = $remoteTarget
-    arguments      = $rawMountArgs
+    pid               = $proc.Id
+    processName       = $procName
+    startTime         = $startTimeIso
+    executablePath    = $rcloneExe
+    mountPoint        = $MountPoint
+    remoteTarget      = $remoteTarget
+    driveRootFolderId = $DriveRootFolderId
+    arguments         = $rawMountArgs
     flags          = $baselineFlags
     commandLine    = "$rcloneExe " + ($formattedMountArgs -join " ")
     stateFile      = $StateFile

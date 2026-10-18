@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { RefreshCw, AlertCircle, Film, Compass } from 'lucide-react';
+import { RefreshCw, AlertCircle, Film } from 'lucide-react';
 import { Footer } from '@/components/layout/Footer';
 import { Navbar } from '@/components/layout/Navbar';
 import { MovieDetail } from '@/features/movies/components/MovieDetail';
@@ -52,33 +52,20 @@ export default function MovieDetailPage() {
         setMovie(fetchedMovie);
         setLoading(false);
 
-        // Fetch candidate similar animations in background, decoupled from main loading
-        const candidateGenres = fetchedMovie.genres && fetchedMovie.genres.length > 0
-          ? fetchedMovie.genres.slice(0, 2)
-          : ['Animation'];
-
         browseCatalog({
           animationOnly: true,
-          genres: candidateGenres,
+          genres: fetchedMovie.genres && fetchedMovie.genres.length > 0 ? fetchedMovie.genres.slice(0, 2) : ['Animation'],
           size: 6,
           signal: controller.signal,
         })
-          .then((similarRes) => {
-            if (!isCurrent) return;
-            const filtered = similarRes.items.filter((m) => m.id !== fetchedMovie.id).slice(0, 5);
-            setSimilarMovies(filtered);
+          .then((res) => {
+            if (isCurrent) setSimilarMovies(res.items.filter((m) => m.id !== fetchedMovie.id).slice(0, 5));
           })
-          .catch((similarErr: any) => {
-            if (!isCurrent || similarErr?.isCanceled || similarErr?.name === 'AbortError') return;
-            // Failure to fetch similar rail does not break or alter movie detail view
-            setSimilarMovies([]);
-          });
+          .catch(() => {});
       })
       .catch((err: any) => {
-        if (!isCurrent || err?.isCanceled || err?.name === 'AbortError') {
-          return; // Caller unmounted / changed page
-        }
-        setError(err?.message || 'Không thể kết nối đến máy chủ danh mục phim');
+        if (!isCurrent || err?.isCanceled || err?.name === 'AbortError') return;
+        setError(err?.message || 'Không thể kết nối đến máy chủ');
         setLoading(false);
       });
 
@@ -93,44 +80,24 @@ export default function MovieDetailPage() {
       <Navbar />
       {loading ? (
         <main className="min-h-screen bg-background">
-          {/* Skeleton Hero Backdrop */}
-          <div className="relative min-h-[420px] sm:min-h-[480px] bg-surface animate-pulse border-b border-surface-border">
-            <div className="page-shell pt-10 pb-12 flex flex-col md:flex-row gap-6 md:items-end">
-              <div className="aspect-[2/3] w-44 sm:w-56 rounded-lg bg-surface-elevated shrink-0" />
-              <div className="space-y-3 flex-1">
-                {['h-4 w-28', 'h-10 w-3/4', 'h-4 w-1/2', 'h-16 max-w-2xl'].map((c) => (
-                  <div key={c} className={`${c} rounded bg-zinc-800`} />
-                ))}
-                <div className="flex gap-3 pt-3">
-                  <div className="h-10 w-36 rounded bg-zinc-800" />
-                  <div className="h-10 w-36 rounded bg-zinc-800" />
-                </div>
-              </div>
-            </div>
-          </div>
+          <div className="min-h-[420px] bg-surface animate-pulse" />
         </main>
       ) : notFoundState || error ? (
         <main className="min-h-[70vh] flex items-center justify-center bg-background px-4 py-16 text-center">
-          <div className={`max-w-md space-y-4 rounded-xl border p-8 shadow-xl ${
-            notFoundState ? 'border-surface-border bg-surface' : 'border-red-500/30 bg-red-950/20'
-          }`}>
-            <div className={`grid h-14 w-14 place-items-center rounded-full mx-auto ${
-              notFoundState ? 'bg-zinc-850 text-zinc-400' : 'bg-red-900/40 text-red-400'
-            }`}>
-              {notFoundState ? <Film size={26} /> : <AlertCircle size={26} />}
+          <div className="max-w-md space-y-4 rounded-xl border border-surface-border bg-surface p-8">
+            <div className="grid h-12 w-12 place-items-center rounded-full mx-auto bg-zinc-800 text-zinc-300">
+              {notFoundState ? <Film size={24} /> : <AlertCircle size={24} />}
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">
+            <h1 className="text-xl font-bold text-white">
               {notFoundState ? 'Không tìm thấy phim hoạt hình' : 'Không thể kết nối đến máy chủ'}
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-400">
-              {notFoundState
-                ? `Tác phẩm có mã định danh "${canonicalId}" không tồn tại trên hệ thống hoặc đã được cập nhật.`
-                : error}
+            <p className="text-xs text-zinc-400">
+              {notFoundState ? `Mã phim "${canonicalId}" không tồn tại.` : error}
             </p>
             <div className="pt-2 flex flex-wrap justify-center gap-3">
               {notFoundState ? (
                 <Link href="/search?genre=Animation" className="btn-primary text-xs flex items-center gap-1.5">
-                  <Compass size={14} /> Khám phá kho hoạt hình
+                  <Film size={14} /> Khám phá kho hoạt hình
                 </Link>
               ) : (
                 <button

@@ -1,0 +1,15 @@
+{
+  "gates": {
+    "spring_start": "PASS",
+    "login_http": "PASS",
+    "validate_import_http": "PASS",
+    "search_exact_id_http": "PASS",
+    "local_range_http": "PASS",
+    "protected_grant_range_http": "PASS",
+    "next_production_pages_http": "PASS"
+  },
+  "scope": "Production Spring compiled classes and Next production build; isolated H2/media. Sync/model/Drive/browser decoder NOT_RUN.",
+  "logs_dir": "C:\\Users\\Admin\\AppData\\Local\\Temp\\dippie-current-http-tu4y8yjj",
+  "status": "PASS",
+  "owned_processes_stopped": true
+}

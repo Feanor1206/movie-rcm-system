@@ -34,27 +34,8 @@ export function resolveStreamUrl(streamUrl: string): string {
   return `${baseHost}${cleanPath}`;
 }
 
-function getDOMExceptionClass(): typeof DOMException {
-  if (typeof DOMException !== 'undefined') {
-    return DOMException;
-  }
-  if (typeof globalThis !== 'undefined' && (globalThis as any).DOMException) {
-    return (globalThis as any).DOMException;
-  }
-  try {
-    const ac = new AbortController();
-    ac.abort();
-    if (ac.signal.reason?.constructor) {
-      return ac.signal.reason.constructor as typeof DOMException;
-    }
-  } catch {
-    // fallback
-  }
-  return Error as any;
-}
-
 function createDOMException(message: string, name: string): DOMException {
-  const Ctor = getDOMExceptionClass();
+  const Ctor = typeof DOMException !== 'undefined' ? DOMException : (Error as any);
   try {
     return new Ctor(message, name);
   } catch {
@@ -108,29 +89,12 @@ export async function getMediaDescriptor(
       }
     }, timeoutMs);
 
-    const abortPromise = new Promise<never>((_, reject) => {
-      if (controller.signal.aborted) {
-        reject(controller.signal.reason || new Error('The operation was aborted.'));
-      } else {
-        controller.signal.addEventListener(
-          'abort',
-          () => reject(controller.signal.reason || new Error('The operation was aborted.')),
-          { once: true }
-        );
-      }
-    });
-
     const url = `${SPRINGBOOT_API}/movies/${encodeURIComponent(movieId)}/media-descriptor`;
-    const response = await Promise.race([
-      fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
-        signal: controller.signal,
-      }),
-      abortPromise,
-    ]);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
 
     if (!response.ok) {
       throw new Error(`Lỗi tải mô tả media (${response.status})`);
@@ -154,31 +118,10 @@ export async function getMediaDescriptor(
       throw new Error('Thiếu hoặc sai trường hasFeature/hasTrailer');
     }
 
-    if (data.hasFeature) {
-      if (
-        !data.feature ||
-        typeof data.feature !== 'object' ||
-        Array.isArray(data.feature) ||
-        data.feature.kind !== 'feature' ||
-        typeof data.feature.streamUrl !== 'string' ||
-        data.feature.streamUrl.trim() === ''
-      ) {
-        throw new Error('Dữ liệu feature không hợp lệ');
-      }
-    }
-
-    if (data.hasTrailer) {
-      if (
-        !data.trailer ||
-        typeof data.trailer !== 'object' ||
-        Array.isArray(data.trailer) ||
-        data.trailer.kind !== 'trailer' ||
-        typeof data.trailer.streamUrl !== 'string' ||
-        data.trailer.streamUrl.trim() === ''
-      ) {
-        throw new Error('Dữ liệu trailer không hợp lệ');
-      }
-    }
+    const isInvalid = (a: any, k: string) =>
+      !a || typeof a !== 'object' || Array.isArray(a) || a.kind !== k || typeof a.streamUrl !== 'string' || !a.streamUrl.trim();
+    if (data.hasFeature && isInvalid(data.feature, 'feature')) throw new Error('Dữ liệu feature không hợp lệ');
+    if (data.hasTrailer && isInvalid(data.trailer, 'trailer')) throw new Error('Dữ liệu trailer không hợp lệ');
 
     return {
       movieId: data.movieId,
@@ -227,48 +170,26 @@ export interface PlaybackGrantResponse {
 }
 
 export function getStoredAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return (
-    localStorage.getItem('dippie_auth_token') ||
-    localStorage.getItem('token') ||
-    localStorage.getItem('auth_token') ||
-    null
-  );
+  return typeof window !== 'undefined'
+    ? localStorage.getItem('dippie_auth_token') || localStorage.getItem('token') || localStorage.getItem('auth_token')
+    : null;
 }
 
-/**
- * Requests a short-lived playback grant token for browser <video> player (H4, R1, R2).
- * Allows protected (authenticated / private) media streaming without exposing JWT in URL.
- */
 export async function requestPlaybackGrant(
   assetId: string,
   signal?: AbortSignal
 ): Promise<PlaybackGrantResponse | null> {
   if (!assetId) return null;
   const token = getStoredAuthToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   try {
     const res = await fetch(`${SPRINGBOOT_API}/media/grant/${assetId}`, {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       signal,
     });
-    if (!res.ok) {
-      return null;
-    }
-    const data = await res.json();
-    return {
-      assetId: data.assetId,
-      grant: data.grant,
-      streamUrl: resolveStreamUrl(data.streamUrl),
-      expiresIn: data.expiresIn,
-    };
+    if (!res.ok) return null;
+    const d = await res.json();
+    return { assetId: d.assetId, grant: d.grant, streamUrl: resolveStreamUrl(d.streamUrl), expiresIn: d.expiresIn };
   } catch {
     return null;
   }

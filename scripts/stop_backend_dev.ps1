@@ -91,7 +91,7 @@ if ($canonicalLiveExe -ne $canonicalExpectedExe) {
 
 # 6. CommandLine argument verification (must contain expected application and snapshot profile)
 $cmdLine = [string]$cimProc.CommandLine
-if (-not $cmdLine.Contains("MovieRcmApplication") -or -not $cmdLine.Contains("snapshot")) {
+if ((-not $cmdLine.Contains("MovieRcmApplication") -and -not $cmdLine.Contains("moviercm-backend")) -or -not $cmdLine.Contains("snapshot")) {
     Write-Warning "[stop_backend_dev] IDENTITY_MISMATCH: Live process PID $targetPid CommandLine does not contain expected application or profile markers. CommandLine: '$cmdLine'. Aborting fail-closed without signaling."
     return
 }

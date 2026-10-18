@@ -1,0 +1,70 @@
+{
+  "checkpointId": "SNAPSHOT-01-CHECKPOINT-01",
+  "timestamp": "2026-10-18T06:40:00+07:00",
+  "baselineCommit": "d538fa33d54f3f319d4651b573e016ef12ea3c19",
+  "branch": "dev",
+  "releaseLevel": "usable_preview",
+  "status": "ready_for_handover",
+  "overallStatus": "PASSED",
+  "objectives": {
+    "jsFirstLoadBudget": {
+      "status": "RESOLVED",
+      "route": "/movies/[id]",
+      "budgetThresholdBytes": 143360,
+      "previousGzipBytes": 144261,
+      "currentGzipBytes": 143303,
+      "marginBytes": 57,
+      "nodeVersion": "v26.1.0",
+      "frontendUnitTests": "83/83 PASS"
+    },
+    "runtimeStartupConfiguration": {
+      "status": "RESOLVED",
+      "scripts": [
+        "scripts/start_preview_stack.ps1",
+        "scripts/stop_preview_stack.ps1",
+        "scripts/start_backend_dev.ps1",
+        "scripts/stop_backend_dev.ps1",
+        "scripts/drive/mount_drive.ps1"
+      ],
+      "runbook": "docs/runbooks/CATALOG_IMPORT.md",
+      "corrections": {
+        "javaHome": "Auto-detected process-scoped JDK (C:\\Program Files\\Java\\jdk-25.0.3) without modifying OS environment",
+        "backendJar": "moviercm-backend-0.0.1-SNAPSHOT.jar with automated bytecode/source freshness checks",
+        "endpointSync": "Frontend, Spring Boot, and FastAPI endpoints unified and synchronized",
+        "secretIsolation": "Dynamic session secret or external env var, never hardcoded in git",
+        "modelModes": "Explicit distinction: SERVING_MODE=light (semantic CPU) vs full (CUDA Qwen3-4B LoRA); no false claims for fallback/template",
+        "driveMount": "cinema-drive: with --drive-root-folder-id 1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ --read-only --vfs-cache-mode off --buffer-size 16M to X:",
+        "processLifecycle": "Strictly PID- and identity-based lifecycle management (no broad kill-by-name)"
+      }
+    },
+    "smokeVerification": {
+      "status": "PASSED",
+      "harness": "scripts/smoke_preview_usable.py",
+      "evidencePath": "docs/reviews/evidence/SNAPSHOT_01_SMOKE.json",
+      "screenshotPath": "docs/reviews/evidence/live_preview_drive_player_seek.png",
+      "gates": {
+        "google_drive_mount": "PASS",
+        "fastapi_ready": "PASS",
+        "spring_boot_ready": "PASS",
+        "frontend_ready": "PASS",
+        "admin_login": "PASS",
+        "catalog_import": "PASS",
+        "outbox_sync_ready": "PASS",
+        "catalog_search": "PASS",
+        "drive_playback_and_seeks": "PASS"
+      },
+      "measurements": {
+        "drive_video_dimensions": "1920x1080",
+        "initial_advance_sec": 1.503,
+        "seek_1_sec": 60.0,
+        "seek_2_sec": 120.0
+      }
+    }
+  },
+  "unverifiedLimitations": [
+    "High concurrent multi-user load under sustained parallel imports",
+    "Diverse exotic video codecs beyond standard H.264/AAC MP4 streams",
+    "Sustained network disconnections and jitter during active Drive video streaming",
+    "Rapid back-to-back scrubbing across disparate remote Drive chunks"
+  ]
+}

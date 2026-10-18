@@ -87,7 +87,7 @@ Kiến trúc outbox thực sự đảm bảo tính nhất quán dữ liệu gi�
      Tuyệt đối không cộng thêm offset `source_in_ms` từ coverage lần thứ hai để tránh lệch mốc thời gian (Finding F2).
    - **Bảo vệ danh tính tệp phát (`Media Asset Identity Guard`):** Nếu phân cảnh hoặc phân đoạn trỏ đến `mediaAssetId` khác với tệp đang phát, hệ thống tự động chuyển đổi sang đúng media asset tương ứng (kèm yêu cầu cấp playback grant nếu là protected asset) trước khi thực hiện tua video; nếu asset không tồn tại trong tập, hệ thống phát cảnh báo và từ chối thao tác trên tệp không liên quan.
 6. **Cấu hình Phát Video Google Drive Thực Tế (Finding R3):**
-   - Điểm gắn rclone WinFsp chế độ chỉ đọc: `rclone mount --read-only --vfs-cache-mode off --buffer-size 16M cinema-drive: X:`
+   - Điểm gắn rclone WinFsp chế độ chỉ đọc: `rclone mount --drive-root-folder-id 1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ --read-only --vfs-cache-mode off --buffer-size 16M cinema-drive: X:`
    - Biến môi trường Spring Boot: `APP_MEDIA_DRIVE_MOUNT=X:`
    - Tham số Timeout I/O Google Drive: Truyền `-Dapp.media.drive-read-timeout-ms=60000` và `-Dapp.media.drive-metadata-timeout-ms=60000` vào tiến trình Spring Boot để đảm bảo các file video lớn (>300MB) mở kênh và đọc partial range ổn định qua mạng mà không bị ngắt kết nối giữa chừng.
 
@@ -146,32 +146,68 @@ Phần này hướng dẫn người dùng hoặc nhân viên vận hành khởi 
 
 ---
 
-### 4.2. Lệnh Khởi Chạy Từng Dịch Vụ
+### 4.2. Khởi Chạy Bản Dùng Thử (Usable Preview)
 
-Mở 3 cửa sổ PowerShell độc lập để khởi động 3 dịch vụ:
+Hệ thống hỗ trợ 2 phương thức khởi chạy: tự động qua bộ script launcher (khuyến nghị) hoặc chạy thủ công từng terminal độc lập.
 
-#### Terminal 1: Khởi động Spring Boot Backend (Port 8080)
+#### Cách 1: Khởi chạy Tự Động Toàn Cụm (Khuyến Nghị)
+```powershell
+# Chạy 1 lệnh để tự động kiểm tra cổng, build jar nếu thiếu/cũ, phát hiện JDK và gắn Google Drive:
+powershell -File scripts\start_preview_stack.ps1 -MountDrive
+
+# Dừng toàn bộ các tiến trình an toàn khi không dùng nữa (dựa theo PID và danh tính xác minh):
+powershell -File scripts\stop_preview_stack.ps1
+```
+
+#### Cách 2: Khởi Chạy Từng Dịch Vụ Bằng Terminal Độc Lập
+
+##### Terminal 0: Gắn kết Google Drive (Tùy chọn cho xem video Drive)
+```powershell
+# Gắn ổ X: chế độ chỉ đọc vào đúng thư mục 1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ:
+powershell -File scripts\drive\mount_drive.ps1 -Execute -Remote "cinema-drive:" -DriveRootFolderId "1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ" -MountPoint "X:"
+```
+
+##### Terminal 1: Khởi động Spring Boot Backend (Port 8080)
 ```powershell
 cd D:\Class\movie-rcm-system\backend\springboot
+# Phát hiện JDK cục bộ cho phiên (không đổi OS environment):
 $env:JAVA_HOME = "C:\Program Files\Java\jdk-25.0.3"
-# Cấu hình token đồng bộ (phải khớp giữa Spring Boot và FastAPI):
+# Đảm bảo bytecode và artifact jar tươi mới:
+.\mvnw.cmd package -DskipTests
+# Cấu hình secret đồng bộ (truyền ngoài Git):
 $env:CATALOG_SYNC_TOKEN = "dippie_production_sync_secret_2026"
-.\mvnw.cmd spring-boot:run
-```
-> Khi màn hình xuất hiện `Started MovieRcmApplication in ... seconds (process running for ...)`, backend Spring Boot đã sẵn sàng phục vụ tại `http://localhost:8080`.
 
-#### Terminal 2: Khởi động FastAPI AI & Hybrid Index (Port 8000)
+# Khởi chạy bằng artifact jar chính thức moviercm-backend-0.0.1-SNAPSHOT.jar:
+java -Dserver.port=8080 -Dspring.profiles.active=dev -Dapp.catalog.sync-url=http://127.0.0.1:8000/api/index/sync -Dapp.catalog.sync-token=$env:CATALOG_SYNC_TOKEN -Dapp.media.drive-mount=X: -Dapp.media.drive-read-timeout-ms=60000 -Dapp.media.drive-metadata-timeout-ms=60000 -jar target\moviercm-backend-0.0.1-SNAPSHOT.jar
+```
+> Khi màn hình xuất hiện `Started MovieRcmApplication in ... seconds`, backend Spring Boot đã sẵn sàng phục vụ tại `http://localhost:8080`.
+
+##### Terminal 2: Khởi động FastAPI AI & Hybrid Index (Port 8000)
 ```powershell
 cd D:\Class\movie-rcm-system\backend\fastapi
 $env:FASTAPI_SYNC_SECRET = "dippie_production_sync_secret_2026"
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# Chọn chế độ mô hình (phân biệt rõ ràng; không gọi fallback/template là mô hình thật):
+# - Chế độ nhẹ ('light'): Dùng semantic embedding/indexing phục vụ CPU nhanh gọn.
+# - Chế độ thật ('full'): Yêu cầu GPU CUDA với mô hình Qwen3-4B + Phase23 LoRA.
+$env:SERVING_MODE = "light"
+$env:USE_FULL_QWEN3_4B_LORA = "false"
+
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 > Khi màn hình hiển thị `Application startup complete` và `Uvicorn running on http://0.0.0.0:8000`, dịch vụ tìm kiếm và đồng bộ chỉ mục AI đã sẵn sàng.
 
-#### Terminal 3: Khởi động Next.js Web Frontend (Port 3000)
+##### Terminal 3: Khởi động Next.js Web Frontend (Port 3000)
 ```powershell
 cd D:\Class\movie-rcm-system\frontend
-npm run dev
+$env:PORT = "3000"
+$env:NEXT_PUBLIC_API_URL = "http://localhost:8080"
+$env:NEXT_PUBLIC_SPRINGBOOT_API_URL = "http://localhost:8080/api"
+$env:NEXT_PUBLIC_MODEL_API_URL = "http://localhost:8000/api/chat"
+
+# Chạy bản production build đã kiểm tra JS budget:
+npm start
+# (hoặc npm run dev nếu muốn chạy môi trường phát triển)
 ```
 > Giao diện web sẵn sàng tại `http://localhost:3000`.
 
@@ -189,13 +225,15 @@ npm run dev
   - Mật khẩu: `password123`
   - Quyền hạn: `ROLE_USER` (xem phim, tìm kiếm, phát nội dung được cấp quyền).
 
-#### B. Dữ liệu thử nghiệm có sẵn:
-- **Tệp mẫu sản xuất tích hợp sẵn media cục bộ:**
+#### B. Dữ liệu thử nghiệm:
+- **Tệp Rehearsal tích hợp đầy đủ media Cục bộ & Google Drive (Khuyến nghị cho kiểm thử toàn luồng):**
   - Đường dẫn: `docs/fixtures/rehearsal_catalog.json`
-  - Chứa 2 series, 2 seasons, 3 episodes, 1 segment, 3 characters, 3 media assets (`asset_feature_01`, `asset_feature_02`, `asset_trailer_01`), 1 text track, 1 scene có mốc seek chính xác.
-  - Đã được gắn trực tiếp vào các tệp video mẫu thực tế tại `media/synthetic/feature_test.mp4` và `media/synthetic/trailer_test.mp4`.
-- **Tệp hợp đồng mẫu:**
-  - `docs/contracts/animation-catalog-v1/catalog.example.json`
+  - Chứa 2 series, 2 seasons, 3 episodes, 1 segment, 3 characters, 4 media assets (`asset_feature_01`, `asset_feature_02`, `asset_trailer_01`, `asset_rehearsal_drive`), 1 text track, và scenes có mốc seek chuẩn.
+  - Đã được gắn trực tiếp vào các tệp video mẫu cục bộ (`media/synthetic/feature_test.mp4`, `media/synthetic/trailer_test.mp4`) và video Google Drive thật (`asset_rehearsal_drive` trên thư mục Drive `1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ`).
+  - Dùng tệp này để kiểm tra đầy đủ: Nhập catalog -> Đồng bộ outbox READY -> Tìm kiếm -> Phát/tua video cục bộ và video Google Drive thật.
+- **Tệp hợp đồng mẫu (Chỉ dùng kiểm tra cú pháp và Schema JSON):**
+  - Đường dẫn: `docs/contracts/animation-catalog-v1/catalog.example.json`
+  - Đây là tệp dữ liệu mẫu lý thuyết / hư cấu để kiểm tra tính hợp lệ cú pháp Schema Draft 2020-12 (`/api/admin/catalog/validate`). Không sử dụng tệp này để phát video thật vì không chứa đường dẫn media thực tế trên đĩa hoặc Drive.
 
 ---
 
