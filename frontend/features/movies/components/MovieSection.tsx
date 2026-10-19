@@ -14,6 +14,10 @@ type MovieSectionProps = {
 
 const BTN_SCROLL = 'rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer';
 
+const SvgIcon = ({ d }: { d: string }) => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d={d}/></svg>
+);
+
 export function MovieSection({
   title,
   subtitle,
@@ -22,11 +26,8 @@ export function MovieSection({
 }: MovieSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleScroll = (direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const scrollAmount = direction === 'left' ? -420 : 420;
-      scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-    }
+  const handleScroll = (dir: number) => {
+    scrollRef.current?.scrollBy({ left: dir, behavior: 'smooth' });
   };
 
   return (
@@ -42,18 +43,18 @@ export function MovieSection({
           {/* Scroll Navigation Controls */}
           <div className="hidden sm:flex items-center gap-1">
             <button
-              onClick={() => handleScroll('left')}
+              onClick={() => handleScroll(-420)}
               aria-label={`Cuộn ${title} sang trái`}
               className={BTN_SCROLL}
             >
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+              <SvgIcon d="m12 19-7-7 7-7M19 12H5" />
             </button>
             <button
-              onClick={() => handleScroll('right')}
+              onClick={() => handleScroll(420)}
               aria-label={`Cuộn ${title} sang phải`}
               className={BTN_SCROLL}
             >
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <SvgIcon d="M5 12h14M12 5l7 7-7 7" />
             </button>
           </div>
 
@@ -62,7 +63,7 @@ export function MovieSection({
             className="flex items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-brand ml-2"
           >
             <span>Tất cả</span>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M7 7h10v10M7 17 17 7"/></svg>
+            <SvgIcon d="M7 7h10v10M7 17 17 7" />
           </Link>
         </div>
       </div>

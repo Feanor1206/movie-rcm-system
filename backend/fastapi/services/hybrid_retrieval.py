@@ -145,8 +145,12 @@ class DenseEncoder:
             from transformers import AutoTokenizer, AutoModel
             import torch
             logger.info(f"[DenseEncoder] Loading {self.model_name}...")
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModel.from_pretrained(self.model_name)
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, local_files_only=True)
+                self.model = AutoModel.from_pretrained(self.model_name, local_files_only=True)
+            except Exception:
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                self.model = AutoModel.from_pretrained(self.model_name)
             self.model.eval()
             self.is_loaded = True
         except Exception as e:

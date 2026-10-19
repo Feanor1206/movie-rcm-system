@@ -1,5 +1,6 @@
 package com.dippie.moviercm;
 
+import com.dippie.moviercm.config.StorageKeyConfig;
 import com.dippie.moviercm.exception.MediaNotFoundException;
 import com.dippie.moviercm.exception.MediaUnavailableException;
 import com.dippie.moviercm.exception.SecurityPathTraversalException;
@@ -395,6 +396,62 @@ public class DrivePathSecurityTest {
             try (Stream<Path> stream = Files.walk(dir)) {
                 return stream.collect(Collectors.toSet());
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("10. StorageKeyConfig Zero Drive Disk I/O & Adapter Bounded Fallback Tests")
+    class StorageKeyAndBoundedFallbackTests {
+
+        @Test
+        @DisplayName("StorageKeyConfig.resolvePath performs zero disk IO on Drive paths and succeeds for non-existent target")
+        void testStorageKeyConfigZeroDriveDiskIo() {
+            StorageKeyConfig config = new StorageKeyConfig("./media", "Z:\\NonExistentDriveMountPoint");
+            // Non-existent target under Drive root must resolve purely lexically without hitting disk
+            Path resolved = config.resolvePath("drive", "drive_main", "VideoDieppie/jadooss1/ep01.mp4");
+            assertNotNull(resolved);
+            assertTrue(resolved.toString().replace('\\', '/').endsWith("VideoDieppie/jadooss1/ep01.mp4"));
+
+            // Path traversal must still be rejected purely lexically
+            assertThrows(SecurityPathTraversalException.class, () ->
+                    config.resolvePath("drive", "drive_main", "../secret.txt"));
+        }
+
+        @Test
+        @DisplayName("DriveMediaStorageAdapter resolves VideoDieppie fallback bounded inside metadata executor")
+        void testAdapterBoundedFallbackResolution() throws IOException {
+            Path jadooDir = tempMountDir.resolve("jadooss1");
+            Files.createDirectories(jadooDir);
+            Path actualFile = jadooDir.resolve("ep01.mp4");
+            byte[] content = "JADOO_S01_EP01_STREAM_DATA".getBytes(StandardCharsets.UTF_8);
+            Files.write(actualFile, content);
+
+            // Path that specifies VideoDieppie/ prefix when VideoDieppie folder does NOT exist on disk
+            Path targetWithPrefix = tempMountDir.resolve("VideoDieppie/jadooss1/ep01.mp4");
+
+            // 1. getResourceForPath resolves fallback and reads valid resource
+            Resource resource = adapter.getResourceForPath(tempMountDir, targetWithPrefix);
+            assertNotNull(resource);
+            assertTrue(resource.exists());
+            assertEquals(content.length, resource.contentLength());
+
+            // 2. getResourceLengthForPath returns exact length
+            long length = adapter.getResourceLengthForPath(tempMountDir, targetWithPrefix);
+            assertEquals(content.length, length);
+
+            // 3. openChannelForPath opens channel and reads content
+            try (SeekableByteChannel channel = adapter.openChannelForPath(tempMountDir, targetWithPrefix)) {
+                assertEquals(content.length, channel.size());
+                ByteBuffer buf = ByteBuffer.allocate(content.length);
+                int read = channel.read(buf);
+                assertEquals(content.length, read);
+                assertArrayEquals(content, buf.array());
+            }
+
+            // 4. Fallback targeting path outside root is strictly rejected
+            Path outsideTarget = tempOutsideDir.resolve("VideoDieppie/jadooss1/ep01.mp4");
+            assertThrows(SecurityPathTraversalException.class, () ->
+                    adapter.openChannelForPath(tempMountDir, outsideTarget));
         }
     }
 }

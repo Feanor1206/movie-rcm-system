@@ -348,7 +348,7 @@ try {
 
     # Chờ FastAPI sẵn sàng
     $faReady = $false
-    $deadline = [DateTime]::UtcNow.AddSeconds(60)
+    $deadline = [DateTime]::UtcNow.AddSeconds(90)
     while ([DateTime]::UtcNow -lt $deadline) {
         if ($faProc.HasExited) { throw "FastAPI tiến trình PID $($faProc.Id) đã thoát bất thường với mã $($faProc.ExitCode)." }
         try {
@@ -395,7 +395,7 @@ try {
 
     # Chờ Spring Boot sẵn sàng
     $sbReady = $false
-    $deadline = [DateTime]::UtcNow.AddSeconds(60)
+    $deadline = [DateTime]::UtcNow.AddSeconds(90)
     while ([DateTime]::UtcNow -lt $deadline) {
         if ($sbProc.HasExited) { throw "Spring Boot tiến trình PID $($sbProc.Id) đã thoát bất thường với mã $($sbProc.ExitCode)." }
         try {

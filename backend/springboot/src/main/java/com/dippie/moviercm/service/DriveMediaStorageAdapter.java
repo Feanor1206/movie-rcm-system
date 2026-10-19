@@ -151,6 +151,16 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
             }
 
             if (!Files.exists(resolved) || !Files.isRegularFile(resolved)) {
+                String stripped = relativePath.replace('\\', '/');
+                if (stripped.startsWith("VideoDieppie/")) {
+                    Path alt = root.resolve(stripped.substring("VideoDieppie/".length())).normalize();
+                    if (Files.exists(alt) && Files.isRegularFile(alt)) {
+                        resolved = alt;
+                    }
+                }
+            }
+
+            if (!Files.exists(resolved) || !Files.isRegularFile(resolved)) {
                 if (Files.isSymbolicLink(resolved)) {
                     try {
                         Path linkTarget = Files.readSymbolicLink(resolved);
@@ -250,12 +260,43 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
         }
     }
 
+    public Path resolveFallbackPathBounded(Path rootPath, Path targetPath) {
+        if (targetPath == null) return null;
+        Path effectiveRoot = rootPath;
+        if (effectiveRoot == null && driveMountPath != null && !driveMountPath.isBlank()) {
+            effectiveRoot = Paths.get(driveMountPath).toAbsolutePath().normalize();
+        }
+        if (effectiveRoot == null) return targetPath;
+
+        Path normRoot = effectiveRoot.normalize().toAbsolutePath();
+        Path normTarget = targetPath.normalize().toAbsolutePath();
+
+        if (!normTarget.startsWith(normRoot)) {
+            return targetPath;
+        }
+
+        if (Files.exists(normTarget) && Files.isRegularFile(normTarget)) {
+            return normTarget;
+        }
+
+        Path rel = normRoot.relativize(normTarget);
+        String relStr = rel.toString().replace('\\', '/');
+        if (relStr.startsWith("VideoDieppie/")) {
+            Path alt = normRoot.resolve(relStr.substring("VideoDieppie/".length())).normalize().toAbsolutePath();
+            if (alt.startsWith(normRoot) && Files.exists(alt) && Files.isRegularFile(alt)) {
+                return alt;
+            }
+        }
+        return normTarget;
+    }
+
     public Resource getResourceForPath(Path rootPath, Path targetPath) {
         return ioExecutor.executeMetadata(() -> {
-            validateRealContainment(rootPath, targetPath);
-            Resource resource = new FileSystemResource(targetPath);
+            Path effectiveTarget = resolveFallbackPathBounded(rootPath, targetPath);
+            validateRealContainment(rootPath, effectiveTarget);
+            Resource resource = new FileSystemResource(effectiveTarget);
             if (!resource.exists() || !resource.isReadable()) {
-                throw new MediaUnavailableException("Không thể mở luồng đọc cho tệp media: " + targetPath);
+                throw new MediaUnavailableException("Không thể mở luồng đọc cho tệp media: " + effectiveTarget);
             }
             return resource;
         });
@@ -267,11 +308,12 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
 
     public long getResourceLengthForPath(Path rootPath, Path targetPath) {
         return ioExecutor.executeMetadata(() -> {
-            validateRealContainment(rootPath, targetPath);
+            Path effectiveTarget = resolveFallbackPathBounded(rootPath, targetPath);
+            validateRealContainment(rootPath, effectiveTarget);
             try {
-                return Files.size(targetPath);
+                return Files.size(effectiveTarget);
             } catch (IOException e) {
-                throw new MediaUnavailableException("Không thể xác định kích thước tệp media: " + targetPath);
+                throw new MediaUnavailableException("Không thể xác định kích thước tệp media: " + effectiveTarget);
             }
         });
     }
@@ -281,19 +323,20 @@ public class DriveMediaStorageAdapter implements MediaStorageAdapter {
     }
 
     public SeekableByteChannel openChannelForPath(Path rootPath, Path targetPath) throws IOException {
-        ioExecutor.executeMetadata(() -> {
-            validateRealContainment(rootPath, targetPath);
-            if (!Files.exists(targetPath) || !Files.isRegularFile(targetPath)) {
-                throw new MediaNotFoundException("Không tìm thấy tệp media trên Google Drive: " + targetPath);
+        Path effectiveTarget = ioExecutor.executeMetadata(() -> {
+            Path eff = resolveFallbackPathBounded(rootPath, targetPath);
+            validateRealContainment(rootPath, eff);
+            if (!Files.exists(eff) || !Files.isRegularFile(eff)) {
+                throw new MediaNotFoundException("Không tìm thấy tệp media trên Google Drive: " + eff);
             }
-            return true;
+            return eff;
         });
         DriveResourceReservation reservation = ioExecutor.acquireReservation();
         try {
             FileChannel rawChannel = ioExecutor.executeOpen(
-                    () -> FileChannel.open(targetPath, StandardOpenOption.READ),
+                    () -> FileChannel.open(effectiveTarget, StandardOpenOption.READ),
                     ioExecutor.getMetadataTimeoutMs(),
-                    "openChannel:" + targetPath.getFileName(),
+                    "openChannel:" + effectiveTarget.getFileName(),
                     reservation
             );
             return new DriveSeekableByteChannel(rawChannel, ioExecutor, reservation);

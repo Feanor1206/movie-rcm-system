@@ -47,6 +47,8 @@ public class StorageKeyConfig {
         // Test fixture roots
         allowlist.put("demo_local", new StorageRoot("local", localPath.resolve("demo").normalize()));
         allowlist.put("test_drive", new StorageRoot("drive", localPath.resolve("test_drive").normalize()));
+        allowlist.put("cinema-drive", new StorageRoot("drive", drivePath));
+        allowlist.put("cinema_drive", new StorageRoot("drive", drivePath));
         allowlist.put("animation_drive", new StorageRoot("drive", drivePath));
         allowlist.put("animation_local", new StorageRoot("local", localPath));
     }

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { RefreshCw, AlertCircle, Film } from 'lucide-react';
 import { Footer } from '@/components/layout/Footer';
 import { Navbar } from '@/components/layout/Navbar';
 import { MovieDetail } from '@/features/movies/components/MovieDetail';
@@ -41,26 +40,22 @@ export default function MovieDetailPage() {
       .then((fetchedMovie) => {
         if (!isCurrent) return;
         if (!fetchedMovie) {
-          // Real 404 from backend catalog
           setNotFoundState(true);
           setMovie(null);
           setLoading(false);
           return;
         }
 
-        // D1: Render main detail immediately as soon as main lookup succeeds
         setMovie(fetchedMovie);
         setLoading(false);
 
         browseCatalog({
           animationOnly: true,
-          genres: fetchedMovie.genres && fetchedMovie.genres.length > 0 ? fetchedMovie.genres.slice(0, 2) : ['Animation'],
+          genres: fetchedMovie.genres?.length ? fetchedMovie.genres.slice(0, 2) : ['Animation'],
           size: 6,
           signal: controller.signal,
         })
-          .then((res) => {
-            if (isCurrent) setSimilarMovies(res.items.filter((m) => m.id !== fetchedMovie.id).slice(0, 5));
-          })
+          .then((res) => isCurrent && setSimilarMovies(res.items.filter((m) => m.id !== fetchedMovie.id).slice(0, 5)))
           .catch(() => {});
       })
       .catch((err: any) => {
@@ -85,8 +80,8 @@ export default function MovieDetailPage() {
       ) : notFoundState || error ? (
         <main className="min-h-[70vh] flex items-center justify-center bg-background px-4 py-16 text-center">
           <div className="max-w-md space-y-4 rounded-xl border border-surface-border bg-surface p-8">
-            <div className="grid h-12 w-12 place-items-center rounded-full mx-auto bg-zinc-800 text-zinc-300">
-              {notFoundState ? <Film size={24} /> : <AlertCircle size={24} />}
+            <div className="grid h-12 w-12 place-items-center rounded-full mx-auto bg-zinc-800 text-zinc-300 font-bold">
+              {notFoundState ? '404' : '!'}
             </div>
             <h1 className="text-xl font-bold text-white">
               {notFoundState ? 'Không tìm thấy phim hoạt hình' : 'Không thể kết nối đến máy chủ'}
@@ -96,15 +91,15 @@ export default function MovieDetailPage() {
             </p>
             <div className="pt-2 flex flex-wrap justify-center gap-3">
               {notFoundState ? (
-                <Link href="/search?genre=Animation" className="btn-primary text-xs flex items-center gap-1.5">
-                  <Film size={14} /> Khám phá kho hoạt hình
+                <Link href="/search?genre=Animation" className="btn-primary text-xs">
+                  Khám phá kho hoạt hình
                 </Link>
               ) : (
                 <button
                   onClick={() => setRetryTrigger((c) => c + 1)}
-                  className="btn-primary text-xs flex items-center gap-1.5 cursor-pointer"
+                  className="btn-primary text-xs cursor-pointer"
                 >
-                  <RefreshCw size={13} /> Thử kết nối lại
+                  Thử kết nối lại
                 </button>
               )}
               <Link href="/" className="btn-secondary text-xs">
@@ -114,7 +109,6 @@ export default function MovieDetailPage() {
           </div>
         </main>
       ) : movie ? (
-        /* Valid 200 Movie Detail Presentation */
         <MovieDetail movie={movie} similarMovies={similarMovies} />
       ) : null}
       <Footer />
