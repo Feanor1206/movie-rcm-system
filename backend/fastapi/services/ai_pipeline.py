@@ -18,6 +18,7 @@ Architecture:
 
 import os
 import re
+import time
 import math
 import copy
 import logging
@@ -25,7 +26,13 @@ from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 from services.qwen_service import qwen_service, DEFAULT_MOVIES
 from services.catalog_sync import catalog_sync_manager
-from services.hybrid_retrieval import HybridMovieIndex, tokenize_text
+from services.hybrid_retrieval import (
+    HybridMovieIndex,
+    tokenize_text,
+    split_query_scopes,
+    parse_season_episode_intent,
+    is_descriptive_not_franchise
+)
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -308,8 +315,8 @@ class Ranker06BNode:
         scored = []
         for idx, m in enumerate(filtered_movies):
             # Prior based on rating and retrieval score
-            retrieval_prior = m.get("retrieval_score", 1.0) * 10.0
-            base = float(m.get("rating", 8.0)) * 8.0 + retrieval_prior
+            retrieval_prior = m.get("retrieval_score", 1.0) * 35.0
+            base = float(m.get("rating", 8.0)) * 4.0 + retrieval_prior
             m_genres = set(m.get("genres") or [])
             if specific_inc:
                 overlap_ratio = len(m_genres & specific_inc) / max(1, len(specific_inc))
@@ -352,19 +359,210 @@ class Ranker06BNode:
 class ExplanationGeneratorNode:
     """
     Tầng 5: Sinh lời tư vấn bằng tiếng Việt bám sát dữ liệu thực tế (grounded):
-    - Tên nhân vật (characters)
-    - Tình tiết cốt truyện đã xác thực (verified plot facts)
-    - Mốc thời gian phân cảnh (scene timestamps)
-    - Chẩn đoán thuộc tính so sánh khi thiếu dữ liệu
+    - Tra cứu chính xác: trả đúng tên tập/mùa, không thêm tập không liên quan
+    - Tìm theo tình tiết: nêu chi tiết catalog giải thích vì sao khớp
+    - Tiểu phẩm/phân cảnh: nêu mốc thời gian nếu có, không hiển thị 00:00 khi null
+    - Không khẳng định vượt quá dữ liệu (không bịa rating 8.0, năm 2025, an toàn tuyệt đối)
+    - Làm sạch hiển thị: loại bỏ đuôi file, trùng lặp nhân vật và tiêu đề
     """
     @staticmethod
-    def _format_time_ms(ms: Optional[int]) -> str:
+    def _clean_title(raw_title: Optional[str]) -> str:
+        if not raw_title:
+            return ""
+        t = str(raw_title).strip()
+        t = re.sub(r"\.(?:mp4|mkv|avi|mov)$", "", t, flags=re.IGNORECASE)
+        t = re.sub(r"_(?:720p|1080p|x264|h264|hd)\b", "", t, flags=re.IGNORECASE)
+        t = re.sub(r"\s*\(NEW\s*\)\s*", "", t, flags=re.IGNORECASE)
+        parts = t.split()
+        if len(parts) >= 6 and len(parts) % 2 == 0:
+            half = len(parts) // 2
+            if parts[:half] == parts[half:]:
+                t = " ".join(parts[:half])
+        return t.strip()
+
+    @staticmethod
+    def _clean_characters(chars: List[Any]) -> List[str]:
+        if not chars:
+            return []
+        seen_token_sets = []
+        seen_names = set()
+        clean = []
+        for c in chars:
+            name = str(c).strip() if isinstance(c, str) else str(c.get("name", "")).strip()
+            if not name or re.search(r"[\uac00-\ud7af]", name):
+                continue
+            n_lower = name.lower()
+            if n_lower in seen_names:
+                continue
+            tokens = set(n_lower.split())
+            # Deduplicate if tokens are identical (e.g. 'Choi Jadoo' and 'Jadoo Choi')
+            # or if one is single token and subset of the other (e.g. 'Jadoo' and 'Choi Jadoo')
+            is_alias = False
+            for s_tokens in seen_token_sets:
+                if tokens == s_tokens:
+                    is_alias = True
+                    break
+                if len(tokens) == 1 and tokens.issubset(s_tokens):
+                    is_alias = True
+                    break
+                if len(s_tokens) == 1 and s_tokens.issubset(tokens):
+                    is_alias = True
+                    break
+            if is_alias:
+                continue
+            seen_token_sets.append(tokens)
+            seen_names.add(n_lower)
+            clean.append(name)
+            if len(clean) >= 4:
+                break
+        return clean
+
+    @staticmethod
+    def _format_time_ms(ms: Optional[int]) -> Optional[str]:
         if ms is None or ms < 0:
-            return "00:00"
+            return None
         total_sec = ms // 1000
         mins = total_sec // 60
         secs = total_sec % 60
         return f"{mins:02d}:{secs:02d}"
+
+    GENERIC_ACTION_VERBS = {
+        "chơi", "ăn", "đi", "làm", "xem", "nói", "thấy", "biết", "muốn", "thích",
+        "học", "mua", "bán", "chạy", "nghe", "nhìn", "gặp", "tặng", "giúp", "bảo",
+        "yêu", "ghét", "sợ", "ngủ", "ngồi", "đứng", "cần", "tìm", "cho", "lấy", "bắt",
+        "ném", "đá", "đánh", "hát", "múa", "nấu", "vẽ", "viết", "đọc"
+    }
+
+    def evaluate_candidate_grounding(
+        self,
+        movie: Dict[str, Any],
+        nlu_output: Dict[str, Any],
+        query: str
+    ) -> Tuple[bool, str]:
+        """
+        Xác định xem một candidate movie có đủ căn cứ (grounded) để trả về cho truy vấn hay không.
+        Quy tắc:
+        1. CLARIFICATION intent -> False
+        2. Exact season/episode -> True nếu số tập khớp trong mệnh đề khẳng định (và không phải câu hỏi)
+        3. Exact title / alias -> True nếu tiêu đề khớp trong mệnh đề khẳng định (và không phải câu hỏi)
+        4. Series item -> True
+        5. Segment / Scene item -> True nếu tiêu đề/aliases khớp từ khóa truy vấn
+        6. Similarity search -> True nếu có từ khóa tương đồng (giống, tương tự)
+        7. Genre / Thematic discovery -> True nếu là mô tả thể loại chung
+        8. Plot / Narrative search (Tình tiết):
+           - Phân biệt động từ chung với thực thể / đối tượng cụ thể (C2)
+           - Nếu có specific_entities, bắt buộc phải có ít nhất 1 entity xuất hiện trong metadata
+           - Đối với cụm từ ngắn (len <= 2), không được để 1 động từ chung xác nhận toàn bộ hành động
+           - Đối với cụm từ dài (len >= 3), yêu cầu overlap hợp lý
+        """
+        if not movie:
+            return False, "empty_movie"
+
+        if nlu_output.get("intent_type") == "CLARIFICATION":
+            return False, "clarification_intent"
+
+        q_lower = query.lower().strip()
+        pos_scope, neg_scope = split_query_scopes(query)
+        pos_q_lower = pos_scope.lower().strip()
+
+        # 1. Tra cứu mùa/tập cụ thể (Exact Episode lookup)
+        pos_sea, pos_ep = parse_season_episode_intent(pos_scope)
+        is_question = any(q_word in pos_q_lower for q_word in ["tập nào", "phim nào", "có tập nào", "tập gì", "cảnh nào", "đoạn nào"])
+        if (not is_question) and pos_ep is not None and movie.get("episode_number") == pos_ep:
+            if pos_sea is not None:
+                if movie.get("season_number") == pos_sea:
+                    return True, "exact_season_episode"
+            else:
+                return True, "exact_episode"
+
+        # 2. Tra cứu tên tập / alias chính xác (Exact Title lookup)
+        title = self._clean_title(movie.get("title", ""))
+        if title:
+            title_lower = title.lower().strip()
+            title_clean = re.sub(r"[^\w\s]", "", title_lower).strip()
+            pos_clean = re.sub(r"[^\w\s]", "", pos_q_lower).strip()
+            if title_clean and len(title_clean) >= 4 and (not is_question):
+                if title_clean == pos_clean or title_clean in pos_clean or title_lower in pos_q_lower:
+                    return True, "exact_title"
+
+        # 3. Item type là series
+        if movie.get("item_type") == "series":
+            return True, "series_lookup"
+
+        # 4. Item type là segment hoặc scene
+        if movie.get("item_type") in ("segment", "scene"):
+            seg_title = (movie.get("title") or "").lower()
+            seg_words = [w for w in tokenize_text(seg_title) if len(w) >= 2]
+            q_words = set(tokenize_text(pos_q_lower))
+            if any(w in q_words for w in seg_words if len(w) >= 3):
+                return True, "segment_match"
+
+        # 5. Đề xuất tương tự (Similarity search)
+        if any(w in q_lower for w in ["giống", "tương tự", "như phim", "similar", "like"]):
+            return True, "similarity_match"
+
+        # 6. Xử lý xung đột số tập và tiêu đề
+        if movie.get("diagnostics", {}).get("conflict"):
+            return True, "conflict_resolution"
+
+        # 7. Gợi ý theo thể loại / chủ đề tổng quát
+        cons = nlu_output.get("constraints") or {}
+        has_filter_constraints = bool(
+            cons.get("year_min") or cons.get("year_max") or
+            cons.get("include_genres") or cons.get("exclude_genres")
+        )
+        is_generic_descriptive = is_descriptive_not_franchise(pos_scope)
+        if is_generic_descriptive:
+            return True, "genre_descriptive_discovery"
+
+        # 8. Tra cứu theo tình tiết / cốt truyện cụ thể (Plot search)
+        generic_plot_stop = {
+            "tập", "nào", "phim", "hoạt", "hình", "mùa", "cho", "tôi", "xem", "tìm",
+            "gợi", "ý", "hay", "nhất", "những", "của", "và", "với", "năm", "không", "có",
+            "chứa", "jadoo", "jadu", "xin", "chào", "bộ", "đoạn", "cảnh", "trong", "về",
+            "là", "bị", "phát", "hành"
+        }
+        content_words = [w for w in tokenize_text(pos_scope.lower()) if w not in generic_plot_stop and len(w) >= 2 and not w.isdigit()]
+
+        if not content_words:
+            if has_filter_constraints:
+                if cons.get("year_min") and (movie.get("release_year") or movie.get("year")) != cons.get("year_min"):
+                    return False, "year_mismatch"
+                return True, "filter_constraints_match"
+            return True, "no_specific_plot_keywords"
+
+        title_text = f"{movie.get('title') or ''} {' '.join(movie.get('aliases') or [])}".lower()
+        narrative_text = f"{movie.get('synopsis') or ''} {movie.get('description') or ''} {' '.join(str(f if isinstance(f, str) else f.get('text', '')) for f in (movie.get('plot_facts') or []))} {movie.get('visual_summary') or ''}".lower()
+        category_text = f"{' '.join(movie.get('genres') or [])} {' '.join(movie.get('keywords') or [])} {' '.join(movie.get('themes') or [])}".lower()
+        doc_text = f"{title_text} {narrative_text} {category_text}".lower()
+
+        matched_content = [w for w in content_words if w in doc_text]
+        specific_entities = [w for w in content_words if w not in self.GENERIC_ACTION_VERBS]
+
+        if specific_entities:
+            matched_entities = [e for e in specific_entities if e in doc_text]
+            if len(matched_entities) == 0:
+                return False, "missing_specific_entity"
+
+            if len(content_words) >= 3:
+                overlap_ratio = len(matched_content) / len(content_words)
+                entity_ratio = len(matched_entities) / len(specific_entities)
+                if len(matched_content) < 2 or overlap_ratio < 0.35:
+                    return False, "insufficient_content_overlap"
+                if len(specific_entities) >= 3 and (len(matched_entities) < 2 or entity_ratio < 0.30):
+                    return False, "insufficient_entity_overlap"
+            elif len(content_words) == 2:
+                if len(matched_content) < 2:
+                    return False, "insufficient_content_overlap"
+        else:
+            if len(content_words) >= 2 and len(matched_content) < 2:
+                return False, "generic_verbs_insufficient_overlap"
+            if len(content_words) == 1:
+                return False, "generic_verb_alone_not_grounded"
+            if len(matched_content) == 0:
+                return False, "no_content_match"
+
+        return True, "plot_grounded"
 
     def generate_explanation(
         self,
@@ -377,99 +575,187 @@ class ExplanationGeneratorNode:
 
         if nlu_output.get("intent_type") == "CLARIFICATION":
             clar = nlu_output.get("clarification") or {}
-            return clar.get("question") or "Yêu cầu của bạn chưa đủ rõ ràng hoặc có mâu thuẫn. Bạn có thể nói rõ hơn được không?"
+            return clar.get("question") or "Yêu cầu của bạn chưa đủ thông tin hoặc có điểm mâu thuẫn. Bạn có thể nói rõ hơn được không?"
 
-        if not ranked_movies:
-            return (
-                "Tôi đã kiểm tra toàn bộ kho danh mục theo các ràng buộc khắt khe của bạn "
-                "(về năm phát hành, thể loại và từ khóa), nhưng hiện chưa có kết quả nào khớp 100%. "
-                "Bạn có muốn nới lỏng bớt điều kiện tìm kiếm không?"
-            )
+        q_lower = query.lower().strip()
+        cons = nlu_output.get("constraints") or {}
+
+        # Kiểm tra điều kiện chưa xác minh (unverified condition) áp dụng cho MỌI nhánh trả lời
+        unverified_note = ""
+        has_violence_constraint = (
+            "Violence" in (cons.get("exclude_genres") or []) or
+            any(w in q_lower for w in ("không có bạo lực", "không bạo lực", "tránh bạo lực"))
+        )
+        if has_violence_constraint:
+            unverified_note = " (Lưu ý: Dữ liệu hiện chưa đủ để xác nhận tập không có bạo lực; chưa ghi nhận cảnh báo bạo lực đối với tập này)."
+
+        # 1. Trường hợp không tìm thấy kết quả hoặc top candidate không có căn cứ
+        if not ranked_movies or not self.evaluate_candidate_grounding(ranked_movies[0], nlu_output, query)[0]:
+            pos_scope, _ = split_query_scopes(query)
+            pos_q_lower = pos_scope.lower().strip()
+
+            # Ngoại lệ franchise bên ngoài
+            if any(f in q_lower for f in ["doraemon", "conan", "naruto", "one piece", "dragon ball", "shin"]):
+                return "Hệ thống hiện chỉ có dữ liệu các tập phim của bộ hoạt hình Xin Chào Jadoo. Tác phẩm bạn yêu cầu không có trong hệ thống dữ liệu hiện tại."
+            # Mùa hoặc tập ngoài khoảng trong mệnh đề khẳng định
+            if re.search(r"\b(?:mùa|season)\s*0*(?:[7-9]|\d{2,})\b", pos_q_lower) or re.search(r"\b(?:tập|ep)\s*0*(?:[3-9]\d{2,}|\d{4,})\b", pos_q_lower):
+                return "Hiện danh mục phim chưa có mùa hoặc tập này."
+            # Ràng buộc điều kiện lọc
+            if cons.get("include_genres") or cons.get("exclude_genres") or cons.get("year_min") or cons.get("year_max"):
+                return "Hiện chưa tìm thấy nội dung nào khớp với các điều kiện lọc bạn đưa ra trong danh mục."
+            # Truy vấn tình tiết / nội dung cụ thể
+            generic_plot_stop = {
+                "tập", "nào", "phim", "hoạt", "hình", "mùa", "cho", "tôi", "xem", "tìm",
+                "gợi", "ý", "hay", "nhất", "những", "của", "và", "với", "năm", "không", "có",
+                "chứa", "jadoo", "jadu", "xin", "chào", "bộ", "đoạn", "cảnh", "trong", "về",
+                "là", "bị", "phát", "hành"
+            }
+            content_words = [w for w in tokenize_text(pos_scope.lower()) if w not in generic_plot_stop and len(w) >= 2 and not w.isdigit()]
+            if content_words and not is_descriptive_not_franchise(pos_scope):
+                return "Hiện chưa tìm thấy tập phim nào có tình tiết phù hợp với yêu cầu của bạn trong danh mục." + unverified_note
+            return "Hiện chưa tìm thấy nội dung nào phù hợp với yêu cầu của bạn trong danh mục." + unverified_note
 
         top = ranked_movies[0]
         others = ranked_movies[1:]
 
-        # Extract grounding details
         item_type = top.get("item_type", "movie")
-        title = top.get("title", "Tác phẩm")
-        year = top.get("year", 2025)
-        rating = top.get("rating", 8.0)
-        desc = top.get("description", "")
-        chars = top.get("characters", [])
-        facts = top.get("plot_facts", [])
+        title = self._clean_title(top.get("title", "Tác phẩm"))
+        year = top.get("year") or top.get("release_year")
+        rating = top.get("rating")
+        desc = (top.get("description") or top.get("synopsis") or "").strip()
+        chars = self._clean_characters(top.get("characters") or [])
+        facts = top.get("plot_facts") or []
         start_ms = top.get("start_ms")
         end_ms = top.get("end_ms")
         vis_sum = top.get("visual_summary") or top.get("visual_description")
         diag = top.get("diagnostics") or {}
+        conflict = diag.get("conflict")
 
-        # Build grounded narrative parts
-        grounding_sentences: List[str] = []
+        # 2. Xử lý xung đột số tập và tiêu đề
+        if conflict:
+            req_ep = conflict.get("requested_episode")
+            con_ep = conflict.get("conflicting_episode")
+            con_title = self._clean_title(conflict.get("conflicting_title"))
+            return (
+                f"Bạn vừa yêu cầu **Tập {req_ep}** nhưng nội dung tìm kiếm lại khớp với tập **{con_title}** (Tập {con_ep}). "
+                f"Dưới đây là thông tin Tập {req_ep} (**{title}**) và tập liên quan **{con_title}** để bạn lựa chọn nhé."
+            ) + unverified_note
 
-        # Intro
-        cons = nlu_output.get("constraints") or {}
-        inc = ", ".join(cons.get("include_genres") or [])
-        exc = ", ".join(cons.get("exclude_genres") or [])
-        ref_title = (nlu_output.get("reference") or {}).get("text")
+        # 3. Tra cứu toàn bộ bộ phim (Series lookup) - CHỈ khi item thực sự là series
+        if item_type == "series":
+            desc_part = f" Phim kể về: {desc}" if desc else ""
+            chars_part = f" Nhân vật chính: **{', '.join(chars)}**." if chars else ""
+            return f"Đây là bộ phim hoạt hình **{title}**.{desc_part}{chars_part}".strip() + unverified_note
 
-        if ref_title:
-            grounding_sentences.append(f"Dựa trên sự tương đồng với **{ref_title}**")
-        elif inc:
-            grounding_sentences.append(f"Dựa trên gu thể loại **{inc}**")
-        else:
-            grounding_sentences.append("Dựa trên truy vấn ngữ nghĩa của bạn")
+        # 4. Tra cứu mùa/tập cụ thể hoặc tên tập chính xác (Exact Episode lookup)
+        pos_scope, neg_scope = split_query_scopes(query)
+        pos_q_lower = pos_scope.lower().strip()
+        pos_sea, pos_ep = parse_season_episode_intent(pos_scope)
 
-        if exc:
-            grounding_sentences.append(f"(đã loại trừ hoàn toàn thể loại **{exc}**)")
+        is_question = any(q_word in pos_q_lower for q_word in ["tập nào", "phim nào", "có tập nào", "tập gì", "cảnh nào", "đoạn nào"])
 
-        intro_prefix = " ".join(grounding_sentences)
+        is_exact_num = False
+        if pos_ep is not None and top.get("episode_number") == pos_ep:
+            if pos_sea is not None:
+                is_exact_num = (top.get("season_number") == pos_sea)
+            else:
+                is_exact_num = True
 
-        # Grounding by Item Type
-        if item_type == "scene":
-            ts_str = f"{self._format_time_ms(start_ms)}–{self._format_time_ms(end_ms)}"
-            main_recommendation = (
-                f"{intro_prefix}, tôi đề xuất phân cảnh **{title}** (mốc thời gian **{ts_str}**). "
-            )
-            if vis_sum:
-                main_recommendation += f"Cảnh quay miêu tả: *{vis_sum}*. "
-        elif item_type == "segment":
-            ts_str = f"{self._format_time_ms(start_ms)}–{self._format_time_ms(end_ms)}"
-            main_recommendation = (
-                f"{intro_prefix}, tôi gợi ý đoạn trích **{title}** (thời lượng **{ts_str}**). "
-                f"{desc} "
-            )
-        elif item_type == "episode":
+        is_exact_title = False
+        if title:
+            title_lower = title.lower().strip()
+            title_clean = re.sub(r"[^\w\s]", "", title_lower).strip()
+            pos_clean = re.sub(r"[^\w\s]", "", pos_q_lower).strip()
+            if title_clean and len(title_clean) >= 4:
+                if title_clean == pos_clean or title_clean in pos_clean or title_lower in pos_q_lower:
+                    is_exact_title = True
+
+        if (is_exact_num or is_exact_title) and (not is_question) and item_type == "episode":
+            sea_num = top.get("season_number")
             ep_num = top.get("episode_number")
-            num_str = f"Tập {ep_num}: " if ep_num else ""
-            main_recommendation = (
-                f"{intro_prefix}, tôi đề xuất tập phim **{num_str}{title}** ({year} · {rating}★). "
-                f"{desc} "
-            )
-        else:
-            main_recommendation = (
-                f"{intro_prefix}, tôi đề xuất tác phẩm **{title}** ({year} · {rating}★). "
-                f"{desc} "
-            )
+            sea_prefix = f"Mùa {sea_num}, " if sea_num else ""
+            if ep_num and f"tập {ep_num}" not in title.lower():
+                ep_prefix = f"Tập {ep_num}: "
+            else:
+                ep_prefix = ""
 
-        # Character grounding
-        if chars:
-            main_recommendation += f"Tác phẩm có sự xuất hiện của nhân vật **{', '.join(chars[:2])}**. "
+            meta_parts = []
+            if year:
+                meta_parts.append(str(year))
+            if rating:
+                meta_parts.append(f"{rating}★")
+            meta_str = f" ({' · '.join(meta_parts)})" if meta_parts else ""
 
-        # Verified plot facts grounding
+            resp = f"Đây là {sea_prefix}{ep_prefix}**{title}**{meta_str}."
+            if desc:
+                resp += f" {desc}"
+            elif facts:
+                fact_text = facts[0] if isinstance(facts[0], str) else facts[0].get("text", "")
+                if fact_text:
+                    resp += f" Tình tiết trong tập: *{fact_text}*."
+            return resp.strip() + unverified_note
+
+        # 5. Tra cứu tiểu phẩm / phân cảnh (Segment / Scene)
+        if item_type in ("segment", "scene"):
+            parent_title = self._clean_title(top.get("parent_episode_title") or top.get("episode_title"))
+            ep_num = top.get("episode_number")
+            parent_info = f" (thuộc tập **{parent_title}**)" if parent_title else (f" (thuộc Tập {ep_num})" if ep_num else "")
+
+            start_str = self._format_time_ms(start_ms)
+            end_str = self._format_time_ms(end_ms)
+            if start_str and end_str:
+                time_info = f" [Mốc thời gian: {start_str} – {end_str}]"
+            else:
+                time_info = ""
+
+            resp = f"Đây là tiểu phẩm **{title}**{parent_info}{time_info}."
+            if desc:
+                resp += f" {desc}"
+            elif vis_sum:
+                resp += f" Cảnh quay miêu tả: *{vis_sum}*."
+            return resp.strip() + unverified_note
+
+        # 6. Đề xuất tương tự (Genuine similarity search)
+        is_sim = any(w in q_lower for w in ["giống", "tương tự", "như phim", "similar", "like"])
+        if is_sim:
+            ref_text = (nlu_output.get("reference") or {}).get("text") or "phim bạn yêu cầu"
+            resp = f"Dựa trên sự tương đồng với **{ref_text}**, mình gợi ý tập **{title}**."
+            if desc:
+                resp += f" {desc}"
+            if others:
+                other_names = ", ".join(f"**{self._clean_title(m.get('title'))}**" for m in others[:2])
+                resp += f" Ngoài ra, bạn cũng có thể tham khảo thêm {other_names}."
+            return resp.strip() + unverified_note
+
+        # 7. Tìm theo tình tiết / gợi ý tổng quát (Plot search)
+        sea_num = top.get("season_number")
+        ep_num = top.get("episode_number")
+        ep_str = f" (Mùa {sea_num}, Tập {ep_num})" if (sea_num and ep_num) else (f" (Tập {ep_num})" if ep_num else "")
+
+        pos_scope, _ = split_query_scopes(query)
+        generic_plot_stop = {
+            "tập", "nào", "phim", "hoạt", "hình", "mùa", "cho", "tôi", "xem", "tìm",
+            "gợi", "ý", "hay", "nhất", "những", "của", "và", "với", "năm", "không", "có",
+            "chứa", "jadoo", "jadu", "xin", "chào", "bộ", "đoạn", "cảnh", "trong", "về",
+            "là", "bị", "phát", "hành"
+        }
+        content_words = [w for w in tokenize_text(pos_scope.lower()) if w not in generic_plot_stop and len(w) >= 2 and not w.isdigit()]
+
+        resp = f"Tập phim phù hợp với nội dung bạn tìm là **{title}**{ep_str}."
         if facts:
-            fact_text = facts[0] if isinstance(facts[0], str) else facts[0].get("text", "")
-            main_recommendation += f"Tình tiết cốt truyện xác thực: \"*{fact_text}*\". "
+            matching_facts = [f for f in facts if any(m in (f if isinstance(f, str) else f.get("text", "")).lower() for m in content_words)]
+            chosen_fact = matching_facts[0] if matching_facts else facts[0]
+            fact_text = chosen_fact if isinstance(chosen_fact, str) else chosen_fact.get("text", "")
+            if fact_text:
+                resp += f" Tình tiết trong tập: \"*{fact_text}*\"."
+        elif desc:
+            resp += f" {desc}"
 
-        # Trait diagnostics grounding
-        missing_traits = diag.get("missing_traits") or []
-        if missing_traits:
-            main_recommendation += f"(Hệ thống lưu ý: Dữ liệu thuộc tính {' & '.join(missing_traits)} của mục này chưa được hiệu chuẩn). "
-
-        # Additional recommendations
         if others:
-            other_names = ", ".join(f"**{m.get('title')}**" for m in others[:2])
-            main_recommendation += f"Ngoài ra, bạn cũng có thể tham khảo thêm {other_names}."
+            other_names = ", ".join(f"**{self._clean_title(m.get('title'))}**" for m in others[:2])
+            resp += f" Gợi ý thêm: {other_names}."
 
-        return main_recommendation.strip()
+        return resp.strip() + unverified_note
 
 
 # =============================================================================
@@ -488,9 +774,15 @@ class CascadingAIPipeline:
 
     @staticmethod
     def _build_follow_ups(nlu_result: Dict[str, Any], ranked_top: List[Dict[str, Any]]) -> List[str]:
+        if not ranked_top:
+            return [
+                "Gợi ý các tập phim hoạt hình nổi bật",
+                "Tìm theo mùa hoặc số tập cụ thể (ví dụ: Mùa 1 Tập 1)",
+                "Tìm theo thể loại gia đình hoặc hài hước"
+            ]
         follow_ups = []
-        if ranked_top:
-            top_title = ranked_top[0].get("title", "")
+        top_title = ranked_top[0].get("title", "")
+        if top_title:
             follow_ups.append(f"Tìm nội dung liên quan đến {top_title}")
         cons = nlu_result.get("constraints") or {}
         if "Horror" not in (cons.get("exclude_genres") or []):
@@ -507,7 +799,8 @@ class CascadingAIPipeline:
         catalog: Optional[List[Dict[str, Any]]] = None,
         history: Optional[List[Dict[str, Any]]] = None,
         session_id: str = "default",
-        snapshot: Optional[Any] = None
+        snapshot: Optional[Any] = None,
+        nlu_intent: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Execute full 5-stage recommendation pipeline on the active catalog.
@@ -526,46 +819,86 @@ class CascadingAIPipeline:
         else:
             active_catalog = list(DEFAULT_MOVIES)
 
+        t_start = time.perf_counter()
+
         # Stage 1: Phase 23 Qwen Intent Parser & Patch Merger
-        nlu_result = self.nlu_node.process(query, history, active_catalog, session_id=session_id)
+        t_nlu_start = time.perf_counter()
+        if nlu_intent is not None:
+            nlu_result = nlu_intent
+        else:
+            nlu_result = self.nlu_node.process(query, history, active_catalog, session_id=session_id)
         if not (nlu_result.get("query") or {}).get("text"):
             if "query" not in nlu_result or not isinstance(nlu_result["query"], dict):
                 nlu_result["query"] = {}
             nlu_result["query"]["text"] = query
         nlu_result["raw_query"] = query
+        t_nlu_end = time.perf_counter()
 
         # Stage 2: Hard Constraint & Hybrid Retrieval using snapshot's index
+        t_ret_start = time.perf_counter()
         target_index = getattr(current_snap, "hybrid_index", None) if current_snap is not None else None
         candidates = self.retrieval_node.retrieve_candidates(
             nlu_result, active_catalog, top_k=12, hybrid_index=target_index
         )
+        t_ret_end = time.perf_counter()
 
         # Stage 3: Qwen 0.6B Recommender (Coarse Filtering)
+        t_rec_start = time.perf_counter()
         filtered = self.recommender_node.filter_candidates(candidates, nlu_result)
+        t_rec_end = time.perf_counter()
 
         # Stage 4: Qwen 0.6B Ranker & MMR Diversity
+        t_rank_start = time.perf_counter()
         ranked_top = self.ranker_node.rank_top_k(filtered, nlu_result, top_k=3)
+        t_rank_end = time.perf_counter()
 
+        # Decision Boundary Synchronization (C1): Filter ungrounded candidates before Stage 5 & payload
+        grounded_top = []
+        for m in ranked_top:
+            is_grounded, _reason = self.explainer_node.evaluate_candidate_grounding(m, nlu_result, query)
+            if is_grounded:
+                grounded_top.append(m)
 
         # Stage 5: Grounded Storytelling Explanation
-        explanation_text = self.explainer_node.generate_explanation(ranked_top, nlu_result, query, history)
+        t_exp_start = time.perf_counter()
+        explanation_text = self.explainer_node.generate_explanation(grounded_top, nlu_result, query, history)
+        t_exp_end = time.perf_counter()
 
-        # Aggregate diagnostics from candidates
+        t_total_end = time.perf_counter()
+
+        # Aggregate diagnostics from grounded candidates
         collected_diagnostics = [
-            m.get("diagnostics") for m in ranked_top if m.get("diagnostics")
+            m.get("diagnostics") for m in grounded_top if m.get("diagnostics")
         ]
+
+        # Gather generation metrics from qwen_service
+        gen_stats = getattr(qwen_service, "last_inference_stats", {})
 
         return {
             "text": explanation_text,
-            "recommendedMovies": ranked_top,
+            "recommendedMovies": grounded_top,
             "structuredIntent": nlu_result,
             "pipelineStages": {
                 "nlu": nlu_result,
                 "candidateCount": len(candidates),
-                "rankedCount": len(ranked_top),
+                "rankedCount": len(grounded_top),
                 "diagnostics": collected_diagnostics,
+                "timings_ms": {
+                    "nlu_ms": round((t_nlu_end - t_nlu_start) * 1000, 2),
+                    "generation_ms": gen_stats.get("generation_time_ms", 0.0),
+                    "retrieval_ms": round((t_ret_end - t_ret_start) * 1000, 2),
+                    "recommender_ms": round((t_rec_end - t_rec_start) * 1000, 2),
+                    "ranker_ms": round((t_rank_end - t_rank_start) * 1000, 2),
+                    "explainer_ms": round((t_exp_end - t_exp_start) * 1000, 2),
+                    "total_pipeline_ms": round((t_total_end - t_start) * 1000, 2),
+                },
+                "metrics": {
+                    "prompt_tokens": gen_stats.get("prompt_tokens", 0),
+                    "completion_tokens": gen_stats.get("completion_tokens", 0),
+                    "tokens_per_second": gen_stats.get("tokens_per_second", 0.0),
+                }
             },
-            "followUps": self._build_follow_ups(nlu_result, ranked_top)
+            "followUps": self._build_follow_ups(nlu_result, grounded_top)
         }
 
 

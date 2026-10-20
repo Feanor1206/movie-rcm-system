@@ -31,10 +31,10 @@ ENCODER_DIMENSION = 384
 # 1. TEXT TOKENIZER & NORMALIZER
 # =============================================================================
 def tokenize_text(text: str) -> List[str]:
-    """Tokenize lowercase words, preserving alphanumeric tokens and Vietnamese words."""
+    """Tokenize lowercase words, preserving alphanumeric tokens, single digits, and Vietnamese words."""
     if not text:
         return []
-    return [w.lower() for w in re.findall(r"\b\w+\b", text, flags=re.UNICODE) if len(w) > 1]
+    return [w.lower() for w in re.findall(r"\b\w+\b", text, flags=re.UNICODE) if len(w) > 1 or w.isdigit()]
 
 
 ITEM_TYPE_SYNONYMS = {
@@ -53,6 +53,78 @@ def normalize_item_type(val: Optional[str]) -> Optional[str]:
         if v in syns or any(s in v for s in syns):
             return canonical
     return v
+
+
+GENRE_AND_DESCRIPTIVE_WORDS = {
+    "gia đình", "gia dinh", "hài hước", "hai huoc", "hài", "hai", "vui nhộn", "vui nhon",
+    "tình cảm", "tinh cam", "phiêu lưu", "phieu luu", "học đường", "hoc duong",
+    "tuổi thơ", "tuoi tho", "bạn bè", "ban be", "đời thường", "doi thuong",
+    "cuộc sống", "cuoc song", "kinh dị", "kinh di", "hành động", "hanh dong",
+    "hoạt hình", "hoat hinh", "hoạt họa", "anime", "manga", "hoạt", "hình",
+    "hay", "mới", "cũ", "ngắn", "dài", "chiếu rạp", "đặc biệt", "ngoại truyện",
+    "trẻ em", "thiếu nhi", "tuổi mới lớn", "vui vẻ", "ý nghĩa", "cảm động",
+    "nhẹ nhàng", "bựa", "lầy lội", "dễ thương", "học sinh", "cho", "về", "nhất",
+    "gợi ý", "goi y", "gợi", "ý", "tìm", "tim", "xem", "phim", "bộ", "loạt", "các", "những"
+}
+
+
+def is_descriptive_not_franchise(phrase: str) -> bool:
+    """
+    Kiểm tra xem cụm từ có phải là mô tả thể loại/tính chất/chủ đề chung (không phải tên riêng franchise).
+    Ví dụ: 'gia đình hài hước', 'vui nhộn cho gia đình' -> True
+           'Doraemon', 'Shin', 'Conan' -> False
+    """
+    if not phrase:
+        return True
+    p = phrase.lower().strip()
+    for gw in sorted(GENRE_AND_DESCRIPTIVE_WORDS, key=len, reverse=True):
+        p = re.sub(r"\b" + re.escape(gw) + r"\b", " ", p)
+    remaining = re.findall(r"\b\w+\b", p)
+    return len(remaining) == 0
+
+
+def split_query_scopes(query_text: str) -> Tuple[str, str]:
+    """
+    Tách truy vấn thành phạm vi khẳng định (positive search target) và phạm vi phủ định/loại trừ.
+    Ví dụ: 'Jadoo chơi bóng, không phải tập 999' -> ('Jadoo chơi bóng,', 'tập 999')
+    """
+    if not query_text:
+        return "", ""
+    negation_pattern = r"\b(?:không phải|chứ không phải|tránh|không xem|trừ|bỏ qua|không muốn|không cần|đừng|không lấy|không có|không chứa)\b"
+    parts = re.split(negation_pattern, query_text, maxsplit=1, flags=re.IGNORECASE)
+    pos_scope = parts[0].strip()
+    neg_scope = parts[1].strip() if len(parts) > 1 else ""
+    return pos_scope, neg_scope
+
+
+def parse_season_episode_intent(query_text: str) -> Tuple[Optional[int], Optional[int]]:
+    """
+    Trích xuất số mùa (season) và số tập (episode) bằng ranh giới từ chính xác.
+    Bảo đảm:
+      - 'tập 1' không bao giờ khớp 'tập 10' hay 'tập 11'
+      - 'năm 2021' hay số trong tiêu đề không bị nhận nhầm thành tập
+    """
+    if not query_text:
+        return None, None
+    q_norm = query_text.lower()
+    
+    # Check SxxExx pattern first (e.g., S01E01, S3E1)
+    se_match = re.search(r"\bs0*(\d+)e0*(\d+)\b", q_norm)
+    if se_match:
+        return int(se_match.group(1)), int(se_match.group(2))
+    
+    sea_num = None
+    ep_num = None
+    
+    sea_match = re.search(r"\b(?:mùa|mua|season|phần|phan)\s*#?\s*0*(\d+)\b", q_norm)
+    if sea_match:
+        sea_num = int(sea_match.group(1))
+        
+    ep_match = re.search(r"\b(?:tập|tap|ep|episode)\s*#?\s*0*(\d+)\b", q_norm)
+    if ep_match:
+        ep_num = int(ep_match.group(1))
+        
+    return sea_num, ep_num
 
 
 # =============================================================================
@@ -226,6 +298,33 @@ class HybridMovieIndex:
         title = movie.get("title", "")
         if title:
             parts.extend([title, title, title])
+
+        # Series & Season context for hierarchical items (episodes, segments)
+        series_title = movie.get("series_title")
+        if series_title and isinstance(series_title, str):
+            parts.extend([series_title, series_title])
+
+        season_title = movie.get("season_title")
+        if season_title and isinstance(season_title, str):
+            parts.extend([season_title, season_title])
+
+        season_num = movie.get("season_number")
+        if season_num is not None:
+            parts.extend([f"Mùa {season_num}", f"Season {season_num}", f"Phần {season_num}"])
+
+        ep_num = movie.get("episode_number")
+        if ep_num is not None:
+            parts.extend([f"Tập {ep_num}", f"Tập {ep_num:02d}", f"Episode {ep_num}"])
+            if season_num is not None:
+                parts.extend([
+                    f"Mùa {season_num} Tập {ep_num}",
+                    f"Season {season_num} Episode {ep_num}",
+                    f"S{season_num:02d}E{ep_num:02d}"
+                ])
+
+        parent_ep_title = movie.get("parent_episode_title") or movie.get("episode_title")
+        if parent_ep_title and isinstance(parent_ep_title, str):
+            parts.extend([parent_ep_title, parent_ep_title])
 
         # Aliases repeated 2x
         aliases = movie.get("aliases", [])
@@ -424,11 +523,18 @@ class HybridMovieIndex:
             logger.info("[HybridMovieIndex] Rebuilding index due to missing or stale cache...")
             self.build_from_catalog(search_catalog, save_to_disk=True)
 
-        q_tokens = tokenize_text(query_text)
+        # Determine positive search scope to avoid scoring negation tokens
+        raw_query = str(nlu_intent.get("raw_query") or "").strip() if nlu_intent else ""
+        effective_query = raw_query if raw_query else query_text
+        pos_scope, neg_scope = split_query_scopes(effective_query)
+        pos_q_text, _ = split_query_scopes(query_text)
+
+        search_target_text = pos_q_text.strip() if pos_q_text.strip() else (pos_scope.strip() if pos_scope.strip() else query_text.strip())
+        q_tokens = tokenize_text(search_target_text)
         query_dense = None
-        if query_text.strip():
+        if search_target_text:
             try:
-                query_dense = self.encoder.encode_queries([query_text])[0]
+                query_dense = self.encoder.encode_queries([search_target_text])[0]
             except Exception as e:
                 logger.warning(f"[HybridMovieIndex] Dense encoding failed: {e}. Falling back to BM25 only.")
 
@@ -439,19 +545,32 @@ class HybridMovieIndex:
         year_min = cons.get("year_min")
         year_max = cons.get("year_max")
 
+        # Fallback year inference from query text if NLU constraints missing
+        if year_min is None and year_max is None and query_text:
+            y_m = re.search(r"\b(19\d{2}|20\d{2})\b", query_text)
+            if y_m:
+                y_val = int(y_m.group(1))
+                if any(w in query_text.lower() for w in ("trước", "before")):
+                    year_max = y_val - 1
+                elif any(w in query_text.lower() for w in ("sau", "after")):
+                    year_min = y_val + 1
+                else:
+                    year_min = y_val
+                    year_max = y_val
+
         # Item type filter (series, episode, segment, scene)
         target_types: set = set()
+        q_lower = query_text.lower().strip()
 
         # 1. Highest priority: Infer specific item types directly from user query text
         if query_text:
-            q_lower_check = query_text.lower()
-            if any(w in q_lower_check for w in ("phân cảnh", "cảnh quay", "trích đoạn", "cảnh nhảy", "cảnh rượt", "cảnh ")):
+            if any(w in q_lower for w in ("phân cảnh", "cảnh quay", "trích đoạn", "cảnh nhảy", "cảnh rượt", "cảnh ")):
                 target_types.add("scene")
-            elif any(w in q_lower_check for w in ("truyện ngắn", "mẩu chuyện", "tiểu phẩm")):
+            elif any(w in q_lower for w in ("truyện ngắn", "mẩu chuyện", "tiểu phẩm")):
                 target_types.add("segment")
-            elif any(w in q_lower_check for w in ("tập phim", "tập ")):
+            elif any(w in q_lower for w in ("tập phim", "tập ")):
                 target_types.add("episode")
-            elif any(w in q_lower_check for w in ("bộ phim", "bộ hoạt hình", "loạt phim")):
+            elif any(w in q_lower for w in ("bộ phim", "bộ hoạt hình", "loạt phim")):
                 target_types.add("series")
 
         # 2. Second priority: Explicit item_type_filter argument or NLU parsed item_type
@@ -480,7 +599,10 @@ class HybridMovieIndex:
 
         ref_film = None
         ref_text = (nlu_intent.get("reference") or {}).get("text")
-        if ref_text:
+        is_similarity_search = any(
+            pat in q_lower for pat in ["giống", "tương tự", "như phim", "similar", "like movie", "recommend like"]
+        )
+        if ref_text and is_similarity_search:
             ref_text_lower = ref_text.lower().strip()
             for m in search_catalog:
                 if m.get("title", "").lower() == ref_text_lower or any(ref_text_lower in str(a).lower() for a in m.get("aliases", [])):
@@ -507,13 +629,98 @@ class HybridMovieIndex:
         # Normalize BM25 scores to [0, 1]
         max_bm25 = max(bm25_raw.values()) if bm25_raw and max(bm25_raw.values()) > 0 else 1.0
 
+        # Available seasons and episodes in search catalog
+        available_seasons = {m.get("season_number") for m in search_catalog if m.get("season_number") is not None}
+        available_episodes = {m.get("episode_number") for m in search_catalog if m.get("episode_number") is not None}
+        available_season_episodes = {
+            (m.get("season_number"), m.get("episode_number"))
+            for m in search_catalog if m.get("season_number") is not None and m.get("episode_number") is not None
+        }
+
         scored_candidates = []
-        q_lower = query_text.lower().strip()
-        q_token_set = set(q_tokens)
+        raw_query = str(nlu_intent.get("raw_query") or "").strip() if nlu_intent else ""
+        effective_query = raw_query if raw_query else query_text
+        pos_scope, neg_scope = split_query_scopes(effective_query)
+        pos_lower = pos_scope.lower().strip()
+        pos_clean = re.sub(r"[^\w\s]", "", pos_lower).strip()
+
+        pos_q_text, _ = split_query_scopes(query_text)
+        pos_q_lower = pos_q_text.lower().strip()
+        pos_q_clean = re.sub(r"[^\w\s]", "", pos_q_lower).strip()
+
+        # Parse target season/episode strictly from positive affirmation scope
+        query_sea, query_ep = parse_season_episode_intent(pos_scope)
+        if query_sea is None and query_ep is None and raw_query and pos_q_text != pos_scope:
+            query_sea, query_ep = parse_season_episode_intent(pos_q_text)
+        # Parse excluded season/episode from negation scope
+        excluded_sea, excluded_ep = parse_season_episode_intent(neg_scope) if neg_scope else (None, None)
+
+        # Detect if user explicitly requested a specific franchise/series that is NOT in catalog
+        # Pattern: "phim hoạt hình X", "bộ phim hoạt hình X", "phim X", "loạt phim X"
+        if not is_similarity_search and pos_scope:
+            franchise_match = re.search(
+                r"(?:phim\s+hoạt\s+hình|bộ\s+phim\s+hoạt\s+hình|loạt\s+phim|bộ\s+hoạt\s+hình)\s+([A-ZÀ-Ỹa-zà-ỹ0-9_\-\s]{2,30}?)(?:\s+(?:tập|mùa|phần|bản|movie|chiếu\s+rạp|dài|ngắn|đặc\s+biệt|ngoại\s+truyện|về|có|không|phát\s+hành|năm)\b|$)",
+                pos_scope,
+                re.IGNORECASE
+            )
+            if franchise_match:
+                req_franchise = franchise_match.group(1).strip()
+                req_franchise_clean = re.sub(r"[^\w\s]", "", req_franchise.lower()).strip()
+                catalog_series_names = set()
+                for m in search_catalog:
+                    if m.get("item_type") == "series" or "series" in str(m.get("item_type", "")).lower():
+                        catalog_series_names.add(re.sub(r"[^\w\s]", "", str(m.get("title", "")).lower()).strip())
+                        for a in m.get("aliases", []):
+                            catalog_series_names.add(re.sub(r"[^\w\s]", "", str(a).lower()).strip())
+                universe_keywords = {"jadoo", "jadu", "xin chao jadoo", "hello jadoo", "choi jadoo"}
+                is_catalog_franchise = any(
+                    req_franchise_clean == name or req_franchise_clean in name or name in req_franchise_clean
+                    for name in (catalog_series_names | universe_keywords)
+                    if name
+                )
+                if not is_catalog_franchise and len(req_franchise_clean) >= 3 and not is_descriptive_not_franchise(req_franchise):
+                    logger.info(f"[HybridRetrieval] Foreign franchise detected in positive query: '{req_franchise}'. Abstaining.")
+                    return []
+
+        # Validate existence ONLY for positive requested target
+        if query_sea is not None and query_sea not in available_seasons:
+            return []
+        if query_sea is not None and query_ep is not None and (query_sea, query_ep) not in available_season_episodes:
+            return []
+        if query_sea is None and query_ep is not None and query_ep not in available_episodes:
+            return []
+
+        # Detect conflict between requested episode number and explicit title match
+        detected_conflict = None
+        if query_ep is not None:
+            for m in search_catalog:
+                m_t = str(m.get("title", "")).strip().lower()
+                m_ep = m.get("episode_number")
+                if m_t and len(m_t) >= 4 and (m_t in pos_lower or m_t in pos_q_lower):
+                    if m_ep is not None and m_ep != query_ep:
+                        detected_conflict = {
+                            "type": "EPISODE_TITLE_CONFLICT",
+                            "requested_episode": query_ep,
+                            "conflicting_episode": m_ep,
+                            "conflicting_title": m.get("title")
+                        }
+                        break
+
+        q_lower = f"{raw_query} {query_text}".lower().strip() if raw_query else query_text.lower().strip()
+        q_token_set = set(tokenize_text(q_lower))
+        pos_token_set = set(tokenize_text(pos_scope.lower())) if pos_scope else q_token_set
 
         for m in search_catalog:
             mid = m["id"]
             m_type = normalize_item_type(m.get("item_type", "")) or str(m.get("item_type", "")).lower()
+            ep_num = m.get("episode_number")
+            sea_num = m.get("season_number")
+
+            # Exclusion constraints from negation scope
+            if excluded_ep is not None and ep_num == excluded_ep:
+                continue
+            if excluded_sea is not None and sea_num == excluded_sea:
+                continue
 
             # Hard Constraint: Item Type Filter
             if target_types and m_type and (m_type not in target_types):
@@ -547,12 +754,52 @@ class HybridMovieIndex:
             hybrid_score = (effective_dense_weight * dense_sim) + (effective_bm25_weight * norm_bm25)
 
             # Match Boost 1: Exact title or alias match
-            title_lower = str(m.get("title", "")).lower()
-            aliases_lower = [str(a).lower() for a in m.get("aliases", []) if a]
-            if title_lower and title_lower in q_lower:
-                hybrid_score += 0.45
-            elif any(a in q_lower for a in aliases_lower):
-                hybrid_score += 0.40
+            title_lower = str(m.get("title", "")).lower().strip()
+            title_clean = re.sub(r"[^\w\s]", "", title_lower).strip()
+            title_tokens = set(tokenize_text(title_clean))
+            ref_clean = re.sub(r"[^\w\s]", "", str(ref_text or "").lower()).strip()
+
+            is_exact_title = False
+            if title_clean and len(title_clean) >= 4:
+                if title_clean == ref_clean:
+                    is_exact_title = True
+                elif title_clean == pos_clean or title_clean in pos_clean:
+                    is_exact_title = True
+                elif title_clean == pos_q_clean or title_clean in pos_q_clean:
+                    is_exact_title = True
+                elif title_lower in pos_lower or title_lower in pos_q_lower:
+                    is_exact_title = True
+
+            if is_exact_title:
+                if len(title_tokens) <= 2 and len(q_token_set) >= 5 and "jadoo" not in q_lower:
+                    hybrid_score += 0.20
+                elif m_type == "series":
+                    hybrid_score += 1.50
+                else:
+                    hybrid_score += 1.30
+            elif title_tokens and len(title_tokens) >= 3 and title_tokens.issubset(pos_token_set):
+                hybrid_score += 1.15
+            else:
+                # Word-boundary alias matching on positive affirmation scope only
+                matched_alias = False
+                for a in m.get("aliases", []):
+                    a_str = str(a).strip().lower()
+                    a_clean = re.sub(r"[^\w\s]", "", a_str).strip()
+                    if not a_clean:
+                        continue
+                    if re.search(r"\d", a_str):
+                        a_pat = r"\b" + re.escape(a_str) + r"\b"
+                        if re.search(a_pat, pos_lower) or re.search(a_pat, pos_q_lower):
+                            matched_alias = True
+                            break
+                    else:
+                        if a_str in pos_lower or a_str in pos_q_lower or (len(a_clean) >= 6 and (a_clean in pos_clean or a_clean in pos_q_clean)):
+                            matched_alias = True
+                            break
+                if matched_alias:
+                    hybrid_score += 0.75
+                elif title_tokens and len(title_tokens) >= 2 and (len(title_tokens & q_token_set) / len(title_tokens)) >= 0.75:
+                    hybrid_score += 0.60
 
             # Match Boost 2: Character names and aliases
             char_list = [str(c).lower() for c in m.get("characters", []) if c]
@@ -581,12 +828,40 @@ class HybridMovieIndex:
                 matched_genres = m_genres_lower & inc_lower
                 hybrid_score += len(matched_genres) * 0.15
 
+            # Match Boost 6: Season + Episode Number exact match
+            ep_num = m.get("episode_number")
+            sea_num = m.get("season_number")
+            if ep_num is not None:
+                if query_ep is not None and query_sea is not None:
+                    if ep_num == query_ep and sea_num == query_sea:
+                        hybrid_score += 2.00
+                    elif ep_num == query_ep and sea_num != query_sea:
+                        hybrid_score -= 2.00
+                    else:
+                        hybrid_score -= 2.50
+                elif query_ep is not None:
+                    if ep_num == query_ep:
+                        hybrid_score += 1.60
+                    else:
+                        hybrid_score -= 2.00
+
+            # Match Boost 7: Segment exact title match
+            if m_type == "segment":
+                seg_t = str(m.get("title", "")).lower()
+                if seg_t and seg_t in q_lower:
+                    hybrid_score += 0.90
+
+            item_diag = {}
+            if detected_conflict:
+                item_diag["conflict"] = detected_conflict
+
             scored_candidates.append({
                 "movie": m,
                 "score": round(hybrid_score, 4),
                 "bm25_score": round(norm_bm25, 4),
                 "dense_score": round(dense_sim, 4),
-                "rating": m.get("rating", 8.0)
+                "rating": m.get("rating"),
+                "diagnostics": item_diag
             })
 
         # Graceful fallback: If strict item_type filtering yielded 0 candidates, relax item_type constraint
@@ -626,10 +901,74 @@ class HybridMovieIndex:
                     "score": round(hybrid_score, 4),
                     "bm25_score": round(norm_bm25, 4),
                     "dense_score": round(dense_sim, 4),
-                    "rating": m.get("rating", 8.0)
+                    "rating": m.get("rating"),
+                    "diagnostics": {"conflict": detected_conflict} if detected_conflict else {}
                 })
 
         # Sort by hybrid score descending
         scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+
+        # Confidence guard for unanswerable / out-of-catalog queries (Issue A2)
+        if scored_candidates:
+            top_item = scored_candidates[0]
+            top_score = top_item["score"]
+            top_bm25 = top_item["bm25_score"]
+            top_dense = top_item["dense_score"]
+            raw_top_bm25 = bm25_raw.get(top_item["movie"]["id"], 0.0)
+
+            # Check if top item earned a strong exact boost (exact title, exact season/episode, or segment title)
+            has_strong_boost = (top_score - (0.6 * top_dense + 0.4 * top_bm25)) >= 0.40
+
+            # 1. Analyze query context: detect positive search target vs negation/exclusion
+            raw_text = str(nlu_intent.get("raw_query") or query_text)
+            negation_pattern = r"\b(?:không phải|chứ không phải|tránh|không xem|trừ|bỏ qua|không muốn)\b"
+            neg_parts = re.split(negation_pattern, raw_text, flags=re.IGNORECASE)
+            pos_text = neg_parts[0] if neg_parts else raw_text
+
+            # 2. Check if query is targeting Jadoo universe in its positive clause
+            JADOO_UNIVERSE = {
+                "jadoo", "jadu", "minji", "mimi", "seung-gi", "seunggi", "ho-dol", "hodol",
+                "nan-hee", "nanhee", "doldol", "yun-seok", "eun-hee", "seong-hoon", "min-woo",
+                "romy", "e-cha"
+            }
+            pos_words = set(tokenize_text(pos_text.lower()))
+            is_jadoo_targeted = bool(pos_words & JADOO_UNIVERSE) or (query_ep is not None)
+
+            # 3. Compute informative content tokens
+            generic_stop = {
+                "phim", "hoạt", "hình", "tập", "bộ", "mùa", "cho", "tôi", "xem", "tìm",
+                "gợi", "ý", "hay", "nhất", "những", "của", "và", "với", "năm", "không", "có", "nào"
+            }
+            content_tokens = [t for t in tokenize_text(pos_text) if t not in generic_stop and len(t) >= 2]
+
+            doc_text = self.build_searchable_document_text(top_item["movie"]).lower()
+            matched_content = [t for t in content_tokens if t in doc_text]
+            overlap_ratio = len(matched_content) / len(content_tokens) if content_tokens else 1.0
+
+            is_genre_or_descriptive = is_descriptive_not_franchise(pos_text) or bool(inc_genres)
+
+            # Decision rules:
+            ref_status = (nlu_intent.get("reference") or {}).get("status")
+            if ref_status == "UNRESOLVED_REFERENCE" and not is_jadoo_targeted and not has_strong_boost:
+                return []
+
+            if not has_strong_boost:
+                if is_genre_or_descriptive:
+                    # Generic genre/theme discovery (e.g. 'phim hoạt hình gia đình hài hước')
+                    if top_score < 0.15 and overlap_ratio < 0.15 and top_dense < 0.40:
+                        return []
+                elif not is_jadoo_targeted:
+                    # Query does NOT target Jadoo and has no exact title/segment boost
+                    if overlap_ratio < 0.45 or raw_top_bm25 < 12.0:
+                        return []
+                else:
+                    # Query mentions Jadoo, but if user asked for a completely fabricated premise
+                    non_jadoo_content = [t for t in content_tokens if t not in JADOO_UNIVERSE]
+                    if len(non_jadoo_content) >= 2:
+                        matched_non_jadoo = [t for t in non_jadoo_content if t in doc_text]
+                        non_jadoo_overlap = len(matched_non_jadoo) / len(non_jadoo_content)
+                        if non_jadoo_overlap < 0.20 and raw_top_bm25 < 5.0:
+                            return []
+
         return scored_candidates
 

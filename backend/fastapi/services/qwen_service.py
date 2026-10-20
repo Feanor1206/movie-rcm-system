@@ -2,6 +2,7 @@ import os
 import re
 import glob
 import json
+import time
 import logging
 import threading
 from pathlib import Path
@@ -274,7 +275,7 @@ class QwenRecommendationService:
 
         # 5. Giới hạn tài nguyên và concurrency
         self.max_concurrent_inference = max_concurrent_inference or int(os.getenv("MAX_CONCURRENT_INFERENCE", "1"))
-        self.max_new_tokens = max_new_tokens or int(os.getenv("MAX_NEW_TOKENS", "256"))
+        self.max_new_tokens = max_new_tokens or int(os.getenv("MAX_NEW_TOKENS", "512"))
         self._inference_semaphore = threading.BoundedSemaphore(self.max_concurrent_inference)
         self._load_lock = threading.Lock()
 
@@ -308,6 +309,12 @@ class QwenRecommendationService:
         self.active_base_model_name: Optional[str] = None
         self.active_adapter_path: Optional[str] = None
         self.resolved_gguf_path: Optional[str] = None
+        self.last_inference_stats: Dict[str, Any] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "generation_time_ms": 0.0,
+            "tokens_per_second": 0.0,
+        }
 
         self.system_prompt_v2_2: str = (
             "You are an expert natural language discovery intent parser for the Dippie Cinema animation system.\n"
@@ -480,7 +487,7 @@ class QwenRecommendationService:
         load_kwargs: Dict[str, Any] = {"trust_remote_code": True}
 
         if target_device == "cuda":
-            # Ưu tiên NF4 4-bit cho GPU laptop 6GB VRAM
+            # Ưu tiên NF4 4-bit với bfloat16 Tensor Cores và SDPA cho GPU laptop 6GB VRAM
             try:
                 import bitsandbytes
                 from transformers import BitsAndBytesConfig
@@ -488,11 +495,12 @@ class QwenRecommendationService:
                     load_in_4bit=True,
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_use_double_quant=True,
-                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_compute_dtype=torch.bfloat16,
                 )
                 load_kwargs["device_map"] = "auto"
+                load_kwargs["attn_implementation"] = "sdpa"
                 self.quantization = "4bit-nf4"
-                self.actual_dtype = "float16"
+                self.actual_dtype = "bfloat16"
             except Exception as bnb_err:
                 logger.warning(f"BitsAndBytes NF4 không khả dụng: {bnb_err}. Dùng FP16.")
                 load_kwargs["torch_dtype"] = torch.float16
@@ -511,6 +519,13 @@ class QwenRecommendationService:
         logger.info(f"Đang gắn Phase 23 LoRA Adapter từ: {adapter_path}")
         self.model = PeftModel.from_pretrained(base_model, str(adapter_path))
         self.model.eval()
+        self.model.config.use_cache = True
+
+        # Đảm bảo trọng số LoRA đồng bộ kiểu dữ liệu tính toán (bfloat16) tránh overhead ép kiểu liên tục
+        if target_device == "cuda":
+            for _name, _param in self.model.named_parameters():
+                if "lora_" in _name:
+                    _param.data = _param.data.to(torch.bfloat16)
 
         # Kiểm tra placement thực tế nếu có device_map
         placement_map: Dict[str, Any] = {}
@@ -899,6 +914,11 @@ class QwenRecommendationService:
                     intent["constraints"]["year_min"] = y
                     intent["constraints"]["year_max"] = y
 
+        # Clear hallucinated year constraints if query doesn't mention any 4-digit year
+        if not re.search(r"\b(19\d\d|20\d\d)\b", q_lower):
+            intent["constraints"]["year_min"] = None
+            intent["constraints"]["year_max"] = None
+
         # 3. Trích xuất thể loại Include / Exclude
         neg_clauses = re.findall(
             r"(?:không(?:\s+có|\s+thích|\s+muốn)?|trừ|loại bỏ|bỏ(?:\s+thể loại)?|without|no|exclude|excluding|not)\s+([^,.!?;]+)",
@@ -1008,6 +1028,122 @@ class QwenRecommendationService:
 
         return intent
 
+    @staticmethod
+    def extract_and_repair_json(clean_text: str) -> Dict[str, Any]:
+        """
+        Trích xuất và sửa lỗi cú pháp JSON nhẹ (unclosed structural brackets, trailing commas ngoài chuỗi)
+        từ output sinh bởi LLM.
+        Quy tắc nghiêm ngặt (AI-OPT-01-F03 R3):
+          - Từ chối root array, kể cả array chứa object (ví dụ: '[{"intent_type":"DISCOVERY"}]').
+          - Từ chối output bị cắt cụt giữa chừng trong giá trị chuỗi (ví dụ: '{"query":{"text":"Jadoo không có bạo').
+          - Không thay đổi nội dung bên trong chuỗi ký tự; không sửa dấu phẩy/ngoặc trong string.
+          - Hỗ trợ markdown wrapper (```json ... ```).
+          - Từ chối nếu có nhiều hơn 1 JSON object cấp cao nhất.
+        """
+        if not clean_text or not clean_text.strip():
+            raise ModelOutputParseError("Output sinh ra từ model rỗng.")
+
+        text = clean_text.strip()
+        # Bóc tách wrapper markdown nếu có
+        md_match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, flags=re.DOTALL)
+        if md_match:
+            text = md_match.group(1).strip()
+
+        # Kiểm tra root array: từ chối tuyệt đối
+        if text.startswith("["):
+            raise ModelOutputParseError("Output của model là JSON array, không phải JSON object (dict)")
+
+        # Tìm vị trí dấu mở ngoặc nhọn đầu tiên
+        s_idx = text.find("{")
+        if s_idx == -1:
+            raise ModelOutputParseError(f"Không tìm thấy JSON object trong output: {clean_text[:100]}")
+
+        # Nếu có tiền tố trước {, bảo đảm không có mở ngoặc vuông [
+        prefix = text[:s_idx].strip()
+        if "[" in prefix:
+            raise ModelOutputParseError(f"Phát hiện JSON array bao bọc object: {clean_text[:100]}")
+
+        candidate = text[s_idx:]
+
+        # Máy trạng thái đơn luồng: phân biệt rõ bên trong vs bên ngoài string
+        in_string = False
+        escape = False
+        repaired_chars = []
+        open_brackets_stack = []
+
+        i = 0
+        while i < len(candidate):
+            ch = candidate[i]
+            if in_string:
+                if escape:
+                    repaired_chars.append(ch)
+                    escape = False
+                elif ch == "\\":
+                    repaired_chars.append(ch)
+                    escape = True
+                elif ch == '"':
+                    repaired_chars.append(ch)
+                    in_string = False
+                else:
+                    repaired_chars.append(ch)
+            else:
+                if ch == '"':
+                    repaired_chars.append(ch)
+                    in_string = True
+                elif ch in ("{", "["):
+                    repaired_chars.append(ch)
+                    open_brackets_stack.append(ch)
+                elif ch in ("}", "]"):
+                    repaired_chars.append(ch)
+                    if open_brackets_stack:
+                        last_open = open_brackets_stack[-1]
+                        if (ch == "}" and last_open == "{") or (ch == "]" and last_open == "["):
+                            open_brackets_stack.pop()
+                elif ch == ",":
+                    # Lookahead: chỉ dọn dẹp trailing comma bên ngoài string nếu ký tự tiếp theo là ngoặc đóng hoặc EOF
+                    j = i + 1
+                    while j < len(candidate) and candidate[j] in " \t\r\n":
+                        j += 1
+                    if j < len(candidate) and candidate[j] in ("}", "]"):
+                        pass  # Bỏ qua trailing comma
+                    elif j >= len(candidate):
+                        pass  # Bỏ qua trailing comma ở cuối
+                    else:
+                        repaired_chars.append(ch)
+                else:
+                    repaired_chars.append(ch)
+            i += 1
+
+        # Nếu chuỗi bị cắt cụt khi đang trong string literal -> REJECT FAIL-CLOSED
+        if in_string:
+            raise ModelOutputParseError(
+                f"Output của model bị cắt cụt giữa chừng trong giá trị chuỗi (mid-string truncation): {clean_text[:120]}"
+            )
+
+        repaired_text = "".join(repaired_chars).strip()
+
+        # Đóng các ngoặc cấu trúc còn mở
+        while open_brackets_stack:
+            b = open_brackets_stack.pop()
+            if b == "{":
+                repaired_text += "}"
+            elif b == "[":
+                repaired_text += "]"
+
+        try:
+            decoder = json.JSONDecoder()
+            obj, end_idx = decoder.raw_decode(repaired_text)
+            leftover = repaired_text[end_idx:].strip()
+            if leftover:
+                raise ModelOutputParseError(f"Phát hiện nhiều JSON object hoặc dữ liệu thừa sau object: {leftover[:50]}")
+            if not isinstance(obj, dict):
+                raise ModelOutputParseError(f"Output của model không phải là JSON object (dict): {type(obj)}")
+            return obj
+        except Exception as err:
+            if isinstance(err, ModelOutputParseError):
+                raise
+            raise ModelOutputParseError(f"Không thể phân tích cú pháp JSON từ output của model: {err} | Raw: {clean_text[:200]}")
+
     def parse_discovery_intent(
         self,
         query: str,
@@ -1048,14 +1184,28 @@ class QwenRecommendationService:
                     )
                 with self.acquire_inference_slot():
                     inputs = self.tokenizer(prompt_text, return_tensors="pt").to(self.model.device)
-                    with torch.no_grad():
+                    prompt_len = int(inputs.input_ids.shape[1])
+                    t_gen_start = time.perf_counter()
+                    with torch.inference_mode():
                         out_ids = self.model.generate(
                             **inputs,
                             max_new_tokens=self.max_new_tokens,
                             do_sample=False,
-                            pad_token_id=self.tokenizer.eos_token_id
+                            use_cache=True,
+                            pad_token_id=self.tokenizer.eos_token_id,
+                            eos_token_id=[self.tokenizer.eos_token_id, 151643, 151645]
                         )
-                    raw_text = self.tokenizer.decode(out_ids[0][inputs.input_ids.shape[1]:], skip_special_tokens=True).strip()
+                    t_gen_end = time.perf_counter()
+                    gen_tokens = int(out_ids.shape[1] - prompt_len)
+                    gen_duration = t_gen_end - t_gen_start
+                    tps = (gen_tokens / gen_duration) if gen_duration > 0 else 0.0
+                    self.last_inference_stats = {
+                        "prompt_tokens": prompt_len,
+                        "completion_tokens": gen_tokens,
+                        "generation_time_ms": round(gen_duration * 1000, 2),
+                        "tokens_per_second": round(tps, 2),
+                    }
+                    raw_text = self.tokenizer.decode(out_ids[0][prompt_len:], skip_special_tokens=True).strip()
                     clean_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
             except InferenceCapacityError:
                 raise
@@ -1066,17 +1216,11 @@ class QwenRecommendationService:
                 clean_text = ""
 
             try:
-                if clean_text:
-                    parsed_json = json.loads(clean_text)
-                    if not isinstance(parsed_json, dict):
-                        raise ValueError(f"Output của model không phải là JSON object (dict): {type(parsed_json)}")
-                    raw_parsed = parsed_json
-                else:
-                    raise ValueError("Output sinh ra từ model rỗng.")
+                raw_parsed = self.extract_and_repair_json(clean_text)
             except Exception as json_err:
                 logger.error(f"Lỗi phân tích cú pháp JSON từ output của model: {json_err}")
                 if self.serving_mode == "full" and not self.enable_fallback:
-                    raise ModelOutputParseError(f"Mô hình Qwen3-4B LoRA trả về JSON không hợp lệ: {str(json_err)} | Output thô: {clean_text[:200]}")
+                    raise ModelOutputParseError(f"Mô hình Qwen3-4B LoRA trả về JSON không hợp lệ: {str(json_err)}")
                 raw_parsed = {}
 
         return self.normalize_phase23_intent(raw_parsed, query, catalog)

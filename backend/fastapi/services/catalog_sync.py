@@ -245,6 +245,11 @@ class CatalogSyncManager:
             if isinstance(ep, dict) and "id" in ep:
                 episodes_dict[ep["id"]] = ep
 
+        seasons_dict: Dict[str, Dict[str, Any]] = {}
+        for sea in payload.get("seasons", []):
+            if isinstance(sea, dict) and "id" in sea:
+                seasons_dict[sea["id"]] = sea
+
         # 3. Flatten each entity level into searchable items
         flattened: List[Dict[str, Any]] = []
         eligible_series_ids: Set[str] = set()
@@ -321,9 +326,22 @@ class CatalogSyncManager:
             eligible_episode_ids.add(epid)
             parent_series = series_dict.get(parent_series_id, {})
             season_id = ep.get("season_id", "")
+            parent_season = seasons_dict.get(season_id, {})
+            season_num = parent_season.get("number")
+            season_title = parent_season.get("title", "")
+
             title = ep.get("title", "")
             aliases = extract_alias_strings(ep.get("aliases"))
             ep_num = ep.get("number")
+            if ep_num is not None:
+                aliases.extend([f"Tập {ep_num}", f"Tập {ep_num:02d}", f"Episode {ep_num}"])
+                if season_num is not None:
+                    aliases.extend([
+                        f"Mùa {season_num} Tập {ep_num}",
+                        f"Mùa {season_num} - Tập {ep_num}",
+                        f"Season {season_num} Episode {ep_num}",
+                        f"S{season_num:02d}E{ep_num:02d}"
+                    ])
             air_date = ep.get("release_date")
             duration_ms = ep.get("duration_ms")
             synopsis = ep.get("synopsis", "")
@@ -350,7 +368,7 @@ class CatalogSyncManager:
             themes = ep.get("themes", [])
             primary_asset_id = ep_to_asset.get(epid) or ep.get("primary_media_asset_id")
 
-            year = parse_year_from_date(air_date) or parent_series.get("release_year_start")
+            year = parse_year_from_date(air_date) or parent_season.get("release_year_start") or parent_series.get("release_year_start")
             attr_map = extract_attributes_map(ep.get("attributes"))
 
             dur_min = (duration_ms // 60000) if (duration_ms and duration_ms > 0) else None
@@ -361,8 +379,10 @@ class CatalogSyncManager:
                 "series_id": parent_series_id,
                 "series_title": parent_series.get("title", ""),
                 "season_id": season_id,
+                "season_number": season_num,
+                "season_title": season_title,
                 "title": title,
-                "aliases": aliases,
+                "aliases": list(dict.fromkeys(aliases)),
                 "episode_number": ep_num,
                 "air_date": air_date,
                 "duration_ms": duration_ms,
@@ -445,14 +465,26 @@ class CatalogSyncManager:
                 dur_sec = None
                 runtime_str = "Segment"
 
+            parent_season = seasons_dict.get(parent_ep.get("season_id", ""), {})
+            season_num = parent_season.get("number")
+            parent_ep_num = parent_ep.get("number")
+            parent_ep_title = parent_ep.get("title", "")
+            if parent_ep_title:
+                aliases.extend([f"Tập {parent_ep_title}", parent_ep_title])
+            if parent_ep_num is not None:
+                aliases.extend([f"Tập {parent_ep_num}", f"Tập {parent_ep_num:02d}"])
+
             segment_item: Dict[str, Any] = {
                 "id": seg_id,
                 "episode_id": ep_id,
-                "episode_title": parent_ep.get("title", ""),
+                "episode_title": parent_ep_title,
+                "parent_episode_title": parent_ep_title,
+                "episode_number": parent_ep_num,
+                "season_number": season_num,
                 "series_id": parent_series_id,
                 "series_title": parent_series.get("title", ""),
                 "title": title,
-                "aliases": aliases,
+                "aliases": list(dict.fromkeys(aliases)),
                 "synopsis": synopsis,
                 "characters": char_names,
                 "plot_facts": plot_facts,
