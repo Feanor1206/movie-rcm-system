@@ -41,7 +41,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
+const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
 const REQUEST_TIMEOUT_MS = 8000;
 
 function validateAuthPayload(data: any, fallbackToken?: string): { user: AuthUser; token: string } | null {

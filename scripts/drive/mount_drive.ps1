@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Mounts a Google Drive remote on Windows using rclone and WinFsp.
 .DESCRIPTION
@@ -352,7 +352,11 @@ if ($LogFile) {
 $formattedMountArgs = @($rawMountArgs | ForEach-Object { Format-NativeArgument $_ })
 
 # 4. Launch hidden background rclone process
-$proc = Start-Process -FilePath $rcloneExe -ArgumentList $formattedMountArgs -WindowStyle Hidden -PassThru
+$stateDir = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($StateFile))
+New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+# Detached mounts must not inherit the launcher's stdout/stderr pipes.
+$proc = Start-Process -FilePath $rcloneExe -ArgumentList $formattedMountArgs -WindowStyle Hidden -PassThru `
+    -RedirectStandardOutput ($StateFile + ".stdout.log") -RedirectStandardError ($StateFile + ".stderr.log")
 
 if (-not $proc) {
     throw "Failed to start rclone process."

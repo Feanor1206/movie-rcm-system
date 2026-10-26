@@ -119,13 +119,14 @@ test('3. CineBot Shell: Reduced motion JS policy, focus trap, opener restoration
     'CineBot close button must be >= 44x44px'
   );
 
+  const triggerSource = fs.readFileSync(path.resolve(root, 'features/chat/components/CineBotFloatingTrigger.tsx'), 'utf8');
   // Floating trigger button touch target and responsive position
   assert.ok(
-    cinebotSource.includes('min-h-[44px]') && cinebotSource.includes('min-w-[44px]'),
+    triggerSource.includes('min-h-[44px]') && triggerSource.includes('min-w-[44px]'),
     'CineBot floating trigger must be >= 44x44px'
   );
   assert.ok(
-    cinebotSource.includes('bottom-4 right-4 sm:bottom-6 sm:right-6'),
+    triggerSource.includes('bottom-4 right-4 sm:bottom-6 sm:right-6'),
     'CineBot floating trigger must use responsive safe positioning on mobile'
   );
 });

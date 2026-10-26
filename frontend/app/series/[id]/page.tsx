@@ -32,6 +32,15 @@ import {
 } from '@/lib/services/catalogService';
 import { resolveStreamUrl, requestPlaybackGrant, getStoredAuthToken } from '@/lib/services/mediaService';
 import { resolveFileTimestamp, resolveMediaSeekSeconds } from '@/lib/services/mediaRouting';
+import { useWatchProgress } from '@/lib/hooks/useWatchProgress';
+import { isUsableResumeProgress, readAutoNextPreference, writeAutoNextPreference, type WatchProgressDraft } from '@/lib/services/watchProgressService';
+import {
+  getAdjacentEpisode,
+  getEpisodesForSeason,
+  getInitialEpisode,
+  getInitialSeasonId,
+  sortCatalogSeasons,
+} from '@/lib/services/episodeNavigation';
 
 const formatDuration = (ms?: number) => {
   if (!ms || ms <= 0) return '00:00';
@@ -55,6 +64,8 @@ export default function SeriesDetailPage() {
 
   const [seriesData, setSeriesData] = useState<CatalogSeriesResponse | null>(null);
   const [selectedEpisode, setSelectedEpisode] = useState<CatalogEpisode | null>(null);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
+  const [episodeQuery, setEpisodeQuery] = useState('');
   const [episodeDetail, setEpisodeDetail] = useState<CatalogEpisodeResponse | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<CatalogMediaAsset | null>(null);
 
@@ -71,6 +82,18 @@ export default function SeriesDetailPage() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string>('');
+  const progress = useWatchProgress();
+  const [dismissedResume, setDismissedResume] = useState('');
+  const [autoNext, setAutoNext] = useState(false);
+  const [nextCountdown, setNextCountdown] = useState<number | null>(null);
+  const autoPlayEpisodeRef = useRef<string | null>(null);
+  const progressIdentity = `${selectedEpisode?.id || ''}:${selectedAsset?.id || ''}`;
+  useEffect(() => setAutoNext(readAutoNextPreference()), []);
+  useEffect(() => {
+    setNextCountdown(null);
+    setDismissedResume('');
+  }, [progressIdentity]);
 
   interface PendingSeekIdentity {
     seriesId: string;
@@ -118,16 +141,9 @@ export default function SeriesDetailPage() {
           setError('Không tìm thấy thông tin bộ hoạt hình.');
         } else {
           setSeriesData(data);
-          if (data.episodes && data.episodes.length > 0) {
-            let initialEp = data.episodes[0];
-            if (targetEpisodeId) {
-              const matched = data.episodes.find((e) => e.id === targetEpisodeId);
-              if (matched) {
-                initialEp = matched;
-              }
-            }
-            setSelectedEpisode(initialEp);
-          }
+          const initialSeasonId = getInitialSeasonId(data.seasons || [], data.episodes || [], targetEpisodeId);
+          setSelectedSeasonId(initialSeasonId);
+          setSelectedEpisode(getInitialEpisode(data.episodes || [], initialSeasonId, targetEpisodeId, (data.seasons || []).length > 0));
         }
       })
       .catch((err) => {
@@ -153,16 +169,23 @@ export default function SeriesDetailPage() {
       if (targetEpisodeId) {
         const matched = seriesData.episodes.find((e) => e.id === targetEpisodeId);
         if (matched) {
+          setSelectedSeasonId(matched.seasonId || null);
           setSelectedEpisode(matched);
         }
       } else if (seriesData.episodes.length > 0) {
-        setSelectedEpisode(seriesData.episodes[0]);
+        const firstSeasonId = getInitialSeasonId(seriesData.seasons || [], seriesData.episodes || []);
+        setSelectedSeasonId(firstSeasonId);
+        setSelectedEpisode(getInitialEpisode(seriesData.episodes, firstSeasonId, null, (seriesData.seasons || []).length > 0));
       }
     }
   }, [targetEpisodeId, seriesData]);
 
   // Manual episode selection handler that updates state and keeps URL in sync without page reloads
   const handleSelectEpisode = (ep: CatalogEpisode) => {
+    if (ep.id !== selectedEpisode?.id) saveCurrentProgress('episode-change');
+    setNextCountdown(null);
+    setSelectedSeasonId(ep.seasonId || null);
+    setEpisodeQuery('');
     if (ep.id === selectedEpisode?.id) return;
     setSelectedEpisode(ep);
 
@@ -176,10 +199,101 @@ export default function SeriesDetailPage() {
       currentUrl.searchParams.delete('timescale');
       currentUrl.searchParams.delete('asset');
       window.history.replaceState(null, '', currentUrl.toString());
+      prevUrlEpisodeIdRef.current = ep.id;
     } catch {
       // Safe fallback in SSR or non-browser environments
     }
   };
+
+  const handleSelectSeason = (seasonId: string) => {
+    if (seasonId === selectedSeasonId) return;
+    saveCurrentProgress('episode-change');
+    setNextCountdown(null);
+    const firstEpisode = getInitialEpisode(seriesData?.episodes || [], seasonId);
+    setSelectedSeasonId(seasonId);
+    setSelectedEpisode(firstEpisode);
+    setEpisodeQuery('');
+    prevUrlEpisodeIdRef.current = firstEpisode?.id || null;
+    try {
+      const currentUrl = new URL(window.location.href);
+      if (firstEpisode) currentUrl.searchParams.set('episode', firstEpisode.id);
+      else currentUrl.searchParams.delete('episode');
+      currentUrl.searchParams.delete('scene');
+      currentUrl.searchParams.delete('segment');
+      currentUrl.searchParams.delete('t');
+      currentUrl.searchParams.delete('timeline');
+      currentUrl.searchParams.delete('timescale');
+      currentUrl.searchParams.delete('asset');
+      window.history.replaceState(null, '', currentUrl.toString());
+    } catch {
+      // Safe fallback in SSR or non-browser environments
+    }
+  };
+
+  const orderedSeasons = sortCatalogSeasons(seriesData?.seasons || []);
+  const hasSeasons = orderedSeasons.length > 0;
+  const seasonEpisodes = getEpisodesForSeason(seriesData?.episodes || [], selectedSeasonId, hasSeasons);
+  const filteredSeasonEpisodes = seasonEpisodes.filter((episode) => {
+    const query = episodeQuery.trim().toLocaleLowerCase();
+    if (!query) return true;
+    return `${episode.number ?? episode.episodeNumber ?? ''} ${episode.title} ${episode.synopsis || ''}`
+      .toLocaleLowerCase()
+      .includes(query);
+  });
+  const previousEpisode = getAdjacentEpisode(seriesData?.episodes || [], selectedSeasonId, selectedEpisode?.id || null, -1, hasSeasons);
+  const nextEpisode = getAdjacentEpisode(seriesData?.episodes || [], selectedSeasonId, selectedEpisode?.id || null, 1, hasSeasons);
+  const savedProgress = progress.records.find(record => record.episodeId === selectedEpisode?.id && record.assetId === selectedAsset?.id);
+  const offerResume = !targetTimeMs && !targetSceneId && !targetSegmentId
+    && dismissedResume !== progressIdentity && isUsableResumeProgress(savedProgress) && savedProgress.positionMs >= 5000;
+
+  function saveCurrentProgress(reason: 'interval' | 'pause' | 'ended' | 'episode-change') {
+    const video = videoRef.current;
+    if (!video || !selectedEpisode || !selectedAsset || !seriesData
+        || episodeDetail?.episode?.id !== selectedEpisode.id || !Number.isFinite(video.currentTime)
+        || video.currentTime < 1 || !(video.currentSrc || video.src).includes(encodeURIComponent(selectedAsset.id))) return;
+    let fullEpisode = false;
+    try { fullEpisode = JSON.parse(selectedAsset.coverageJson || '[]').some((item: any) => item.episode_id === selectedEpisode.id && item.scope === 'full_episode'); } catch {}
+    if (!fullEpisode || (offerResume && savedProgress && video.currentTime * 1000 + 2000 < savedProgress.positionMs)) return;
+    const season = seriesData.seasons.find(item => item.id === selectedEpisode.seasonId);
+    const durationMs = Number.isFinite(video.duration) && video.duration > 0 ? Math.round(video.duration * 1000) : selectedAsset.durationMs ?? null;
+    const positionMs = Math.min(Math.floor(video.currentTime * 1000), durationMs ?? Number.MAX_SAFE_INTEGER);
+    const draft: WatchProgressDraft = {
+      episodeId: selectedEpisode.id, assetId: selectedAsset.id, seriesId,
+      seriesTitle: seriesData.series.title, episodeTitle: selectedEpisode.title,
+      seasonId: selectedEpisode.seasonId, seasonNumber: season?.number ?? season?.seasonNumber,
+      seasonTitle: season?.title, episodeNumber: selectedEpisode.number ?? selectedEpisode.episodeNumber,
+      positionMs, durationMs,
+      completed: durationMs != null && positionMs >= durationMs * .95 && durationMs - positionMs <= 60000,
+    };
+    void progress.saveProgress(draft, reason).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (nextCountdown === null || !autoNext || !nextEpisode) return;
+    const cancelHidden = () => { if (document.hidden) setNextCountdown(null); };
+    document.addEventListener('visibilitychange', cancelHidden);
+    const timer = window.setTimeout(() => {
+      if (document.hidden) { setNextCountdown(null); return; }
+      if (nextCountdown > 1) setNextCountdown(nextCountdown - 1);
+      else { autoPlayEpisodeRef.current = nextEpisode.id; handleSelectEpisode(nextEpisode); }
+    }, 1000);
+    return () => { window.clearTimeout(timer); document.removeEventListener('visibilitychange', cancelHidden); };
+  }, [nextCountdown, autoNext, nextEpisode?.id, progressIdentity]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || autoPlayEpisodeRef.current !== selectedEpisode?.id) return;
+    const playNext = () => {
+      if (autoPlayEpisodeRef.current !== selectedEpisode?.id || document.hidden
+          || episodeDetail?.episode?.id !== selectedEpisode?.id || !selectedAsset
+          || !(video.currentSrc || video.src).includes(encodeURIComponent(selectedAsset.id))) return;
+      autoPlayEpisodeRef.current = null;
+      void video.play().catch(() => setPlaybackWarning('Bấm Phát để tiếp tục tập kế tiếp.'));
+    };
+    video.addEventListener('canplay', playNext);
+    if (video.readyState >= 3) playNext();
+    return () => video.removeEventListener('canplay', playNext);
+  }, [streamUrl, selectedEpisode?.id, selectedAsset?.id, episodeDetail?.episode?.id]);
 
   // Load episode detail when selectedEpisode changes (with race condition prevention & AbortSignal)
   useEffect(() => {
@@ -282,7 +396,6 @@ export default function SeriesDetailPage() {
   }, [selectedEpisode?.id, targetAssetId, targetSceneId, targetSegmentId, targetTimeMs, seriesId, targetEpisodeId]);
 
   // Video stream URL resolution with short-lived playback grant for protected media (H4)
-  const [streamUrl, setStreamUrl] = useState<string>('');
 
   useEffect(() => {
     if (!selectedAsset?.id) {
@@ -443,6 +556,7 @@ export default function SeriesDetailPage() {
   };
 
   const handleTimeUpdate = () => {
+    if (videoRef.current && !videoRef.current.paused) saveCurrentProgress('interval');
     if (videoRef.current) {
       const cur = videoRef.current.currentTime;
       setCurrentTime(cur);
@@ -583,14 +697,20 @@ export default function SeriesDetailPage() {
               <video
                 ref={videoRef}
                 data-testid="series-video-player"
+                key={streamUrl}
                 src={streamUrl}
                 controls
                 playsInline
                 onLoadedMetadata={handleLoadedMetadata}
                 onCanPlay={handleLoadedMetadata}
                 onTimeUpdate={handleTimeUpdate}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
+                onPlay={() => { setIsPlaying(true); setNextCountdown(null); }}
+                onPause={() => { setIsPlaying(false); saveCurrentProgress('pause'); }}
+                onSeeking={() => setNextCountdown(null)}
+                onEnded={() => {
+                  saveCurrentProgress('ended');
+                  if (autoNext && nextEpisode && !document.hidden) setNextCountdown(8);
+                }}
                 className="h-full w-full object-contain"
               />
             ) : (
@@ -602,6 +722,29 @@ export default function SeriesDetailPage() {
           </div>
 
           {/* Episode Info & Media Assets Selector */}
+          {offerResume && savedProgress && <div className="comic-card flex flex-wrap items-center gap-3 p-3" data-testid="resume-choice">
+            <span className="text-sm">Bạn đang đọc dở ở {formatDuration(savedProgress.positionMs)}.</span>
+            <button className="btn-primary text-xs" onClick={() => {
+              const video = videoRef.current;
+              if (video && Number.isFinite(video.duration) && savedProgress.positionMs < video.duration * 1000) {
+                setDismissedResume(progressIdentity); video.currentTime = savedProgress.positionMs / 1000; void video.play().catch(() => {});
+              }
+            }}>Xem tiếp</button>
+            <button className="text-xs underline" onClick={() => {
+              setDismissedResume(progressIdentity);
+              if (videoRef.current) { videoRef.current.currentTime = 0; void videoRef.current.play().catch(() => {}); }
+            }}>Xem từ đầu</button>
+          </div>}
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="inline-flex min-h-10 items-center gap-2"><input type="checkbox" checked={autoNext} onChange={event => {
+              setAutoNext(event.target.checked); writeAutoNextPreference(event.target.checked); setNextCountdown(null);
+            }} />Tự chuyển tập trong mùa</label>
+            {nextCountdown !== null && nextEpisode && <div role="status" className="comic-card flex items-center gap-3 p-3" data-testid="next-countdown">
+              Tập tiếp theo sau {nextCountdown} giây
+              <button className="underline" onClick={() => setNextCountdown(null)}>Hủy</button>
+            </div>}
+          </div>
+          {progress.error && <p role="status" className="text-xs text-muted">{progress.error}</p>}
           {selectedEpisode && (
             <div className="rounded-xl border border-surface-border bg-surface p-5">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-border pb-3">
@@ -793,13 +936,76 @@ export default function SeriesDetailPage() {
               <div className="flex items-center gap-2">
                 <Layers size={16} className="text-brand" />
                 <h3 className="text-sm font-bold text-ink">
-                  Danh sách tập ({episodes.length})
+                    Danh sách tập ({seasonEpisodes.length})
                 </h3>
               </div>
             </div>
 
-            <div className="mt-3 space-y-2 max-h-[600px] overflow-y-auto">
-              {episodes.map((ep) => {
+            {hasSeasons && (
+              <div className="mt-4 flex flex-wrap gap-2" aria-label="Chọn mùa">
+                {orderedSeasons.map((season) => (
+                  <button
+                    key={season.id}
+                    type="button"
+                    data-season-id={season.id}
+                    aria-pressed={selectedSeasonId === season.id}
+                    onClick={() => handleSelectSeason(season.id)}
+                    className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      selectedSeasonId === season.id
+                        ? 'border-brand bg-brand/10 text-ink'
+                        : 'border-surface-border bg-surface-elevated text-muted hover:text-ink'
+                    }`}
+                  >
+                    {season.title || `Mùa ${season.number ?? season.seasonNumber ?? ''}`}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedEpisode && (
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  data-testid="previous-episode"
+                  disabled={!previousEpisode}
+                  onClick={() => previousEpisode && handleSelectEpisode(previousEpisode)}
+                  className="btn-secondary text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Tập trước
+                </button>
+                <span className="text-[11px] text-muted">
+                  {seasonEpisodes.findIndex((episode) => episode.id === selectedEpisode.id) + 1} / {seasonEpisodes.length}
+                </span>
+                <button
+                  type="button"
+                  data-testid="next-episode"
+                  disabled={!nextEpisode}
+                  onClick={() => nextEpisode && handleSelectEpisode(nextEpisode)}
+                  className="btn-secondary text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Tập tiếp theo
+                </button>
+              </div>
+            )}
+
+            <label className="mt-4 block">
+              <span className="sr-only">Tìm tập trong bộ này</span>
+              <input
+                data-testid="episode-search-input"
+                type="search"
+                value={episodeQuery}
+                onChange={(event) => setEpisodeQuery(event.target.value)}
+                placeholder="Tìm tập theo số hoặc tên…"
+                className="w-full rounded-md border border-surface-border bg-surface-elevated px-3 py-2 text-xs text-ink placeholder:text-muted focus:border-brand focus:outline-none"
+              />
+            </label>
+
+            <div className="mt-3 max-h-[600px] space-y-2 overflow-y-auto">
+              {filteredSeasonEpisodes.length === 0 ? (
+                <p className="rounded-md border border-dashed border-surface-border p-4 text-xs text-muted">
+                  {seasonEpisodes.length ? 'Không tìm thấy tập phù hợp.' : 'Mùa này chưa có tập nào.'}
+                </p>
+              ) : filteredSeasonEpisodes.map((ep) => {
                 const isSelected = selectedEpisode?.id === ep.id;
                 return (
                   <button

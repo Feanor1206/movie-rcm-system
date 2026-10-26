@@ -1,0 +1,104 @@
+{
+  "phase": "after",
+  "status": "PASSED",
+  "startedAt": "2026-10-26T23:02:26.927Z",
+  "frontend": "http://127.0.0.1:3000",
+  "browser": {
+    "cdpPort": 9337,
+    "isolatedContext": true,
+    "authentication": "guest"
+  },
+  "checks": [
+    {
+      "name": "guest-context",
+      "status": "PASS",
+      "authStorageKeys": 0,
+      "authCookies": 0
+    },
+    {
+      "name": "guest-search",
+      "status": "PASS",
+      "query": "Jadoo",
+      "resultCount": 1,
+      "seriesId": "ser_jadoo"
+    },
+    {
+      "name": "season-selection",
+      "status": "PASS",
+      "seriesId": "ser_jadoo",
+      "seasonId": "sea_jadoo_s01"
+    },
+    {
+      "name": "episode-1-playback",
+      "status": "PASS",
+      "episodeId": "ep_jadoo_s01_0001",
+      "assetId": "asset_jadoo_s01_v0001",
+      "currentSrc": "http://127.0.0.1:3000/api/media/stream/asset_jadoo_s01_v0001",
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "readyState": 4,
+      "timeBefore": 0.378163,
+      "timeAfter": 1.591091,
+      "advanceSeconds": 1.212928
+    },
+    {
+      "name": "pause-resume",
+      "status": "PASS",
+      "paused": true,
+      "resumed": true,
+      "timeBefore": 1.721876,
+      "timeAfter": 2.728701
+    },
+    {
+      "name": "episode-1-seek",
+      "status": "PASS",
+      "episodeId": "ep_jadoo_s01_0001",
+      "assetId": "asset_jadoo_s01_v0001",
+      "targetSeconds": 8,
+      "settledSeconds": 8.258022,
+      "advancedSeconds": 9.361928
+    },
+    {
+      "name": "episode-2-playback",
+      "status": "PASS",
+      "episodeId": "ep_jadoo_s01_0002",
+      "assetId": "asset_jadoo_s01_v0002",
+      "currentSrc": "http://127.0.0.1:3000/api/media/stream/asset_jadoo_s01_v0002",
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "readyState": 4,
+      "timeBefore": 0.363452,
+      "timeAfter": 1.577632,
+      "advanceSeconds": 1.2141799999999998
+    },
+    {
+      "name": "account-continue-watching",
+      "status": "PASS",
+      "episodeId": "ep_jadoo_s01_0001",
+      "restoredSqlProgress": true
+    },
+    {
+      "name": "deferred-dialogs",
+      "status": "PASS",
+      "loginDialogCount": 1,
+      "chatOpened": true,
+      "modelCalled": false
+    }
+  ],
+  "episodes": [
+    {
+      "episodeId": "ep_jadoo_s01_0001",
+      "assetId": "asset_jadoo_s01_v0001"
+    },
+    {
+      "episodeId": "ep_jadoo_s01_0002",
+      "assetId": "asset_jadoo_s01_v0002"
+    }
+  ],
+  "screenshots": {},
+  "series": {
+    "id": "ser_jadoo",
+    "title": "Xin Chào Jadoo"
+  },
+  "finishedAt": "2026-10-26T23:02:42.435Z"
+}

@@ -321,6 +321,7 @@ public class SeedAndConfigPolicyTest {
         executeSqlFile(jdbcUrl, "../../database/migrations/02_add_favorite_items.sql");
         executeSqlFile(jdbcUrl, "../../database/migrations/03_add_media_assets.sql");
         executeSqlFile(jdbcUrl, "../../database/migrations/04_add_catalog_tables.sql");
+        executeSqlFile(jdbcUrl, "../../database/migrations/05_add_watch_progress.sql");
 
         // 4. Assert favorite_items & media_assets exist and prior data is 100% intact
         try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {

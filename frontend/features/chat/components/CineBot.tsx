@@ -19,11 +19,9 @@ import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import type { Movie } from '@/types/movie';
 
 const QUICK_PROMPTS = [
-  'Spirited Away',
-  'Hoạt hình sau 2000',
-  'Trước năm 2015',
-  'Sci-Fi vũ trụ',
-  'Điểm cao nhất',
+  'Jadoo Mùa 1 Tập 1',
+  'Jadoo sợ tăng cân',
+  'Tìm tiểu phẩm Jadoo',
 ];
 
 const BTN_HEAD = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer';
@@ -397,18 +395,4 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   );
 }
 
-/**
- * Floating Trigger Button for CineBot (Clean rectangular design, accessible 44px touch target)
- */
-export function CineBotFloatingTrigger({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label="Mở Chatbot CineBot"
-      className="comic-bot-trigger fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-full sm:rounded-md border border-surface-border bg-surface px-3.5 py-2.5 sm:px-4 text-xs font-semibold text-ink shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
-    >
-      <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-brand-sm" />
-      <span>Hỏi CineBot</span>
-    </button>
-  );
-}
+export { CineBotFloatingTrigger } from './CineBotFloatingTrigger';

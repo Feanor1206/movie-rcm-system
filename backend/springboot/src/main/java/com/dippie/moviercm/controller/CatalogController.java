@@ -14,7 +14,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/catalog")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class CatalogController {
 
     private final CatalogQueryService queryService;

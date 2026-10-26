@@ -2,8 +2,8 @@
 .SYNOPSIS
     Khởi động toàn bộ cụm dịch vụ Bản dùng thử (Usable Preview) Dippie Cinema.
 .DESCRIPTION
-    Khởi động đồng bộ 3 dịch vụ chính:
-    1. FastAPI (Cổng 8000 hoặc tùy chọn) - AI & Hybrid Index Sync
+    Khởi động Spring Boot và Next.js; FastAPI chỉ chạy khi chọn -ModelMode light/full:
+    1. FastAPI (Cổng 8000 hoặc tùy chọn) - AI & Hybrid Index Sync (tùy chọn)
     2. Spring Boot (Cổng 8080 hoặc tùy chọn) - Core Backend sử dụng moviercm-backend-0.0.1-SNAPSHOT.jar
     3. Next.js Frontend (Cổng 3000 hoặc tùy chọn) - Giao diện Web
     Tùy chọn gắn Google Drive (X:) an toàn qua rclone WinFsp (--drive-root-folder-id 1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ).
@@ -19,7 +19,11 @@
 .PARAMETER SyncSecret
     Mã bí mật đồng bộ catalog giữa Spring Boot và FastAPI. Lấy từ biến môi trường ngoài Git nếu không truyền.
 .PARAMETER ModelMode
-    Chế độ mô hình AI: 'light' (nhẹ, phục vụ CPU/GGUF) hoặc 'full' (mô hình thật Qwen3-4B + Phase23 LoRA trên CUDA).
+    Chế độ AI: 'off' (mặc định, không chạy FastAPI), 'light' hoặc 'full' (Qwen3-4B + Phase23 LoRA trên CUDA).
+.PARAMETER DataDirectory
+    Thư mục H2 và catalog snapshot riêng cho preview.
+.PARAMETER StateFile
+    Tệp trạng thái riêng để quản lý tiến trình preview.
 .PARAMETER MountDrive
     Gắn kết ổ đĩa Google Drive chế độ chỉ đọc vào điểm gắn chỉ định.
 .PARAMETER DriveMountPoint
@@ -39,8 +43,10 @@ param(
     [int]$FastApiPort = 8000,
     [int]$FrontendPort = 3000,
     [string]$SyncSecret,
-    [ValidateSet("light", "full")]
-    [string]$ModelMode = "light",
+    [ValidateSet("off", "light", "full")]
+    [string]$ModelMode = "off",
+    [string]$DataDirectory,
+    [string]$StateFile,
     [switch]$MountDrive,
     [string]$DriveMountPoint = "X:",
     [string]$DriveRemote = "cinema-drive:",
@@ -60,8 +66,6 @@ $backendDir = Join-Path $root "backend\springboot"
 $fastapiDir = Join-Path $root "backend\fastapi"
 $frontendDir = Join-Path $root "frontend"
 $targetDir = Join-Path $root "target"
-if (-not (Test-Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
-$stateFile = Join-Path $targetDir "preview_stack.json"
 
 Write-Host "==========================================================================" -ForegroundColor Cyan
 Write-Host " KHỞI ĐỘNG BẢN DÙNG THỬ (USABLE PREVIEW) — DIPPIE CINEMA" -ForegroundColor Cyan
@@ -140,8 +144,134 @@ function Start-ChildServiceProcess {
     if (-not $proc) {
         throw "Không thể khởi tạo tiến trình con cho '$FileName'."
     }
+    # Keep the native handle open so PowerShell 5.1 retains ExitCode after WaitForExit.
+    $null = $proc.Handle
     return $proc
 }
+
+function Get-PreviewPaths {
+    param([string]$BackendDirectory, [string]$TargetDirectory, [string]$DataDirectory, [string]$StateFile)
+    if (-not $DataDirectory) { $DataDirectory = Join-Path $BackendDirectory "data\preview" }
+    if (-not $StateFile) { $StateFile = Join-Path $TargetDirectory "preview_stack.json" }
+    $DataDirectory = [System.IO.Path]::GetFullPath($DataDirectory)
+    $StateFile = [System.IO.Path]::GetFullPath($StateFile)
+    return [PSCustomObject]@{
+        DataDirectory = $DataDirectory
+        StateFile = $StateFile
+        DriveStateFile = Join-Path $DataDirectory "drive_mount.json"
+    }
+}
+
+function Get-PreviewRuntimeContract {
+    param(
+        [ValidateSet("off", "light", "full")][string]$ModelMode,
+        [int]$SpringPort,
+        [int]$FastApiPort,
+        [int]$FrontendPort,
+        [string]$DataDirectory,
+        [string]$SyncSecret
+    )
+
+    $DataDirectory = [System.IO.Path]::GetFullPath($DataDirectory)
+    $databasePath = (Join-Path $DataDirectory "preview_db").Replace("\", "/")
+    $syncUrl = if ($ModelMode -eq "off") { "http://127.0.0.1:1/api/index/sync" } else { "http://127.0.0.1:$FastApiPort/api/index/sync" }
+    $modelUrl = if ($ModelMode -eq "off") { "http://127.0.0.1:1/api/chat" } else { "http://127.0.0.1:$FastApiPort/api/chat" }
+    $syncToken = if ($ModelMode -eq "off") { "" } else { $SyncSecret }
+    $springEnvironment = [System.Collections.Generic.Dictionary[string, string]]::new()
+    $springEnvironment["SPRING_DATASOURCE_URL"] = "jdbc:h2:file:$databasePath;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER"
+    $springEnvironment["APP_CATALOG_SNAPSHOT_PATH"] = Join-Path $DataDirectory "committed_catalog_snapshot.json"
+    $springEnvironment["APP_CATALOG_SYNC_URL"] = $syncUrl
+    $springEnvironment["CATALOG_SYNC_TOKEN"] = $syncToken
+    $springEnvironment["FASTAPI_SYNC_SECRET"] = $syncToken
+    $springEnvironment["APP_CORS_ALLOWED_ORIGINS"] = "http://127.0.0.1:$FrontendPort,http://localhost:$FrontendPort"
+    if ($env:APP_CORS_ALLOWED_ORIGINS) { $springEnvironment["APP_CORS_ALLOWED_ORIGINS"] += ",$env:APP_CORS_ALLOWED_ORIGINS" }
+
+    $frontendEnvironment = [System.Collections.Generic.Dictionary[string, string]]::new()
+    $frontendEnvironment["PORT"] = [string]$FrontendPort
+    $frontendEnvironment["HOSTNAME"] = "127.0.0.1"
+    $frontendEnvironment["NODE_ENV"] = "production"
+    $frontendEnvironment["NEXT_PUBLIC_API_URL"] = "/api"
+    $frontendEnvironment["NEXT_PUBLIC_SPRINGBOOT_API_URL"] = "/api"
+    $frontendEnvironment["SPRINGBOOT_INTERNAL_URL"] = "http://127.0.0.1:$SpringPort"
+    $frontendEnvironment["NEXT_PUBLIC_MODEL_API_URL"] = $modelUrl
+    $frontendEnvironment["MODEL_API_URL"] = $modelUrl
+
+    $serviceNames = if ($ModelMode -eq "off") { @("SpringBoot", "NextFrontend") } else { @("FastAPI", "SpringBoot", "NextFrontend") }
+    return [PSCustomObject]@{
+        StartFastApi = ($ModelMode -ne "off")
+        ServiceNames = $serviceNames
+        SpringEnvironment = $springEnvironment
+        FrontendEnvironment = $frontendEnvironment
+        CatalogSyncUrl = $syncUrl
+        ModelApiUrl = $modelUrl
+    }
+}
+
+function Get-SpringBootArguments {
+    param([int]$SpringPort, [string]$DriveMountPoint, [string]$JarFile)
+    return @(
+        "-Dserver.address=127.0.0.1",
+        "-Dserver.port=$SpringPort",
+        "-Dspring.profiles.active=dev",
+        "-Dapp.media.drive-mount=$DriveMountPoint",
+        "-Dapp.media.drive.mount-path=$DriveMountPoint\",
+        "-Dapp.media.drive-metadata-timeout-ms=60000",
+        "-Dapp.media.drive-read-timeout-ms=60000",
+        "-jar", $JarFile
+    )
+}
+
+function Get-PreviewPortsToCheck {
+    param([ValidateSet("off", "light", "full")][string]$ModelMode, [int]$SpringPort, [int]$FastApiPort, [int]$FrontendPort)
+    $ports = @(
+        @{ Port = $SpringPort; Name = "Spring Boot Backend" },
+        @{ Port = $FrontendPort; Name = "Next.js Web Frontend" }
+    )
+    if ($ModelMode -ne "off") { $ports = @(@{ Port = $FastApiPort; Name = "FastAPI AI Engine" }) + $ports }
+    return $ports
+}
+
+function Test-FrontendBuildStale {
+    param([string]$FrontendDirectory, [string]$BuildIdPath, [string]$StandaloneServerPath, [string]$BuildEnvironmentFile, [string]$ExpectedBuildEnvironment)
+    if (-not (Test-Path -LiteralPath $BuildIdPath -PathType Leaf) -or -not (Test-Path -LiteralPath $StandaloneServerPath -PathType Leaf) -or -not (Test-Path -LiteralPath $BuildEnvironmentFile -PathType Leaf)) { return $true }
+    if ((Get-Content -LiteralPath $BuildEnvironmentFile -Raw) -cne $ExpectedBuildEnvironment) { return $true }
+
+    $buildTime = (Get-Item -LiteralPath $BuildIdPath).LastWriteTimeUtc
+    $sourceFiles = @()
+    $sourceFiles += @(Get-ChildItem -LiteralPath $FrontendDirectory -File -Force -ErrorAction SilentlyContinue)
+    foreach ($directory in @("app", "components", "features", "lib", "public", "types")) {
+        $sourceDirectory = Join-Path $FrontendDirectory $directory
+        if (Test-Path -LiteralPath $sourceDirectory -PathType Container) {
+            $sourceFiles += @(Get-ChildItem -LiteralPath $sourceDirectory -Recurse -File -Force -ErrorAction SilentlyContinue)
+        }
+    }
+    foreach ($sourceFile in $sourceFiles) {
+        if ($sourceFile.LastWriteTimeUtc -gt $buildTime) { return $true }
+    }
+    return $false
+}
+
+function Test-RecordedProcessIdentity {
+    param($Process, $Record)
+    if (-not $Process -or -not $Record -or [string]::IsNullOrWhiteSpace([string]$Record.ExecutablePath) -or [string]::IsNullOrWhiteSpace([string]$Record.StartTime)) { return $false }
+    try {
+        $expectedPath = [System.IO.Path]::GetFullPath([string]$Record.ExecutablePath)
+        $livePath = [System.IO.Path]::GetFullPath([string]$Process.ExecutablePath)
+        $expectedStart = [DateTime]::Parse([string]$Record.StartTime).ToUniversalTime()
+        $liveStart = ([DateTime]$Process.CreationDate).ToUniversalTime()
+        if ($Process.PSObject.Properties["ProcessId"] -and [int]$Process.ProcessId -ne [int]$Record.PID) { return $false }
+        return [string]::Equals($livePath, $expectedPath, [System.StringComparison]::OrdinalIgnoreCase) -and [Math]::Abs(($liveStart - $expectedStart).TotalSeconds) -le 3.0
+    } catch {
+        return $false
+    }
+}
+
+$previewPaths = Get-PreviewPaths -BackendDirectory $backendDir -TargetDirectory $targetDir -DataDirectory $DataDirectory -StateFile $StateFile
+$DataDirectory = $previewPaths.DataDirectory
+$stateFile = $previewPaths.StateFile
+$driveStateFile = $previewPaths.DriveStateFile
+New-Item -ItemType Directory -Path $DataDirectory -Force | Out-Null
+New-Item -ItemType Directory -Path ([System.IO.Path]::GetDirectoryName($stateFile)) -Force | Out-Null
 
 # -----------------------------------------------------------------------------
 # 0. Kiểm tra Stack đang chạy (không ghi đè state của stack đang hoạt động)
@@ -149,12 +279,18 @@ function Start-ChildServiceProcess {
 if (Test-Path -Path $stateFile -PathType Leaf -ErrorAction SilentlyContinue) {
     try {
         $existingState = Get-Content -Path $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($existingState -and $existingState.Processes) {
+        if (-not $existingState -or -not $existingState.PSObject.Properties["Processes"] -or -not $existingState.PSObject.Properties["DriveMounted"]) {
+            throw "Tệp trạng thái '$stateFile' thiếu cấu trúc ownership. Không ghi đè để tránh mất thông tin tiến trình."
+        }
+        if ($existingState.DriveMounted) {
+            throw "Stack hiện có ghi nhận Drive đã gắn trong '$stateFile'. Vui lòng dừng stack cũ trước."
+        }
+        if ($existingState.Processes) {
             $hasLive = $false
             foreach ($p in $existingState.Processes) {
                 if ($p.PID -and [int]$p.PID -gt 0) {
                     $cim = Get-CimInstance Win32_Process -Filter "ProcessId = $($p.PID)" -ErrorAction SilentlyContinue
-                    if ($cim) {
+                    if ($cim -and (Test-RecordedProcessIdentity -Process $cim -Record $p)) {
                         $hasLive = $true
                         break
                     }
@@ -178,20 +314,22 @@ $stackState = [PSCustomObject]@{
     FastApiPort     = $FastApiPort
     FrontendPort    = $FrontendPort
     ModelMode       = $ModelMode
+    DataDirectory   = $DataDirectory
+    StateFile       = $stateFile
+    DriveStateFile  = $driveStateFile
     DriveMounted    = $false
     DriveMountPoint = $DriveMountPoint
     DriveRemote     = $DriveRemote
     DriveFolderId   = $DriveFolderId
     Processes       = @()
 }
+$faProc = $null
+$sbProc = $null
+$feProc = $null
 
 function Save-StackState {
-    try {
-        $json = $stackState | ConvertTo-Json -Depth 5
-        [System.IO.File]::WriteAllText($stateFile, $json, [System.Text.UTF8Encoding]::new($false))
-    } catch {
-        Write-Warning "Không thể lưu tệp trạng thái: $_"
-    }
+    $json = $stackState | ConvertTo-Json -Depth 5
+    [System.IO.File]::WriteAllText($stateFile, $json, [System.Text.UTF8Encoding]::new($false))
 }
 
 # Lưu trạng thái STARTING ban đầu
@@ -205,11 +343,7 @@ try {
     # 1. Preflight kiểm tra cổng mạng
     # -------------------------------------------------------------------------
     Write-Host "`n[1/7] Kiểm tra sẵn sàng các cổng mạng..." -ForegroundColor Yellow
-    $portsToCheck = @(
-        @{ Port = $FastApiPort; Name = "FastAPI AI Engine" },
-        @{ Port = $SpringPort; Name = "Spring Boot Backend" },
-        @{ Port = $FrontendPort; Name = "Next.js Web Frontend" }
-    )
+    $portsToCheck = Get-PreviewPortsToCheck -ModelMode $ModelMode -SpringPort $SpringPort -FastApiPort $FastApiPort -FrontendPort $FrontendPort
 
     foreach ($p in $portsToCheck) {
         $conn = Get-NetTCPConnection -LocalPort $p.Port -State Listen -ErrorAction SilentlyContinue
@@ -217,7 +351,8 @@ try {
             throw "CỔNG BỊ CHIẾM: Cổng $($p.Port) ($($p.Name)) đang được sử dụng bởi PID $($conn.OwningProcess). Vui lòng dừng tiến trình đó trước khi khởi động bản dùng thử."
         }
     }
-    Write-Host "  -> Tất cả các cổng ($FastApiPort, $SpringPort, $FrontendPort) đều đang trống và sẵn sàng." -ForegroundColor Green
+    $checkedPorts = @($portsToCheck | ForEach-Object { $_.Port }) -join ", "
+    Write-Host "  -> Tất cả các cổng ($checkedPorts) đều đang trống và sẵn sàng." -ForegroundColor Green
 
     # -------------------------------------------------------------------------
     # 2. Phát hiện JDK cho tiến trình (không thay đổi biến môi trường OS)
@@ -278,7 +413,9 @@ try {
     # 4. Thiết lập Secret đồng bộ và chế độ Mô hình AI
     # -------------------------------------------------------------------------
     Write-Host "`n[4/7] Thiết lập cấu hình đồng bộ bảo mật và Mô hình AI..." -ForegroundColor Yellow
-    if (-not $SyncSecret) {
+    if ($ModelMode -eq "off") {
+        $SyncSecret = ""
+    } elseif (-not $SyncSecret) {
         if ($env:FASTAPI_SYNC_SECRET) {
             $SyncSecret = $env:FASTAPI_SYNC_SECRET
         } elseif ($env:CATALOG_SYNC_TOKEN) {
@@ -288,12 +425,22 @@ try {
         }
     }
 
+    $runtimeContract = Get-PreviewRuntimeContract `
+        -ModelMode $ModelMode `
+        -SpringPort $SpringPort `
+        -FastApiPort $FastApiPort `
+        -FrontendPort $FrontendPort `
+        -DataDirectory $DataDirectory `
+        -SyncSecret $SyncSecret
+
     Write-Host "  -> Chế độ phục vụ AI (ModelMode): $ModelMode" -ForegroundColor Cyan
     if ($ModelMode -eq "full") {
         Write-Host "  -> CHÚ Ý: Chế độ 'full' sử dụng mô hình thật Qwen3-4B + Phase23 LoRA trên CUDA/GPU." -ForegroundColor Magenta
         Write-Host "  -> Tuyệt đối không gọi fallback/template là mô hình thật." -ForegroundColor Magenta
-    } else {
+    } elseif ($ModelMode -eq "light") {
         Write-Host "  -> Chế độ 'light' sử dụng semantic search và embedding gọn nhẹ, phù hợp CPU." -ForegroundColor Gray
+    } else {
+        Write-Host "  -> AI tắt; Spring Boot và giao diện vẫn chạy, FastAPI không được khởi động." -ForegroundColor Gray
     }
 
     # -------------------------------------------------------------------------
@@ -302,8 +449,9 @@ try {
     if ($MountDrive) {
         Write-Host "`n[5/7] Gắn kết Google Drive ($DriveRemote) vào điểm gắn $DriveMountPoint..." -ForegroundColor Yellow
         $mountScript = Join-Path $root "scripts\drive\mount_drive.ps1"
-        & powershell -NoProfile -File $mountScript -Execute -Remote $DriveRemote -DriveRootFolderId $DriveFolderId -MountPoint $DriveMountPoint
-        if ($LASTEXITCODE -ne 0) {
+        $mountResultText = (& $mountScript -Execute -Remote $DriveRemote -DriveRootFolderId $DriveFolderId -MountPoint $DriveMountPoint -StateFile $driveStateFile -AsJson | Out-String)
+        $mountResult = $mountResultText | ConvertFrom-Json
+        if (-not $mountResult.Success -or $mountResult.Status -ne "MOUNTED") {
             throw "Gắn kết Google Drive thất bại. Vui lòng kiểm tra lại dịch vụ WinFsp hoặc rclone."
         }
         $stackState.DriveMounted = $true
@@ -330,74 +478,65 @@ try {
     $feLog = Join-Path $logsDir "nextjs.stdout.log"
     $feErr = Join-Path $logsDir "nextjs.stderr.log"
 
-    # 6.1. FastAPI AI Engine
-    Write-Host "  [a] Khởi động FastAPI trên cổng $FastApiPort..." -ForegroundColor Yellow
-    $faEnv = [System.Collections.Generic.Dictionary[string, string]]::new()
-    foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
-        $faEnv[$key] = [System.Environment]::GetEnvironmentVariable($key)
+    if ($runtimeContract.StartFastApi) {
+        # 6.1. FastAPI AI Engine (explicit light/full opt-in only)
+        Write-Host "  [a] Khởi động FastAPI trên cổng $FastApiPort..." -ForegroundColor Yellow
+        $faEnv = [System.Collections.Generic.Dictionary[string, string]]::new()
+        foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
+            $faEnv[$key] = [System.Environment]::GetEnvironmentVariable($key)
+        }
+        $faEnv["PORT"] = [string]$FastApiPort
+        $faEnv["FASTAPI_SYNC_SECRET"] = $SyncSecret
+        $faEnv["CATALOG_SYNC_TOKEN"] = $SyncSecret
+        $faEnv["SERVING_MODE"] = $ModelMode
+        $faEnv["USE_FULL_QWEN3_4B_LORA"] = if ($ModelMode -eq "full") { "true" } else { "false" }
+        $faEnv["PYTHONPATH"] = $fastapiDir
+
+        $pythonExe = (Get-Command python -ErrorAction Stop).Source
+        $faArgs = @("-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", [string]$FastApiPort, "--log-level", "warning")
+        $faProc = Start-ChildServiceProcess -FileName $pythonExe -Arguments $faArgs -WorkingDirectory $fastapiDir -EnvironmentVariables $faEnv -StdOutFile $faLog -StdErrFile $faErr
+
+        $stackState.Processes += @{
+            Name           = "FastAPI"
+            PID            = $faProc.Id
+            StartTime      = $faProc.StartTime.ToString("o")
+            ExecutablePath = $pythonExe
+            Port           = $FastApiPort
+            LogFile        = $faLog
+        }
+        Save-StackState
+        Write-Host "      FastAPI đã spawn với PID $($faProc.Id). Chờ readiness..." -ForegroundColor Gray
+
+        if ($TestInjectFailureAfter -eq "FastApiSpawn") {
+            throw "TEST_INJECTED_FAILURE: Giả lập lỗi có kiểm soát ngay sau khi FastAPI vừa spawn."
+        }
+
+        $faReady = $false
+        $deadline = [DateTime]::UtcNow.AddSeconds(90)
+        while ([DateTime]::UtcNow -lt $deadline) {
+            if ($faProc.HasExited) { throw "FastAPI tiến trình PID $($faProc.Id) đã thoát bất thường với mã $($faProc.ExitCode)." }
+            try {
+                $res = Invoke-WebRequest -Uri "http://127.0.0.1:$FastApiPort/health" -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+                if ($res.StatusCode -eq 200) { $faReady = $true; break }
+            } catch { Start-Sleep -Milliseconds 600 }
+        }
+        if (-not $faReady) { throw "FastAPI không sẵn sàng trên cổng $FastApiPort sau 90 giây." }
+        Write-Host "      FastAPI HEALTHY (200 OK)." -ForegroundColor Green
+    } else {
+        Write-Host "  [a] FastAPI không được khởi động trong ModelMode off." -ForegroundColor Gray
     }
-    $faEnv["PORT"] = [string]$FastApiPort
-    $faEnv["FASTAPI_SYNC_SECRET"] = $SyncSecret
-    $faEnv["CATALOG_SYNC_TOKEN"] = $SyncSecret
-    $faEnv["SERVING_MODE"] = $ModelMode
-    $faEnv["USE_FULL_QWEN3_4B_LORA"] = if ($ModelMode -eq "full") { "true" } else { "false" }
-    $faEnv["PYTHONPATH"] = $fastapiDir
-
-    $pythonExe = (Get-Command python -ErrorAction Stop).Source
-    $faArgs = @("-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", [string]$FastApiPort, "--log-level", "warning")
-
-    $faProc = Start-ChildServiceProcess -FileName $pythonExe -Arguments $faArgs -WorkingDirectory $fastapiDir -EnvironmentVariables $faEnv -StdOutFile $faLog -StdErrFile $faErr
-
-    # Lưu ownership ngay khi tiến trình spawn
-    $stackState.Processes += @{
-        Name           = "FastAPI"
-        PID            = $faProc.Id
-        StartTime      = $faProc.StartTime.ToString("o")
-        ExecutablePath = $pythonExe
-        Port           = $FastApiPort
-        LogFile        = $faLog
-    }
-    Save-StackState
-    Write-Host "      FastAPI đã spawn với PID $($faProc.Id). Chờ readiness..." -ForegroundColor Gray
-
-    # Failure Injection Hook kiểm thử
-    if ($TestInjectFailureAfter -eq "FastApiSpawn") {
-        throw "TEST_INJECTED_FAILURE: Giả lập lỗi có kiểm soát ngay sau khi FastAPI vừa spawn."
-    }
-
-    # Chờ FastAPI sẵn sàng
-    $faReady = $false
-    $deadline = [DateTime]::UtcNow.AddSeconds(90)
-    while ([DateTime]::UtcNow -lt $deadline) {
-        if ($faProc.HasExited) { throw "FastAPI tiến trình PID $($faProc.Id) đã thoát bất thường với mã $($faProc.ExitCode)." }
-        try {
-            $res = Invoke-WebRequest -Uri "http://127.0.0.1:$FastApiPort/health" -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-            if ($res.StatusCode -eq 200) { $faReady = $true; break }
-        } catch { Start-Sleep -Milliseconds 600 }
-    }
-    if (-not $faReady) { throw "FastAPI không sẵn sàng trên cổng $FastApiPort sau 60 giây." }
-    Write-Host "      FastAPI HEALTHY (200 OK)." -ForegroundColor Green
 
     # 6.2. Spring Boot Core Backend
     Write-Host "  [b] Khởi động Spring Boot trên cổng $SpringPort..." -ForegroundColor Yellow
-    $springArgs = @(
-        "-Dserver.address=127.0.0.1",
-        "-Dserver.port=$SpringPort",
-        "-Dspring.profiles.active=dev",
-        "-Dapp.catalog.sync-url=http://127.0.0.1:$FastApiPort/api/index/sync",
-        "-Dapp.media.drive-mount=$DriveMountPoint",
-        "-Dapp.media.drive.mount-path=$DriveMountPoint\",
-        "-Dapp.media.drive-metadata-timeout-ms=60000",
-        "-Dapp.media.drive-read-timeout-ms=60000",
-        "-jar", $jarFile
-    )
+    $springArgs = Get-SpringBootArguments -SpringPort $SpringPort -DriveMountPoint $DriveMountPoint -JarFile $jarFile
 
     $sbEnv = [System.Collections.Generic.Dictionary[string, string]]::new()
     foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
         $sbEnv[$key] = [System.Environment]::GetEnvironmentVariable($key)
     }
-    $sbEnv["CATALOG_SYNC_TOKEN"] = $SyncSecret
-    $sbEnv["FASTAPI_SYNC_SECRET"] = $SyncSecret
+    foreach ($key in $runtimeContract.SpringEnvironment.Keys) {
+        $sbEnv[$key] = $runtimeContract.SpringEnvironment[$key]
+    }
     $sbProc = Start-ChildServiceProcess -FileName $javaBin -Arguments $springArgs -WorkingDirectory $backendDir -EnvironmentVariables $sbEnv -StdOutFile $sbLog -StdErrFile $sbErr
 
     # Lưu ownership ngay khi tiến trình spawn
@@ -436,30 +575,58 @@ try {
     foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
         $feEnv[$key] = [System.Environment]::GetEnvironmentVariable($key)
     }
-    $feEnv["PORT"] = [string]$FrontendPort
-    $feEnv["NEXT_PUBLIC_API_URL"] = "http://127.0.0.1:$SpringPort"
-    $feEnv["NEXT_PUBLIC_SPRINGBOOT_API_URL"] = "http://127.0.0.1:$SpringPort/api"
-    $feEnv["NEXT_PUBLIC_MODEL_API_URL"] = "http://127.0.0.1:$FastApiPort/api/chat"
-
+    foreach ($key in $runtimeContract.FrontendEnvironment.Keys) {
+        $feEnv[$key] = $runtimeContract.FrontendEnvironment[$key]
+    }
     $nodeExe = (Get-Command node -ErrorAction Stop).Source
     $nextBin = Join-Path $frontendDir "node_modules\next\dist\bin\next"
-
-    # Kiểm tra BUILD_ID để quyết định start vs dev
     $buildIdPath = Join-Path $frontendDir ".next\BUILD_ID"
-    $nextSubCmd = if (($SpringPort -eq 8080) -and ($FastApiPort -eq 8000) -and (Test-Path $buildIdPath)) {
-        "start"
-    } else {
-        if (-not (Test-Path $buildIdPath)) {
-            Write-Host "      (Chưa phát hiện BUILD_ID, chạy chế độ 'dev')..." -ForegroundColor Gray
-        } else {
-            Write-Host "      (Cổng tùy biến khác 8080/8000, chạy chế độ 'dev' để nhận biến động)..." -ForegroundColor Gray
+    $standaloneDir = Join-Path $frontendDir ".next\standalone"
+    $standaloneServer = Join-Path $standaloneDir "server.js"
+    $buildEnvironmentFile = Join-Path $frontendDir ".next\preview-build-env.json"
+    $expectedBuildEnvironment = [PSCustomObject]@{
+        ProxyTarget = $feEnv["SPRINGBOOT_INTERNAL_URL"]
+        ApiUrl = $feEnv["NEXT_PUBLIC_API_URL"]
+        SpringBootApiUrl = $feEnv["NEXT_PUBLIC_SPRINGBOOT_API_URL"]
+        ModelApiUrl = $feEnv["NEXT_PUBLIC_MODEL_API_URL"]
+    } | ConvertTo-Json -Compress
+    if (Test-FrontendBuildStale -FrontendDirectory $frontendDir -BuildIdPath $buildIdPath -StandaloneServerPath $standaloneServer -BuildEnvironmentFile $buildEnvironmentFile -ExpectedBuildEnvironment $expectedBuildEnvironment) {
+        Write-Host "      Frontend build chưa có hoặc đã cũ; đang build standalone..." -ForegroundColor Yellow
+        $buildOut = Join-Path $logsDir "next-build.stdout.log"
+        $buildErr = Join-Path $logsDir "next-build.stderr.log"
+        $buildProc = Start-ChildServiceProcess -FileName $nodeExe -Arguments @($nextBin, "build") -WorkingDirectory $frontendDir -EnvironmentVariables $feEnv -StdOutFile $buildOut -StdErrFile $buildErr
+        $stackState.Processes += @{
+            Name = "FrontendBuild"
+            PID = $buildProc.Id
+            StartTime = $buildProc.StartTime.ToString("o")
+            ExecutablePath = $nodeExe
+            Port = $null
+            LogFile = $buildOut
         }
-        "dev"
+        Save-StackState
+        if (-not $buildProc.WaitForExit(300000)) { throw "Next.js standalone build timed out after 300 seconds." }
+        $stackState.Processes = @($stackState.Processes | Where-Object { [int]$_.PID -ne $buildProc.Id })
+        Save-StackState
+        if ($buildProc.ExitCode -ne 0) { throw "Next.js standalone build thất bại với mã thoát $($buildProc.ExitCode)." }
+        [System.IO.File]::WriteAllText($buildEnvironmentFile, $expectedBuildEnvironment, [System.Text.UTF8Encoding]::new($false))
     }
-    Write-Host "      Sử dụng Next.js $nextSubCmd..." -ForegroundColor Gray
+    if (-not (Test-Path -LiteralPath $standaloneServer -PathType Leaf)) { throw "Không tìm thấy frontend standalone server tại '$standaloneServer'." }
 
-    $feArgs = @($nextBin, $nextSubCmd, "-H", "127.0.0.1", "-p", [string]$FrontendPort)
-    $feProc = Start-ChildServiceProcess -FileName $nodeExe -Arguments $feArgs -WorkingDirectory $frontendDir -EnvironmentVariables $feEnv -StdOutFile $feLog -StdErrFile $feErr
+    $sourceStatic = Join-Path $frontendDir ".next\static"
+    $standaloneStatic = Join-Path $standaloneDir ".next\static"
+    New-Item -ItemType Directory -Path $standaloneStatic -Force | Out-Null
+    if (Test-Path -LiteralPath $sourceStatic -PathType Container) {
+        $staticItems = @(Get-ChildItem -LiteralPath $sourceStatic -Force)
+        foreach ($item in $staticItems) { Copy-Item -LiteralPath $item.FullName -Destination $standaloneStatic -Recurse -Force }
+    }
+    $sourcePublic = Join-Path $frontendDir "public"
+    $standalonePublic = Join-Path $standaloneDir "public"
+    if (Test-Path -LiteralPath $sourcePublic -PathType Container) {
+        New-Item -ItemType Directory -Path $standalonePublic -Force | Out-Null
+        foreach ($item in @(Get-ChildItem -LiteralPath $sourcePublic -Force)) { Copy-Item -LiteralPath $item.FullName -Destination $standalonePublic -Recurse -Force }
+    }
+
+    $feProc = Start-ChildServiceProcess -FileName $nodeExe -Arguments @("server.js") -WorkingDirectory $standaloneDir -EnvironmentVariables $feEnv -StdOutFile $feLog -StdErrFile $feErr
 
     # Lưu ownership ngay khi tiến trình spawn
     $stackState.Processes += @{
@@ -495,25 +662,29 @@ try {
     Write-Host "==========================================================================" -ForegroundColor Green
     Write-Host " URL Giao diện Web   : http://localhost:$FrontendPort" -ForegroundColor White
     Write-Host " Core Backend API    : http://localhost:$SpringPort" -ForegroundColor White
-    Write-Host " AI & Sync Engine    : http://localhost:$FastApiPort" -ForegroundColor White
+    if ($runtimeContract.StartFastApi) {
+        Write-Host " AI & Sync Engine    : http://localhost:$FastApiPort ($ModelMode)" -ForegroundColor White
+    } else {
+        Write-Host " AI & Sync Engine    : disabled (ModelMode off; FastAPI không được khởi động)" -ForegroundColor Gray
+    }
     Write-Host " Tài khoản Admin     : admin / password123 (truy cập /admin/import)" -ForegroundColor White
     Write-Host " Tài khoản User      : user / password123 (xem phim, tìm kiếm)" -ForegroundColor White
     Write-Host " Tệp trạng thái      : $stateFile" -ForegroundColor Gray
     Write-Host "`nĐể dừng toàn bộ cụm tiến trình trên an toàn, chạy lệnh:" -ForegroundColor Yellow
-    Write-Host "  powershell -File scripts\stop_preview_stack.ps1" -ForegroundColor Yellow
+    Write-Host "  powershell -NoProfile -File scripts\stop_preview_stack.ps1 -StateFile `"$stateFile`"" -ForegroundColor Yellow
     Write-Host "==========================================================================" -ForegroundColor Green
 
     if (-not $Background) {
         Write-Host "`nĐang giữ phiên làm việc... Nhấn Ctrl+C để dừng." -ForegroundColor Gray
         try {
-            while (-not $faProc.HasExited -and -not $sbProc.HasExited -and -not $feProc.HasExited) {
+            while ((-not $runtimeContract.StartFastApi -or -not $faProc.HasExited) -and -not $sbProc.HasExited -and -not $feProc.HasExited) {
                 Start-Sleep -Seconds 2
             }
         } finally {
             Write-Host "`nPhát hiện yêu cầu dừng. Đang dọn dẹp các tiến trình..." -ForegroundColor Yellow
             $stopScript = Join-Path $PSScriptRoot "stop_preview_stack.ps1"
             if (Test-Path $stopScript) {
-                & powershell -NoProfile -File $stopScript
+                & powershell -NoProfile -File $stopScript -StateFile $stateFile
             }
         }
     }
@@ -532,17 +703,13 @@ catch {
             $pInfo = $stackState.Processes[$i]
             $procId = [int]$pInfo.PID
             $pName = [string]$pInfo.Name
-            $pExe = [string]$pInfo.ExecutablePath
             $pStartStr = [string]$pInfo.StartTime
 
             Write-Host "  -> Đang dọn dẹp $pName (PID $procId)..." -ForegroundColor Gray
             if ($procId -gt 0 -and $pStartStr) {
-                $pStart = [DateTime]::Parse($pStartStr)
                 $cim = Get-CimInstance Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue
                 if ($cim) {
-                    $liveExe = [string]$cim.ExecutablePath
-                    $delta = [Math]::Abs(($cim.CreationDate.ToUniversalTime() - $pStart.ToUniversalTime()).TotalSeconds)
-                    if ($liveExe -and ([System.IO.Path]::GetFullPath($liveExe).ToLowerInvariant() -eq [System.IO.Path]::GetFullPath($pExe).ToLowerInvariant()) -and ($delta -le 3.0)) {
+                    if (Test-RecordedProcessIdentity -Process $cim -Record $pInfo) {
                         try {
                             Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
                         } catch {}
@@ -577,11 +744,16 @@ catch {
         $stopDriveScript = Join-Path $root "scripts\drive\stop_drive.ps1"
         if (Test-Path $stopDriveScript) {
             try {
-                & powershell -NoProfile -File $stopDriveScript
+                $driveResultText = (& powershell -NoProfile -File $stopDriveScript -StateFile $driveStateFile -AsJson | Out-String)
+                $driveResult = $driveResultText | ConvertFrom-Json
+                if (-not $driveResult.Success) { throw $driveResult.Message }
             } catch {
                 Write-Warning "Lỗi khi chạy stop_drive.ps1: $_"
                 $cleanupFailed = $true
             }
+        } else {
+            Write-Warning "Không tìm thấy stop_drive.ps1 để tháo gắn drive thuộc stack này."
+            $cleanupFailed = $true
         }
     }
 
@@ -590,7 +762,7 @@ catch {
         Write-Host "  -> Dọn dẹp hoàn tất: mọi tài nguyên tạo bởi lượt chạy này đã được giải phóng." -ForegroundColor Green
     } else {
         $stackState.Status = "FAILED_NEEDS_CLEANUP"
-        Save-StackState
+        try { Save-StackState } catch { Write-Warning "Không thể lưu ownership state sau lỗi dọn dẹp: $_" }
         Write-Warning "  -> Một số tài nguyên chưa dừng được hẳn. Giữ tệp trạng thái tại: $stateFile để người dùng kiểm tra."
     }
 

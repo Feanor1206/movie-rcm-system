@@ -48,7 +48,7 @@ export class CatalogApiError extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = 7000;
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
+const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
 
 /**
  * Normalizes a raw backend movie response into the frontend Movie type.
@@ -428,6 +428,7 @@ export interface CatalogSeriesSummary {
   releaseYearEnd?: number;
   releaseStatus?: string;
   genreIds?: string;
+  genreIdsJson?: string;
   keywords?: string;
   themes?: string;
   creators?: string;
@@ -439,7 +440,7 @@ export interface CatalogSeason {
   id: string;
   seriesId: string;
   number?: number;
-  seasonNumber: number;
+  seasonNumber?: number;
   title: string;
   synopsis?: string;
   episodeCount?: number;
@@ -450,7 +451,7 @@ export interface CatalogEpisode {
   seriesId: string;
   seasonId?: string;
   number?: number;
-  episodeNumber: number;
+  episodeNumber?: number;
   title: string;
   synopsis?: string;
   airDate?: string;
@@ -527,7 +528,7 @@ export interface CatalogEpisodeResponse {
 
 export interface CatalogSearchResult {
   id: string;
-  type: 'series' | 'episode' | 'segment' | 'scene' | string;
+  type: 'series' | 'episode' | 'segment' | 'scene';
   title: string;
   parentTitle?: string;
   seriesId?: string;
@@ -536,6 +537,7 @@ export interface CatalogSearchResult {
   startMs?: number;
   endMs?: number;
   snippet?: string;
+  releaseYearStart?: number;
 }
 
 function getAuthHeader(): Record<string, string> {
@@ -669,19 +671,50 @@ export async function retryCatalogSnapshot(
  */
 export async function getCatalogSeriesList(
   baseUrl = SPRINGBOOT_API,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<CatalogSeriesSummary[]> {
   const url = `${baseUrl}/catalog/series`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...getAuthHeader(),
-    },
-    signal,
-  });
-  if (!res.ok) return [];
-  return await res.json();
+  return executeWithLifecycle(async (requestSignal) => {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json', ...getAuthHeader() },
+      signal: requestSignal,
+    });
+    if (!res.ok) throw new CatalogApiError(`Lỗi tải danh mục bộ hoạt hình (${res.status})`, res.status);
+    const body = await res.json();
+    if (!Array.isArray(body)) throw new CatalogApiError('Danh mục bộ hoạt hình không hợp lệ (thiếu mảng dữ liệu)', 502, body);
+    return body.map(normalizeCatalogSeriesSummary);
+  }, { signal, timeoutMs });
+}
+
+function normalizeCatalogSeriesSummary(raw: any): CatalogSeriesSummary {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new CatalogApiError('Bộ hoạt hình từ máy chủ không hợp lệ (không phải object)', 502, raw);
+  }
+  if (typeof raw.id !== 'string' || !raw.id.trim()) {
+    throw new CatalogApiError('Bộ hoạt hình thiếu ID bắt buộc', 502, raw);
+  }
+  if (typeof raw.title !== 'string' || !raw.title.trim()) {
+    throw new CatalogApiError(`Bộ hoạt hình [${raw.id.trim()}] thiếu tiêu đề bắt buộc`, 502, raw);
+  }
+  for (const key of ['releaseYearStart', 'releaseYearEnd'] as const) {
+    if (raw[key] != null && (typeof raw[key] !== 'number' || !Number.isFinite(raw[key]))) {
+      throw new CatalogApiError(`Bộ hoạt hình [${raw.id.trim()}] có ${key} không hợp lệ`, 502, raw);
+    }
+  }
+  return {
+    id: raw.id.trim(),
+    title: raw.title.trim(),
+    originalTitle: typeof raw.originalTitle === 'string' ? raw.originalTitle : undefined,
+    synopsis: typeof raw.synopsis === 'string' ? raw.synopsis : undefined,
+    primaryLanguage: typeof raw.primaryLanguage === 'string' ? raw.primaryLanguage : undefined,
+    releaseYearStart: raw.releaseYearStart ?? undefined,
+    releaseYearEnd: raw.releaseYearEnd ?? undefined,
+    releaseStatus: typeof raw.releaseStatus === 'string' ? raw.releaseStatus : undefined,
+    genreIds: typeof raw.genreIds === 'string' ? raw.genreIds : undefined,
+    genreIdsJson: typeof raw.genreIdsJson === 'string' ? raw.genreIdsJson : undefined,
+  };
 }
 
 /**
@@ -738,19 +771,35 @@ export async function getCatalogEpisodeDetail(
 export async function searchAnimationCatalog(
   q: string,
   baseUrl = SPRINGBOOT_API,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<CatalogSearchResult[]> {
+  if (!q.trim()) return [];
   const url = `${baseUrl}/catalog/search?q=${encodeURIComponent(q.trim())}`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...getAuthHeader(),
-    },
-    signal,
-  });
-  if (!res.ok) return [];
-  return await res.json();
+  return executeWithLifecycle(async (requestSignal) => {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json', ...getAuthHeader() },
+      signal: requestSignal,
+    });
+    if (!res.ok) throw new CatalogApiError(`Lỗi tìm kiếm danh mục hoạt hình (${res.status})`, res.status);
+    const body = await res.json();
+    if (!Array.isArray(body)) throw new CatalogApiError('Kết quả tìm kiếm danh mục không hợp lệ (thiếu mảng dữ liệu)', 502, body);
+    const validTypes = new Set(['series', 'episode', 'segment', 'scene']);
+    return body.map((item: any) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)
+          || typeof item.id !== 'string' || !item.id.trim()
+          || typeof item.title !== 'string' || !item.title.trim()
+          || !validTypes.has(item.type)) {
+        throw new CatalogApiError('Kết quả tìm kiếm thiếu ID, tiêu đề hoặc loại nội dung hợp lệ', 502, item);
+      }
+      return {
+        ...item,
+        id: item.id.trim(),
+        title: item.title.trim(),
+      } as CatalogSearchResult;
+    });
+  }, { signal, timeoutMs });
 }
 
 

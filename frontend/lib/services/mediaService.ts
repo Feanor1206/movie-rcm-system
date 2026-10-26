@@ -18,7 +18,7 @@ export interface MediaDescriptor {
 }
 
 const DEFAULT_TIMEOUT_MS = 6000;
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
+const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
 
 /**
  * Resolves a stream URL returned by descriptor into a full URL if relative.

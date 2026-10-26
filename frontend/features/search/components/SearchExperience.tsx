@@ -1,414 +1,163 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import {
-  Search,
-  X,
-  SlidersHorizontal,
-  RotateCcw,
-  AlertCircle,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-  Sparkles,
-  Film,
-  Play,
-} from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Film, RefreshCw, Search, X } from 'lucide-react';
 import Link from 'next/link';
-import { MovieCard } from '@/features/movies/components/MovieCard';
 import {
-  browseCatalog,
+  getCatalogSeriesList,
   searchAnimationCatalog,
-  type PageResponse,
   type CatalogSearchResult,
 } from '@/lib/services/catalogService';
-import type { Movie } from '@/types/movie';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
-import { useWatchlist } from '@/lib/context/WatchlistContext';
 
-const DISCOVERY_GENRES = ['Adventure', 'Family', 'Fantasy', 'Sci-Fi', 'Drama', 'Romance', 'Comedy'];
-
-type SortOption = 'rating' | 'year' | 'title';
-
-type DataSnapshot = {
-  key: string;
+type SearchSnapshot = {
   query: string;
-  genres: string[];
-  yearMin?: number;
-  yearMax?: number;
-  sort: string;
-  direction: string;
-  page: number;
-  size: number;
-  data: PageResponse<Movie>;
+  results: CatalogSearchResult[];
 };
+
+const PAGE_SIZE_DEFAULT = 12;
+const LEGACY_FILTER_KEYS = ['genre', 'genres', 'yearMin', 'yearMax', 'sort', 'direction'];
+
+function parseNonNegativeInteger(value: string | null, fallback: number): number {
+  if (!value || !/^\d+$/.test(value)) return fallback;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function toSeriesResult(series: Awaited<ReturnType<typeof getCatalogSeriesList>>[number]): CatalogSearchResult {
+  return {
+    id: series.id,
+    type: 'series',
+    title: series.title,
+    seriesId: series.id,
+    snippet: series.synopsis,
+    releaseYearStart: series.releaseYearStart,
+  };
+}
+
+function typeLabel(type: CatalogSearchResult['type']): string {
+  return {
+    series: 'Bộ hoạt hình',
+    episode: 'Tập phim',
+    segment: 'Tiểu phẩm',
+    scene: 'Phân cảnh',
+  }[type];
+}
 
 export function SearchExperience() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const { openChat } = useWatchlist();
-
-  // 1. Read URL parameters as Single Source of Truth
   const urlQuery = (searchParams.get('q') || searchParams.get('query') || '').trim();
-  const urlGenre = (searchParams.get('genre') || '').trim();
-  const urlGenresParam = (searchParams.get('genres') || '').trim();
-  const urlSort = searchParams.get('sort') || 'rating';
-  const urlDirection = searchParams.get('direction') || (urlSort === 'title' ? 'asc' : 'desc');
+  const page = parseNonNegativeInteger(searchParams.get('page'), 0);
+  const requestedSize = parseNonNegativeInteger(searchParams.get('size'), PAGE_SIZE_DEFAULT);
+  const pageSize = requestedSize >= 1 && requestedSize <= 48 ? requestedSize : PAGE_SIZE_DEFAULT;
+  const hasLegacyFilters = LEGACY_FILTER_KEYS.some((key) => searchParams.has(key));
 
-  // Strict integer helper: rejects non-numeric or fractional strings like '1.5' or '2junk'
-  const parseStrictInteger = (val: string | null): number | undefined => {
-    if (!val || typeof val !== 'string') return undefined;
-    const trimmed = val.trim();
-    if (!/^\d+$/.test(trimmed)) return undefined;
-    const n = Number(trimmed);
-    return Number.isSafeInteger(n) ? n : undefined;
-  };
-
-  // Page validation: strict non-negative integer >= 0
-  const urlPageRaw = parseStrictInteger(searchParams.get('page'));
-  const validatedPage = urlPageRaw !== undefined && urlPageRaw >= 0 ? urlPageRaw : 0;
-
-  // Size validation: strict integer 1..100 (default 12)
-  const urlSizeRaw = parseStrictInteger(searchParams.get('size'));
-  const validatedSize = urlSizeRaw !== undefined && urlSizeRaw >= 1 && urlSizeRaw <= 100 ? urlSizeRaw : 12;
-
-  // Year bounds validation: strict integers 1888..2100
-  const parsedYearMin = parseStrictInteger(searchParams.get('yearMin'));
-  const parsedYearMax = parseStrictInteger(searchParams.get('yearMax'));
-  const validatedYearMin =
-    parsedYearMin !== undefined && parsedYearMin >= 1888 && parsedYearMin <= 2100
-      ? parsedYearMin
-      : undefined;
-  const validatedYearMax =
-    parsedYearMax !== undefined && parsedYearMax >= 1888 && parsedYearMax <= 2100
-      ? parsedYearMax
-      : undefined;
-
-  // Genres deduplication (supports ?genre=... and ?genres=...)
-  const selectedGenres = useMemo(() => {
-    const list: string[] = [];
-    if (urlGenre) list.push(urlGenre);
-    if (urlGenresParam) {
-      urlGenresParam.split(',').forEach((g) => {
-        const trimmed = g.trim();
-        if (trimmed && !list.includes(trimmed)) list.push(trimmed);
-      });
-    }
-    return list;
-  }, [urlGenre, urlGenresParam]);
-
-  const validatedSort: SortOption =
-    urlSort === 'year' || urlSort === 'title' ? urlSort : 'rating';
-  const validatedDirection: 'asc' | 'desc' =
-    urlDirection === 'asc' || urlDirection === 'desc'
-      ? urlDirection
-      : validatedSort === 'title'
-      ? 'asc'
-      : 'desc';
-
-  // 2. Canonical Params Key for Data Snapshot (S2)
-  const currentParamsKey = useMemo(() => {
-    return JSON.stringify({
-      q: urlQuery,
-      genres: [...selectedGenres].sort(),
-      yearMin: validatedYearMin,
-      yearMax: validatedYearMax,
-      sort: validatedSort,
-      direction: validatedDirection,
-      page: validatedPage,
-      size: validatedSize,
-    });
-  }, [urlQuery, selectedGenres, validatedYearMin, validatedYearMax, validatedSort, validatedDirection, validatedPage, validatedSize]);
-
-  // 3. S1: Local input draft with pending navigation tracking
   const [inputValue, setInputValue] = useState(urlQuery);
-  const lastPushedQueryRef = useRef<string | null>(null);
-
-  // S1 Fix: Synchronize draft with URL only on external navigation or when not actively advanced
-  useEffect(() => {
-    if (lastPushedQueryRef.current !== null && urlQuery === lastPushedQueryRef.current) {
-      // This URL update is the acknowledgment of our own push!
-      // If user has already typed ahead (e.g. C while B was in-flight), DO NOT overwrite draft!
-      lastPushedQueryRef.current = null;
-      return;
-    }
-    // External navigation (back/forward button, deep link): sync draft
-    setInputValue(urlQuery);
-  }, [urlQuery]);
-
-  // 4. URL Updater helper (S3: preserves yearMin/yearMax/size)
-  const updateUrl = useCallback(
-    (updates: {
-      q?: string | null;
-      genres?: string[] | null;
-      yearMin?: number | null;
-      yearMax?: number | null;
-      sort?: string;
-      direction?: string;
-      page?: number;
-      size?: number;
-    }) => {
-      const params = new URLSearchParams(searchParams.toString());
-
-      if (updates.q !== undefined) {
-        params.delete('query');
-        if (updates.q && updates.q.trim()) {
-          const qVal = updates.q.trim();
-          params.set('q', qVal);
-          lastPushedQueryRef.current = qVal;
-        } else {
-          params.delete('q');
-          lastPushedQueryRef.current = '';
-        }
-      }
-
-      if (updates.genres !== undefined) {
-        params.delete('genre');
-        if (updates.genres && updates.genres.length > 0) {
-          params.set('genres', updates.genres.join(','));
-        } else {
-          params.delete('genres');
-        }
-      }
-
-      if (updates.yearMin !== undefined) {
-        if (typeof updates.yearMin === 'number') {
-          params.set('yearMin', String(updates.yearMin));
-        } else {
-          params.delete('yearMin');
-        }
-      }
-
-      if (updates.yearMax !== undefined) {
-        if (typeof updates.yearMax === 'number') {
-          params.set('yearMax', String(updates.yearMax));
-        } else {
-          params.delete('yearMax');
-        }
-      }
-
-      if (updates.sort !== undefined) {
-        params.set('sort', updates.sort);
-      }
-
-      if (updates.direction !== undefined) {
-        params.set('direction', updates.direction);
-      }
-
-      if (updates.size !== undefined) {
-        if (typeof updates.size === 'number' && updates.size !== 12) {
-          params.set('size', String(updates.size));
-        } else {
-          params.delete('size');
-        }
-      }
-
-      if (updates.page !== undefined) {
-        if (updates.page > 0) {
-          params.set('page', String(updates.page));
-        } else {
-          params.delete('page');
-        }
-      }
-
-      const queryString = params.toString();
-      const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
-      router.push(newUrl, { scroll: false });
-    },
-    [searchParams, pathname, router]
-  );
-
-  // Debounce input value changes to URL
-  useEffect(() => {
-    if (inputValue.trim() === urlQuery.trim()) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      updateUrl({ q: inputValue.trim(), page: 0 });
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [inputValue, urlQuery, updateUrl]);
-
-  // 5. Data Fetching States with Query Snapshot & Generation Guard
-  const [dataSnapshot, setDataSnapshot] = useState<DataSnapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<SearchSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
-  const [animationResults, setAnimationResults] = useState<CatalogSearchResult[]>([]);
-
+  const lastPushedQueryRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Fetch from animation catalog when query is present
   useEffect(() => {
-    if (!urlQuery.trim()) {
-      setAnimationResults([]);
+    if (lastPushedQueryRef.current !== null && urlQuery === lastPushedQueryRef.current) {
+      lastPushedQueryRef.current = null;
       return;
     }
-    let active = true;
-    searchAnimationCatalog(urlQuery)
-      .then((res) => {
-        if (active) setAnimationResults(res);
-      })
-      .catch(() => {
-        if (active) setAnimationResults([]);
-      });
-    return () => {
-      active = false;
-    };
+    setInputValue(urlQuery);
   }, [urlQuery]);
 
-  // S2: Data is only considered CURRENT if snapshot key matches current params key
-  const isCurrentData = dataSnapshot !== null && dataSnapshot.key === currentParamsKey;
+  const updateUrl = (updates: { q?: string; page?: number }, clearLegacy = false) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (updates.q !== undefined) {
+      params.delete('query');
+      if (updates.q.trim()) {
+        params.set('q', updates.q.trim());
+        lastPushedQueryRef.current = updates.q.trim();
+      } else {
+        params.delete('q');
+        lastPushedQueryRef.current = '';
+      }
+    }
+    if (updates.page !== undefined) {
+      if (updates.page > 0) params.set('page', String(updates.page));
+      else params.delete('page');
+    }
+    if (clearLegacy) LEGACY_FILTER_KEYS.forEach((key) => params.delete(key));
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+  };
 
-  // Data fetching effect
   useEffect(() => {
-    const currentRequestId = ++requestIdRef.current;
+    if (inputValue.trim() === urlQuery) return;
+    const timer = setTimeout(() => updateUrl({ q: inputValue, page: 0 }), 350);
+    return () => clearTimeout(timer);
+  }, [inputValue, urlQuery, searchParams, pathname, router]);
 
-    // Check yearMin > yearMax invalid range
-    if (
-      typeof validatedYearMin === 'number' &&
-      typeof validatedYearMax === 'number' &&
-      validatedYearMin > validatedYearMax
-    ) {
-      setError(`Khoảng năm không hợp lệ: năm bắt đầu (${validatedYearMin}) không được lớn hơn năm kết thúc (${validatedYearMax})`);
-      setLoading(false);
-      return;
-    }
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
+  useEffect(() => {
+    const requestId = ++requestIdRef.current;
     const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     setLoading(true);
     setError(null);
+    const request = urlQuery
+      ? searchAnimationCatalog(urlQuery, undefined, controller.signal)
+      : getCatalogSeriesList(undefined, controller.signal).then((items) => items.map(toSeriesResult));
 
-    browseCatalog({
-      query: urlQuery,
-      genres: selectedGenres,
-      animationOnly: true, // Always constrained to Animation
-      yearMin: validatedYearMin,
-      yearMax: validatedYearMax,
-      sort: validatedSort,
-      direction: validatedDirection,
-      page: validatedPage,
-      size: validatedSize,
-      signal: controller.signal,
-    })
-      .then((response) => {
-        if (currentRequestId === requestIdRef.current) {
-          setDataSnapshot({
-            key: currentParamsKey,
-            query: urlQuery,
-            genres: selectedGenres,
-            yearMin: validatedYearMin,
-            yearMax: validatedYearMax,
-            sort: validatedSort,
-            direction: validatedDirection,
-            page: validatedPage,
-            size: validatedSize,
-            data: response,
-          });
-          setLoading(false);
-        }
-      })
-      .catch((err: any) => {
-        if (currentRequestId !== requestIdRef.current) {
-          return;
-        }
-        if (err?.isCanceled || err?.name === 'AbortError') {
-          return; // Silent caller cancellation
-        }
-        setError(err?.message || 'Không thể kết nối đến máy chủ danh mục phim');
-        setLoading(false);
-      });
+    request.then((results) => {
+      if (controller.signal.aborted || requestId !== requestIdRef.current) return;
+      setSnapshot({ query: urlQuery, results });
+      setLoading(false);
+    }).catch((err: any) => {
+      if (controller.signal.aborted || requestId !== requestIdRef.current || err?.name === 'AbortError' || err?.isCanceled) return;
+      setError(err?.message || 'Không thể tải catalog hoạt hình.');
+      setLoading(false);
+    });
 
-    return () => {
-      controller.abort();
-    };
-  }, [
-    currentParamsKey,
-    urlQuery,
-    selectedGenres,
-    validatedYearMin,
-    validatedYearMax,
-    validatedSort,
-    validatedDirection,
-    validatedPage,
-    validatedSize,
-    retryTrigger,
-  ]);
+    return () => controller.abort();
+  }, [urlQuery, retryTrigger]);
 
-  const toggleGenre = (genre: string) => {
-    const newGenres = selectedGenres.includes(genre)
-      ? selectedGenres.filter((g) => g !== genre)
-      : [...selectedGenres, genre];
-    updateUrl({ genres: newGenres, page: 0 });
-  };
+  const isCurrentSnapshot = snapshot?.query === urlQuery;
+  const currentResults = isCurrentSnapshot ? snapshot.results : [];
+  const totalPages = Math.max(1, Math.ceil(currentResults.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const visibleResults = currentResults.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
-  const handleSortChange = (newSort: SortOption) => {
-    const newDir = newSort === 'title' ? 'asc' : 'desc';
-    updateUrl({ sort: newSort, direction: newDir, page: 0 });
-  };
+  useEffect(() => {
+    if (isCurrentSnapshot && page !== safePage) updateUrl({ page: safePage });
+  }, [isCurrentSnapshot, page, safePage, searchParams, pathname, router]);
 
-  const clearAllFilters = () => {
-    lastPushedQueryRef.current = '';
+  const clearQuery = () => {
     setInputValue('');
-    router.push(pathname, { scroll: false });
+    updateUrl({ q: '', page: 0 });
   };
-
-  const handlePageChange = (newPage: number) => {
-    updateUrl({ page: newPage });
-  };
-
-  const activeFilterCount =
-    (urlQuery ? 1 : 0) +
-    selectedGenres.length +
-    (validatedYearMin !== undefined ? 1 : 0) +
-    (validatedYearMax !== undefined ? 1 : 0) +
-    (validatedSize !== 12 ? 1 : 0);
 
   return (
     <main className="page-shell min-h-[75vh] py-8 sm:py-12">
-      {/* Title */}
-      <div>
-        <h1 className="comic-heading text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-          Tìm một câu chuyện.
-        </h1>
-        <p className="mt-1.5 text-sm text-muted">
-          Một cái tên, một nhân vật, hay một tình tiết bạn còn nhớ.
-        </p>
-      </div>
+      <header>
+        <h1 className="comic-heading text-3xl font-bold tracking-tight text-ink sm:text-4xl">Tìm một câu chuyện.</h1>
+        <p className="mt-1.5 text-sm text-muted">Tìm bộ, tập, tiểu phẩm hoặc phân cảnh trong catalog hoạt hình.</p>
+      </header>
 
-      {/* Search Input Bar */}
       <div className="mt-6">
         <div className="relative flex max-w-2xl items-center border-2 border-ink bg-surface px-3.5 py-3 shadow-brand-sm focus-within:bg-mint/30">
-          <Search className="text-muted shrink-0" size={18} />
+          <Search className="shrink-0 text-muted" size={18} />
           <input
             data-testid="search-query-input"
             autoFocus
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Tìm theo tên phim hoặc từ khóa cốt truyện..."
+            onChange={(event) => setInputValue(event.target.value)}
+            placeholder="Tên bộ, tập hoặc tình tiết…"
             className="w-full bg-transparent px-3 text-sm text-ink placeholder:text-muted focus:outline-none"
           />
           {inputValue && (
             <button
-              onClick={() => {
-                lastPushedQueryRef.current = '';
-                setInputValue('');
-                updateUrl({ q: '', page: 0 });
-              }}
-              className="rounded p-1 text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer"
+              onClick={clearQuery}
+              className="cursor-pointer rounded p-1 text-muted hover:bg-surface-elevated hover:text-ink"
               aria-label="Xóa từ khóa"
             >
               <X size={15} />
@@ -417,267 +166,71 @@ export function SearchExperience() {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="mt-5 flex flex-col gap-3 rounded-lg border border-surface-border bg-surface p-4">
-        {/* Genre Chips */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Lọc theo thể loại phụ hoạt hình:
-            </span>
-            {activeFilterCount > 0 && (
-              <button
-                onClick={clearAllFilters}
-                className="flex items-center gap-1 text-xs text-brand hover:underline cursor-pointer"
-              >
-                <RotateCcw size={12} /> Đặt lại bộ lọc ({activeFilterCount})
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {DISCOVERY_GENRES.map((genre) => {
-              const selected = selectedGenres.includes(genre);
-              return (
-                <button
-                  key={genre}
-                  onClick={() => toggleGenre(genre)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                    selected
-                      ? 'bg-brand text-zinc-950 font-bold shadow-brand-sm'
-                      : 'border border-surface-border bg-surface-muted text-muted hover:border-ink hover:text-ink'
-                  }`}
-                >
-                  {genre} {selected && '✓'}
-                </button>
-              );
-            })}
-          </div>
+      {hasLegacyFilters && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-950/10 p-3 text-xs text-muted">
+          <span>Bộ lọc phim cũ không áp dụng cho catalog bộ và tập.</span>
+          <button type="button" onClick={() => updateUrl({}, true)} className="btn-secondary text-xs">Xóa bộ lọc cũ</button>
         </div>
+      )}
 
-        {/* Year & Size Active Summary (S3) */}
-        {(validatedYearMin !== undefined || validatedYearMax !== undefined || validatedSize !== 12) && (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-850/60 text-xs text-muted">
-            <span className="text-muted flex items-center gap-1">
-              <Calendar size={13} /> Bộ lọc nâng cao:
-            </span>
-            {validatedYearMin !== undefined && (
-              <span className="rounded bg-surface-elevated px-2 py-0.5 text-[11px] text-muted">
-                Từ năm: {validatedYearMin}
-              </span>
-            )}
-            {validatedYearMax !== undefined && (
-              <span className="rounded bg-surface-elevated px-2 py-0.5 text-[11px] text-muted">
-                Đến năm: {validatedYearMax}
-              </span>
-            )}
-            {validatedSize !== 12 && (
-              <span className="rounded bg-surface-elevated px-2 py-0.5 text-[11px] text-muted">
-                Cỡ trang: {validatedSize}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Sort & Stats Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-850 text-xs text-muted">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal size={14} />
-            <span>Sắp xếp theo:</span>
-            <div className="flex items-center gap-1 ml-1">
-              {[
-                { id: 'rating', label: 'Điểm cao nhất' },
-                { id: 'year', label: 'Năm mới nhất' },
-                { id: 'title', label: 'Tên (A-Z)' },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => handleSortChange(opt.id as SortOption)}
-                  className={`rounded px-2.5 py-1 transition-colors cursor-pointer ${
-                    validatedSort === opt.id
-                      ? 'bg-surface-elevated text-ink font-bold'
-                      : 'hover:text-ink'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {loading && dataSnapshot && (
-              <span className="flex items-center gap-1 text-[11px] text-brand animate-pulse">
-                <RefreshCw size={11} className="animate-spin" /> Đang cập nhật...
-              </span>
-            )}
-            <span>
-              {loading && !isCurrentData
-                ? 'Đang tải dữ liệu...'
-                : isCurrentData
-                ? `Tìm thấy ${dataSnapshot.data.totalElements} phim hoạt hình`
-                : dataSnapshot
-                ? `Kết quả trước: ${dataSnapshot.data.totalElements} phim`
-                : ''}
-            </span>
-          </div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-y border-surface-border py-3 text-xs text-muted">
+        <div className="flex items-center gap-2"><Film size={14} /><span>{urlQuery ? `Kết quả cho “${urlQuery}”` : 'Các bộ hoạt hình trong catalog'}</span></div>
+        <div className="flex items-center gap-2">
+          {loading && snapshot && <span className="flex items-center gap-1 text-brand"><RefreshCw size={11} className="animate-spin" />Đang cập nhật…</span>}
+          {isCurrentSnapshot && !loading && <span>{currentResults.length} kết quả</span>}
         </div>
       </div>
 
-      {/* Main Results Section */}
-      <section className="mt-8">
-        {/* Animation Catalog v1 Results Section */}
-        {animationResults.length > 0 && (
-          <div className="mb-8 border-2 border-ink bg-surface p-4 sm:p-5">
-            <div className="flex items-center justify-between border-b border-surface-border pb-3">
-              <div className="flex items-center gap-2">
-                <Film size={16} className="text-brand-dark" />
-                <h3 className="text-sm font-bold text-ink">
-                  Những câu chuyện tìm thấy ({animationResults.length})
-                </h3>
-              </div>
-              <span className="hidden text-xs text-muted sm:block">Bộ phim, tập phim và những tiểu phẩm</span>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {animationResults.map((item) => {
-                const targetUrl = buildMediaItemHref(item);
-                return (
-                  <Link
-                    key={`${item.type}_${item.id}`}
-                    href={targetUrl}
-                    data-testid="search-result-card"
-                    data-result-id={item.id}
-                    data-result-type={item.type}
-                    className="comic-card flex flex-col justify-between p-4 transition-colors hover:bg-mint"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="bg-mint px-1.5 py-0.5 text-[10px] font-bold text-ink border border-ink/30">
-                          {({ series: 'Bộ phim', episode: 'Tập phim', segment: 'Tiểu phẩm', scene: 'Phân cảnh' } as Record<string, string>)[item.type] || 'Câu chuyện'}
-                        </span>
-                        {item.startMs !== undefined && item.startMs !== null && (
-                          <span className="font-mono text-[10px] text-muted">
-                            {Math.floor(item.startMs / 60000)}:
-                            {Math.floor((item.startMs % 60000) / 1000).toString().padStart(2, '0')}
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="comic-heading mt-2 text-base font-bold text-ink line-clamp-2">{item.title}</h4>
-                      {item.parentTitle && item.parentTitle !== item.seriesId && (
-                        <p className="text-[11px] text-muted italic line-clamp-1">{item.parentTitle}</p>
-                      )}
-                      {item.snippet && (
-                        <p className="mt-1.5 text-xs leading-relaxed text-muted line-clamp-2">{item.snippet}</p>
-                      )}
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-end text-xs font-semibold text-brand-dark">
-                      <span>Xem chi tiết →</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Error State */}
+      <section className="mt-6" aria-live="polite">
         {error ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-red-500/30 bg-red-950/20 px-6 py-12 text-center">
-            <div className="grid h-12 w-12 place-items-center rounded bg-red-900/40 text-red-400 mb-3">
-              <AlertCircle size={22} />
-            </div>
-            <h3 className="text-base font-bold text-ink">Không thể nạp danh mục phim</h3>
-            <p className="mt-1 max-w-md text-xs sm:text-sm text-muted">{error}</p>
-            <div className="mt-5 flex gap-3">
-              <button
-                onClick={() => setRetryTrigger((c) => c + 1)}
-                className="btn-primary flex items-center gap-1.5 text-xs"
-              >
-                <RefreshCw size={12} /> Thử kết nối lại
-              </button>
-              <button onClick={clearAllFilters} className="btn-secondary text-xs">
-                Xóa bộ lọc
-              </button>
-            </div>
+          <div role="alert" className="flex flex-col items-center rounded-lg border border-red-500/30 bg-red-950/10 px-6 py-12 text-center">
+            <AlertCircle size={24} className="text-red-400" />
+            <h2 className="mt-3 font-bold text-ink">Không thể tải catalog</h2>
+            <p className="mt-1 max-w-md text-sm text-muted">{error}</p>
+            <button type="button" onClick={() => setRetryTrigger((value) => value + 1)} className="btn-primary mt-5 flex items-center gap-2 text-xs">
+              <RefreshCw size={13} /> Thử lại
+            </button>
           </div>
-        ) : loading && !isCurrentData ? (
-          /* S2: Loading Skeleton State while new query is in-flight */
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6">
-            {Array.from({ length: validatedSize }).map((_, i) => (
-              <div
-                key={i}
-                className="overflow-hidden rounded-lg border border-surface-border bg-surface animate-pulse"
-              >
-                <div className="aspect-[2/3] w-full bg-surface-elevated" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 w-3/4 rounded bg-surface-elevated" />
-                  <div className="h-3 w-1/2 rounded bg-surface-elevated" />
-                </div>
-              </div>
-            ))}
+        ) : loading && !isCurrentSnapshot ? (
+          <div data-testid="catalog-skeleton" role="status" className="rounded-lg border border-surface-border bg-surface p-8 text-center text-sm text-muted">Đang tải catalog…</div>
+        ) : isCurrentSnapshot && currentResults.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-surface-border bg-surface px-6 py-16 text-center">
+            <Search size={22} className="mx-auto text-muted" />
+            <h2 className="mt-3 font-bold text-ink">Không tìm thấy câu chuyện phù hợp</h2>
+            <p className="mt-1 text-sm text-muted">{urlQuery ? `Không có bộ, tập hoặc phân cảnh khớp với “${urlQuery}”.` : 'Catalog hiện chưa có bộ hoạt hình nào.'}</p>
           </div>
-        ) : isCurrentData && dataSnapshot.data.items.length === 0 ? (
-          /* S2: Empty State only when current query response has completed with 0 items */
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-surface-border bg-surface px-6 py-16 text-center">
-            <div className="grid h-12 w-12 place-items-center rounded bg-surface-muted text-muted mb-3">
-              <Search size={20} />
-            </div>
-            <h3 className="text-base font-bold text-ink">Không tìm thấy bộ phim hoạt hình nào</h3>
-            <p className="mt-1 max-w-md text-xs sm:text-sm text-muted">
-              {dataSnapshot.query
-                ? `Không có phim hoạt hình nào khớp với từ khóa "${dataSnapshot.query}".`
-                : 'Không có phim nào thỏa mãn các bộ lọc thể loại đang chọn.'}
-            </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <button onClick={openChat} className="btn-primary text-xs">
-                Hỏi CineBot gợi ý ngay
-              </button>
-              <button onClick={clearAllFilters} className="btn-secondary text-xs">
-                Xem toàn bộ kho hoạt hình
-              </button>
-            </div>
-          </div>
-        ) : isCurrentData && dataSnapshot.data.items.length > 0 ? (
-          /* Results Grid & Pagination */
+        ) : isCurrentSnapshot ? (
           <>
-            <div
-              className={`grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6 transition-opacity duration-200 ${
-                loading ? 'opacity-60 pointer-events-none' : ''
-              }`}
-            >
-              {dataSnapshot.data.items.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} fluid />
+            <div data-testid="catalog-results" className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
+              {visibleResults.map((item) => (
+                <Link
+                  key={`${item.type}_${item.id}`}
+                  href={buildMediaItemHref(item)}
+                  data-testid="search-result-card"
+                  data-result-id={item.id}
+                  data-result-type={item.type}
+                  className="comic-card flex min-h-36 flex-col justify-between p-4 transition-colors hover:bg-mint"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="border border-ink/30 bg-mint px-1.5 py-0.5 text-[10px] font-bold text-ink">{typeLabel(item.type)}</span>
+                      {item.releaseYearStart && <span className="text-xs text-muted">{item.releaseYearStart}</span>}
+                      {item.startMs !== undefined && <span className="font-mono text-[10px] text-muted">{Math.floor(item.startMs / 60000)}:{Math.floor((item.startMs % 60000) / 1000).toString().padStart(2, '0')}</span>}
+                    </div>
+                    <h2 className="comic-heading mt-2 line-clamp-2 text-base font-bold text-ink">{item.title}</h2>
+                    {item.parentTitle && item.parentTitle !== item.seriesId && <p className="line-clamp-1 text-[11px] italic text-muted">{item.parentTitle}</p>}
+                    {item.snippet && <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted">{item.snippet}</p>}
+                  </div>
+                  <span className="mt-3 text-right text-xs font-semibold text-brand-dark">Mở câu chuyện →</span>
+                </Link>
               ))}
             </div>
-
-            {/* Pagination Controls */}
-            {dataSnapshot.data.totalPages > 1 && (
-              <nav
-                aria-label="Phân trang danh mục phim"
-                className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-surface-border bg-surface px-4 py-3 text-xs text-muted"
-              >
-                <span>
-                  Trang <strong className="text-ink">{dataSnapshot.data.page + 1}</strong> / {dataSnapshot.data.totalPages} (Tổng cộng {dataSnapshot.data.totalElements} phim)
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handlePageChange(dataSnapshot.data.page - 1)}
-                    disabled={!dataSnapshot.data.hasPrevious || loading}
-                    className="flex items-center gap-1 rounded border border-surface-border bg-surface-muted px-3 py-1.5 font-medium text-muted hover:border-ink hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                  >
-                    <ChevronLeft size={14} /> Trang trước
-                  </button>
-
-                  <button
-                    onClick={() => handlePageChange(dataSnapshot.data.page + 1)}
-                    disabled={!dataSnapshot.data.hasNext || loading}
-                    className="flex items-center gap-1 rounded border border-surface-border bg-surface-muted px-3 py-1.5 font-medium text-muted hover:border-ink hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                  >
-                    Trang sau <ChevronRight size={14} />
-                  </button>
+            {totalPages > 1 && (
+              <nav aria-label="Phân trang catalog" className="mt-6 flex items-center justify-between rounded-lg border border-surface-border bg-surface px-4 py-3 text-xs text-muted">
+                <span>Trang {safePage + 1} / {totalPages}</span>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => updateUrl({ page: Math.max(0, safePage - 1) })} disabled={safePage === 0 || loading} className="btn-secondary flex items-center gap-1 text-xs disabled:opacity-40"><ChevronLeft size={14} />Trước</button>
+                  <button type="button" onClick={() => updateUrl({ page: Math.min(totalPages - 1, safePage + 1) })} disabled={safePage >= totalPages - 1 || loading} className="btn-secondary flex items-center gap-1 text-xs disabled:opacity-40">Sau<ChevronRight size={14} /></button>
                 </div>
               </nav>
             )}

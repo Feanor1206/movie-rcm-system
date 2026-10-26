@@ -101,7 +101,7 @@ function getText(node) {
 }
 
 // Harness to execute actual HomePage
-function createHomeHarness(browseCatalogMock) {
+function createHomeHarness(seriesListMock) {
   let slots = [];
   let hookIndex = 0;
   let effects = [];
@@ -175,8 +175,11 @@ function createHomeHarness(browseCatalogMock) {
           MovieSection: 'MovieSection',
         };
       }
+      if (mod.includes('SeriesShelf')) {
+        return { SeriesShelf: 'SeriesShelf' };
+      }
       if (mod.includes('catalogService')) {
-        return { browseCatalog: browseCatalogMock };
+        return { getCatalogSeriesList: (_baseUrl, _signal) => seriesListMock() };
       }
       if (mod.includes('WatchlistContext')) {
         return { useWatchlist: () => ({ openChat: () => {}, watchlist: ['totoro'] }) };
@@ -650,6 +653,7 @@ function mountProductionProvider(fetcher, customAuth = {}) {
     setTimeout: (fn) => setTimeout(fn, 0),
     clearTimeout: (id) => clearTimeout(id),
     require: (name) => {
+      if (name === 'next/dynamic') return { __esModule: true, default: () => () => null };
       if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (name.includes('AuthContext')) {
         return {
@@ -692,68 +696,39 @@ function mountProductionProvider(fetcher, customAuth = {}) {
 // TEST CASES: ROUND 6 CUTOVER & JOURNEY INTEGRATION
 // ============================================================================
 
-test('1. Home: Enforces animationOnly=true across all queries, handles empty and error states', async () => {
-  const capturedQueries = [];
-
-  // 1A. Success Case: Verify animationOnly=true constraint on all queries
-  const mockBrowse = async (options) => {
-    capturedQueries.push(options);
-    return {
-      items: [sampleMovie({ id: 'totoro', title: 'My Neighbor Totoro' })],
-      page: 0,
-      size: 10,
-      totalElements: 1,
-      totalPages: 1,
-      hasNext: false,
-      hasPrevious: false,
-    };
+test('1. Home: Loads real catalog series once and preserves loading, empty, error, retry, and cover states', async () => {
+  let listCalls = 0;
+  const jadooSeries = {
+    id: 'jadoo',
+    title: 'Jadoo',
+    synopsis: 'A real catalog synopsis.',
+    releaseYearStart: 2000,
   };
-
-  const h = createHomeHarness(mockBrowse);
+  const h = createHomeHarness(async () => { listCalls++; return [jadooSeries]; });
   h.render();
   await h.settle();
 
-  assert.equal(capturedQueries.length, 2, 'The cover loads recent and favorite rails without redundant genre requests');
-  for (const q of capturedQueries) {
-    assert.equal(q.animationOnly, true, 'Every Home rail query must enforce animationOnly=true');
-  }
-
-  const rails = findNodes(h.tree, (n) => n.type === 'MovieSection');
-  assert.equal(rails.length, 2, 'Both comic shelves must render backend records');
-  assert.equal(rails[0].props.movies[0].title, 'My Neighbor Totoro');
+  assert.equal(listCalls, 1, 'Home asks the SQL-backed series endpoint once');
+  const shelf = findNodes(h.tree, (n) => n.type === 'SeriesShelf')[0];
+  assert.ok(shelf, 'Home renders the real series shelf');
+  assert.equal(shelf.props.series[0].id, 'jadoo');
+  assert.equal(shelf.props.series[0].synopsis, 'A real catalog synopsis.');
   assert.ok(findNodes(h.tree, (n) => n.type === 'h1').length, 'The illustrated cover remains visible');
 
-  // 1B. Empty State: Backend returns 0 animation items
-  const emptyHarness = createHomeHarness(async () => ({
-    items: [],
-    page: 0,
-    size: 10,
-    totalElements: 0,
-    totalPages: 0,
-    hasNext: false,
-    hasPrevious: false,
-  }));
+  const emptyHarness = createHomeHarness(async () => []);
   emptyHarness.render();
   await emptyHarness.settle();
 
-  const emptyRails = findNodes(emptyHarness.tree, (n) => n.type === 'MovieSection');
-  assert.equal(emptyRails.length, 2);
-  assert.ok(emptyRails.every((rail) => rail.props.movies.length === 0), 'Empty shelves receive no fabricated films');
+  const emptyShelf = findNodes(emptyHarness.tree, (n) => n.type === 'SeriesShelf')[0];
+  assert.ok(emptyShelf, 'An empty catalog still renders the shelf container');
+  assert.deepEqual(emptyShelf.props.series, []);
   assert.ok(findNodes(emptyHarness.tree, (n) => n.type === 'h1').length, 'The cover stays visible for an empty catalog');
 
-  // 1C. Error State: Backend network failure
+  // Catalog errors stay visible and a retry reloads the endpoint.
   let retryTriggered = false;
   const errorHarness = createHomeHarness(async () => {
     if (retryTriggered) {
-      return {
-        items: [sampleMovie({ id: 'm-retry', title: 'Retry Animation' })],
-        page: 0,
-        size: 10,
-        totalElements: 1,
-        totalPages: 1,
-        hasNext: false,
-        hasPrevious: false,
-      };
+      return [{ id: 'retry-series', title: 'Retry Animation' }];
     }
     throw new Error('Máy chủ danh mục không phản hồi');
   });
@@ -762,18 +737,18 @@ test('1. Home: Enforces animationOnly=true across all queries, handles empty and
 
   const errorText = getText(errorHarness.tree);
   assert.ok(
-    errorText.includes('Kệ phim đang nghỉ một chút'),
+    errorText.includes('Kệ truyện đang nghỉ một chút'),
     'Must render error state when catalog service is down'
   );
 
   // Retry button
-  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Tải lại kệ phim'))[0];
+  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Tải lại kệ truyện'))[0];
   assert.ok(retryBtn, 'Retry button must be provided');
   retryTriggered = true;
   retryBtn.props.onClick();
   await errorHarness.settle();
 
-  assert.equal(findNodes(errorHarness.tree, (n) => n.type === 'MovieSection')[0].props.movies[0].id, 'm-retry', 'Retry restores real shelf records');
+  assert.equal(findNodes(errorHarness.tree, (n) => n.type === 'SeriesShelf')[0].props.series[0].id, 'retry-series', 'Retry restores real series records');
 });
 
 test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministic similar rail (D1 decoupled)', async () => {
@@ -1033,7 +1008,7 @@ test('5. Profile: Enforces 5-min TTL, clears stale IDs on library update, and pr
   assert.ok(getText(p.tree).includes('Thử tải lại'), 'Network error provides retry button');
 });
 
-test('6. Cross-surface consistency: Canonical ID and attributes match across Home, Detail, and Profile', async () => {
+test('6. Home uses the real series catalog while legacy movie detail and Profile keep canonical IDs', async () => {
   const canonicalMovie = sampleMovie({
     id: 'totoro',
     title: 'My Neighbor Totoro',
@@ -1042,22 +1017,20 @@ test('6. Cross-surface consistency: Canonical ID and attributes match across Hom
     genres: ['Animation', 'Family'],
   });
 
-  // Home renders canonical ID 'totoro'
-  const home = createHomeHarness(async () => ({
-    items: [canonicalMovie],
-    page: 0,
-    size: 10,
-    totalElements: 1,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
-  }));
+  // Home renders canonical SQL series records rather than the legacy movie response.
+  const home = createHomeHarness(async () => ([{
+    id: 'totoro-series',
+    title: 'My Neighbor Totoro',
+    synopsis: 'Two girls discover friendly spirits.',
+    releaseYearStart: 1988,
+  }]));
   home.render();
   await home.settle();
 
-  const shelf = findNodes(home.tree, (n) => n.type === 'MovieSection')[0];
+  const shelf = findNodes(home.tree, (n) => n.type === 'SeriesShelf')[0];
   assert.ok(shelf, 'Home must render a catalog shelf');
-  assert.equal(shelf.props.movies[0].id, 'totoro');
+  assert.equal(shelf.props.series[0].id, 'totoro-series');
+  assert.equal(shelf.props.series[0].releaseYearStart, 1988);
 
   // Detail renders exact same canonical ID 'totoro'
   const detail = createDetailHarness('totoro', async () => canonicalMovie);

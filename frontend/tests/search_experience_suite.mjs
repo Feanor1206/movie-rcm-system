@@ -97,7 +97,8 @@ function getText(node) {
 }
 
 // Harness to execute actual SearchExperience.tsx
-function createSearchHarness(initialUrl = '', browseMock) {
+function createSearchHarness(initialUrl = '', catalogMocks = {}) {
+  const mocks = typeof catalogMocks === 'function' ? {} : catalogMocks;
   let params = new URLSearchParams(initialUrl);
   let slots = [];
   let hookIndex = 0;
@@ -212,8 +213,8 @@ function createSearchHarness(initialUrl = '', browseMock) {
       if (mod.includes('mediaRouting')) return mediaRoutingModule.exports;
       if (mod.includes('catalogService')) {
         return {
-          browseCatalog: browseMock,
-          searchAnimationCatalog: async () => [],
+          getCatalogSeriesList: mocks.seriesList || (async () => []),
+          searchAnimationCatalog: mocks.search || (async () => []),
         };
       }
       if (mod.includes('WatchlistContext')) {
@@ -362,7 +363,7 @@ function renderActualMovieCard(movie, watchlistContext = {}) {
 // ============================================================================
 
 test('1. S1 (P2): Delayed router navigation does NOT overwrite user typing draft', async () => {
-  const h = createSearchHarness('q=A', async () => emptyPage());
+  const h = createSearchHarness('q=A');
   h.render();
   await h.settle();
 
@@ -400,7 +401,7 @@ test('1. S1 (P2): Delayed router navigation does NOT overwrite user typing draft
 });
 
 test('2. S1 (P2): External navigation (browser back/forward or deep link) syncs draft input', async () => {
-  const h = createSearchHarness('q=original', async () => emptyPage());
+  const h = createSearchHarness('q=original');
   h.render();
   await h.settle();
 
@@ -418,7 +419,7 @@ test('2. S1 (P2): External navigation (browser back/forward or deep link) syncs 
 });
 
 test('3. S1 (P2): Clear button resets input draft and triggers push with query removed', async () => {
-  const h = createSearchHarness('q=spirited', async () => emptyPage());
+  const h = createSearchHarness('q=spirited');
   h.render();
   await h.settle();
 
@@ -436,252 +437,136 @@ test('3. S1 (P2): Clear button resets input draft and triggers push with query r
   );
 });
 
-test('4. S2 (P2): Snapshot query key binding prevents false no-results on pending query transition', async () => {
-  let pendingResolve;
-  const mockBrowse = async (options) => {
-    if (options.query === 'new') {
-      return new Promise((resolve) => {
-        pendingResolve = resolve;
-      });
-    }
-    return emptyPage();
-  };
-
-  const h = createSearchHarness('q=old', mockBrowse);
-  h.render();
-  await h.settle();
-
-  // Initial empty result for 'old'
-  let treeText = getText(h.tree);
-  assert.ok(treeText.includes('Không có phim hoạt hình nào khớp với từ khóa "old"'));
-
-  // User navigates to 'new' (which remains pending)
-  h.navigate('q=new');
-  await h.settle();
-
-  treeText = getText(h.tree);
-  // S2 Requirement: MUST NOT show no-results message for 'new' while query is pending
-  const showsNoResultsForNew = treeText.includes('Không có phim hoạt hình nào khớp với từ khóa "new"');
-  assert.equal(
-    showsNoResultsForNew,
-    false,
-    'Must NOT display no-results for "new" before its fetch response completes'
-  );
-
-  // Must indicate updating/loading state
-  const showsLoadingOrUpdating =
-    treeText.includes('Đang cập nhật') ||
-    findNodes(h.tree, (n) => n.props?.['data-testid'] === 'catalog-skeleton').length > 0;
-  assert.ok(showsLoadingOrUpdating, 'Must display loading/updating indicator while new query is pending');
-
-  // Once new query completes with empty results, only then render no-results for 'new'
-  pendingResolve(emptyPage({ query: 'new' }));
-  await h.settle();
-
-  treeText = getText(h.tree);
-  assert.ok(
-    treeText.includes('Không có phim hoạt hình nào khớp với từ khóa "new"'),
-    'Now that fetch completed, empty message for "new" is legitimately displayed'
-  );
-});
-
-test('5. S2 (P2): Query transition from results to pending preserves previous results labeled as updating', async () => {
-  const ghibliPage = {
-    items: [
-      sampleMovie({ id: 'm-totoro', title: 'My Neighbor Totoro' }),
-      sampleMovie({ id: 'm-mononoke', title: 'Princess Mononoke' }),
-    ],
-    page: 0,
-    size: 12,
-    totalElements: 2,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
-  };
-
-  let resolveDisney;
-  const mockBrowse = async (options) => {
-    if (options.query === 'disney') {
-      return new Promise((resolve) => {
-        resolveDisney = resolve;
-      });
-    }
-    return ghibliPage;
-  };
-
-  const h = createSearchHarness('q=ghibli', mockBrowse);
-  h.render();
-  await h.settle();
-
-  // Ghibli results are visible
-  let renderedCards = findNodes(h.tree, (n) => n.type === 'MovieCard');
-  assert.equal(renderedCards.length, 2);
-  assert.equal(renderedCards[0].props.movie.title, 'My Neighbor Totoro');
-
-  // Navigate to 'disney' (pending)
-  h.navigate('q=disney');
-  await h.settle();
-
-  // While pending, updating indicator is shown
-  assert.ok(getText(h.tree).includes('Đang cập nhật'), 'Indicator "Đang cập nhật" must appear');
-
-  // Resolve disney with 1 item
-  resolveDisney({
-    items: [sampleMovie({ id: 'm-aladdin', title: 'Aladdin' })],
-    page: 0,
-    size: 12,
-    totalElements: 1,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
+test('4. Catalog search: pending query does not render a false empty state', async () => {
+  let resolveSearch;
+  const h = createSearchHarness('q=new', {
+    seriesList: async () => [],
+    search: async () => new Promise((resolve) => { resolveSearch = resolve; }),
   });
-  await h.settle();
-
-  renderedCards = findNodes(h.tree, (n) => n.type === 'MovieCard');
-  assert.equal(renderedCards.length, 1);
-  assert.equal(renderedCards[0].props.movie.title, 'Aladdin');
-});
-
-test('6. S3 (P2): URL yearMin, yearMax, and size parameters are parsed, validated, and forwarded to browseCatalog', async () => {
-  let capturedOptions = null;
-  const mockBrowse = async (options) => {
-    capturedOptions = options;
-    return emptyPage();
-  };
-
-  const url = 'q=spirited&genres=Adventure,Family&yearMin=1995&yearMax=2010&size=24&sort=year&direction=asc&page=1';
-  const h = createSearchHarness(url, mockBrowse);
   h.render();
   await h.settle();
 
-  assert.ok(capturedOptions, 'browseCatalog must be invoked');
-  assert.equal(capturedOptions.query, 'spirited');
-  assert.deepEqual([...capturedOptions.genres], ['Adventure', 'Family']);
-  assert.equal(capturedOptions.yearMin, 1995, 'yearMin must be forwarded');
-  assert.equal(capturedOptions.yearMax, 2010, 'yearMax must be forwarded');
-  assert.equal(capturedOptions.size, 24, 'size must be forwarded');
-  assert.equal(capturedOptions.sort, 'year');
-  assert.equal(capturedOptions.direction, 'asc');
-  assert.equal(capturedOptions.page, 1);
-  assert.equal(capturedOptions.animationOnly, true, 'animationOnly must be enforced');
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-testid'] === 'catalog-skeleton').length, 1);
+  assert.equal(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'), false);
 
-  // Verify active filters summary in the UI
-  const treeText = getText(h.tree);
-  assert.ok(treeText.includes('Từ năm: 1995'), 'Active filter summary must show yearMin');
-  assert.ok(treeText.includes('Đến năm: 2010'), 'Active filter summary must show yearMax');
-  assert.ok(treeText.includes('Cỡ trang: 24'), 'Active filter summary must show page size');
+  resolveSearch([]);
+  await h.settle();
+  assert.ok(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'));
+  assert.ok(getText(h.tree).includes('Không có bộ, tập hoặc phân cảnh khớp'));
 });
 
-test('7. S3 (P2): Invalid year range (yearMin > yearMax) renders warning and resets cleanly', async () => {
-  let browseCalled = false;
-  const mockBrowse = async () => {
-    browseCalled = true;
-    return emptyPage();
-  };
+test('5. Catalog search: query navigation never labels old results as the new query', async () => {
+  let resolveSecond;
+  const h = createSearchHarness('q=first', {
+    seriesList: async () => [],
+    search: async (query) => {
+      if (query === 'second') return new Promise((resolve) => { resolveSecond = resolve; });
+      return [{ id: 'series-first', type: 'series', title: 'First Story', seriesId: 'series-first' }];
+    },
+  });
+  h.render();
+  await h.settle();
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-first').length, 1);
 
-  // yearMin (2020) > yearMax (2000)
-  const h = createSearchHarness('q=totoro&yearMin=2020&yearMax=2000', mockBrowse);
+  h.navigate('q=second');
+  await h.settle();
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-testid'] === 'catalog-skeleton').length, 1);
+  assert.equal(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'), false);
+
+  resolveSecond([{ id: 'series-second', type: 'series', title: 'Second Story', seriesId: 'series-second' }]);
+  await h.settle();
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-second').length, 1);
+});
+
+test('6. Catalog list: renders SQL series only, paginates client-side, and explains legacy film filters', async () => {
+  const series = Array.from({ length: 13 }, (_, index) => ({
+    id: 'series-' + index,
+    type: 'series',
+    title: 'Story ' + index,
+    seriesId: 'series-' + index,
+    synopsis: 'Catalog synopsis ' + index,
+    releaseYearStart: 2000 + index,
+  }));
+  let listCalls = 0;
+  const h = createSearchHarness('page=1&size=2&sort=rating', {
+    seriesList: async () => { listCalls++; return series; },
+    search: async () => [],
+  });
   h.render();
   await h.settle();
 
-  const treeText = getText(h.tree);
-  assert.ok(
-    treeText.includes('Khoảng năm không hợp lệ'),
-    'UI must render invalid year range warning'
-  );
-  assert.equal(browseCalled, false, 'Invalid year range must not send broken query to backend');
+  const cards = findNodes(h.tree, (node) => node.props?.['data-testid'] === 'search-result-card');
+  assert.equal(listCalls, 1);
+  assert.equal(cards.length, 2, 'URL page and size slice the bounded catalog on the client');
+  assert.equal(cards[0].props['data-result-id'], 'series-2');
+  assert.equal(cards[0].props.href, '/series/series-2');
+  assert.ok(getText(cards[0]).includes('Catalog synopsis 2'));
+  assert.ok(getText(cards[0]).includes('2002'));
+  assert.ok(getText(h.tree).includes('Bộ lọc phim cũ không áp dụng'));
+  assert.equal(getText(h.tree).includes('Điểm cao nhất'), false, 'Unsupported movie sort controls are not shown');
 
-  // Clicking clear filters button in error banner resets invalid parameters
-  const clearBtn = findNodes(
-    h.tree,
-    (n) => n.type === 'button' && getText(n).includes('Xóa bộ lọc')
-  )[0];
-  assert.ok(clearBtn, 'Clear filters button must exist');
-
-  clearBtn.props.onClick();
-  await h.settle();
-
-  assert.ok(
-    h.pushes.some((u) => !u.includes('yearMin') && !u.includes('yearMax')),
-    'Clear filters button pushes URL without invalid year parameters'
-  );
+  const clearOldFilters = findNodes(h.tree, (node) => node.type === 'button' && getText(node).includes('Xóa bộ lọc cũ'))[0];
+  clearOldFilters.props.onClick();
+  assert.ok(h.pushes.some((url) => !url.includes('sort=')), 'The old filter notice can clear stale movie URL fields');
 });
 
-test('8. S4 (P2): Generation guard - Slow response A does NOT overwrite subsequent response B', async () => {
-  let resolveA;
-  let resolveB;
-
-  const mockBrowse = async (options) => {
-    if (options.query === 'slow') {
-      return new Promise((resolve) => {
-        resolveA = resolve;
-      });
-    }
-    if (options.query === 'fast') {
-      return new Promise((resolve) => {
-        resolveB = resolve;
-      });
-    }
-    return emptyPage();
-  };
-
-  const h = createSearchHarness('q=slow', mockBrowse);
+test('7. Catalog search: API failure stays an error and retry can recover', async () => {
+  let shouldFail = true;
+  const h = createSearchHarness('q=jadoo', {
+    seriesList: async () => [],
+    search: async () => {
+      if (shouldFail) throw new Error('HTTP 503 catalog unavailable');
+      return [{ id: 'jadoo', type: 'series', title: 'Jadoo', seriesId: 'jadoo' }];
+    },
+  });
   h.render();
   await h.settle();
 
-  // User immediately switches to 'fast'
+  assert.ok(getText(h.tree).includes('HTTP 503 catalog unavailable'));
+  assert.equal(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'), false);
+  const retry = findNodes(h.tree, (node) => node.type === 'button' && getText(node).includes('Thử lại'))[0];
+  assert.ok(retry);
+  shouldFail = false;
+  retry.props.onClick();
+  await h.settle();
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'jadoo').length, 1);
+});
+
+test('8. Catalog search: slow response cannot overwrite the latest query', async () => {
+  let resolveSlow;
+  let resolveFast;
+  const h = createSearchHarness('q=slow', {
+    seriesList: async () => [],
+    search: async (query) => {
+      if (query === 'slow') return new Promise((resolve) => { resolveSlow = resolve; });
+      return new Promise((resolve) => { resolveFast = resolve; });
+    },
+  });
+  h.render();
+  await h.settle();
+
   h.navigate('q=fast');
   await h.settle();
-
-  // Fast resolves first with B data
-  resolveB({
-    items: [sampleMovie({ id: 'm-fast', title: 'Fast Movie' })],
-    page: 0,
-    size: 12,
-    totalElements: 1,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
-  });
+  resolveFast([{ id: 'series-fast', type: 'series', title: 'Fast Story', seriesId: 'series-fast' }]);
+  await h.settle();
+  resolveSlow([{ id: 'series-slow', type: 'series', title: 'Slow Story', seriesId: 'series-slow' }]);
   await h.settle();
 
-  let cards = findNodes(h.tree, (n) => n.type === 'MovieCard');
-  assert.equal(cards.length, 1);
-  assert.equal(cards[0].props.movie.title, 'Fast Movie');
-
-  // Slow A now resolves late with A data
-  resolveA({
-    items: [sampleMovie({ id: 'm-slow', title: 'Slow Movie' })],
-    page: 0,
-    size: 12,
-    totalElements: 1,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
-  });
-  await h.settle();
-
-  // Generation guard MUST discard late A; UI remains Fast Movie
-  cards = findNodes(h.tree, (n) => n.type === 'MovieCard');
-  assert.equal(cards.length, 1);
-  assert.equal(cards[0].props.movie.title, 'Fast Movie', 'Slow response A must NOT overwrite response B');
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-fast').length, 1);
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-slow').length, 0);
 });
 
-test('9. S4 (P2): Cancellation and cleanup on unmount', async () => {
-  const h = createSearchHarness('q=cancel-test', async () => new Promise(() => {}));
+test('9. Catalog search: unmount cancels the active request', async () => {
+  const h = createSearchHarness('q=cancel-test', {
+    seriesList: async () => [],
+    search: async () => new Promise(() => {}),
+  });
   h.render();
   await h.settle();
-
-  // Unmount component
   h.unmount();
 
-  // All active AbortControllers must be signaled
-  assert.ok(
-    h.abortedSignals.some((s) => s.aborted === true),
-    'Unmount must abort in-flight catalog fetch request'
-  );
+  assert.ok(h.abortedSignals.some((signal) => signal.aborted), 'Unmount must abort in-flight catalog search');
 });
-
 test('10. S4 (P2): MovieCard renders fallback placeholder when poster is missing or empty', () => {
   const movieWithoutPoster = sampleMovie({
     id: 'anim-no-poster',

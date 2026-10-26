@@ -21,7 +21,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/catalog")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminCatalogController {
 

@@ -1,0 +1,66 @@
+{
+  "scope": "Live same-origin Next -> Spring SQL; no model calls",
+  "checks": [
+    {
+      "name": "save canonical episode",
+      "passed": true
+    },
+    {
+      "name": "concurrent SQL update admits one write and rejects stale write",
+      "passed": true
+    },
+    {
+      "name": "guest cannot read account history",
+      "passed": true
+    },
+    {
+      "name": "other principal cannot read history",
+      "passed": true
+    },
+    {
+      "name": "private catalog audio not public",
+      "passed": true
+    },
+    {
+      "name": "public HEAD",
+      "passed": true
+    },
+    {
+      "name": "same-origin exact byte Range",
+      "passed": true
+    },
+    {
+      "name": "out of range 416",
+      "passed": true
+    },
+    {
+      "name": "admin import protected from guest",
+      "passed": true
+    },
+    {
+      "name": "disabled chat uses gateway not backend rewrite",
+      "passed": true
+    }
+  ],
+  "saved_progress": {
+    "episodeId": "ep_jadoo_s01_0001",
+    "seriesId": "ser_jadoo",
+    "seriesTitle": "Xin Chào Jadoo",
+    "seasonId": "sea_jadoo_s01",
+    "seasonNumber": 1,
+    "seasonTitle": "Xin Chào Jadoo - Mùa 1",
+    "episodeNumber": 1,
+    "episodeTitle": "Anh sẽ mua cho em tất cả những gì em muốn ăn.",
+    "assetId": "asset_jadoo_s01_v0001",
+    "positionMs": 123000,
+    "durationMs": 2027319,
+    "completed": false,
+    "version": 3,
+    "updatedAt": "2026-10-27T05:57:02.479025"
+  },
+  "concurrent_statuses": [
+    200,
+    409
+  ],
+  "passed": true
+}

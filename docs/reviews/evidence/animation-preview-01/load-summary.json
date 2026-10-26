@@ -1,0 +1,60 @@
+{
+  "measured_at_utc": "2026-10-26T22:57:05Z",
+  "scope": "loopback HTTP catalog and bounded Range reads; not browser buffering or Internet capacity",
+  "qwen": "not called",
+  "phases": {
+    "catalog_10_sessions": {
+      "requests": 120,
+      "wall_seconds": 4.328,
+      "status_counts": {
+        "200": 120
+      },
+      "unexpected": 0,
+      "bytes": 11004630,
+      "latency_ms": {
+        "p50": 236.16,
+        "p95": 948.73,
+        "max": 1022.18
+      }
+    },
+    "catalog_20_sessions": {
+      "requests": 240,
+      "wall_seconds": 4.391,
+      "status_counts": {
+        "200": 240
+      },
+      "unexpected": 0,
+      "bytes": 22009260,
+      "latency_ms": {
+        "p50": 225.77,
+        "p95": 1619.72,
+        "max": 1666.58
+      }
+    },
+    "drive_5_readers": {
+      "requests": 20,
+      "wall_seconds": 15.704,
+      "status_counts": {
+        "200": 5,
+        "206": 15
+      },
+      "unexpected": 0,
+      "bytes": 31457280,
+      "latency_ms": {
+        "p50": 4453.47,
+        "p95": 5527.16,
+        "max": 5529.66
+      }
+    }
+  },
+  "recovery": {
+    "path": "/api/catalog/series/ser_jadoo",
+    "method": "GET",
+    "status": 200,
+    "bytes": 310103,
+    "valid": true,
+    "ms": 15.61
+  },
+  "passed": true,
+  "raw_evidence_local": "target/active-100/load.json"
+}

@@ -407,3 +407,81 @@ test('9. C2: Search/Query precedence: blank query falls back to search parameter
   await api.browseCatalog({ query: 'spirited', search: 'anime' });
   assert.ok(requestedUrl.includes('query=spirited'), 'Non-empty query takes precedence over search');
 });
+
+test('10. Catalog API: series list validates and maps real catalog fields', async () => {
+  let requestedUrl = '';
+  const { api } = loadService(async (url, options) => {
+    requestedUrl = url;
+    assert.equal(options.method, 'GET');
+    return {
+      ok: true,
+      status: 200,
+      json: async () => [{
+        id: 'jadoo',
+        title: 'Jadoo',
+        synopsis: 'A catalog synopsis.',
+        releaseYearStart: 2000,
+        releaseYearEnd: 2005,
+        genreIdsJson: '["comedy"]',
+      }],
+    };
+  });
+
+  const result = await api.getCatalogSeriesList();
+  assert.equal(requestedUrl, 'http://test-server/api/catalog/series');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 'jadoo');
+  assert.equal(result[0].title, 'Jadoo');
+  assert.equal(result[0].synopsis, 'A catalog synopsis.');
+  assert.equal(result[0].releaseYearStart, 2000);
+  assert.equal(result[0].releaseYearEnd, 2005);
+  assert.equal(result[0].genreIdsJson, '["comedy"]');
+});
+
+test('11. Catalog API: series list preserves HTTP and malformed-data errors', async () => {
+  const { api: failedApi } = loadService(async () => ({
+    ok: false,
+    status: 503,
+    json: async () => ({}),
+  }));
+  await assert.rejects(failedApi.getCatalogSeriesList(), (error) => error.status === 503);
+
+  const { api: malformedApi } = loadService(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => [{ id: '', title: 'No ID' }],
+  }));
+  await assert.rejects(malformedApi.getCatalogSeriesList(), (error) => error.status === 502);
+});
+
+test('12. Catalog API: search encodes queries and validates result type', async () => {
+  let requestedUrl = '';
+  const { api } = loadService(async (url) => {
+    requestedUrl = url;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => [{ id: 'ep-1', type: 'episode', title: 'Episode 1', seriesId: 'jadoo' }],
+    };
+  });
+  const result = await api.searchAnimationCatalog('Jadoo & friends');
+  assert.ok(requestedUrl.endsWith('/catalog/search?q=Jadoo%20%26%20friends'));
+  assert.equal(result[0].seriesId, 'jadoo');
+
+  const { api: malformedApi } = loadService(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => [{ id: 'x', type: 'movie', title: 'Legacy film' }],
+  }));
+  await assert.rejects(malformedApi.searchAnimationCatalog('movie'), (error) => error.status === 502);
+});
+
+test('13. Catalog API: list request propagates caller cancellation', async () => {
+  const external = new AbortController();
+  const { api } = loadService(async (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+  }));
+  const pending = api.getCatalogSeriesList(undefined, external.signal, 500);
+  external.abort();
+  await assert.rejects(pending, (error) => error.isCanceled === true);
+});

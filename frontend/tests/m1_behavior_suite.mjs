@@ -48,6 +48,7 @@ function renderComponent(filePath, componentName, contextVal, authVal, props = {
     exports: module.exports,
     process: { env: {} },
     require: (name) => {
+      if (name === 'next/dynamic') return { __esModule: true, default: () => () => null };
       if (name === 'react') return { createElement: (t, p, ...c) => ({ type: t, props: { ...(p || {}), children: c.length === 1 ? c[0] : c } }), ...hooks };
       if (name === 'next/image') return { default: (p) => ({ type: 'img', props: p }) };
       if (name === 'next/link') return { default: (p) => ({ type: 'a', props: p }) };
@@ -180,6 +181,7 @@ function makeHarness(file, provider, fetcher, authContextRef) {
     },
     clearTimeout: (id) => timers.delete(id),
     require: (name) => {
+      if (name === 'next/dynamic') return { __esModule: true, default: () => () => null };
       if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (name === './AuthContext') return { useAuth: () => authContextRef.current };
       return {};

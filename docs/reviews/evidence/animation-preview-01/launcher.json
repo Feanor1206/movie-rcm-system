@@ -1,0 +1,6 @@
+{
+  "launcher_exit": 0,
+  "elapsed_seconds": 41.67,
+  "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start_preview_stack.ps1 -Background -MountDrive",
+  "model_mode": "off"
+}

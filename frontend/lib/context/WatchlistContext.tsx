@@ -9,8 +9,10 @@ import React, {
   useCallback,
   ReactNode,
 } from 'react';
-import { CineBot, CineBotFloatingTrigger } from '@/features/chat/components/CineBot';
-import { AuthModal } from '@/features/auth/components/AuthModal';
+import { CineBotFloatingTrigger } from '@/features/chat/components/CineBotFloatingTrigger';
+import dynamic from 'next/dynamic';
+const CineBot = dynamic(() => import('@/features/chat/components/CineBot').then(module => module.CineBot), { ssr: false });
+const AuthModal = dynamic(() => import('@/features/auth/components/AuthModal').then(module => module.AuthModal), { ssr: false });
 import { useAuth } from './AuthContext';
 
 export type Toast = {
@@ -49,7 +51,7 @@ type WatchlistContextType = {
 
 const WatchlistContext = createContext<WatchlistContextType | undefined>(undefined);
 
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
+const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
 const GUEST_STORAGE_KEY = 'dippie_guest_library_v1';
 const REQUEST_TIMEOUT_MS = 7000;
 
@@ -136,7 +138,7 @@ function getActorKey(status: string, user: { id: number } | null, token: string 
 }
 
 export function WatchlistProvider({ children }: { children: ReactNode }) {
-  const { user, token, status, isAuthenticated, handleSessionExpired } = useAuth();
+  const { user, token, status, isAuthenticated, handleSessionExpired, isAuthModalOpen } = useAuth();
 
   const currentActorKey = getActorKey(status, user, token);
 
@@ -1503,9 +1505,10 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const isFavorite = useCallback((id: string) => visibleFavorites.includes(id), [visibleFavorites]);
   const getRating = useCallback((id: string) => visibleRatings[id], [visibleRatings]);
 
-  const openChat = () => setIsChatOpen(true);
+  const [hasOpenedChat, setHasOpenedChat] = useState(false);
+  const openChat = () => { setHasOpenedChat(true); setIsChatOpen(true); };
   const closeChat = () => setIsChatOpen(false);
-  const toggleChat = () => setIsChatOpen((prev) => !prev);
+  const toggleChat = () => { setHasOpenedChat(true); setIsChatOpen((prev) => !prev); };
 
   return (
     <WatchlistContext.Provider
@@ -1540,11 +1543,11 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       {children}
 
       {/* Global Auth Modal */}
-      <AuthModal />
+      {isAuthModalOpen && <AuthModal />}
 
       {/* Global CineBot Widget & Modal */}
       {!isChatOpen && <CineBotFloatingTrigger onClick={openChat} />}
-      <CineBot isOpen={isChatOpen} onClose={closeChat} />
+      {hasOpenedChat && <CineBot isOpen={isChatOpen} onClose={closeChat} />}
 
       {/* Global Toast Container */}
       <div
