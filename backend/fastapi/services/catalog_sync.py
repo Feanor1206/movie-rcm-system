@@ -14,6 +14,7 @@ Transforms hierarchical catalog trees into unified searchable items:
 
 import os
 import json
+import copy
 import logging
 import hashlib
 import time
@@ -137,17 +138,17 @@ class CatalogSyncManager:
 
     def get_flattened_catalog(self) -> List[Dict[str, Any]]:
         """Return all flattened searchable items (series, episodes, segments, scenes)."""
-        return list(self._flattened_items)
+        return copy.deepcopy(self._flattened_items)
 
     def get_item_by_id(self, item_id: str) -> Dict[str, Any]:
-        return self._items_by_id.get(item_id, {})
+        return copy.deepcopy(self._items_by_id.get(item_id, {}))
 
     def copy_from(self, other: "CatalogSyncManager") -> None:
         """Atomically copy state from candidate manager (H2)."""
-        self._raw_catalog = other._raw_catalog
-        self._flattened_items = list(other._flattened_items)
-        self._items_by_id = dict(other._items_by_id)
-        self._item_counts = dict(other._item_counts)
+        self._raw_catalog = copy.deepcopy(other._raw_catalog)
+        self._flattened_items = copy.deepcopy(other._flattened_items)
+        self._items_by_id = copy.deepcopy(other._items_by_id)
+        self._item_counts = copy.deepcopy(other._item_counts)
         self._content_hash = other._content_hash
         self._is_loaded = other._is_loaded
 
@@ -692,15 +693,17 @@ class AcceptedSnapshot:
         # the mutable compatibility singleton catalog_sync_manager, preventing subsequent
         # publications from mutating retained reader snapshots.
         mgr = getattr(self, "catalog_manager", None)
-        if mgr is not None and mgr is catalog_sync_manager:
+        if mgr is not None:
             isolated = mgr.clone() if hasattr(mgr, "clone") else mgr.__class__()
             if not hasattr(mgr, "clone") and hasattr(isolated, "copy_from"):
                 isolated.copy_from(mgr)
             object.__setattr__(self, "catalog_manager", isolated)
+        if self.payload is not None:
+            object.__setattr__(self, "payload", copy.deepcopy(self.payload))
 
     @property
     def is_ready(self) -> bool:
-        return self.generation > 0 and getattr(self.catalog_manager, "is_loaded", False)
+        return self.generation >= 0 and getattr(self.catalog_manager, "is_loaded", False)
 
     def get_flattened_catalog(self) -> List[Dict[str, Any]]:
         return self.catalog_manager.get_flattened_catalog()

@@ -19,9 +19,9 @@ const BTN_ACT = 'min-h-[44px] inline-flex items-center justify-center rounded bo
 const BTN_PLAY = 'min-h-[44px] px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer';
 const BTN_FEAT = `btn-primary ${BTN_PLAY}`;
 const BTN_PRI = `btn-primary min-h-[44px] ${BTN_PLAY}`;
-const BTN_SEC = `btn-secondary text-zinc-300 ${BTN_PLAY}`;
+const BTN_SEC = `btn-secondary text-muted ${BTN_PLAY}`;
 const BTN_SQ = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded cursor-pointer';
-const BTN_ICON = `${BTN_SQ} text-zinc-300 hover:text-white`;
+const BTN_ICON = `${BTN_SQ} text-muted hover:text-ink`;
 const BTN_PLAY_PAUSE = `${BTN_SQ} bg-brand text-zinc-950 font-bold`;
 const UNCONF_CLS = 'border-amber-400 bg-amber-400/20 text-amber-300';
 const ALERT_BOX = 'mt-4 flex items-center justify-between gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200';
@@ -31,21 +31,21 @@ const FOCUS_SEL = 'button:not([disabled]), input:not([disabled]), video, [tabind
 const STARS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const STAR_BASE = 'flex h-9 w-9 items-center justify-center rounded text-xs font-bold cursor-pointer disabled:opacity-60';
 const STAR_ACT = `${STAR_BASE} bg-amber-400 text-black`;
-const STAR_INACT = `${STAR_BASE} border border-surface-border bg-surface-muted text-zinc-400`;
+const STAR_INACT = `${STAR_BASE} border border-surface-border bg-surface-muted text-muted`;
 const BTN_WATCH = `${BTN_ACT} px-4 py-2 text-sm font-semibold`;
-const WATCH_CONF = `${BTN_WATCH} btn-secondary text-white`;
-const WATCH_DEF = `${BTN_WATCH} btn-secondary text-zinc-300`;
+const WATCH_CONF = `${BTN_WATCH} btn-secondary text-ink`;
+const WATCH_DEF = `${BTN_WATCH} btn-secondary text-muted`;
 const WATCH_UNCONF = `${BTN_WATCH} ${UNCONF_CLS}`;
 const BTN_FAV_BASE = `${BTN_ACT} min-w-[44px] p-2`;
 const FAV_CONF = `${BTN_FAV_BASE} border-brand bg-brand/15 text-brand`;
-const FAV_DEF = `${BTN_FAV_BASE} border-zinc-700 bg-surface text-zinc-300 hover:text-white`;
+const FAV_DEF = `${BTN_FAV_BASE} border-ink/30 bg-surface text-muted hover:text-ink`;
 const FAV_UNCONF = `${BTN_FAV_BASE} ${UNCONF_CLS}`;
 const pad = (n: number) => (n < 10 ? '0' : '') + (n | 0);
 const formatTime = (s: number) => s > 0 ? `${pad(s / 60)}:${pad(s % 60)}` : '00:00';
 const CARD = 'rounded-lg border border-surface-border bg-surface p-4';
 const BORDER_T = 'pt-2 border-t border-surface-border';
 const STREAM_ERR = 'Lỗi nạp video.';
-const CHAT_BTN = `border border-zinc-700 bg-surface text-zinc-300 ${BTN_PLAY}`;
+const CHAT_BTN = `border border-ink/30 bg-surface text-muted ${BTN_PLAY}`;
 const Icon = ({ d, fill = 'none' }: { d: string; fill?: string }) => (
   <svg width={18} height={18} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth={2}><path d={d} /></svg>
 );
@@ -331,10 +331,10 @@ export function MovieDetail({
             <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
               <div className="flex items-center gap-2 truncate">
                 <span className="h-2 w-2 rounded-full bg-brand shrink-0" />
-                <h3 id="video-player-title" className="text-sm font-bold text-white truncate">
+                <h3 id="video-player-title" className="text-sm font-bold text-ink truncate">
                   {movie.title}
                 </h3>
-                <span className="text-xs text-zinc-400 shrink-0">
+                <span className="text-xs text-muted shrink-0">
                   • {activeMediaKind === 'feature' ? 'Phim chính' : 'Trailer'}
                 </span>
               </div>
@@ -385,7 +385,7 @@ export function MovieDetail({
               {playerState === 'error' && (
                 <div data-testid="video-error-overlay" className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 p-6 text-center z-20">
                   <AlertCircle size={44} className="text-amber-400 mb-3" />
-                  <p className="text-xs text-zinc-300 mb-4">
+                  <p className="text-xs text-zinc-200 mb-4">
                     {playbackError || STREAM_ERR}
                   </p>
                   <button
@@ -403,7 +403,7 @@ export function MovieDetail({
             <div className="flex flex-col gap-2 border-t border-surface-border bg-surface-muted/95 p-3 sm:px-4">
               {/* Timeline Scrubber */}
               <div className="flex items-center gap-3">
-                <span data-testid="video-time-display" className="text-xs font-mono text-zinc-300 shrink-0 min-w-[80px]">
+                <span data-testid="video-time-display" className="text-xs font-mono text-muted shrink-0 min-w-[80px]">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
                 <input
@@ -504,7 +504,7 @@ export function MovieDetail({
 
         {/* Content Layer */}
         <div className="page-shell relative z-10 pb-12 pt-6 sm:pt-10">
-          <Link href="/" className="inline-flex items-center gap-1 text-xs text-zinc-400 mb-6">
+          <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted mb-6">
             &larr; Trang chủ
           </Link>
 
@@ -522,9 +522,9 @@ export function MovieDetail({
                     className="object-cover"
                   />
                 ) : (
-                  <div data-testid="movie-poster-placeholder" className="flex h-full w-full flex-col items-center justify-center p-4 text-center bg-zinc-900">
+                  <div data-testid="movie-poster-placeholder" className="flex h-full w-full flex-col items-center justify-center p-4 text-center bg-mint">
                     <Film size={36} className="mb-2 text-zinc-600" />
-                    <span className="text-xs text-zinc-400">
+                    <span className="text-xs text-muted">
                       {movie.title}
                     </span>
                   </div>
@@ -541,19 +541,19 @@ export function MovieDetail({
                 Tuyển chọn Dippie
               </span>
 
-              <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-5xl">
+              <h1 className="mt-3 text-3xl font-extrabold text-ink sm:text-5xl">
                 {movie.title}
               </h1>
 
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs sm:text-sm text-zinc-400">
-                <span className="flex items-center gap-1 text-white font-bold">
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted">
+                <span className="flex items-center gap-1 text-ink font-bold">
                   <Star size={14} className="fill-amber-400 text-amber-400" />
                   {movie.rating} / 10
                 </span>
                 <span>{movie.year} · {movie.runtime} · {movie.genres.join(', ')}</span>
               </div>
 
-              <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-200">
+              <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink">
                 {movie.description}
               </p>
 
@@ -613,7 +613,7 @@ export function MovieDetail({
                   aria-label={wlAria}
                 >
                   {isWatchlistPending ? (
-                    <span className="flex items-center gap-1.5"><Loader2 size={15} className="animate-spin text-zinc-400" /> Đang cập nhật...</span>
+                    <span className="flex items-center gap-1.5"><Loader2 size={15} className="animate-spin text-muted" /> Đang cập nhật...</span>
                   ) : isWatchlistUnconfirmed ? (
                     <span className="flex items-center gap-1.5 font-bold"><RefreshCw size={15} className="text-amber-400" /> Thử lại</span>
                   ) : inWatchlist ? (
@@ -659,7 +659,7 @@ export function MovieDetail({
           <div className="space-y-8">
             {/* Interactive Rating Selector */}
             <div className={CARD}>
-              <h2 className="text-sm font-bold text-white">Đánh giá bộ phim này</h2>
+              <h2 className="text-sm font-bold text-ink">Đánh giá bộ phim này</h2>
 
               <div className="mt-4 flex flex-wrap items-center gap-1.5">
                 {STARS.map((star) => (
@@ -706,7 +706,7 @@ export function MovieDetail({
                   <button
                     disabled={isRatingPending}
                     onClick={() => removeRating(mid, movie.title)}
-                    className="text-zinc-400 hover:text-red-400 underline text-xs cursor-pointer disabled:opacity-50"
+                    className="text-muted hover:text-red-400 underline text-xs cursor-pointer disabled:opacity-50"
                   >
                     Xóa đánh giá
                   </button>
@@ -717,17 +717,17 @@ export function MovieDetail({
 
           {/* Right: Technical Attributes */}
           <div className={`${CARD} h-fit space-y-2 text-xs`}>
-            <h3 className="font-bold uppercase text-zinc-300">Thông tin</h3>
-            <p><span className="text-zinc-500">Thể loại: </span>{movie.genres.join(', ')}</p>
-            <p className={BORDER_T}><span className="text-zinc-500">Năm / Thời lượng: </span>{movie.year} · {movie.runtime}</p>
+            <h3 className="font-bold uppercase text-muted">Thông tin</h3>
+            <p><span className="text-muted">Thể loại: </span>{movie.genres.join(', ')}</p>
+            <p className={BORDER_T}><span className="text-muted">Năm / Thời lượng: </span>{movie.year} · {movie.runtime}</p>
           </div>
         </div>
 
         {/* Similar Movies */}
         <div className="mt-12 pt-8 border-t border-surface-border">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-white uppercase">Phim tương tự</h2>
-            <Link href="/search?genre=Animation" className="text-xs text-zinc-400 hover:text-brand">Tất cả &rarr;</Link>
+            <h2 className="text-sm font-bold text-ink uppercase">Phim tương tự</h2>
+            <Link href="/search?genre=Animation" className="text-xs text-muted hover:text-brand">Tất cả &rarr;</Link>
           </div>
           {similarMovies.length > 0 ? (
             <div className="movie-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 sm:gap-4 scroll-smooth">
@@ -738,9 +738,9 @@ export function MovieDetail({
                       {m.poster?.trim() ? (
                         <Image src={m.poster} alt={m.title} fill sizes="185px" className="object-cover" />
                       ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-zinc-900 text-zinc-500">
+                        <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-mint text-muted">
                           <Film size={24} className="mb-1 text-zinc-600" />
-                          <span className="text-[11px] font-medium leading-tight line-clamp-2 text-zinc-400">{m.title}</span>
+                          <span className="text-[11px] font-medium leading-tight line-clamp-2 text-muted">{m.title}</span>
                         </div>
                       )}
                       <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-400 border border-surface-border">
@@ -749,8 +749,8 @@ export function MovieDetail({
                       <Link href={`/movies/${m.id}`} className="absolute inset-0 z-10" />
                     </div>
                     <div className="p-3">
-                      <Link href={`/movies/${m.id}`} className="block truncate text-sm font-semibold text-white hover:text-brand">{m.title}</Link>
-                      <div className="mt-1 flex items-center justify-between text-xs text-zinc-400">
+                      <Link href={`/movies/${m.id}`} className="block truncate text-sm font-semibold text-ink hover:text-brand">{m.title}</Link>
+                      <div className="mt-1 flex items-center justify-between text-xs text-muted">
                         <span>{m.year} · {m.runtime}</span>
                       </div>
                     </div>
@@ -759,7 +759,7 @@ export function MovieDetail({
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-surface-border bg-surface p-6 text-center text-xs text-zinc-400">
+            <div className="rounded-lg border border-surface-border bg-surface p-6 text-center text-xs text-muted">
               Hiện chưa có tác phẩm hoạt hình nào trong danh mục này.
             </div>
           )}

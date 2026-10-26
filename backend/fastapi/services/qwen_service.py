@@ -315,6 +315,7 @@ class QwenRecommendationService:
             "generation_time_ms": 0.0,
             "tokens_per_second": 0.0,
         }
+        self._request_context = threading.local()
 
         self.system_prompt_v2_2: str = (
             "You are an expert natural language discovery intent parser for the Dippie Cinema animation system.\n"
@@ -845,35 +846,76 @@ class QwenRecommendationService:
         2. Chuẩn hóa quy tắc năm tất định (before/after/from-to/until).
         3. Chuẩn hóa thể loại include/exclude và tham chiếu phim.
         """
+        raw_intent = raw_intent if isinstance(raw_intent, dict) else {}
+        raw_query = raw_intent.get("query")
+        raw_query = raw_query if isinstance(raw_query, dict) else {}
+        raw_reference = raw_intent.get("reference")
+        raw_reference = raw_reference if isinstance(raw_reference, dict) else {}
+        raw_constraints = raw_intent.get("constraints")
+        raw_constraints = raw_constraints if isinstance(raw_constraints, dict) else {}
+        raw_preferences = raw_intent.get("preferences")
+        raw_preferences = raw_preferences if isinstance(raw_preferences, dict) else {}
+        raw_clarification = raw_intent.get("clarification")
+        raw_clarification = raw_clarification if isinstance(raw_clarification, dict) else {}
+
+        def string_list(value: Any) -> List[str]:
+            if not isinstance(value, list):
+                return []
+            return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+        def integer(value: Any) -> Optional[int]:
+            if isinstance(value, bool):
+                return None
+            if isinstance(value, float) and not value.is_integer():
+                return None
+            try:
+                return int(value)
+            except (TypeError, ValueError, OverflowError):
+                return None
+
+        def optional_text(value: Any) -> Optional[str]:
+            return value.strip() or None if isinstance(value, str) else None
+
         q_lower = query.lower().strip()
         movies = catalog or DEFAULT_MOVIES
+        raw_intent_type = raw_intent.get("intent_type", "DISCOVERY")
+        if not isinstance(raw_intent_type, str):
+            raw_intent_type = "DISCOVERY"
+        raw_intent_type = raw_intent_type.strip().upper() or "DISCOVERY"
+        raw_include_genres = string_list(raw_constraints.get("include_genres"))
+        raw_exclude_genres = string_list(raw_constraints.get("exclude_genres"))
+        raw_unsupported_facets = string_list(raw_preferences.get("unsupported_facets"))
+        raw_reference_text = optional_text(raw_reference.get("text"))
+        raw_reference_status = raw_reference.get("status", "NO_REFERENCE")
+        if not isinstance(raw_reference_status, str):
+            raw_reference_status = "NO_REFERENCE"
 
         intent: Dict[str, Any] = {
             "schema_version": "1.0",
-            "intent_type": raw_intent.get("intent_type", "DISCOVERY"),
-            "query": {"text": (raw_intent.get("query") or {}).get("text")},
+            "intent_type": raw_intent_type,
+            "query": {"text": optional_text(raw_query.get("text"))},
             "reference": {
-                "text": (raw_intent.get("reference") or {}).get("text"),
-                "status": (raw_intent.get("reference") or {}).get("status", "NO_REFERENCE"),
+                "text": raw_reference_text,
+                "status": raw_reference_status,
             },
             "constraints": {
-                "year_min": (raw_intent.get("constraints") or {}).get("year_min"),
-                "year_max": (raw_intent.get("constraints") or {}).get("year_max"),
-                "include_genres": list((raw_intent.get("constraints") or {}).get("include_genres") or []),
-                "exclude_genres": list((raw_intent.get("constraints") or {}).get("exclude_genres") or []),
+                "year_min": integer(raw_constraints.get("year_min")),
+                "year_max": integer(raw_constraints.get("year_max")),
+                "include_genres": raw_include_genres,
+                "exclude_genres": raw_exclude_genres,
             },
             "preferences": {
-                "use_personalization": (raw_intent.get("preferences") or {}).get("use_personalization"),
-                "unsupported_facets": list((raw_intent.get("preferences") or {}).get("unsupported_facets") or []),
+                "use_personalization": raw_preferences.get("use_personalization") if isinstance(raw_preferences.get("use_personalization"), bool) else None,
+                "unsupported_facets": raw_unsupported_facets,
             },
-            "requested_k": raw_intent.get("requested_k"),
-            "diversify": raw_intent.get("diversify"),
+            "requested_k": integer(raw_intent.get("requested_k")),
+            "diversify": raw_intent.get("diversify") if isinstance(raw_intent.get("diversify"), bool) else None,
             "clarification": {
-                "required": bool((raw_intent.get("clarification") or {}).get("required", False)),
-                "reason": (raw_intent.get("clarification") or {}).get("reason"),
-                "question": (raw_intent.get("clarification") or {}).get("question"),
+                "required": raw_clarification.get("required") is True,
+                "reason": optional_text(raw_clarification.get("reason")),
+                "question": optional_text(raw_clarification.get("question")),
             },
-            "no_op": bool(raw_intent.get("no_op", False)),
+            "no_op": raw_intent.get("no_op") is True,
         }
 
         # 1. Chuẩn hóa tên intent từ Confusion Matrix của Phase 23
@@ -1154,6 +1196,7 @@ class QwenRecommendationService:
         Tầng 1 (Phase 23 Intent Parser):
         Chuyển câu truy vấn tự nhiên thành đối tượng StructuredDiscoveryIntent v1 chuẩn hóa.
         """
+        self.reset_request_inference_stats()
         if not self.is_loaded:
             self.load_model()
 
@@ -1205,6 +1248,7 @@ class QwenRecommendationService:
                         "generation_time_ms": round(gen_duration * 1000, 2),
                         "tokens_per_second": round(tps, 2),
                     }
+                    self._request_context.inference_stats = dict(self.last_inference_stats)
                     raw_text = self.tokenizer.decode(out_ids[0][prompt_len:], skip_special_tokens=True).strip()
                     clean_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
             except InferenceCapacityError:
@@ -1224,6 +1268,22 @@ class QwenRecommendationService:
                 raw_parsed = {}
 
         return self.normalize_phase23_intent(raw_parsed, query, catalog)
+
+    def reset_request_inference_stats(self) -> None:
+        self._request_context.inference_stats = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "generation_time_ms": 0.0,
+            "tokens_per_second": 0.0,
+        }
+
+    def get_request_inference_stats(self) -> Dict[str, Any]:
+        return dict(getattr(self._request_context, "inference_stats", {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "generation_time_ms": 0.0,
+            "tokens_per_second": 0.0,
+        }))
 
     def generate_grounded_explanation(
         self,

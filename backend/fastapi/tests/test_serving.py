@@ -24,6 +24,7 @@ import json
 import threading
 import time
 import unittest
+import torch
 from pathlib import Path
 from typing import Optional
 from unittest.mock import patch, MagicMock
@@ -516,7 +517,7 @@ class TestServingGateway(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test_16_full_mode_invalid_json_output_returns_502(self):
         mock_model = MagicMock()
-        mock_model.generate.return_value = [[1, 2, 3]]
+        mock_model.generate.return_value = torch.tensor([[1, 2, 3]])
         mock_tok = MagicMock()
         mock_tok.apply_chat_template.return_value = "dummy prompt"
         mock_tok.return_value.to.return_value = MagicMock(input_ids=MagicMock(shape=[1, 1]))
@@ -541,7 +542,7 @@ class TestServingGateway(unittest.TestCase):
     def test_17_full_mode_valid_generation_preserves_normalization(self):
         valid_json = '{"intent_type": "DISCOVERY", "constraints": {"include_genres": ["Animation", "Adventure"], "exclude_genres": ["Horror"]}}'
         mock_model = MagicMock()
-        mock_model.generate.return_value = [[1, 2, 3]]
+        mock_model.generate.return_value = torch.tensor([[1, 2, 3]])
         mock_tok = MagicMock()
         mock_tok.apply_chat_template.return_value = "dummy prompt"
         mock_tok.return_value.to.return_value = MagicMock(input_ids=MagicMock(shape=[1, 1]))
@@ -592,6 +593,7 @@ class TestServingGateway(unittest.TestCase):
         )
         s_light.is_loaded = True
         s_light.active_inference_backend = "qwen3-0.6b-gguf+phase23-normalizer"
+        s_light.resolved_gguf_path = s_light.model_name_or_path
 
         h_light = s_light.get_health_status()
         self.assertEqual(h_light["activeBaseModelName"], "Qwen3-0.6B-Q8_0.gguf")

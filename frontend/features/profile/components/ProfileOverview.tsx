@@ -333,12 +333,12 @@ export function ProfileOverview() {
                 <span className="text-xs font-bold text-brand uppercase tracking-wider">
                   {isGuestMode ? 'Chế độ khách' : 'Thành viên Dippie'}
                 </span>
-                <span className="text-zinc-500">•</span>
-                <span className="text-xs text-zinc-400">
+                <span className="text-muted">•</span>
+                <span className="text-xs text-muted">
                   {isGuestMode ? 'Lưu trữ cục bộ trên thiết bị' : user?.email || 'Tài khoản đám mây'}
                 </span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white mt-0.5">
+              <h1 className="text-xl sm:text-2xl font-bold text-ink mt-0.5">
                 {isGuestMode ? 'Khách ghé thăm' : user?.fullName || user?.username}
               </h1>
             </div>
@@ -364,37 +364,37 @@ export function ProfileOverview() {
         {/* Stats Row */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 border-t border-surface-border pt-6">
           <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-zinc-400 text-xs">
+            <div className="flex items-center gap-2 text-muted text-xs">
               <Bookmark size={14} className="text-brand" />
               <span>Watchlist</span>
             </div>
-            <p className="mt-1 text-lg sm:text-2xl font-bold text-white">{watchlist.length}</p>
+            <p className="mt-1 text-lg sm:text-2xl font-bold text-ink">{watchlist.length}</p>
           </div>
 
           <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-zinc-400 text-xs">
+            <div className="flex items-center gap-2 text-muted text-xs">
               <Heart size={14} className="text-brand" />
               <span>Yêu thích</span>
             </div>
-            <p className="mt-1 text-lg sm:text-2xl font-bold text-white">{favorites.length}</p>
+            <p className="mt-1 text-lg sm:text-2xl font-bold text-ink">{favorites.length}</p>
           </div>
 
           <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-zinc-400 text-xs">
+            <div className="flex items-center gap-2 text-muted text-xs">
               <Star size={14} className="text-brand" />
               <span>Đã chấm điểm</span>
             </div>
-            <p className="mt-1 text-lg sm:text-2xl font-bold text-white">
+            <p className="mt-1 text-lg sm:text-2xl font-bold text-ink">
               {Object.keys(ratings).length}
             </p>
           </div>
 
           <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
-            <div className="flex items-center gap-2 text-zinc-400 text-xs">
+            <div className="flex items-center gap-2 text-muted text-xs">
               <Film size={14} className="text-brand" />
               <span>Thể loại ưu tiên</span>
             </div>
-            <p className="mt-1 text-xs sm:text-sm font-semibold text-white truncate">
+            <p className="mt-1 text-xs sm:text-sm font-semibold text-ink truncate">
               {topGenres.length > 0 ? topGenres.map((g) => g[0]).join(', ') : 'Chưa xác định'}
             </p>
           </div>
@@ -409,7 +409,7 @@ export function ProfileOverview() {
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
               activeTab === 'watchlist'
                 ? 'border-brand text-brand'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             <Bookmark size={15} /> Watchlist ({watchlist.length})
@@ -420,7 +420,7 @@ export function ProfileOverview() {
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
               activeTab === 'favorites'
                 ? 'border-brand text-brand'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             <Heart size={15} /> Yêu thích ({favorites.length})
@@ -431,7 +431,7 @@ export function ProfileOverview() {
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
               activeTab === 'ratings'
                 ? 'border-brand text-brand'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             <Star size={15} /> Đã chấm điểm ({Object.keys(ratings).length})
@@ -440,7 +440,7 @@ export function ProfileOverview() {
 
         {/* Guest Mode notice */}
         {isGuestMode && (
-          <div className="my-4 flex items-center justify-between rounded-lg border border-surface-border bg-surface-muted px-4 py-3 text-xs text-zinc-400">
+          <div className="my-4 flex items-center justify-between rounded-lg border border-surface-border bg-surface-muted px-4 py-3 text-xs text-muted">
             <span>
               Dữ liệu danh sách đang lưu trên trình duyệt của thiết bị này. Đăng nhập để bảo lưu và mở khóa gợi ý cá nhân hóa sâu.
             </span>
@@ -482,7 +482,7 @@ export function ProfileOverview() {
         {/* Tab Content Panels */}
         <div className="mt-6">
           {isLibraryLoading && watchlist.length === 0 && favorites.length === 0 && Object.keys(ratings).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
+            <div className="flex flex-col items-center justify-center py-20 text-muted">
               <Loader2 className="animate-spin text-brand mb-3" size={28} />
               <p className="text-xs">Đang tải thư viện cá nhân từ máy chủ...</p>
             </div>
@@ -498,10 +498,10 @@ export function ProfileOverview() {
                       ) : item.status === 'loading' ? (
                         <div
                           key={item.id}
-                          className="flex h-56 flex-col items-center justify-center rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
+                          className="flex h-56 flex-col items-center justify-center rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs"
                         >
                           <Loader2 size={18} className="animate-spin text-brand mb-2" />
-                          <span className="text-zinc-500 text-[11px]">Đang tải dữ liệu...</span>
+                          <span className="text-muted text-[11px]">Đang tải dữ liệu...</span>
                         </div>
                       ) : item.status === 'error' ? (
                         <div
@@ -512,15 +512,15 @@ export function ProfileOverview() {
                             <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
                               <AlertCircle size={12} /> Lỗi kết nối
                             </div>
-                            <p className="font-bold text-white truncate">{item.id}</p>
-                            <p className="text-[11px] text-zinc-400 mt-1">
+                            <p className="font-bold text-ink truncate">{item.id}</p>
+                            <p className="text-[11px] text-muted mt-1">
                               Không thể kết nối máy chủ để tải thông tin phim.
                             </p>
                           </div>
                           <div className="mt-3 flex flex-col gap-1.5">
                             <button
                               onClick={() => fetchRemoteMovie(item.id)}
-                              className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                              className="flex items-center justify-center gap-1 rounded bg-surface-elevated py-1.5 text-[11px] text-muted hover:bg-surface-elevated transition-colors cursor-pointer"
                             >
                               <RefreshCw size={12} /> Thử tải lại
                             </button>
@@ -530,7 +530,7 @@ export function ProfileOverview() {
                               className={`flex items-center justify-center gap-1 rounded py-1.5 text-[11px] transition-colors cursor-pointer disabled:opacity-50 ${
                                 isActionUnconfirmed(item.id, 'watchlist')
                                   ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-400/40'
-                                  : 'bg-zinc-800 text-red-300 hover:bg-red-500/20'
+                                  : 'bg-surface-elevated text-red-300 hover:bg-red-500/20'
                               }`}
                               aria-label={
                                 isActionPending(item.id, 'watchlist')
@@ -568,14 +568,14 @@ export function ProfileOverview() {
                         /* Movie absent from catalog (404) */
                         <div
                           key={item.id}
-                          className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
+                          className="flex flex-col justify-between rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs"
                         >
                           <div>
                             <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
                               <AlertCircle size={12} /> Không có trong catalog (404)
                             </div>
-                            <p className="font-bold text-white truncate">{item.id}</p>
-                            <p className="text-[11px] text-zinc-500 mt-1">
+                            <p className="font-bold text-ink truncate">{item.id}</p>
+                            <p className="text-[11px] text-muted mt-1">
                               Tác phẩm này không còn tồn tại trong danh mục phim.
                             </p>
                           </div>
@@ -585,7 +585,7 @@ export function ProfileOverview() {
                             className={`mt-3 flex items-center justify-center gap-1 rounded py-1.5 text-[11px] transition-colors cursor-pointer disabled:opacity-50 ${
                               isActionUnconfirmed(item.id, 'watchlist')
                                 ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-400/40'
-                                : 'bg-zinc-800 text-red-300 hover:bg-red-500/20'
+                                : 'bg-surface-elevated text-red-300 hover:bg-red-500/20'
                             }`}
                             aria-label={
                               isActionPending(item.id, 'watchlist')
@@ -625,7 +625,7 @@ export function ProfileOverview() {
                   <div className="flex flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/5 py-12 px-4 text-center">
                     <AlertCircle size={28} className="text-red-400 mb-2" />
                     <p className="text-sm font-bold text-red-300">{libraryError}</p>
-                    <p className="text-xs text-zinc-400 mt-1 mb-4">
+                    <p className="text-xs text-muted mt-1 mb-4">
                       Không thể đồng bộ danh sách từ máy chủ. Vui lòng kiểm tra kết nối mạng.
                     </p>
                     <button
@@ -653,10 +653,10 @@ export function ProfileOverview() {
                       ) : item.status === 'loading' ? (
                         <div
                           key={item.id}
-                          className="flex h-56 flex-col items-center justify-center rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
+                          className="flex h-56 flex-col items-center justify-center rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs"
                         >
                           <Loader2 size={18} className="animate-spin text-brand mb-2" />
-                          <span className="text-zinc-500 text-[11px]">Đang tải dữ liệu...</span>
+                          <span className="text-muted text-[11px]">Đang tải dữ liệu...</span>
                         </div>
                       ) : item.status === 'error' ? (
                         <div
@@ -667,15 +667,15 @@ export function ProfileOverview() {
                             <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
                               <AlertCircle size={12} /> Lỗi kết nối
                             </div>
-                            <p className="font-bold text-white truncate">{item.id}</p>
-                            <p className="text-[11px] text-zinc-400 mt-1">
+                            <p className="font-bold text-ink truncate">{item.id}</p>
+                            <p className="text-[11px] text-muted mt-1">
                               Không thể kết nối máy chủ để tải thông tin phim.
                             </p>
                           </div>
                           <div className="mt-3 flex flex-col gap-1.5">
                             <button
                               onClick={() => fetchRemoteMovie(item.id)}
-                              className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                              className="flex items-center justify-center gap-1 rounded bg-surface-elevated py-1.5 text-[11px] text-muted hover:bg-surface-elevated transition-colors cursor-pointer"
                             >
                               <RefreshCw size={12} /> Thử tải lại
                             </button>
@@ -685,7 +685,7 @@ export function ProfileOverview() {
                               className={`flex items-center justify-center gap-1 rounded py-1.5 text-[11px] transition-colors cursor-pointer disabled:opacity-50 ${
                                 isActionUnconfirmed(item.id, 'favorite')
                                   ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-400/40'
-                                  : 'bg-zinc-800 text-red-300 hover:bg-red-500/20'
+                                  : 'bg-surface-elevated text-red-300 hover:bg-red-500/20'
                               }`}
                               aria-label={
                                 isActionPending(item.id, 'favorite')
@@ -723,14 +723,14 @@ export function ProfileOverview() {
                         /* Movie absent from catalog (404) */
                         <div
                           key={item.id}
-                          className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs"
+                          className="flex flex-col justify-between rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs"
                         >
                           <div>
                             <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
                               <AlertCircle size={12} /> Không có trong catalog (404)
                             </div>
-                            <p className="font-bold text-white truncate">{item.id}</p>
-                            <p className="text-[11px] text-zinc-500 mt-1">
+                            <p className="font-bold text-ink truncate">{item.id}</p>
+                            <p className="text-[11px] text-muted mt-1">
                               Tác phẩm này không còn tồn tại trong danh mục phim.
                             </p>
                           </div>
@@ -740,7 +740,7 @@ export function ProfileOverview() {
                             className={`mt-3 flex items-center justify-center gap-1 rounded py-1.5 text-[11px] transition-colors cursor-pointer disabled:opacity-50 ${
                               isActionUnconfirmed(item.id, 'favorite')
                                 ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-400/40'
-                                : 'bg-zinc-800 text-red-300 hover:bg-red-500/20'
+                                : 'bg-surface-elevated text-red-300 hover:bg-red-500/20'
                             }`}
                             aria-label={
                               isActionPending(item.id, 'favorite')
@@ -780,7 +780,7 @@ export function ProfileOverview() {
                   <div className="flex flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/5 py-12 px-4 text-center">
                     <AlertCircle size={28} className="text-red-400 mb-2" />
                     <p className="text-sm font-bold text-red-300">{libraryError}</p>
-                    <p className="text-xs text-zinc-400 mt-1 mb-4">
+                    <p className="text-xs text-muted mt-1 mb-4">
                       Không thể đồng bộ danh sách từ máy chủ. Vui lòng kiểm tra kết nối mạng.
                     </p>
                     <button
@@ -808,7 +808,7 @@ export function ProfileOverview() {
                           <div>
                             <MovieCard movie={item.movie} fluid />
                             <div className="mt-1 flex items-center justify-between px-1 text-xs">
-                              <span className="text-zinc-400 text-[11px]">Điểm của bạn:</span>
+                              <span className="text-muted text-[11px]">Điểm của bạn:</span>
                               <div className="flex items-center gap-2">
                                 <span className="flex items-center gap-0.5 font-bold text-amber-400">
                                   <Star size={11} className="fill-amber-400" /> {item.rating}/10
@@ -828,7 +828,7 @@ export function ProfileOverview() {
                                   className={`transition-colors cursor-pointer p-0.5 disabled:opacity-50 ${
                                     isActionUnconfirmed(item.id, 'rating')
                                       ? 'text-amber-400 hover:text-amber-300'
-                                      : 'text-zinc-500 hover:text-red-400'
+                                      : 'text-muted hover:text-red-400'
                                   }`}
                                   title={
                                     isActionUnconfirmed(item.id, 'rating')
@@ -859,9 +859,9 @@ export function ProfileOverview() {
                             </div>
                           </div>
                         ) : item.status === 'loading' ? (
-                          <div className="flex h-56 flex-col items-center justify-center rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs">
+                          <div className="flex h-56 flex-col items-center justify-center rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs">
                             <Loader2 size={18} className="animate-spin text-brand mb-2" />
-                            <span className="text-zinc-500 text-[11px]">Đang tải dữ liệu...</span>
+                            <span className="text-muted text-[11px]">Đang tải dữ liệu...</span>
                           </div>
                         ) : item.status === 'error' ? (
                           <div className="flex flex-col justify-between rounded-lg border border-amber-900/40 bg-surface-muted p-4 text-xs">
@@ -869,18 +869,18 @@ export function ProfileOverview() {
                               <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
                                 <AlertCircle size={12} /> Lỗi kết nối
                               </div>
-                              <p className="font-bold text-white truncate">{item.id}</p>
+                              <p className="font-bold text-ink truncate">{item.id}</p>
                               <p className="text-amber-400 font-semibold mt-1">
                                 Điểm đã chấm: {item.rating}/10 ★
                               </p>
-                              <p className="text-[11px] text-zinc-400 mt-1">
+                              <p className="text-[11px] text-muted mt-1">
                                 Không thể kết nối máy chủ để tải thông tin phim.
                               </p>
                             </div>
                             <div className="mt-3 flex flex-col gap-1.5">
                               <button
                                 onClick={() => fetchRemoteMovie(item.id)}
-                                className="flex items-center justify-center gap-1 rounded bg-zinc-800 py-1.5 text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                                className="flex items-center justify-center gap-1 rounded bg-surface-elevated py-1.5 text-[11px] text-muted hover:bg-surface-elevated transition-colors cursor-pointer"
                               >
                                 <RefreshCw size={12} /> Thử tải lại
                               </button>
@@ -890,7 +890,7 @@ export function ProfileOverview() {
                                 className={`flex items-center justify-center gap-1 rounded py-1.5 text-[11px] transition-colors cursor-pointer disabled:opacity-50 ${
                                   isActionUnconfirmed(item.id, 'rating')
                                     ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-400/40'
-                                    : 'bg-zinc-800 text-red-300 hover:bg-red-500/20'
+                                    : 'bg-surface-elevated text-red-300 hover:bg-red-500/20'
                                 }`}
                                 aria-label={
                                   isActionPending(item.id, 'rating')
@@ -926,16 +926,16 @@ export function ProfileOverview() {
                           </div>
                         ) : (
                           /* Absent from catalog (404) */
-                          <div className="flex flex-col justify-between rounded-lg border border-zinc-800 bg-surface-muted p-4 text-xs">
+                          <div className="flex flex-col justify-between rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs">
                             <div>
                               <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
                                 <AlertCircle size={12} /> Không có trong catalog (404)
                               </div>
-                              <p className="font-bold text-white truncate">{item.id}</p>
+                              <p className="font-bold text-ink truncate">{item.id}</p>
                               <p className="text-amber-400 font-semibold mt-1">
                                 Điểm đã chấm: {item.rating}/10 ★
                               </p>
-                              <p className="text-[11px] text-zinc-500 mt-1">
+                              <p className="text-[11px] text-muted mt-1">
                                 Tác phẩm này không còn tồn tại trong danh mục phim.
                               </p>
                             </div>
@@ -945,7 +945,7 @@ export function ProfileOverview() {
                               className={`mt-3 flex items-center justify-center gap-1 rounded py-1.5 text-[11px] transition-colors cursor-pointer disabled:opacity-50 ${
                                 isActionUnconfirmed(item.id, 'rating')
                                   ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-400/40'
-                                  : 'bg-zinc-800 text-red-300 hover:bg-red-500/20'
+                                  : 'bg-surface-elevated text-red-300 hover:bg-red-500/20'
                               }`}
                               aria-label={
                                 isActionPending(item.id, 'rating')
@@ -986,7 +986,7 @@ export function ProfileOverview() {
                   <div className="flex flex-col items-center justify-center rounded-xl border border-red-500/20 bg-red-500/5 py-12 px-4 text-center">
                     <AlertCircle size={28} className="text-red-400 mb-2" />
                     <p className="text-sm font-bold text-red-300">{libraryError}</p>
-                    <p className="text-xs text-zinc-400 mt-1 mb-4">
+                    <p className="text-xs text-muted mt-1 mb-4">
                       Không thể đồng bộ danh sách từ máy chủ. Vui lòng kiểm tra kết nối mạng.
                     </p>
                     <button
@@ -1023,9 +1023,9 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-surface-border bg-surface px-6 py-14 text-center">
-      <Film className="text-zinc-500 mb-2.5" size={28} />
-      <h3 className="text-base font-bold text-white">{title}</h3>
-      <p className="mt-1 max-w-md text-xs text-zinc-400">{description}</p>
+      <Film className="text-muted mb-2.5" size={28} />
+      <h3 className="text-base font-bold text-ink">{title}</h3>
+      <p className="mt-1 max-w-md text-xs text-muted">{description}</p>
       <div className="mt-4 flex gap-2">
         <Link href="/" className="btn-primary text-xs">
           Khám phá phim <ArrowRight size={13} />

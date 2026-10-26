@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Bookmark, Check, Loader2, Star, RefreshCw, Film } from 'lucide-react';
+import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
@@ -51,9 +52,9 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
         fluid ? 'w-full' : 'w-[155px] shrink-0 sm:w-[185px] md:w-[205px]'
       }`}
     >
-      <article className="overflow-hidden rounded-lg border border-surface-border bg-surface transition-all duration-200 group-hover:border-brand/40 group-hover:shadow-card-hover">
+      <article className="comic-card overflow-hidden transition-all duration-200 group-hover:shadow-card-hover">
         {/* Poster Media */}
-        <div className="relative aspect-[2/3] w-full overflow-hidden bg-surface-elevated">
+        <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-elevated">
           {hasPoster ? (
             <Image
               src={movie.poster}
@@ -68,20 +69,20 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
               className="object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-zinc-900 text-zinc-500">
-              <Film size={28} className="mb-2 text-zinc-600" />
-              <span className="text-[11px] font-medium leading-tight line-clamp-2 text-zinc-400">
+            <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-mint text-muted">
+              <Film size={28} className="mb-2 text-muted" />
+              <span className="text-[11px] font-medium leading-tight line-clamp-2 text-muted">
                 {movie.title}
               </span>
             </div>
           )}
 
           {/* Overlay gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/30 opacity-70" />
+          <div className="absolute inset-0 comic-halftone pointer-events-none opacity-20" />
 
           {/* Rating Badge */}
-          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-surface-border backdrop-blur-md">
-            <Star size={11} className="fill-amber-400" />
+          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-2 py-0.5 text-[11px] font-bold text-ink border border-surface-border backdrop-blur-md">
+            <Star size={11} className="fill-mint" />
             {movie.rating}
           </span>
 
@@ -98,7 +99,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
 
           {/* Hover / Focus Overlay: Navigate to Details */}
           <Link
-            href={`/movies/${movie.id}`}
+            href={buildMediaItemHref(movie)}
             aria-label={`Xem chi tiết ${movie.title}`}
             className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
           >
@@ -123,7 +124,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
                 ? 'bg-amber-400 text-zinc-950 shadow-md border border-amber-300 hover:bg-amber-300 ring-2 ring-amber-400/40'
                 : inWatchlist
                 ? 'bg-brand text-zinc-950 shadow-brand-sm'
-                : 'bg-surface/85 text-zinc-300 border border-surface-border hover:bg-brand hover:text-zinc-950 hover:border-brand'
+                : 'bg-surface/85 text-muted border border-surface-border hover:bg-brand hover:text-zinc-950 hover:border-brand'
             }`}
           >
             {isPending ? (
@@ -139,19 +140,19 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
         </div>
 
         {/* Content Info */}
-        <div className="p-3">
+        <div className="border-t-2 border-ink p-3">
           <Link
-            href={`/movies/${movie.id}`}
-            className="block truncate text-sm font-semibold text-white transition-colors hover:text-brand focus-visible:outline-none focus-visible:text-brand"
+            href={buildMediaItemHref(movie)}
+            className="block truncate text-sm font-semibold text-ink transition-colors hover:text-brand focus-visible:outline-none focus-visible:text-brand"
           >
             {movie.title}
           </Link>
 
-          <div className="mt-1 flex items-center justify-between text-xs text-zinc-400">
+          <div className="mt-1 flex items-center justify-between text-xs text-muted">
             <span>{movie.year} · {movie.runtime}</span>
           </div>
 
-          <p className="mt-1 truncate text-xs text-zinc-500">
+          <p className="mt-1 truncate text-xs text-muted">
             {movie.genres.join(', ')}
           </p>
         </div>

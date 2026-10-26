@@ -22,6 +22,7 @@ Verifies all 12 failure injection, concurrency, reader isolation, and recovery s
 =============================================================================
 """
 
+import hmac
 import ast
 import copy
 import json
@@ -114,6 +115,7 @@ def create_test_context(temp_dir: Path, sync_mod, hybrid_mod):
         ),
         "SYNC_STATE_PATH": state_path,
         "json": json,
+        "hmac": hmac,
         "Request": SimpleNamespace,
         "AcceptedSnapshot": sync_mod.AcceptedSnapshot,
         "get_accepted_snapshot": ctx_get_snapshot,

@@ -12,7 +12,7 @@ type MovieSectionProps = {
   exploreHref?: string;
 };
 
-const BTN_SCROLL = 'rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer';
+const BTN_SCROLL = 'rounded-md border border-surface-border bg-surface p-1.5 text-muted transition hover:border-brand/40 hover:text-ink cursor-pointer';
 
 const SvgIcon = ({ d }: { d: string }) => (
   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d={d}/></svg>
@@ -36,7 +36,7 @@ export function MovieSection({
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <h2 className="section-title">{title}</h2>
-          {subtitle && <p className="mt-1 text-xs sm:text-sm text-zinc-400">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-xs sm:text-sm text-muted">{subtitle}</p>}
         </div>
 
         <div className="flex items-center gap-2">
@@ -60,7 +60,7 @@ export function MovieSection({
 
           <Link
             href={exploreHref}
-            className="flex items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-brand ml-2"
+            className="flex items-center gap-1 text-xs font-medium text-muted transition hover:text-brand ml-2"
           >
             <span>Tất cả</span>
             <SvgIcon d="M7 7h10v10M7 17 17 7" />
@@ -79,7 +79,7 @@ export function MovieSection({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-surface-border bg-surface p-6 text-center text-xs sm:text-sm text-zinc-400">
+        <div className="rounded-lg border border-surface-border bg-surface p-6 text-center text-xs sm:text-sm text-muted">
           Hiện chưa có tác phẩm hoạt hình nào trong danh mục này.
         </div>
       )}

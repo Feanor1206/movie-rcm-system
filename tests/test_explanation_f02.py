@@ -164,7 +164,7 @@ def test_06_genuine_similarity_search(explainer):
     }]
     nlu = {
         "query": {"text": "Tìm phim tương tự Shin Cậu Bé Bút Chì"},
-        "reference": {"text": "Shin Cậu Bé Bút Chì"}
+        "reference": {"text": "Shin Cậu Bé Bút Chì", "status": "CLEAR_REFERENCE_TEXT"}
     }
     res = explainer.generate_explanation(ranked, nlu, query="Tìm phim tương tự Shin Cậu Bé Bút Chì")
     

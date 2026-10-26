@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { Menu, Search, User, X, LogOut, Bookmark, UserCheck } from 'lucide-react';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { useAuth } from '@/lib/context/AuthContext';
-import { AuthModal } from '@/features/auth/components/AuthModal';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -17,7 +16,7 @@ export function Navbar() {
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
 
   const navLinks = [
-    { name: 'Khám phá', href: '/' },
+    { name: 'Trang bìa', href: '/' },
     { name: 'Kho phim', href: '/search' },
     { name: 'Danh sách xem', href: '/profile', count: watchlist.length },
     { name: 'Nhập dữ liệu', href: '/admin/import' },
@@ -42,16 +41,16 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-surface-border bg-background/90 backdrop-blur-md">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="comic-navbar sticky top-0 z-40 border-b-2 border-ink bg-paper-white">
+      <nav className="mx-auto flex h-[86px] max-w-[1280px] items-center justify-between px-5 sm:px-8">
         {/* Left: Brand Logo & Links */}
         <div className="flex items-center gap-8">
           <Link
             href="/"
-            className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
+            className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
           >
-            <span className="tracking-tighter font-extrabold text-2xl">DIPPIE</span>
-            <span className="h-2 w-2 rounded-full bg-brand" />
+            <span className="comic-wordmark">Dippie</span>
+            <span className="logo-stamp" aria-hidden="true">✳</span>
           </Link>
 
           {/* Desktop Nav Items */}
@@ -62,13 +61,14 @@ export function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`text-sm font-medium transition-colors ${
-                    isActive ? 'text-white font-semibold' : 'text-zinc-400 hover:text-white'
+                    isActive ? 'text-ink font-semibold' : 'text-muted hover:text-ink'
                   }`}
                 >
                   {link.name}
                   {link.count !== undefined && link.count > 0 && (
-                    <span className="ml-1 text-xs text-zinc-500 font-normal">
+                    <span className="ml-1 text-xs text-muted font-normal">
                       ({link.count})
                     </span>
                   )}
@@ -83,16 +83,16 @@ export function Navbar() {
           {/* Chatbot Trigger */}
           <button
             onClick={openChat}
-            className="rounded-md border border-surface-border bg-surface-elevated px-3.5 py-1.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-brand hover:text-white cursor-pointer"
+            className="rounded-md border border-surface-border bg-surface-elevated px-3.5 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand hover:text-ink cursor-pointer"
           >
-            Hỏi CineBot
+            Trò chuyện
           </button>
 
           {/* Search Button */}
           <Link
             href="/search"
             aria-label="Tìm kiếm phim"
-            className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer"
+            className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-1.5 text-xs text-muted transition-colors hover:border-ink hover:text-ink cursor-pointer"
           >
             <Search size={14} />
             <span>Tìm kiếm</span>
@@ -104,7 +104,7 @@ export function Navbar() {
               <button
                 data-testid="nav-user-dropdown-button"
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1 text-xs text-ink hover:border-ink hover:text-ink transition-colors cursor-pointer"
               >
                 <div className="grid h-6 w-6 place-items-center rounded bg-brand text-[11px] font-bold text-zinc-950 shadow-brand-sm">
                   {getInitials(user.fullName || user.username)}
@@ -119,22 +119,22 @@ export function Navbar() {
               {userDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-52 rounded-lg border border-surface-border bg-surface-elevated p-2 shadow-2xl animate-fade-in z-50">
                   <div className="px-2.5 py-2 border-b border-surface-border">
-                    <p className="text-xs font-bold text-white truncate">{user.fullName || user.username}</p>
-                    <p className="text-[11px] text-zinc-400 truncate">{user.email}</p>
+                    <p className="text-xs font-bold text-ink truncate">{user.fullName || user.username}</p>
+                    <p className="text-[11px] text-muted truncate">{user.email}</p>
                   </div>
 
                   <div className="mt-1.5 space-y-0.5">
                     <Link
                       href="/profile"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-surface-hover hover:text-white transition-colors"
+                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted hover:bg-surface-hover hover:text-ink transition-colors"
                     >
                       <UserCheck size={14} /> Hồ sơ cá nhân
                     </Link>
                     <Link
                       href="/profile"
                       onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-surface-hover hover:text-white transition-colors"
+                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted hover:bg-surface-hover hover:text-ink transition-colors"
                     >
                       <Bookmark size={14} /> Watchlist ({watchlist.length})
                     </Link>
@@ -158,7 +158,7 @@ export function Navbar() {
             <button
               data-testid="nav-login-button"
               onClick={() => openAuthModal('login')}
-              className="rounded-md bg-surface border border-surface-border px-3 py-1.5 text-xs font-semibold text-zinc-100 hover:border-brand hover:bg-brand hover:text-zinc-950 transition-all cursor-pointer shadow-sm hover:shadow-brand-sm"
+              className="rounded-md bg-surface border border-surface-border px-3 py-1.5 text-xs font-semibold text-ink hover:border-brand hover:bg-brand hover:text-zinc-950 transition-all cursor-pointer shadow-sm hover:shadow-brand-sm"
             >
               Đăng nhập
             </button>
@@ -178,7 +178,7 @@ export function Navbar() {
           ) : (
             <button
               onClick={() => openAuthModal('login')}
-              className="rounded bg-brand px-2.5 py-1 text-xs font-bold text-zinc-950 hover:bg-brand-hover active:bg-brand-active cursor-pointer shadow-brand-sm"
+              className="min-h-[44px] rounded bg-brand px-2.5 py-1 text-xs font-bold text-zinc-950 hover:bg-brand-hover active:bg-brand-active cursor-pointer shadow-brand-sm"
             >
               Đăng nhập
             </button>
@@ -187,7 +187,7 @@ export function Navbar() {
           <button
             aria-label={open ? 'Đóng menu' : 'Mở menu'}
             onClick={() => setOpen(!open)}
-            className="rounded-md border border-surface-border bg-surface p-2 text-zinc-300 hover:text-white cursor-pointer"
+            className="min-h-[44px] min-w-[44px] rounded-md border border-surface-border bg-surface p-2 text-muted hover:text-ink cursor-pointer"
           >
             {open ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -206,7 +206,7 @@ export function Navbar() {
                   href={link.href}
                   onClick={() => setOpen(false)}
                   className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium ${
-                    isActive ? 'bg-surface-elevated text-white font-bold border border-surface-border' : 'text-zinc-300 hover:bg-surface-hover'
+                    isActive ? 'bg-surface-elevated text-ink font-bold border border-surface-border' : 'text-muted hover:bg-surface-hover'
                   }`}
                 >
                   <span>{link.name}</span>
@@ -227,7 +227,7 @@ export function Navbar() {
                 }}
                 className="btn-primary w-full justify-center text-xs"
               >
-                Hỏi CineBot gợi ý hoạt hình
+                Trò chuyện gợi ý hoạt hình
               </button>
               <Link
                 href="/search"
@@ -241,8 +241,6 @@ export function Navbar() {
         </div>
       )}
 
-      {/* Global Authentication Modal */}
-      <AuthModal />
     </header>
   );
 }

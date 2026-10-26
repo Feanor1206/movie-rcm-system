@@ -92,10 +92,10 @@ export default function AdminImportPage() {
             <Database size={14} />
             <span>Quản trị danh mục</span>
           </div>
-          <h1 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-extrabold text-ink sm:text-3xl">
             Nhập Dữ Liệu Hoạt Hình (dippie.catalog.v1)
           </h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-muted">
             Nhập dữ liệu JSON từ bên ngoài, kiểm tra tính hợp lệ trước khi lưu trữ bền vững trong cơ sở dữ liệu.
           </p>
         </div>
@@ -103,14 +103,14 @@ export default function AdminImportPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setRefreshNonce((n) => n + 1)}
-            className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-zinc-300"
+            className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-muted"
           >
             <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
             <span>Làm mới</span>
           </button>
           <Link
             href="/search"
-            className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-zinc-300"
+            className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-muted"
           >
             <Film size={14} />
             <span>Xem kho phim</span>
@@ -128,20 +128,20 @@ export default function AdminImportPage() {
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
                 <Film size={18} className="text-brand" />
-                <h2 className="text-base font-bold text-white">
+                <h2 className="text-base font-bold text-ink">
                   Các bộ hoạt hình đã nhập ({seriesList.length})
                 </h2>
               </div>
-              <span className="text-xs text-zinc-400">Xem chi tiết các phần, tập và cảnh</span>
+              <span className="text-xs text-muted">Xem chi tiết các phần, tập và cảnh</span>
             </div>
 
             {isLoading ? (
-              <div className="flex items-center justify-center py-10 text-xs text-zinc-400">
+              <div className="flex items-center justify-center py-10 text-xs text-muted">
                 <RefreshCw size={16} className="animate-spin text-brand mr-2" />
                 <span>Đang tải danh sách bộ phim...</span>
               </div>
             ) : seriesList.length === 0 ? (
-              <div className="py-8 text-center text-xs text-zinc-400">
+              <div className="py-8 text-center text-xs text-muted">
                 Chưa có bộ hoạt hình nào được nhập. Hãy tải tệp JSON lên để bắt đầu.
               </div>
             ) : (
@@ -155,21 +155,21 @@ export default function AdminImportPage() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/series/${encodeURIComponent(ser.id)}`}
-                          className="text-sm font-bold text-white hover:text-brand transition-colors"
+                          className="text-sm font-bold text-ink hover:text-brand transition-colors"
                         >
                           {ser.title}
                         </Link>
                         {ser.releaseYearStart && (
-                          <span className="rounded bg-surface-elevated px-1.5 py-0.5 text-[10px] text-zinc-400 border border-surface-border">
+                          <span className="rounded bg-surface-elevated px-1.5 py-0.5 text-[10px] text-muted border border-surface-border">
                             {ser.releaseYearStart}
                           </span>
                         )}
-                        <span className="font-mono text-[11px] text-zinc-500">
+                        <span className="font-mono text-[11px] text-muted">
                           [{ser.id}]
                         </span>
                       </div>
                       {ser.synopsis && (
-                        <p className="mt-1 line-clamp-1 text-xs text-zinc-400 max-w-xl">
+                        <p className="mt-1 line-clamp-1 text-xs text-muted max-w-xl">
                           {ser.synopsis}
                         </p>
                       )}
@@ -207,7 +207,7 @@ export default function AdminImportPage() {
               </div>
               <button
                 onClick={() => setActionMessage(null)}
-                className="text-zinc-400 hover:text-white"
+                className="text-muted hover:text-ink"
               >
                 ✕
               </button>
@@ -219,20 +219,20 @@ export default function AdminImportPage() {
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
                 <Activity size={18} className="text-brand" />
-                <h2 className="text-base font-bold text-white">
+                <h2 className="text-base font-bold text-ink">
                   Hàng đợi Outbox & Đồng bộ Chỉ mục AI ({snapshots.length})
                 </h2>
               </div>
-              <span className="text-xs text-zinc-400">Trạng thái đồng bộ tự động giữa Spring Boot và FastAPI</span>
+              <span className="text-xs text-muted">Trạng thái đồng bộ tự động giữa Spring Boot và FastAPI</span>
             </div>
 
             {isLoading ? (
-              <div className="flex items-center justify-center py-8 text-xs text-zinc-400">
+              <div className="flex items-center justify-center py-8 text-xs text-muted">
                 <RefreshCw size={16} className="animate-spin text-brand mr-2" />
                 <span>Đang kiểm tra hàng đợi outbox...</span>
               </div>
             ) : snapshots.length === 0 ? (
-              <div className="py-6 text-center text-xs text-zinc-400">
+              <div className="py-6 text-center text-xs text-muted">
                 Chưa có snapshot nào được tạo. Khi bạn nhập gói catalog, snapshot sẽ được ghi nhận tại đây.
               </div>
             ) : (
@@ -250,8 +250,8 @@ export default function AdminImportPage() {
                           <span className="font-mono font-bold text-brand">
                             Thế hệ {snap.snapshotVersion}
                           </span>
-                          <span className="font-mono text-zinc-400">[{snap.id}]</span>
-                          <span className="text-zinc-400">({snap.totalItems} mục)</span>
+                          <span className="font-mono text-muted">[{snap.id}]</span>
+                          <span className="text-muted">({snap.totalItems} mục)</span>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -286,7 +286,7 @@ export default function AdminImportPage() {
                               type="button"
                               onClick={() => handleRetrySnapshot(snap.id)}
                               disabled={isRetrying}
-                              className="btn-secondary flex items-center gap-1 text-[11px] py-1 px-2.5 font-semibold text-brand hover:text-white disabled:opacity-50"
+                              className="btn-secondary flex items-center gap-1 text-[11px] py-1 px-2.5 font-semibold text-brand hover:text-ink disabled:opacity-50"
                             >
                               <RotateCcw size={11} className={isRetrying ? 'animate-spin' : ''} />
                               <span>{isRetrying ? 'Đang gửi...' : 'Thử lại'}</span>
@@ -301,7 +301,7 @@ export default function AdminImportPage() {
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+                      <div className="flex items-center justify-between text-[10px] text-muted font-mono">
                         <span title={snap.contentHash}>SHA-256: {snap.contentHash.slice(0, 16)}...</span>
                         {snap.retryCount !== undefined && snap.retryCount > 0 && (
                           <span>Số lần thử lại: {snap.retryCount}</span>
@@ -319,18 +319,18 @@ export default function AdminImportPage() {
         <div className="space-y-6">
           {/* Workflow Guide Card */}
           <div className="rounded-xl border border-surface-border bg-surface p-5">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
               <Sparkles size={16} className="text-brand" />
               <span>Quy trình nhập dữ liệu</span>
             </h3>
-            <ol className="mt-3 space-y-2.5 text-xs text-zinc-300">
+            <ol className="mt-3 space-y-2.5 text-xs text-muted">
               <li className="flex gap-2">
                 <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
                   1
                 </span>
                 <span>
                   <strong>JSON bên ngoài:</strong> Chuẩn hóa theo hợp đồng{' '}
-                  <code className="text-zinc-400">dippie.catalog.v1</code>.
+                  <code className="text-muted">dippie.catalog.v1</code>.
                 </span>
               </li>
               <li className="flex gap-2">
@@ -364,11 +364,11 @@ export default function AdminImportPage() {
           <div className="rounded-xl border border-surface-border bg-surface p-5">
             <div className="flex items-center gap-2 border-b border-surface-border pb-3">
               <Clock size={16} className="text-brand" />
-              <h3 className="text-sm font-bold text-white">Lịch sử gói nhập</h3>
+              <h3 className="text-sm font-bold text-ink">Lịch sử gói nhập</h3>
             </div>
 
             {history.length === 0 ? (
-              <p className="mt-3 text-xs text-zinc-500">Chưa có lịch sử nhập gói.</p>
+              <p className="mt-3 text-xs text-muted">Chưa có lịch sử nhập gói.</p>
             ) : (
               <div className="mt-3 space-y-3">
                 {history.map((pkg: any) => (
@@ -377,17 +377,17 @@ export default function AdminImportPage() {
                     className="rounded-lg border border-surface-border bg-surface-elevated p-3 text-xs"
                   >
                     <div className="flex items-center justify-between">
-                      <strong className="text-white font-mono">{pkg.id}</strong>
+                      <strong className="text-ink font-mono">{pkg.id}</strong>
                       <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand border border-brand/20">
                         Rev {pkg.revision}
                       </span>
                     </div>
                     {pkg.description && (
-                      <p className="mt-1 text-[11px] text-zinc-400 line-clamp-2">
+                      <p className="mt-1 text-[11px] text-muted line-clamp-2">
                         {pkg.description}
                       </p>
                     )}
-                    <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+                    <div className="mt-2 flex items-center justify-between text-[10px] text-muted font-mono">
                       <span>{pkg.defaultLanguage?.toUpperCase()}</span>
                       <span title={pkg.contentHash}>
                         {pkg.contentHash ? `SHA: ${pkg.contentHash.slice(0, 10)}...` : ''}

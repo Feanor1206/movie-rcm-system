@@ -208,12 +208,14 @@ class NLUUnderstandingNode:
         logger.info(f"[Stage 1 - Phase 23 NLU] Đang phân tích StructuredDiscoveryIntent: '{query}'")
         parsed = qwen_service.parse_discovery_intent(query=query, history=history, catalog=catalog)
 
-        if parsed.get("intent_type") == "CONVERSATIONAL_PATCH" and session_id in self.session_state:
+        # The compatibility default is shared by anonymous callers, so it must not carry state.
+        has_session = bool(session_id and session_id != "default")
+        if has_session and parsed.get("intent_type") == "CONVERSATIONAL_PATCH" and session_id in self.session_state:
             effective = self.apply_patch(self.session_state[session_id], parsed)
             self.session_state[session_id] = effective
             return effective
 
-        if parsed.get("intent_type") == "DISCOVERY":
+        if has_session and parsed.get("intent_type") == "DISCOVERY":
             self.session_state[session_id] = copy.deepcopy(parsed)
 
         return parsed
@@ -426,6 +428,18 @@ class ExplanationGeneratorNode:
         secs = total_sec % 60
         return f"{mins:02d}:{secs:02d}"
 
+    @staticmethod
+    def _is_resolved_similarity_query(nlu_output: Dict[str, Any], query: str) -> bool:
+        reference = nlu_output.get("reference") or {}
+        if reference.get("status") != "CLEAR_REFERENCE_TEXT" or not reference.get("text"):
+            return False
+        positive_query, _ = split_query_scopes(query)
+        return bool(re.search(
+            r"\b(?:giống|tương\s+tự|như\s+phim|similar|(?:movie|film|show|series|something|anything)\s+like)\b",
+            positive_query,
+            flags=re.IGNORECASE,
+        ))
+
     GENERIC_ACTION_VERBS = {
         "chơi", "ăn", "đi", "làm", "xem", "nói", "thấy", "biết", "muốn", "thích",
         "học", "mua", "bán", "chạy", "nghe", "nhìn", "gặp", "tặng", "giúp", "bảo",
@@ -468,12 +482,17 @@ class ExplanationGeneratorNode:
         # 1. Tra cứu mùa/tập cụ thể (Exact Episode lookup)
         pos_sea, pos_ep = parse_season_episode_intent(pos_scope)
         is_question = any(q_word in pos_q_lower for q_word in ["tập nào", "phim nào", "có tập nào", "tập gì", "cảnh nào", "đoạn nào"])
-        if (not is_question) and pos_ep is not None and movie.get("episode_number") == pos_ep:
-            if pos_sea is not None:
-                if movie.get("season_number") == pos_sea:
-                    return True, "exact_season_episode"
+        if (not is_question) and pos_ep is not None:
+            if movie.get("episode_number") == pos_ep:
+                if pos_sea is not None:
+                    if movie.get("season_number") == pos_sea:
+                        return True, "exact_season_episode"
+                    else:
+                        return False, "season_mismatch"
+                else:
+                    return True, "exact_episode"
             else:
-                return True, "exact_episode"
+                return False, "episode_mismatch"
 
         # 2. Tra cứu tên tập / alias chính xác (Exact Title lookup)
         title = self._clean_title(movie.get("title", ""))
@@ -497,8 +516,8 @@ class ExplanationGeneratorNode:
             if any(w in q_words for w in seg_words if len(w) >= 3):
                 return True, "segment_match"
 
-        # 5. Đề xuất tương tự (Similarity search)
-        if any(w in q_lower for w in ["giống", "tương tự", "như phim", "similar", "like"]):
+        # Similarity needs an explicitly resolved reference; "I would like ..." is not one.
+        if self._is_resolved_similarity_query(nlu_output, query):
             return True, "similarity_match"
 
         # 6. Xử lý xung đột số tập và tiêu đề
@@ -716,7 +735,7 @@ class ExplanationGeneratorNode:
             return resp.strip() + unverified_note
 
         # 6. Đề xuất tương tự (Genuine similarity search)
-        is_sim = any(w in q_lower for w in ["giống", "tương tự", "như phim", "similar", "like"])
+        is_sim = self._is_resolved_similarity_query(nlu_output, query)
         if is_sim:
             ref_text = (nlu_output.get("reference") or {}).get("text") or "phim bạn yêu cầu"
             resp = f"Dựa trên sự tương đồng với **{ref_text}**, mình gợi ý tập **{title}**."
@@ -806,6 +825,9 @@ class CascadingAIPipeline:
         Execute full 5-stage recommendation pipeline on the active catalog.
         Captures and uses AcceptedSnapshot for thread-safe consistency (CATALOG-01-F08 R1).
         """
+        reset_metrics = getattr(qwen_service, "reset_request_inference_stats", None)
+        if callable(reset_metrics):
+            reset_metrics()
         from services.catalog_sync import get_accepted_snapshot
         current_snap = snapshot if snapshot is not None else get_accepted_snapshot()
 
@@ -855,9 +877,19 @@ class CascadingAIPipeline:
         # Decision Boundary Synchronization (C1): Filter ungrounded candidates before Stage 5 & payload
         grounded_top = []
         for m in ranked_top:
-            is_grounded, _reason = self.explainer_node.evaluate_candidate_grounding(m, nlu_result, query)
+            is_grounded, reason = self.explainer_node.evaluate_candidate_grounding(m, nlu_result, query)
             if is_grounded:
-                grounded_top.append(m)
+                m_copy = dict(m)
+                m_copy["_grounding_reason"] = reason
+                grounded_top.append(m_copy)
+
+        # Exact Lookup Disambiguation:
+        # If the top candidate is an exact season/episode or exact title lookup,
+        # prioritize only the exact matching target(s) and prune secondary mismatched cards.
+        if grounded_top:
+            top_reason = grounded_top[0].get("_grounding_reason")
+            if top_reason in ("exact_season_episode", "exact_title"):
+                grounded_top = [m for m in grounded_top if m.get("_grounding_reason") == top_reason]
 
         # Stage 5: Grounded Storytelling Explanation
         t_exp_start = time.perf_counter()
@@ -872,7 +904,8 @@ class CascadingAIPipeline:
         ]
 
         # Gather generation metrics from qwen_service
-        gen_stats = getattr(qwen_service, "last_inference_stats", {})
+        get_request_stats = getattr(qwen_service, "get_request_inference_stats", None)
+        gen_stats = get_request_stats() if callable(get_request_stats) else {}
 
         return {
             "text": explanation_text,

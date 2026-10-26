@@ -1,29 +1,4 @@
-import React from 'react';
 import Link from 'next/link';
-
-const GENRES: [string, string][] = [
-  ['Animation', 'Hoạt hình'],
-  ['Fantasy', 'Kỳ ảo'],
-  ['Family', 'Gia đình'],
-  ['Adventure', 'Phiêu lưu'],
-];
-
 export function Footer() {
-  return (
-    <footer className="border-t border-surface-border bg-background py-6 text-xs text-zinc-500">
-      <div className="mx-auto max-w-7xl px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Link href="/" className="font-bold text-white">DIPPIE</Link>
-          <span>· Tuyển chọn phim hoạt hình</span>
-        </div>
-        <div className="flex flex-wrap gap-4">
-          {GENRES.map(([g, l]) => (
-            <Link key={g} href={`/search?genre=${g}`} className="text-zinc-400 hover:text-white">{l}</Link>
-          ))}
-          <Link href="/profile" className="text-zinc-400 hover:text-white">Cá nhân</Link>
-        </div>
-        <span>© 2026</span>
-      </div>
-    </footer>
-  );
+ return <footer className="comic-footer"><div className="page-shell flex flex-col gap-6 py-8 sm:flex-row sm:items-center sm:justify-between"><Link href="/" className="comic-wordmark text-3xl">Dippie<span className="ml-2 text-sage">✳</span></Link><p className="text-sm">Những câu chuyện nhỏ. Những thế giới lớn.</p><nav aria-label="Liên kết cuối trang" className="flex gap-5 text-xs font-semibold"><Link href="/search">Kho phim</Link><Link href="/search?genre=Family">Gia đình</Link><Link href="/profile">Danh sách xem</Link></nav><span className="text-[10px] tracking-widest">© DIPPIE 2026</span></div></footer>;
 }

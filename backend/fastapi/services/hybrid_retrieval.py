@@ -519,8 +519,22 @@ class HybridMovieIndex:
         # Resolve corpus
         search_catalog = list(catalog) if catalog is not None else list(self.documents.values())
 
-        if not self.is_ready or (catalog is not None and self.is_stale(catalog)):
-            logger.info("[HybridMovieIndex] Rebuilding index due to missing or stale cache...")
+        if catalog is not None and (not self.is_ready or self.is_stale(catalog)):
+            logger.info("[HybridMovieIndex] Building a request-local index for a different catalog...")
+            request_index = self.__class__(index_path=self.index_path)
+            request_index.encoder = self.encoder
+            request_index.build_from_catalog(search_catalog, save_to_disk=False)
+            return request_index.search_hybrid(
+                query_text=query_text,
+                nlu_intent=nlu_intent,
+                catalog=None,
+                dense_weight=dense_weight,
+                bm25_weight=bm25_weight,
+                item_type_filter=item_type_filter,
+            )
+
+        if not self.is_ready:
+            logger.info("[HybridMovieIndex] Building index due to missing cache...")
             self.build_from_catalog(search_catalog, save_to_disk=True)
 
         # Determine positive search scope to avoid scoring negation tokens

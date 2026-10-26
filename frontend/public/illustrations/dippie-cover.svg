@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 580" fill="none">
+<defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#253c2b" opacity=".16"/></pattern><pattern id="lines" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><path d="M0 0V8" stroke="#243e2b" stroke-width="1" opacity=".16"/></pattern></defs>
+<path fill="#d7e7cb" d="M0 0h760v580H0z"/><path fill="url(#dots)" d="M0 0h760v580H0z"/>
+<circle cx="542" cy="157" r="105" fill="#f6f3e8" stroke="#233a2b" stroke-width="2"/><path d="m530 19 3 16m97 12-10 12m62 67-16 5M412 67l13 12M394 153h-18" stroke="#233a2b" stroke-width="3"/>
+<path d="M0 335C81 239 153 284 227 304c91 25 131-107 232-82 122 30 185 11 301-37v395H0Z" fill="#abc7a0" stroke="#233a2b" stroke-width="2"/>
+<path d="M0 398c122-92 210-20 311 2 151 33 236-64 449-57v237H0Z" fill="#769d76" stroke="#233a2b" stroke-width="2"/>
+<path d="M339 348c-7 54 80 84 51 125-19 25-56 36-51 107h191c-13-57-66-70-77-98-16-39 36-83-13-122Z" fill="#eaf0df" stroke="#233a2b" stroke-width="2"/>
+<g stroke="#233a2b" stroke-width="3" stroke-linejoin="round"><path d="M57 470V155"/><path d="M60 155C-4 197 1 306 59 345c72-55 71-149 1-190Z" fill="#6f976c"/><path d="m60 186-1 143m-1-92-24-21m25 69 27-23"/><path d="M687 452V207"/><path d="M689 188c-49 24-71 96-46 141 21 36 71 23 88-12 23-48 6-104-42-129Z" fill="#aac99a"/><path d="m689 220-2 130m1-82 20-17m-20 65-22-22"/>
+<path d="M139 518V347m-19 30 19-41 18 41-18 26Z" fill="#bed7a9"/>
+<path d="M597 506V368m-32 38 32-71 37 71-37 33Z" fill="#c9dda9"/></g>
+<!-- The little woodland cinema, drawn as a storybook house -->
+<g stroke="#21372a" stroke-width="3" stroke-linejoin="round"><path d="m277 284 110-99 119 99-21 9H295Z" fill="#f8f4e7"/><path d="m265 282 121-113 132 114-15 10-116-97-106 99Z" fill="#284a37"/>
+<path d="M298 286h184v132H298Z" fill="#f8f4e7"/><path d="M306 286h169v132H306Z" fill="url(#lines)"/><path d="M363 333c0-35 62-35 62 0v85h-62Z" fill="#2b4c37"/>
+<path d="M317 319h30v39h-30Zm117 0h30v39h-30Z" fill="#b6d7a1"/><path d="M332 320v37m-15-18h30m102-19v37m-15-18h30"/>
+<path d="M332 254h123v37H332Z" fill="#d8e8c8"/><text x="393" y="280" text-anchor="middle" fill="#21372a" stroke="none" font-family="Georgia,serif" font-weight="bold" font-size="23" letter-spacing="3">CINÉMA</text>
+<path d="M286 419h208l13 11H275Z" fill="#d8e8c8"/><path d="M354 427h77l13 10h-104Z" fill="#f8f4e7"/>
+<path d="m386 149 1-34h49l-8 13 8 14h-49" fill="#f8f4e7"/>
+</g>
+<!-- A reader and a small friend on their way to the next adventure -->
+<g stroke="#21372a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+<path d="m246 477-8 55m36-55 6 55"/><path d="M226 532h19m30 0h18" stroke-width="6"/>
+<path d="m230 429-13 46c16 13 50 15 74-1l-13-45Z" fill="#f8f4e7"/><path d="M232 430c-21 0-29 22-25 36l25-6m44-29c19 3 24 22 20 29l-23-4" fill="#95b888"/>
+<circle cx="254" cy="406" r="27" fill="#f8f4e7"/><path d="M228 405c-6-22 14-39 31-34 20-7 31 14 23 32l-9-16c-10 11-28 15-43 11Z" fill="#243f2c"/><path d="m244 408 1 1m21-1 1 1m-19 12c5 4 10 4 14 0"/>
+<path d="m243 449 15 4 15-4v24l-15 5-15-6Z" fill="#c0d8a8"/><path d="M258 453v25"/>
+<path d="M513 486c-6-31 9-50 27-49 20-1 27 18 22 49v32h-49Z" fill="#f8f4e7"/><path d="m517 445-7-25c10-1 20 10 22 18m16 0c9-21 19-22 23-17l-8 29" fill="#f8f4e7"/><path d="M523 462h1m23 0h1m-13 8 4 1m-18 47-5 10m35-10 6 10"/><path d="M513 486c18 10 34 10 49-1" fill="#9cbd8b"/>
+</g>
+<g stroke="#21372a" stroke-width="2.5" stroke-linecap="round"><path d="m32 552 6-18m0 18 9-9m657 0 5-22m-4 23 17-13m-119 29 4-19m0 20 12-11M170 565l4-21m0 21 11-12"/><path d="m116 145 12-8 11 7m-13-7 1-8m419 188 10-6 9 6"/></g>
+<path d="M95 59h205l-9 65H154l-25 20 3-20H85Z" fill="#fbf9f2" stroke="#21372a" stroke-width="2.5"/><text x="191" y="87" text-anchor="middle" fill="#21372a" font-family="Georgia,serif" font-size="20" font-style="italic">Một câu chuyện hay</text><text x="191" y="111" text-anchor="middle" fill="#21372a" font-family="Georgia,serif" font-size="20" font-style="italic">đang chờ bạn!</text>
+<rect x="577" y="449" width="144" height="68" fill="#fbf9f2" stroke="#21372a" stroke-width="2" transform="rotate(-6 577 449)"/><text x="649" y="470" fill="#21372a" font-family="monospace" text-anchor="middle" font-size="12" transform="rotate(-6 649 470)">ĐI THÔI, TỚ SẴN SÀNG!</text><text x="649" y="493" fill="#21372a" font-family="Georgia,serif" text-anchor="middle" font-size="20" font-style="italic" transform="rotate(-6 649 493)">Cùng xem nhé →</text>
+</svg>

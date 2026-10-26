@@ -11,9 +11,11 @@ import {
   Check,
   Play,
   RotateCcw,
+  Film,
 } from 'lucide-react';
 import { sendChatMessage, ChatMessage } from '@/lib/services/chatService';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
+import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import type { Movie } from '@/types/movie';
 
 const QUICK_PROMPTS = [
@@ -24,8 +26,7 @@ const QUICK_PROMPTS = [
   'Điểm cao nhất',
 ];
 
-const BDG = 'rounded bg-zinc-900 border px-1.5 py-0.5 text-[10px]';
-const BTN_HEAD = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer';
+const BTN_HEAD = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer';
 
 export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { isWatchlisted, toggleWatchlist } = useWatchlist();
@@ -33,7 +34,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
     {
       id: 'welcome',
       sender: 'bot',
-      text: 'Xin chào! Tôi là CineBot, trợ lý gợi ý phim hoạt hình Dippie.',
+      text: 'Chào bạn! Mình là CineBot. Bạn đang muốn xem câu chuyện nào? Kể mình nghe một cái tên hay tình tiết bạn còn nhớ nhé.',
       timestamp: 'Vừa xong',
       followUps: QUICK_PROMPTS.slice(0, 3),
     },
@@ -196,19 +197,19 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       aria-labelledby="cinebot-dialog-title"
       className="fixed inset-0 z-50 flex items-end justify-end p-0 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in pointer-events-auto"
     >
-      <div className="flex h-full w-full flex-col overflow-hidden bg-surface border-0 sm:border sm:border-surface-border sm:rounded-xl sm:h-[620px] sm:w-[440px] sm:shadow-2xl">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-surface border-0 sm:border-2 sm:border-surface-border sm:rounded-none sm:h-[620px] sm:w-[440px] sm:shadow-2xl">
         {/* Chatbot Header */}
         <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
           <div>
             <div className="flex items-center gap-2">
-              <h2 id="cinebot-dialog-title" className="text-sm font-bold text-white">
+              <h2 id="cinebot-dialog-title" className="comic-heading text-xl font-bold text-ink">
                 CineBot
               </h2>
-              <span className="rounded bg-brand/15 border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand font-semibold">
-                Trợ lý Dippie
+              <span className="rounded bg-brand/15 border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand-dark font-semibold">
+                Bạn đồng hành
               </span>
             </div>
-            <p className="text-[11px] text-zinc-400">Gợi ý phim hoạt hình</p>
+            <p className="text-[11px] text-muted">Gợi ý phim hoạt hình</p>
           </div>
 
           <div className="flex items-center gap-1">
@@ -240,75 +241,49 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             >
               {/* Message Box */}
               <div
-                className={`max-w-[90%] rounded-lg px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
+                className={`max-w-[90%] rounded-[16px_16px_16px_2px] px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-brand text-zinc-950 font-medium shadow-brand-sm'
-                    : 'bg-surface-muted text-zinc-100 border border-surface-border'
+                    ? 'bg-mint text-ink border border-ink font-medium shadow-brand-sm !rounded-[16px_16px_2px_16px]'
+                    : 'bg-surface-muted text-ink border border-surface-border'
                 }`}
               >
-                <p>{msg.text}</p>
+                <p>{msg.text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part)}</p>
                 <span
                   className={`mt-1 block text-[10px] ${
-                    msg.sender === 'user' ? 'text-zinc-950/70 text-right font-medium' : 'text-zinc-500'
+                    msg.sender === 'user' ? 'text-zinc-950/70 text-right font-medium' : 'text-muted'
                   }`}
                 >
                   {msg.timestamp}
                 </span>
               </div>
 
-              {/* Phase 23 Structured Intent Badges */}
-              {msg.sender === 'bot' && msg.structuredIntent && (
-                <div className="mt-1.5 flex flex-wrap gap-1 max-w-[95%]">
-                  <span className={`${BDG} border-zinc-700 font-mono text-emerald-400`}>
-                    {msg.structuredIntent.intent_type}
-                  </span>
-                  {msg.structuredIntent.reference_films && msg.structuredIntent.reference_films.length > 0 && (
-                    <span className={`${BDG} border-zinc-800 text-amber-300`}>
-                      Ref: {msg.structuredIntent.reference_films.join(', ')}
-                    </span>
-                  )}
-                  {msg.structuredIntent.include_genres && msg.structuredIntent.include_genres.length > 0 && (
-                    <span className={`${BDG} border-zinc-800 text-sky-300`}>
-                      +{msg.structuredIntent.include_genres.join(', ')}
-                    </span>
-                  )}
-                  {msg.structuredIntent.exclude_genres && msg.structuredIntent.exclude_genres.length > 0 && (
-                    <span className={`${BDG} border-red-900/60 text-rose-400`}>
-                      -{msg.structuredIntent.exclude_genres.join(', ')}
-                    </span>
-                  )}
-                  {(msg.structuredIntent.year_min || msg.structuredIntent.year_max) && (
-                    <span className={`${BDG} border-zinc-800 text-purple-300`}>
-                      Năm: {msg.structuredIntent.year_min || '…'}–{msg.structuredIntent.year_max || 'nay'}
-                    </span>
-                  )}
-                  {msg.structuredIntent.requested_k && (
-                    <span className={`${BDG} border-zinc-800 text-zinc-400`}>
-                      Top {msg.structuredIntent.requested_k}
-                    </span>
-                  )}
-                </div>
-              )}
-
               {/* Embedded Interactive Movie Cards */}
               {msg.movies && msg.movies.length > 0 && (
                 <div className="mt-2.5 w-full space-y-2">
                   {msg.movies.map((movie) => {
                     const inWatchlist = isWatchlisted(movie.id);
+                    const mediaHref = buildMediaItemHref(movie);
+                    const hasPoster = Boolean(movie.poster && movie.poster.trim());
                     return (
                       <div
                         key={movie.id}
-                        className="flex gap-3 rounded-lg border border-surface-border bg-surface-muted p-2.5 transition-colors hover:border-zinc-700"
+                        className="flex gap-3 rounded-lg border border-surface-border bg-surface-muted p-2.5 transition-colors hover:border-ink/30"
                       >
                         {/* Poster */}
                         <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-surface-border bg-surface">
-                          <Image
-                            src={movie.poster}
-                            alt={movie.title}
-                            fill
-                            className="object-cover"
-                            sizes="56px"
-                          />
+                          {hasPoster ? (
+                            <Image
+                              src={movie.poster}
+                              alt={movie.title}
+                              fill
+                              className="object-cover"
+                              sizes="56px"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-mint text-muted">
+                              <Film size={20} />
+                            </div>
+                          )}
                         </div>
 
                         {/* Details */}
@@ -316,9 +291,9 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                           <div>
                             <div className="flex items-center justify-between gap-1">
                               <Link
-                                href={`/movies/${movie.id}`}
+                                href={mediaHref}
                                 onClick={onClose}
-                                className="truncate text-xs sm:text-sm font-semibold text-white hover:text-brand transition-colors"
+                                className="truncate text-xs sm:text-sm font-semibold text-ink hover:text-brand transition-colors"
                               >
                                 {movie.title}
                               </Link>
@@ -326,7 +301,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                                 <Star size={11} className="fill-amber-400" /> {movie.rating}
                               </span>
                             </div>
-                            <p className="text-[11px] text-zinc-400 mt-0.5">
+                            <p className="text-[11px] text-muted mt-0.5">
                               {movie.year} · {movie.runtime} · {movie.genres.join(', ')}
                             </p>
                           </div>
@@ -334,7 +309,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                           {/* Quick Actions */}
                           <div className="mt-2 flex items-center gap-2">
                             <Link
-                              href={`/movies/${movie.id}`}
+                              href={mediaHref}
                               onClick={onClose}
                               className="inline-flex items-center gap-1 rounded bg-brand px-2 py-0.5 text-[10px] font-bold text-zinc-950 hover:bg-brand-hover shadow-brand-sm cursor-pointer"
                             >
@@ -343,7 +318,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
                             <button
                               onClick={() => toggleWatchlist(movie.id, movie.title)}
-                              className="inline-flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-200 hover:border-zinc-500 hover:text-white cursor-pointer"
+                              className="inline-flex items-center gap-1 rounded border border-ink/30 bg-surface-elevated px-2 py-0.5 text-[10px] font-medium text-ink hover:border-zinc-500 hover:text-ink cursor-pointer"
                             >
                               {inWatchlist ? (
                                 <>
@@ -369,7 +344,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                       key={prompt}
                       disabled={isTyping}
                       onClick={() => handleSend(prompt)}
-                      className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="rounded border border-ink/30 bg-mint px-2.5 py-1 text-[11px] text-muted transition-colors hover:border-ink hover:text-ink cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {prompt}
                     </button>
@@ -381,7 +356,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
           {/* Typing indicator */}
           {isTyping && (
-            <div className="flex items-center gap-2 text-xs text-zinc-300 bg-surface-muted border border-brand/40 rounded-md px-3 py-1.5 w-fit">
+            <div className="flex items-center gap-2 text-xs text-muted bg-surface-muted border border-brand/40 rounded-md px-3 py-1.5 w-fit">
               <span className="flex gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -405,12 +380,12 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={isTyping ? "CineBot đang phản hồi..." : "Nhập câu hỏi..."}
-              className="w-full bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:outline-none disabled:opacity-60"
+              className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-60"
             />
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isTyping}
-              className="grid h-7 w-7 place-items-center rounded bg-brand text-zinc-950 transition hover:bg-brand-hover shadow-brand-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="grid h-11 w-11 shrink-0 place-items-center border border-ink bg-brand text-ink transition hover:bg-brand-hover shadow-brand-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               aria-label="Gửi tin nhắn"
             >
               <Send size={13} />
@@ -430,7 +405,7 @@ export function CineBotFloatingTrigger({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       aria-label="Mở Chatbot CineBot"
-      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-full sm:rounded-md border border-surface-border bg-surface px-3.5 py-2.5 sm:px-4 text-xs font-semibold text-white shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
+      className="comic-bot-trigger fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-full sm:rounded-md border border-surface-border bg-surface px-3.5 py-2.5 sm:px-4 text-xs font-semibold text-ink shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
     >
       <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-brand-sm" />
       <span>Hỏi CineBot</span>

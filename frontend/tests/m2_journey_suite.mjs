@@ -713,14 +713,15 @@ test('1. Home: Enforces animationOnly=true across all queries, handles empty and
   h.render();
   await h.settle();
 
-  assert.ok(capturedQueries.length >= 3, 'Must issue queries for top rated, recent, and genres');
+  assert.equal(capturedQueries.length, 2, 'The cover loads recent and favorite rails without redundant genre requests');
   for (const q of capturedQueries) {
     assert.equal(q.animationOnly, true, 'Every Home rail query must enforce animationOnly=true');
   }
 
-  const heroNodes = findNodes(h.tree, (n) => n.type === 'EditorialHero');
-  assert.equal(heroNodes.length, 1, 'EditorialHero must be rendered from top backend record');
-  assert.equal(heroNodes[0].props.movie.title, 'My Neighbor Totoro');
+  const rails = findNodes(h.tree, (n) => n.type === 'MovieSection');
+  assert.equal(rails.length, 2, 'Both comic shelves must render backend records');
+  assert.equal(rails[0].props.movies[0].title, 'My Neighbor Totoro');
+  assert.ok(findNodes(h.tree, (n) => n.type === 'h1').length, 'The illustrated cover remains visible');
 
   // 1B. Empty State: Backend returns 0 animation items
   const emptyHarness = createHomeHarness(async () => ({
@@ -735,11 +736,10 @@ test('1. Home: Enforces animationOnly=true across all queries, handles empty and
   emptyHarness.render();
   await emptyHarness.settle();
 
-  const emptyText = getText(emptyHarness.tree);
-  assert.ok(
-    emptyText.includes('Hiện chưa có tác phẩm hoạt hình nào trong danh mục tiêu điểm của máy chủ'),
-    'Must display informative empty state when animation catalog has no records'
-  );
+  const emptyRails = findNodes(emptyHarness.tree, (n) => n.type === 'MovieSection');
+  assert.equal(emptyRails.length, 2);
+  assert.ok(emptyRails.every((rail) => rail.props.movies.length === 0), 'Empty shelves receive no fabricated films');
+  assert.ok(findNodes(emptyHarness.tree, (n) => n.type === 'h1').length, 'The cover stays visible for an empty catalog');
 
   // 1C. Error State: Backend network failure
   let retryTriggered = false;
@@ -762,18 +762,18 @@ test('1. Home: Enforces animationOnly=true across all queries, handles empty and
 
   const errorText = getText(errorHarness.tree);
   assert.ok(
-    errorText.includes('Không thể nạp danh mục hoạt hình'),
+    errorText.includes('Kệ phim đang nghỉ một chút'),
     'Must render error state when catalog service is down'
   );
 
   // Retry button
-  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Thử kết nối lại'))[0];
+  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Tải lại kệ phim'))[0];
   assert.ok(retryBtn, 'Retry button must be provided');
   retryTriggered = true;
   retryBtn.props.onClick();
   await errorHarness.settle();
 
-  assert.ok(findNodes(errorHarness.tree, (n) => n.type === 'EditorialHero').length === 1, 'Retry loads data');
+  assert.equal(findNodes(errorHarness.tree, (n) => n.type === 'MovieSection')[0].props.movies[0].id, 'm-retry', 'Retry restores real shelf records');
 });
 
 test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministic similar rail (D1 decoupled)', async () => {
@@ -1055,9 +1055,9 @@ test('6. Cross-surface consistency: Canonical ID and attributes match across Hom
   home.render();
   await home.settle();
 
-  const hero = findNodes(home.tree, (n) => n.type === 'EditorialHero')[0];
-  assert.ok(hero, 'Home must render EditorialHero');
-  assert.equal(hero.props.movie.id, 'totoro');
+  const shelf = findNodes(home.tree, (n) => n.type === 'MovieSection')[0];
+  assert.ok(shelf, 'Home must render a catalog shelf');
+  assert.equal(shelf.props.movies[0].id, 'totoro');
 
   // Detail renders exact same canonical ID 'totoro'
   const detail = createDetailHarness('totoro', async () => canonicalMovie);

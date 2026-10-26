@@ -1558,16 +1558,16 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
             role="status"
             className={`pointer-events-auto flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-xs sm:text-sm font-medium shadow-2xl backdrop-blur-xl animate-slide-up transition-all ${
               toast.type === 'error'
-                ? 'border-red-500/50 bg-surface/95 text-red-300 shadow-red-900/20'
+                ? 'border-red-800 bg-surface text-red-800'
                 : toast.type === 'success'
-                ? 'border-brand/50 bg-surface/95 text-white shadow-brand-sm'
-                : 'border-surface-border bg-surface/95 text-zinc-300'
+                ? 'border-ink bg-mint text-ink shadow-brand-sm'
+                : 'border-ink bg-surface text-ink'
             }`}
           >
             <span>{toast.message}</span>
             <button
               onClick={() => dismissToast(toast.id)}
-              className="ml-2 text-zinc-400 hover:text-white cursor-pointer"
+              className="ml-2 text-muted hover:text-ink cursor-pointer"
               aria-label="Đóng thông báo"
             >
               ✕

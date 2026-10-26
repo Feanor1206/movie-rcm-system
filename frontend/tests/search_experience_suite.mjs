@@ -37,6 +37,12 @@ const transpileOptions = {
 const searchTranspiled = ts.transpileModule(searchSource, transpileOptions).outputText;
 const movieCardTranspiled = ts.transpileModule(movieCardSource, transpileOptions).outputText;
 
+// Resolve the production navigation helper alongside the component under test.
+const mediaRoutingModule = { exports: {} };
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../lib/services/mediaRouting.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText, { exports: mediaRoutingModule.exports, module: mediaRoutingModule, URLSearchParams });
+
 const turn = () => new Promise((resolve) => setImmediate(resolve));
 
 function emptyPage(options = {}) {
@@ -203,6 +209,7 @@ function createSearchHarness(initialUrl = '', browseMock) {
           usePathname: () => '/search',
         };
       }
+      if (mod.includes('mediaRouting')) return mediaRoutingModule.exports;
       if (mod.includes('catalogService')) {
         return {
           browseCatalog: browseMock,
@@ -337,6 +344,7 @@ function renderActualMovieCard(movie, watchlistContext = {}) {
       if (mod === 'lucide-react') {
         return new Proxy({}, { get: (_, name) => name });
       }
+      if (mod.includes('mediaRouting')) return mediaRoutingModule.exports;
       if (mod.includes('WatchlistContext')) {
         return { useWatchlist: () => defaultWatchlist };
       }

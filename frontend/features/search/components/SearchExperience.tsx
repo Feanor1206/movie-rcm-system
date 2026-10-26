@@ -25,6 +25,7 @@ import {
   type CatalogSearchResult,
 } from '@/lib/services/catalogService';
 import type { Movie } from '@/types/movie';
+import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
 const DISCOVERY_GENRES = ['Adventure', 'Family', 'Fantasy', 'Sci-Fi', 'Drama', 'Romance', 'Comedy'];
@@ -379,18 +380,18 @@ export function SearchExperience() {
     <main className="page-shell min-h-[75vh] py-8 sm:py-12">
       {/* Title */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Kho phim hoạt hình & tuyển chọn
+        <h1 className="comic-heading text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+          Tìm một câu chuyện.
         </h1>
-        <p className="mt-1.5 text-sm text-zinc-400">
-          Khám phá và lọc danh mục phim hoạt hình chính thức từ máy chủ Dippie Cinema.
+        <p className="mt-1.5 text-sm text-muted">
+          Một cái tên, một nhân vật, hay một tình tiết bạn còn nhớ.
         </p>
       </div>
 
       {/* Search Input Bar */}
       <div className="mt-6">
-        <div className="relative flex max-w-2xl items-center rounded-md border border-surface-border bg-surface px-3.5 py-3 shadow-lg focus-within:border-brand">
-          <Search className="text-zinc-400 shrink-0" size={18} />
+        <div className="relative flex max-w-2xl items-center border-2 border-ink bg-surface px-3.5 py-3 shadow-brand-sm focus-within:bg-mint/30">
+          <Search className="text-muted shrink-0" size={18} />
           <input
             data-testid="search-query-input"
             autoFocus
@@ -398,7 +399,7 @@ export function SearchExperience() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Tìm theo tên phim hoặc từ khóa cốt truyện..."
-            className="w-full bg-transparent px-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none"
+            className="w-full bg-transparent px-3 text-sm text-ink placeholder:text-muted focus:outline-none"
           />
           {inputValue && (
             <button
@@ -407,7 +408,7 @@ export function SearchExperience() {
                 setInputValue('');
                 updateUrl({ q: '', page: 0 });
               }}
-              className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
+              className="rounded p-1 text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer"
               aria-label="Xóa từ khóa"
             >
               <X size={15} />
@@ -421,7 +422,7 @@ export function SearchExperience() {
         {/* Genre Chips */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-muted uppercase tracking-wider">
               Lọc theo thể loại phụ hoạt hình:
             </span>
             {activeFilterCount > 0 && (
@@ -444,7 +445,7 @@ export function SearchExperience() {
                   className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
                     selected
                       ? 'bg-brand text-zinc-950 font-bold shadow-brand-sm'
-                      : 'border border-surface-border bg-surface-muted text-zinc-300 hover:border-zinc-600 hover:text-white'
+                      : 'border border-surface-border bg-surface-muted text-muted hover:border-ink hover:text-ink'
                   }`}
                 >
                   {genre} {selected && '✓'}
@@ -456,22 +457,22 @@ export function SearchExperience() {
 
         {/* Year & Size Active Summary (S3) */}
         {(validatedYearMin !== undefined || validatedYearMax !== undefined || validatedSize !== 12) && (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-850/60 text-xs text-zinc-300">
-            <span className="text-zinc-400 flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-850/60 text-xs text-muted">
+            <span className="text-muted flex items-center gap-1">
               <Calendar size={13} /> Bộ lọc nâng cao:
             </span>
             {validatedYearMin !== undefined && (
-              <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300">
+              <span className="rounded bg-surface-elevated px-2 py-0.5 text-[11px] text-muted">
                 Từ năm: {validatedYearMin}
               </span>
             )}
             {validatedYearMax !== undefined && (
-              <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300">
+              <span className="rounded bg-surface-elevated px-2 py-0.5 text-[11px] text-muted">
                 Đến năm: {validatedYearMax}
               </span>
             )}
             {validatedSize !== 12 && (
-              <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300">
+              <span className="rounded bg-surface-elevated px-2 py-0.5 text-[11px] text-muted">
                 Cỡ trang: {validatedSize}
               </span>
             )}
@@ -479,7 +480,7 @@ export function SearchExperience() {
         )}
 
         {/* Sort & Stats Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-850 text-xs text-zinc-400">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-850 text-xs text-muted">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} />
             <span>Sắp xếp theo:</span>
@@ -494,8 +495,8 @@ export function SearchExperience() {
                   onClick={() => handleSortChange(opt.id as SortOption)}
                   className={`rounded px-2.5 py-1 transition-colors cursor-pointer ${
                     validatedSort === opt.id
-                      ? 'bg-zinc-800 text-white font-bold'
-                      : 'hover:text-white'
+                      ? 'bg-surface-elevated text-ink font-bold'
+                      : 'hover:text-ink'
                   }`}
                 >
                   {opt.label}
@@ -527,30 +528,20 @@ export function SearchExperience() {
       <section className="mt-8">
         {/* Animation Catalog v1 Results Section */}
         {animationResults.length > 0 && (
-          <div className="mb-8 rounded-xl border border-brand/30 bg-surface p-5 shadow-sm">
+          <div className="mb-8 border-2 border-ink bg-surface p-4 sm:p-5">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-brand" />
-                <h3 className="text-sm font-bold text-white">
-                  Kết quả từ Danh Mục Hoạt Hình dippie.catalog.v1 ({animationResults.length})
+                <Film size={16} className="text-brand-dark" />
+                <h3 className="text-sm font-bold text-ink">
+                  Những câu chuyện tìm thấy ({animationResults.length})
                 </h3>
               </div>
-              <span className="text-xs text-zinc-400">Bộ, tập, phân cảnh và truyện ngắn</span>
+              <span className="hidden text-xs text-muted sm:block">Bộ phim, tập phim và những tiểu phẩm</span>
             </div>
 
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {animationResults.map((item) => {
-                const baseSeriesId = item.seriesId || (item.type === 'series' ? item.id : '');
-                const params = new URLSearchParams();
-                if (item.episodeId) params.set('episode', item.episodeId);
-                else if (item.type === 'episode') params.set('episode', item.id);
-                if (item.type === 'scene') params.set('scene', item.id);
-                if (item.mediaAssetId) params.set('asset', item.mediaAssetId);
-                if (item.startMs !== undefined && item.startMs !== null) {
-                  params.set('t', String(item.startMs));
-                }
-                const queryString = params.toString();
-                const targetUrl = `/series/${encodeURIComponent(baseSeriesId || item.id)}${queryString ? `?${queryString}` : ''}`;
+                const targetUrl = buildMediaItemHref(item);
                 return (
                   <Link
                     key={`${item.type}_${item.id}`}
@@ -558,30 +549,30 @@ export function SearchExperience() {
                     data-testid="search-result-card"
                     data-result-id={item.id}
                     data-result-type={item.type}
-                    className="flex flex-col justify-between rounded-lg border border-surface-border bg-surface-elevated p-3 transition-colors hover:border-brand/40 hover:bg-surface-hover/80"
+                    className="comic-card flex flex-col justify-between p-4 transition-colors hover:bg-mint"
                   >
                     <div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand uppercase border border-brand/20">
-                          {item.type}
+                        <span className="bg-mint px-1.5 py-0.5 text-[10px] font-bold text-ink border border-ink/30">
+                          {({ series: 'Bộ phim', episode: 'Tập phim', segment: 'Tiểu phẩm', scene: 'Phân cảnh' } as Record<string, string>)[item.type] || 'Câu chuyện'}
                         </span>
                         {item.startMs !== undefined && item.startMs !== null && (
-                          <span className="font-mono text-[10px] text-zinc-400">
+                          <span className="font-mono text-[10px] text-muted">
                             {Math.floor(item.startMs / 60000)}:
                             {Math.floor((item.startMs % 60000) / 1000).toString().padStart(2, '0')}
                           </span>
                         )}
                       </div>
-                      <h4 className="mt-2 text-xs font-bold text-white line-clamp-1">{item.title}</h4>
-                      {item.parentTitle && (
-                        <p className="text-[11px] text-zinc-400 italic line-clamp-1">{item.parentTitle}</p>
+                      <h4 className="comic-heading mt-2 text-base font-bold text-ink line-clamp-2">{item.title}</h4>
+                      {item.parentTitle && item.parentTitle !== item.seriesId && (
+                        <p className="text-[11px] text-muted italic line-clamp-1">{item.parentTitle}</p>
                       )}
                       {item.snippet && (
-                        <p className="mt-1.5 text-[11px] text-zinc-300 line-clamp-2">{item.snippet}</p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-muted line-clamp-2">{item.snippet}</p>
                       )}
                     </div>
 
-                    <div className="mt-3 flex items-center justify-end text-[11px] font-semibold text-brand">
+                    <div className="mt-3 flex items-center justify-end text-xs font-semibold text-brand-dark">
                       <span>Xem chi tiết →</span>
                     </div>
                   </Link>
@@ -597,8 +588,8 @@ export function SearchExperience() {
             <div className="grid h-12 w-12 place-items-center rounded bg-red-900/40 text-red-400 mb-3">
               <AlertCircle size={22} />
             </div>
-            <h3 className="text-base font-bold text-white">Không thể nạp danh mục phim</h3>
-            <p className="mt-1 max-w-md text-xs sm:text-sm text-zinc-400">{error}</p>
+            <h3 className="text-base font-bold text-ink">Không thể nạp danh mục phim</h3>
+            <p className="mt-1 max-w-md text-xs sm:text-sm text-muted">{error}</p>
             <div className="mt-5 flex gap-3">
               <button
                 onClick={() => setRetryTrigger((c) => c + 1)}
@@ -621,8 +612,8 @@ export function SearchExperience() {
               >
                 <div className="aspect-[2/3] w-full bg-surface-elevated" />
                 <div className="p-3 space-y-2">
-                  <div className="h-4 w-3/4 rounded bg-zinc-800" />
-                  <div className="h-3 w-1/2 rounded bg-zinc-800" />
+                  <div className="h-4 w-3/4 rounded bg-surface-elevated" />
+                  <div className="h-3 w-1/2 rounded bg-surface-elevated" />
                 </div>
               </div>
             ))}
@@ -630,11 +621,11 @@ export function SearchExperience() {
         ) : isCurrentData && dataSnapshot.data.items.length === 0 ? (
           /* S2: Empty State only when current query response has completed with 0 items */
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-surface-border bg-surface px-6 py-16 text-center">
-            <div className="grid h-12 w-12 place-items-center rounded bg-surface-muted text-zinc-400 mb-3">
+            <div className="grid h-12 w-12 place-items-center rounded bg-surface-muted text-muted mb-3">
               <Search size={20} />
             </div>
-            <h3 className="text-base font-bold text-white">Không tìm thấy bộ phim hoạt hình nào</h3>
-            <p className="mt-1 max-w-md text-xs sm:text-sm text-zinc-400">
+            <h3 className="text-base font-bold text-ink">Không tìm thấy bộ phim hoạt hình nào</h3>
+            <p className="mt-1 max-w-md text-xs sm:text-sm text-muted">
               {dataSnapshot.query
                 ? `Không có phim hoạt hình nào khớp với từ khóa "${dataSnapshot.query}".`
                 : 'Không có phim nào thỏa mãn các bộ lọc thể loại đang chọn.'}
@@ -665,17 +656,17 @@ export function SearchExperience() {
             {dataSnapshot.data.totalPages > 1 && (
               <nav
                 aria-label="Phân trang danh mục phim"
-                className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-surface-border bg-surface px-4 py-3 text-xs text-zinc-400"
+                className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-surface-border bg-surface px-4 py-3 text-xs text-muted"
               >
                 <span>
-                  Trang <strong className="text-white">{dataSnapshot.data.page + 1}</strong> / {dataSnapshot.data.totalPages} (Tổng cộng {dataSnapshot.data.totalElements} phim)
+                  Trang <strong className="text-ink">{dataSnapshot.data.page + 1}</strong> / {dataSnapshot.data.totalPages} (Tổng cộng {dataSnapshot.data.totalElements} phim)
                 </span>
 
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handlePageChange(dataSnapshot.data.page - 1)}
                     disabled={!dataSnapshot.data.hasPrevious || loading}
-                    className="flex items-center gap-1 rounded border border-surface-border bg-surface-muted px-3 py-1.5 font-medium text-zinc-300 hover:border-zinc-600 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    className="flex items-center gap-1 rounded border border-surface-border bg-surface-muted px-3 py-1.5 font-medium text-muted hover:border-ink hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   >
                     <ChevronLeft size={14} /> Trang trước
                   </button>
@@ -683,7 +674,7 @@ export function SearchExperience() {
                   <button
                     onClick={() => handlePageChange(dataSnapshot.data.page + 1)}
                     disabled={!dataSnapshot.data.hasNext || loading}
-                    className="flex items-center gap-1 rounded border border-surface-border bg-surface-muted px-3 py-1.5 font-medium text-zinc-300 hover:border-zinc-600 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    className="flex items-center gap-1 rounded border border-surface-border bg-surface-muted px-3 py-1.5 font-medium text-muted hover:border-ink hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   >
                     Trang sau <ChevronRight size={14} />
                   </button>

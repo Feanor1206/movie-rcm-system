@@ -95,17 +95,31 @@ function Start-ChildServiceProcess {
     $argString = ($Arguments | ForEach-Object { Format-NativeArgument $_ }) -join ' '
 
     if ($StdOutFile -and $StdErrFile) {
+        $previousEnvironment = @{}
         if ($EnvironmentVariables) {
             foreach ($key in $EnvironmentVariables.Keys) {
-                [System.Environment]::SetEnvironmentVariable($key, [string]$EnvironmentVariables[$key], "Process")
+                $previousEnvironment[$key] = [System.Environment]::GetEnvironmentVariable($key, "Process")
             }
         }
-        $proc = Start-Process -FilePath $FileName `
-            -ArgumentList $argString `
-            -WorkingDirectory $WorkingDirectory `
-            -RedirectStandardOutput $StdOutFile `
-            -RedirectStandardError $StdErrFile `
-            -PassThru -NoNewWindow
+        try {
+            if ($EnvironmentVariables) {
+                foreach ($key in $EnvironmentVariables.Keys) {
+                    [System.Environment]::SetEnvironmentVariable($key, [string]$EnvironmentVariables[$key], "Process")
+                }
+            }
+            $proc = Start-Process -FilePath $FileName `
+                -ArgumentList $argString `
+                -WorkingDirectory $WorkingDirectory `
+                -RedirectStandardOutput $StdOutFile `
+                -RedirectStandardError $StdErrFile `
+                -PassThru -WindowStyle Hidden
+        } finally {
+            if ($EnvironmentVariables) {
+                foreach ($key in $EnvironmentVariables.Keys) {
+                    [System.Environment]::SetEnvironmentVariable($key, $previousEnvironment[$key], "Process")
+                }
+            }
+        }
     } else {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $FileName
@@ -242,6 +256,11 @@ try {
             Write-Host "  -> Phát hiện mã nguồn mới hơn artifact ($($newestSrc.Name) lúc $($newestSrc.LastWriteTime)). Yêu cầu đóng gói lại." -ForegroundColor Yellow
             $needsBuild = $true
         }
+        $pomFile = Join-Path $backendDir "pom.xml"
+        if ((Test-Path $pomFile) -and ((Get-Item $pomFile).LastWriteTime -gt $jarMtime)) {
+            Write-Host "  -> Phát hiện cấu hình Maven mới hơn artifact (pom.xml). Yêu cầu đóng gói lại." -ForegroundColor Yellow
+            $needsBuild = $true
+        }
     }
 
     if ($needsBuild) {
@@ -366,7 +385,6 @@ try {
         "-Dserver.port=$SpringPort",
         "-Dspring.profiles.active=dev",
         "-Dapp.catalog.sync-url=http://127.0.0.1:$FastApiPort/api/index/sync",
-        "-Dapp.catalog.sync-token=$SyncSecret",
         "-Dapp.media.drive-mount=$DriveMountPoint",
         "-Dapp.media.drive.mount-path=$DriveMountPoint\",
         "-Dapp.media.drive-metadata-timeout-ms=60000",
@@ -374,7 +392,13 @@ try {
         "-jar", $jarFile
     )
 
-    $sbProc = Start-ChildServiceProcess -FileName $javaBin -Arguments $springArgs -WorkingDirectory $backendDir -EnvironmentVariables $null -StdOutFile $sbLog -StdErrFile $sbErr
+    $sbEnv = [System.Collections.Generic.Dictionary[string, string]]::new()
+    foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
+        $sbEnv[$key] = [System.Environment]::GetEnvironmentVariable($key)
+    }
+    $sbEnv["CATALOG_SYNC_TOKEN"] = $SyncSecret
+    $sbEnv["FASTAPI_SYNC_SECRET"] = $SyncSecret
+    $sbProc = Start-ChildServiceProcess -FileName $javaBin -Arguments $springArgs -WorkingDirectory $backendDir -EnvironmentVariables $sbEnv -StdOutFile $sbLog -StdErrFile $sbErr
 
     # Lưu ownership ngay khi tiến trình spawn
     $stackState.Processes += @{

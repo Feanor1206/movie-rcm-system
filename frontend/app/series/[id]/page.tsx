@@ -31,6 +31,7 @@ import {
   CatalogMediaAsset,
 } from '@/lib/services/catalogService';
 import { resolveStreamUrl, requestPlaybackGrant, getStoredAuthToken } from '@/lib/services/mediaService';
+import { resolveFileTimestamp, resolveMediaSeekSeconds } from '@/lib/services/mediaRouting';
 
 const formatDuration = (ms?: number) => {
   if (!ms || ms <= 0) return '00:00';
@@ -40,71 +41,6 @@ const formatDuration = (ms?: number) => {
   return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
 };
 
-interface CoverageEntry {
-  episode_id?: string;
-  segment_id?: string | null;
-  sequence?: number;
-  source_in_ms?: number;
-  source_out_ms?: number | null;
-  episode_in_ms?: number | null;
-  scope?: string;
-}
-
-function resolveFileTimestamp(
-  logicalMs: number,
-  asset?: CatalogMediaAsset | null,
-  segmentId?: string | null,
-  episodeId?: string | null
-): number | null {
-  if (!asset?.coverageJson || typeof logicalMs !== 'number' || isNaN(logicalMs)) {
-    return null;
-  }
-  try {
-    const coverageList: CoverageEntry[] = JSON.parse(asset.coverageJson);
-    if (!Array.isArray(coverageList) || coverageList.length === 0) {
-      return null;
-    }
-
-    const relevantCoverage = episodeId
-      ? coverageList.filter((c) => !c.episode_id || c.episode_id === episodeId)
-      : coverageList;
-
-    if (segmentId) {
-      const segCov = relevantCoverage.find((c) => c.segment_id === segmentId);
-      if (segCov && typeof segCov.source_in_ms === 'number') {
-        if (typeof segCov.episode_in_ms !== 'number' || isNaN(segCov.episode_in_ms)) {
-          return null;
-        }
-        const delta = logicalMs - segCov.episode_in_ms;
-        if (delta < 0) return null;
-        return (segCov.source_in_ms + delta) / 1000;
-      }
-    }
-
-    const validEntries = relevantCoverage.filter(
-      (c) => typeof c.source_in_ms === 'number' && typeof c.episode_in_ms === 'number'
-    );
-
-    const matches = validEntries.filter((c) => {
-      const epIn = c.episode_in_ms as number;
-      const dur =
-        typeof c.source_out_ms === 'number' && typeof c.source_in_ms === 'number'
-          ? c.source_out_ms - c.source_in_ms
-          : Infinity;
-      return logicalMs >= epIn && logicalMs <= epIn + dur;
-    });
-
-    if (matches.length === 1) {
-      const match = matches[0];
-      const delta = logicalMs - (match.episode_in_ms as number);
-      return ((match.source_in_ms as number) + delta) / 1000;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 export default function SeriesDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -113,6 +49,7 @@ export default function SeriesDetailPage() {
   // Deep linking parameters
   const targetEpisodeId = searchParams.get('episode');
   const targetSceneId = searchParams.get('scene');
+  const targetSegmentId = searchParams.get('segment');
   const targetAssetId = searchParams.get('asset');
   const targetTimeMs = searchParams.get('t');
 
@@ -140,6 +77,7 @@ export default function SeriesDetailPage() {
     episodeId: string;
     assetId: string;
     sceneId?: string | null;
+    segmentId?: string | null;
     targetSec: number;
     generation: number;
   }
@@ -150,6 +88,7 @@ export default function SeriesDetailPage() {
   const playGenRef = useRef<number>(0);
   const pendingSeekRef = useRef<PendingSeekIdentity | null>(null);
   const initialDeepLinkHandledRef = useRef<boolean>(false);
+  const prevUrlEpisodeIdRef = useRef<string | null>(targetEpisodeId);
 
   // Unmount cleanup guard
   useEffect(() => {
@@ -161,7 +100,7 @@ export default function SeriesDetailPage() {
   // Reset deep-link handling when search params change
   useEffect(() => {
     initialDeepLinkHandledRef.current = false;
-  }, [targetEpisodeId, targetAssetId, targetSceneId, targetTimeMs]);
+  }, [targetEpisodeId, targetAssetId, targetSceneId, targetSegmentId, targetTimeMs]);
 
   // Load series data with AbortController and generation guard
   useEffect(() => {
@@ -183,7 +122,9 @@ export default function SeriesDetailPage() {
             let initialEp = data.episodes[0];
             if (targetEpisodeId) {
               const matched = data.episodes.find((e) => e.id === targetEpisodeId);
-              if (matched) initialEp = matched;
+              if (matched) {
+                initialEp = matched;
+              }
             }
             setSelectedEpisode(initialEp);
           }
@@ -202,7 +143,43 @@ export default function SeriesDetailPage() {
     return () => {
       controller.abort();
     };
-  }, [seriesId, targetEpisodeId]);
+  }, [seriesId]);
+
+  // Synchronize selectedEpisode when targetEpisodeId in URL changes (deep-link or back/forward)
+  useEffect(() => {
+    if (!seriesData?.episodes) return;
+    if (targetEpisodeId !== prevUrlEpisodeIdRef.current) {
+      prevUrlEpisodeIdRef.current = targetEpisodeId;
+      if (targetEpisodeId) {
+        const matched = seriesData.episodes.find((e) => e.id === targetEpisodeId);
+        if (matched) {
+          setSelectedEpisode(matched);
+        }
+      } else if (seriesData.episodes.length > 0) {
+        setSelectedEpisode(seriesData.episodes[0]);
+      }
+    }
+  }, [targetEpisodeId, seriesData]);
+
+  // Manual episode selection handler that updates state and keeps URL in sync without page reloads
+  const handleSelectEpisode = (ep: CatalogEpisode) => {
+    if (ep.id === selectedEpisode?.id) return;
+    setSelectedEpisode(ep);
+
+    try {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('episode', ep.id);
+      currentUrl.searchParams.delete('scene');
+      currentUrl.searchParams.delete('segment');
+      currentUrl.searchParams.delete('t');
+      currentUrl.searchParams.delete('timeline');
+      currentUrl.searchParams.delete('timescale');
+      currentUrl.searchParams.delete('asset');
+      window.history.replaceState(null, '', currentUrl.toString());
+    } catch {
+      // Safe fallback in SSR or non-browser environments
+    }
+  };
 
   // Load episode detail when selectedEpisode changes (with race condition prevention & AbortSignal)
   useEffect(() => {
@@ -225,14 +202,18 @@ export default function SeriesDetailPage() {
         if (detail) {
           setEpisodeDetail(detail);
 
+          // Only apply URL targetSceneId / targetSegmentId / targetTimeMs / targetAssetId
+          // if this selected episode matches the URL's targetEpisodeId!
+          const isUrlEpisode = targetEpisodeId ? detail.episode.id === targetEpisodeId : false;
+
           // Select asset based on deep-link or default to first
           let assetToSelect: CatalogMediaAsset | null = null;
-          if (targetAssetId && detail.mediaAssets) {
+          if (isUrlEpisode && targetAssetId && detail.mediaAssets) {
             assetToSelect = detail.mediaAssets.find((a) => a.id === targetAssetId) || null;
           }
-          if (!assetToSelect && targetSceneId && detail.scenes && detail.mediaAssets) {
+          if (!assetToSelect && isUrlEpisode && targetSceneId && detail.scenes && detail.mediaAssets) {
             const sc = detail.scenes.find((s) => s.id === targetSceneId);
-            if (sc && sc.mediaAssetId) {
+            if (sc?.mediaAssetId) {
               assetToSelect = detail.mediaAssets.find((a) => a.id === sc.mediaAssetId) || null;
             }
           }
@@ -241,30 +222,44 @@ export default function SeriesDetailPage() {
           }
           setSelectedAsset(assetToSelect);
 
-          // Handle initial deep-link seek with strict identity tuple
-          if (!initialDeepLinkHandledRef.current && assetToSelect) {
+          // Handle initial deep-link seek only for the URL's target episode
+          if (isUrlEpisode && !initialDeepLinkHandledRef.current && assetToSelect) {
             initialDeepLinkHandledRef.current = true;
-            let seekSec: number | null = null;
-            if (targetTimeMs && !isNaN(Number(targetTimeMs))) {
-              const isFile = searchParams.get('timeline') === 'file' || searchParams.get('timescale') === 'file';
-              if (isFile) {
-                seekSec = Number(targetTimeMs) / 1000;
-              } else {
-                seekSec = resolveFileTimestamp(Number(targetTimeMs), assetToSelect, undefined, detail.episode.id);
-              }
-            } else if (targetSceneId && detail.scenes) {
-              const sc = detail.scenes.find((s) => s.id === targetSceneId);
-              if (sc) {
-                seekSec = sc.startMs / 1000;
-                setActiveSceneId(sc.id);
+            const sc = targetSceneId && detail.scenes ? detail.scenes.find((s) => s.id === targetSceneId) : undefined;
+            const seg = targetSegmentId && detail.segments ? detail.segments.find((s) => s.id === targetSegmentId) : undefined;
+
+            const seekSec = resolveMediaSeekSeconds({
+              timeMs: targetTimeMs,
+              timeline: searchParams.get('timeline') || searchParams.get('timescale'),
+              isScene: !!targetSceneId,
+              isSegment: !!targetSegmentId,
+              asset: assetToSelect,
+              segmentId: targetSegmentId || undefined,
+              episodeId: detail.episode.id,
+              sceneStartMs: sc?.startMs,
+              segmentStartMs: seg?.episodeStartMs,
+            });
+
+            if (targetSegmentId && seg) {
+              setActiveSegmentId(seg.id);
+              if (seekSec === null) {
+                setPlaybackWarning(`Phân đoạn [${seg.title || seg.id}] chưa xác định thời điểm bắt đầu (episode_start_ms = null).`);
               }
             }
-            if (seekSec !== null && seekSec >= 0) {
+            if (targetSceneId && sc) {
+              setActiveSceneId(sc.id);
+              if (seekSec === null) {
+                setPlaybackWarning(`Phân cảnh [${sc.title || sc.id}] chưa xác định thời điểm bắt đầu (start_ms = null).`);
+              }
+            }
+
+            if (seekSec !== null && !isNaN(seekSec) && isFinite(seekSec) && seekSec >= 0) {
               pendingSeekRef.current = {
                 seriesId: String(seriesId),
                 episodeId: detail.episode.id,
                 assetId: assetToSelect.id,
                 sceneId: targetSceneId || null,
+                segmentId: targetSegmentId || null,
                 targetSec: seekSec,
                 generation: ++playGenRef.current,
               };
@@ -284,7 +279,7 @@ export default function SeriesDetailPage() {
     return () => {
       controller.abort();
     };
-  }, [selectedEpisode?.id, targetAssetId, targetSceneId, targetTimeMs, seriesId]);
+  }, [selectedEpisode?.id, targetAssetId, targetSceneId, targetSegmentId, targetTimeMs, seriesId, targetEpisodeId]);
 
   // Video stream URL resolution with short-lived playback grant for protected media (H4)
   const [streamUrl, setStreamUrl] = useState<string>('');
@@ -440,6 +435,9 @@ export default function SeriesDetailPage() {
       if (pending.sceneId) {
         setActiveSceneId(pending.sceneId);
       }
+      if (pending.segmentId) {
+        setActiveSegmentId(pending.segmentId);
+      }
       pendingSeekRef.current = null;
     }
   };
@@ -475,7 +473,7 @@ export default function SeriesDetailPage() {
   if (isLoadingSeries) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex items-center gap-2 text-sm text-zinc-400">
+        <div className="flex items-center gap-2 text-sm text-muted">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand border-t-transparent" />
           <span>Đang nạp dữ liệu bộ hoạt hình...</span>
         </div>
@@ -487,8 +485,8 @@ export default function SeriesDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
         <AlertCircle size={40} className="mx-auto text-red-400" />
-        <h2 className="mt-4 text-xl font-bold text-white">Lỗi hiển thị bộ phim</h2>
-        <p className="mt-2 text-sm text-zinc-400">{error || 'Không tìm thấy dữ liệu bộ phim.'}</p>
+        <h2 className="mt-4 text-xl font-bold text-ink">Lỗi hiển thị bộ phim</h2>
+        <p className="mt-2 text-sm text-muted">{error || 'Không tìm thấy dữ liệu bộ phim.'}</p>
         <Link href="/admin/import" className="btn-secondary mt-6 inline-flex items-center gap-2 text-xs">
           <ArrowLeft size={14} />
           <span>Quay lại trang quản lý</span>
@@ -500,14 +498,14 @@ export default function SeriesDetailPage() {
   const { series, seasons, episodes } = seriesData;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="series-page mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Breadcrumb Navigation */}
-      <div className="mb-6 flex items-center gap-2 text-xs text-zinc-400">
-        <Link href="/" className="hover:text-white transition-colors">Trang chủ</Link>
+      <div className="mb-6 flex items-center gap-2 text-xs text-muted">
+        <Link href="/" className="hover:text-ink transition-colors">Trang chủ</Link>
         <ChevronRight size={12} />
-        <Link href="/admin/import" className="hover:text-white transition-colors">Danh mục hoạt hình</Link>
+        <Link href="/search" className="hover:text-ink transition-colors">Kho phim</Link>
         <ChevronRight size={12} />
-        <span className="text-zinc-200 font-medium">{series.title}</span>
+        <span className="text-ink font-medium">{series.title}</span>
       </div>
 
       {/* Series Hero Metadata Card */}
@@ -519,23 +517,22 @@ export default function SeriesDetailPage() {
                 Bộ Hoạt Hình
               </span>
               {series.releaseYearStart && (
-                <span className="rounded bg-surface-elevated px-2 py-0.5 text-xs text-zinc-400 border border-surface-border">
+                <span className="rounded bg-surface-elevated px-2 py-0.5 text-xs text-muted border border-surface-border">
                   Năm {series.releaseYearStart}
                   {series.releaseYearEnd ? ` - ${series.releaseYearEnd}` : ''}
                 </span>
               )}
-              <span className="font-mono text-xs text-zinc-500">[{series.id}]</span>
             </div>
 
-            <h1 className="mt-2 text-2xl font-extrabold text-white sm:text-3xl">
+            <h1 className="mt-2 text-2xl font-extrabold text-ink sm:text-3xl">
               {series.title}
             </h1>
             {series.originalTitle && (
-              <p className="text-xs text-zinc-400 italic">Tên gốc: {series.originalTitle}</p>
+              <p className="text-xs text-muted italic">Tên gốc: {series.originalTitle}</p>
             )}
 
             {series.synopsis && (
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-300">
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted">
                 {series.synopsis}
               </p>
             )}
@@ -543,16 +540,16 @@ export default function SeriesDetailPage() {
             {/* Tags / Genres / Keywords */}
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {series.genreIds && (
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-1.5 text-xs text-muted">
                   <Tag size={12} className="text-brand" />
                   <span>Thể loại:</span>
-                  <span className="text-zinc-200 font-medium">{series.genreIds}</span>
+                  <span className="text-ink font-medium">{series.genreIds}</span>
                 </div>
               )}
               {series.studios && (
-                <div className="ml-4 flex items-center gap-1.5 text-xs text-zinc-400">
+                <div className="ml-4 flex items-center gap-1.5 text-xs text-muted">
                   <span>Studio:</span>
-                  <span className="text-zinc-200 font-medium">{series.studios}</span>
+                  <span className="text-ink font-medium">{series.studios}</span>
                 </div>
               )}
             </div>
@@ -573,7 +570,7 @@ export default function SeriesDetailPage() {
               </div>
               <button
                 onClick={() => setPlaybackWarning(null)}
-                className="text-zinc-400 hover:text-white"
+                className="text-muted hover:text-ink"
               >
                 ✕
               </button>
@@ -597,8 +594,8 @@ export default function SeriesDetailPage() {
                 className="h-full w-full object-contain"
               />
             ) : (
-              <div className="flex flex-col items-center justify-center text-center p-6 text-zinc-500">
-                <Film size={36} className="mb-2 text-zinc-600" />
+              <div className="flex flex-col items-center justify-center text-center p-6 text-zinc-200">
+                <Film size={36} className="mb-2 text-zinc-400" />
                 <p className="text-xs">Tập này chưa có luồng video Google Drive được cấu hình.</p>
               </div>
             )}
@@ -612,10 +609,10 @@ export default function SeriesDetailPage() {
                   <span className="text-xs font-bold text-brand">
                     Tập {selectedEpisode.number ?? selectedEpisode.episodeNumber}
                   </span>
-                  <h2 className="text-lg font-bold text-white">{selectedEpisode.title}</h2>
+                  <h2 className="text-lg font-bold text-ink">{selectedEpisode.title}</h2>
                 </div>
                 {selectedEpisode.durationMs && (
-                  <span className="flex items-center gap-1 rounded bg-surface-elevated px-2 py-1 text-xs text-zinc-400 border border-surface-border">
+                  <span className="flex items-center gap-1 rounded bg-surface-elevated px-2 py-1 text-xs text-muted border border-surface-border">
                     <Clock size={12} />
                     {formatDuration(selectedEpisode.durationMs)}
                   </span>
@@ -623,7 +620,7 @@ export default function SeriesDetailPage() {
               </div>
 
               {selectedEpisode.synopsis && (
-                <p className="mt-3 text-xs leading-relaxed text-zinc-300">
+                <p className="mt-3 text-xs leading-relaxed text-muted">
                   {selectedEpisode.synopsis}
                 </p>
               )}
@@ -631,7 +628,7 @@ export default function SeriesDetailPage() {
               {/* Media Assets (Storage info: Google Drive) */}
               {episodeDetail?.mediaAssets && episodeDetail.mediaAssets.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-surface-border flex items-center gap-2 text-xs">
-                  <span className="text-zinc-400">Nguồn phát:</span>
+                  <span className="text-muted">Nguồn phát:</span>
                   {episodeDetail.mediaAssets.map((asset) => (
                     <button
                       key={asset.id}
@@ -641,7 +638,7 @@ export default function SeriesDetailPage() {
                       className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer border ${
                         selectedAsset?.id === asset.id
                           ? 'border-brand bg-brand/10 text-brand'
-                          : 'border-surface-border bg-surface-elevated text-zinc-300 hover:text-white'
+                          : 'border-surface-border bg-surface-elevated text-muted hover:text-ink'
                       }`}
                     >
                       {asset.storageProvider === 'drive' ? 'Google Drive Video' : 'Local Video'} [{asset.id}]
@@ -658,11 +655,11 @@ export default function SeriesDetailPage() {
               <div className="flex items-center justify-between border-b border-surface-border pb-3">
                 <div className="flex items-center gap-2">
                   <Layers size={16} className="text-brand" />
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-ink">
                     Truyện ngắn / Phân đoạn ({episodeDetail.segments.length})
                   </h3>
                 </div>
-                <span className="text-xs text-zinc-500">Nhấp vào phân đoạn để tua video</span>
+                <span className="text-xs text-muted">Nhấp vào phân đoạn để tua video</span>
               </div>
 
               <div className="mt-3 divide-y divide-surface-border">
@@ -696,12 +693,12 @@ export default function SeriesDetailPage() {
                           <span className="font-mono text-xs font-bold text-brand">
                             {timeLabel}
                           </span>
-                          <span className="text-xs font-bold text-white">
+                          <span className="text-xs font-bold text-ink">
                             {seg.title || `Phân đoạn ${seg.position}`}
                           </span>
                         </div>
                         {seg.synopsis && (
-                          <p className="text-xs text-zinc-400 line-clamp-2">
+                          <p className="text-xs text-muted line-clamp-2">
                             {seg.synopsis}
                           </p>
                         )}
@@ -724,11 +721,11 @@ export default function SeriesDetailPage() {
               <div className="flex items-center justify-between border-b border-surface-border pb-3">
                 <div className="flex items-center gap-2">
                   <Sparkles size={16} className="text-brand" />
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-ink">
                     Phân cảnh chi tiết ({episodeDetail.scenes.length})
                   </h3>
                 </div>
-                <span className="text-xs text-zinc-500">Nhấp vào phân cảnh để tua video</span>
+                <span className="text-xs text-muted">Nhấp vào phân cảnh để tua video</span>
               </div>
 
               <div className="mt-3 divide-y divide-surface-border">
@@ -759,17 +756,17 @@ export default function SeriesDetailPage() {
                           <span className="font-mono text-xs font-bold text-brand">
                             {timeLabel}
                           </span>
-                          <span className="text-xs font-bold text-white">
+                          <span className="text-xs font-bold text-ink">
                             {scene.title || 'Phân cảnh'}
                           </span>
                         </div>
                         {scene.visualDescription && (
-                          <p className="text-xs text-zinc-400 line-clamp-2">
+                          <p className="text-xs text-muted line-clamp-2">
                             {scene.visualDescription}
                           </p>
                         )}
                         {scene.summary && !scene.visualDescription && (
-                          <p className="text-xs text-zinc-400 line-clamp-2">
+                          <p className="text-xs text-muted line-clamp-2">
                             {scene.summary}
                           </p>
                         )}
@@ -795,7 +792,7 @@ export default function SeriesDetailPage() {
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
                 <Layers size={16} className="text-brand" />
-                <h3 className="text-sm font-bold text-white">
+                <h3 className="text-sm font-bold text-ink">
                   Danh sách tập ({episodes.length})
                 </h3>
               </div>
@@ -808,11 +805,12 @@ export default function SeriesDetailPage() {
                   <button
                     key={ep.id}
                     data-episode-id={ep.id}
-                    onClick={() => setSelectedEpisode(ep)}
+                    aria-pressed={isSelected}
+                    onClick={() => handleSelectEpisode(ep)}
                     className={`flex w-full items-start justify-between gap-3 rounded-lg p-3 text-left transition-colors cursor-pointer border ${
                       isSelected
-                        ? 'border-brand bg-brand/10 text-white'
-                        : 'border-surface-border bg-surface-elevated text-zinc-300 hover:bg-surface-hover hover:text-white'
+                        ? 'border-brand bg-brand/10 text-ink'
+                        : 'border-surface-border bg-surface-elevated text-muted hover:bg-surface-hover hover:text-ink'
                     }`}
                   >
                     <div>
@@ -823,14 +821,14 @@ export default function SeriesDetailPage() {
                         <strong className="text-xs font-semibold">{ep.title}</strong>
                       </div>
                       {ep.synopsis && (
-                        <p className="mt-1 line-clamp-2 text-[11px] text-zinc-400">
+                        <p className="mt-1 line-clamp-2 text-[11px] text-muted">
                           {ep.synopsis}
                         </p>
                       )}
                     </div>
 
                     {ep.durationMs && (
-                      <span className="font-mono text-[10px] text-zinc-500 shrink-0">
+                      <span className="font-mono text-[10px] text-muted shrink-0">
                         {formatDuration(ep.durationMs)}
                       </span>
                     )}
@@ -841,6 +839,6 @@ export default function SeriesDetailPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

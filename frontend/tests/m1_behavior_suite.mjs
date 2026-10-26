@@ -17,6 +17,12 @@ const movieCardFile = path.resolve(__dirname, '../features/movies/components/Mov
 const movieDetailFile = path.resolve(__dirname, '../features/movies/components/MovieDetail.tsx');
 const profileOverviewFile = path.resolve(__dirname, '../features/profile/components/ProfileOverview.tsx');
 
+// Resolve the production navigation helper alongside the component under test.
+const mediaRoutingModule = { exports: {} };
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../lib/services/mediaRouting.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText, { exports: mediaRoutingModule.exports, module: mediaRoutingModule, URLSearchParams });
+
 function renderComponent(filePath, componentName, contextVal, authVal, props = {}, initialStates = []) {
   const rawCode = fs.readFileSync(filePath, 'utf8');
   const code = ts.transpileModule(rawCode, {
@@ -46,6 +52,7 @@ function renderComponent(filePath, componentName, contextVal, authVal, props = {
       if (name === 'next/image') return { default: (p) => ({ type: 'img', props: p }) };
       if (name === 'next/link') return { default: (p) => ({ type: 'a', props: p }) };
       if (name === 'lucide-react') return new Proxy({}, { get: (_, prop) => (p) => ({ type: String(prop), props: p }) });
+      if (name.includes('mediaRouting')) return mediaRoutingModule.exports;
       if (name.includes('WatchlistContext')) return { useWatchlist: () => contextVal };
       if (name.includes('AuthContext')) return { useAuth: () => authVal };
       if (name.includes('MovieSection')) return { MovieSection: () => null };

@@ -1,5 +1,6 @@
 import os
 import sys
+import hmac
 
 # Khắc phục xung đột OpenMP trên môi trường Windows Anaconda
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -253,11 +254,16 @@ def sync_index(
             detail="Chức năng đồng bộ chỉ mục bị vô hiệu hóa: Chưa cấu hình CATALOG_SYNC_TOKEN hoặc FASTAPI_SYNC_SECRET ngoài Git."
         )
 
-    auth_header = http_request.headers.get("X-Service-Token") or http_request.headers.get("Authorization")
-    if not auth_header:
+    service_token = http_request.headers.get("X-Service-Token")
+    auth_header = http_request.headers.get("Authorization")
+    if service_token is None and not auth_header:
         raise HTTPException(status_code=401, detail="Unauthorized: missing X-Service-Token or Authorization header")
-    token = auth_header.replace("Bearer ", "").strip()
-    if token != FASTAPI_SYNC_SECRET:
+    if service_token is not None:
+        token = service_token.strip()
+    else:
+        auth_parts = auth_header.split()
+        token = auth_parts[1] if len(auth_parts) == 2 and auth_parts[0].casefold() == "bearer" else ""
+    if not hmac.compare_digest(token.encode("utf-8"), FASTAPI_SYNC_SECRET.encode("utf-8")):
         raise HTTPException(status_code=403, detail="Forbidden: invalid service token")
 
     global _current_sync_generation, _current_sync_hash, _active_catalog_payload
