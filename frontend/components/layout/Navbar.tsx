@@ -103,6 +103,7 @@ export function Navbar() {
             <div className="relative" ref={dropdownRef}>
               <button
                 data-testid="nav-user-dropdown-button"
+                aria-expanded={userDropdownOpen}
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1 text-xs text-ink hover:border-ink hover:text-ink transition-colors cursor-pointer"
               >
@@ -171,6 +172,7 @@ export function Navbar() {
           {isAuthenticated ? (
             <Link
               href="/profile"
+              aria-label="Hồ sơ cá nhân"
               className="grid h-8 w-8 place-items-center rounded bg-brand text-xs font-bold text-zinc-950 shadow-brand-sm"
             >
               {getInitials(user?.fullName || user?.username)}
@@ -186,6 +188,8 @@ export function Navbar() {
 
           <button
             aria-label={open ? 'Đóng menu' : 'Mở menu'}
+            aria-expanded={open}
+            aria-controls="mobile-navigation"
             onClick={() => setOpen(!open)}
             className="min-h-[44px] min-w-[44px] rounded-md border border-surface-border bg-surface p-2 text-muted hover:text-ink cursor-pointer"
           >
@@ -196,7 +200,7 @@ export function Navbar() {
 
       {/* Mobile Drawer */}
       {open && (
-        <div className="border-b border-surface-border bg-background px-5 py-5 md:hidden animate-slide-up">
+        <div id="mobile-navigation" className="border-b border-surface-border bg-background px-5 py-5 md:hidden animate-slide-up">
           <div className="flex flex-col gap-3">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -236,6 +240,15 @@ export function Navbar() {
               >
                 Tìm kiếm hoạt hình
               </Link>
+              {isAuthenticated && (
+                <button
+                  data-testid="mobile-logout"
+                  onClick={() => { setOpen(false); logout(); }}
+                  className="btn-secondary w-full justify-center text-xs"
+                >
+                  <LogOut size={14} /> Đăng xuất
+                </button>
+              )}
             </div>
           </div>
         </div>

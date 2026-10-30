@@ -199,12 +199,13 @@ export function AuthModal() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">
+              <label htmlFor="auth-full-name" className="block text-xs font-medium text-muted mb-1.5">
                 Họ và tên
               </label>
               <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
                 <User size={15} className="text-muted mr-2 shrink-0" />
                 <input
+                  id="auth-full-name"
                   ref={!isLogin ? firstInputRef : undefined}
                   type="text"
                   disabled={isSubmitting}
@@ -218,12 +219,13 @@ export function AuthModal() {
           )}
 
           <div>
-            <label className="block text-xs font-medium text-muted mb-1.5">
+            <label htmlFor="auth-username" className="block text-xs font-medium text-muted mb-1.5">
               {isLogin ? 'Tên đăng nhập hoặc Email' : 'Tên đăng nhập'}
             </label>
             <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
               <User size={15} className="text-muted mr-2 shrink-0" />
               <input
+                id="auth-username"
                 ref={isLogin ? firstInputRef : undefined}
                 data-testid="login-username-input"
                 type="text"
@@ -240,12 +242,13 @@ export function AuthModal() {
 
           {!isLogin && (
             <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">
+              <label htmlFor="auth-email" className="block text-xs font-medium text-muted mb-1.5">
                 Email
               </label>
               <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
                 <Mail size={15} className="text-muted mr-2 shrink-0" />
                 <input
+                  id="auth-email"
                   type="email"
                   required
                   disabled={isSubmitting}
@@ -260,12 +263,13 @@ export function AuthModal() {
           )}
 
           <div>
-            <label className="block text-xs font-medium text-muted mb-1.5">
+            <label htmlFor="auth-password" className="block text-xs font-medium text-muted mb-1.5">
               Mật khẩu
             </label>
             <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
               <Lock size={15} className="text-muted mr-2 shrink-0" />
               <input
+                id="auth-password"
                 data-testid="login-password-input"
                 type="password"
                 required

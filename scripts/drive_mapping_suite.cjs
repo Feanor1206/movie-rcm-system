@@ -453,7 +453,7 @@ describe('DRIVE-01: Drive Media Mapping & Validation Suite', () => {
 
   // Test 9: Chặn Windows junction / symlink trỏ ra ngoài mount root (Finding D6)
   it('9. Strictly rejects Windows junction and symlink boundary escapes outside mount root (Finding D6)', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-drive-mapping-junc-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'regression-drive-mapping-junc-'));
     try {
       const mountRoot = path.join(tempDir, 'mount');
       const outsideDir = path.join(tempDir, 'outside');

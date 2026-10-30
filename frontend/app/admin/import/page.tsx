@@ -18,6 +18,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { CatalogImportModal } from '@/features/admin/components/CatalogImportModal';
+import { useAuth } from '@/lib/context/AuthContext';
 import {
   getCatalogSeriesList,
   getImportHistory,
@@ -29,6 +30,8 @@ import {
 } from '@/lib/services/catalogService';
 
 export default function AdminImportPage() {
+  const { status, user, token, openAuthModal, retryVerify } = useAuth();
+  const isAdmin = status === 'authenticated' && user?.role === 'ROLE_ADMIN' && !!token;
   const [seriesList, setSeriesList] = useState<CatalogSeriesSummary[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [snapshots, setSnapshots] = useState<CatalogSnapshot[]>([]);
@@ -36,28 +39,29 @@ export default function AdminImportPage() {
   const [refreshNonce, setRefreshNonce] = useState<number>(0);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [loadErrors, setLoadErrors] = useState({ series: false, history: false, snapshots: false });
 
   useEffect(() => {
-    let mounted = true;
+    if (!isAdmin) return;
+    const controller = new AbortController();
     setIsLoading(true);
+    setLoadErrors({ series: false, history: false, snapshots: false });
 
-    Promise.all([
-      getCatalogSeriesList().catch(() => []),
-      getImportHistory().catch(() => []),
-      getCatalogSnapshots().catch(() => []),
+    Promise.allSettled([
+      getCatalogSeriesList(undefined, controller.signal),
+      getImportHistory(undefined, controller.signal),
+      getCatalogSnapshots(undefined, controller.signal),
     ]).then(([series, hist, snaps]) => {
-      if (mounted) {
-        setSeriesList(series);
-        setHistory(hist);
-        setSnapshots(snaps);
-        setIsLoading(false);
-      }
+      if (controller.signal.aborted) return;
+      setSeriesList(series.status === 'fulfilled' ? series.value : []);
+      setHistory(hist.status === 'fulfilled' ? hist.value : []);
+      setSnapshots(snaps.status === 'fulfilled' ? snaps.value : []);
+      setLoadErrors({ series: series.status === 'rejected', history: hist.status === 'rejected', snapshots: snaps.status === 'rejected' });
+      setIsLoading(false);
     });
 
-    return () => {
-      mounted = false;
-    };
-  }, [refreshNonce]);
+    return () => controller.abort();
+  }, [refreshNonce, isAdmin, token]);
 
   const handleImportSuccess = (_res: CatalogImportResponse) => {
     setRefreshNonce((n) => n + 1);
@@ -82,6 +86,11 @@ export default function AdminImportPage() {
       setRetryingId(null);
     }
   };
+
+  if (status === 'checking') return <div role="status" className="p-8 text-sm">Đang kiểm tra tài khoản…</div>;
+  if (status === 'unavailable') return <div role="alert" className="p-8 text-sm">Không thể kiểm tra tài khoản. <button className="underline" onClick={() => retryVerify()}>Thử lại</button></div>;
+  if (status === 'guest') return <div className="p-8 text-sm">Vui lòng đăng nhập để quản trị danh mục. <button data-testid="admin-sign-in" className="underline" onClick={() => openAuthModal('login')}>Đăng nhập</button></div>;
+  if (!isAdmin) return <div data-testid="admin-forbidden" role="alert" className="p-8 text-sm">Tài khoản này không có quyền quản trị danh mục.</div>;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -140,6 +149,8 @@ export default function AdminImportPage() {
                 <RefreshCw size={16} className="animate-spin text-brand mr-2" />
                 <span>Đang tải danh sách bộ phim...</span>
               </div>
+            ) : loadErrors.series ? (
+              <LoadError label="danh sách bộ phim" onRetry={() => setRefreshNonce((n) => n + 1)} />
             ) : seriesList.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted">
                 Chưa có bộ hoạt hình nào được nhập. Hãy tải tệp JSON lên để bắt đầu.
@@ -231,6 +242,8 @@ export default function AdminImportPage() {
                 <RefreshCw size={16} className="animate-spin text-brand mr-2" />
                 <span>Đang kiểm tra hàng đợi outbox...</span>
               </div>
+            ) : loadErrors.snapshots ? (
+              <LoadError label="trạng thái đồng bộ" onRetry={() => setRefreshNonce((n) => n + 1)} />
             ) : snapshots.length === 0 ? (
               <div className="py-6 text-center text-xs text-muted">
                 Chưa có snapshot nào được tạo. Khi bạn nhập gói catalog, snapshot sẽ được ghi nhận tại đây.
@@ -367,7 +380,9 @@ export default function AdminImportPage() {
               <h3 className="text-sm font-bold text-ink">Lịch sử gói nhập</h3>
             </div>
 
-            {history.length === 0 ? (
+            {isLoading ? <p role="status" className="mt-3 text-xs text-muted">Đang tải lịch sử…</p> : loadErrors.history ? (
+              <div data-testid="history-error"><LoadError label="lịch sử nhập" onRetry={() => setRefreshNonce((n) => n + 1)} /></div>
+            ) : history.length === 0 ? (
               <p className="mt-3 text-xs text-muted">Chưa có lịch sử nhập gói.</p>
             ) : (
               <div className="mt-3 space-y-3">
@@ -402,4 +417,8 @@ export default function AdminImportPage() {
       </div>
     </div>
   );
+}
+
+function LoadError({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return <p role="alert" className="mt-3 text-xs text-red-400">Không thể tải {label}. <button className="underline" onClick={onRetry}>Thử lại</button></p>;
 }

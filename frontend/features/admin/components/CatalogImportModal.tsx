@@ -38,15 +38,14 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
   const [importResult, setImportResult] = useState<CatalogImportResponse | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
-  const [isSyncingAi, setIsSyncingAi] = useState<boolean>(false);
-  const [aiSyncStatus, setAiSyncStatus] = useState<string | null>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const validatedHashRef = useRef<string | null>(null);
+  const inputVersionRef = useRef(0);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const inputVersion = ++inputVersionRef.current;
 
     setFileName(file.name);
     setParsingError(null);
@@ -57,10 +56,15 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
     const reader = new FileReader();
     reader.onload = (event) => {
+      if (inputVersion !== inputVersionRef.current) return;
+      inputVersionRef.current += 1;
+      setValidationResult(null);
+      validatedHashRef.current = null;
       const content = event.target?.result as string;
       setJsonInput(content);
     };
     reader.onerror = () => {
+      if (inputVersion !== inputVersionRef.current) return;
       setParsingError('Không thể đọc tệp JSON đã chọn.');
     };
     reader.readAsText(file);
@@ -90,15 +94,17 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
     setImportResult(null);
     setImportError(null);
     validatedHashRef.current = null;
+    const inputVersion = inputVersionRef.current;
 
     try {
       const result = await validateCatalogPackage(parsed);
+      if (inputVersion !== inputVersionRef.current) return;
       setValidationResult(result);
       if (result.valid) {
         validatedHashRef.current = result.contentHash || 'valid_hash';
       }
     } catch (err: any) {
-      setParsingError(`Lỗi kết nối máy chủ xác thực: ${err?.message || err}`);
+      if (inputVersion === inputVersionRef.current) setParsingError(`Lỗi kết nối máy chủ xác thực: ${err?.message || err}`);
     } finally {
       setIsValidating(false);
     }
@@ -123,11 +129,6 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
       if (onImportSuccess) {
         onImportSuccess(res);
       }
-      setAiSyncStatus(
-        res.indexStatus === 'READY'
-          ? 'Chỉ mục AI đã sẵn sàng.'
-          : 'Đã đưa vào hàng đợi Outbox. Đang đồng bộ chỉ mục AI trong nền.'
-      );
     } catch (err: any) {
       setImportError(err?.message || 'Có lỗi xảy ra trong quá trình nhập dữ liệu.');
     } finally {
@@ -187,12 +188,14 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
         {/* Textarea for JSON content */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-zinc-400">
+          <label htmlFor="catalog-json" className="mb-1 block text-xs font-medium text-zinc-400">
             Nội dung JSON của gói catalog:
           </label>
           <textarea
+            id="catalog-json"
             value={jsonInput}
             onChange={(e) => {
+              inputVersionRef.current += 1;
               setJsonInput(e.target.value);
               setValidationResult(null);
               setImportResult(null);
@@ -369,7 +372,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
             <div className="mt-3 flex items-center justify-between border-t border-emerald-500/20 pt-2 text-[11px] text-zinc-400">
               <span>Import ID: <code className="text-emerald-300">{importResult.importId}</code></span>
-              <span>{isSyncingAi ? 'Đang đồng bộ AI...' : (aiSyncStatus || 'Chỉ mục AI sẵn sàng.')}</span>
+              <span>Trạng thái chỉ mục: {importResult.indexStatus || 'chưa xác định'}</span>
             </div>
           </div>
         )}

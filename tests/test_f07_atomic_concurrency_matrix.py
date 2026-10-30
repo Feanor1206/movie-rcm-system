@@ -18,6 +18,7 @@ Verifies all 10 required failure injection and concurrency scenarios:
 
 import ast
 import copy
+import hmac
 import json
 import logging
 import os
@@ -83,6 +84,11 @@ def create_test_context(temp_dir: Path, sync_mod, hybrid_mod):
         nodes.append(node)
 
     state_path = temp_dir / "state.json"
+    snapshots = {"current": None}
+
+    def publish_snapshot(snapshot):
+        snapshots["current"] = snapshot
+
     ns = {
         "FASTAPI_SYNC_SECRET": "test-sync-secret-f07",
         "_current_sync_generation": 0,
@@ -98,6 +104,10 @@ def create_test_context(temp_dir: Path, sync_mod, hybrid_mod):
         ),
         "SYNC_STATE_PATH": state_path,
         "json": json,
+        "hmac": hmac,
+        "AcceptedSnapshot": sync_mod.AcceptedSnapshot,
+        "set_accepted_snapshot": publish_snapshot,
+        "get_accepted_snapshot": lambda: snapshots["current"],
         "Request": SimpleNamespace
     }
 
@@ -138,7 +148,7 @@ def test_matrix():
         res_a = call_sync(1, payload_a)
         assert res_a.get("status") == "success", f"Initial sync failed: {res_a}"
         assert ns["_current_sync_generation"] == 1
-        assert "accepted-A" in [doc["title"] for doc in index.documents.values() if doc.get("item_type") == "series"]
+        assert "accepted-A" in [doc["title"] for doc in ns["cascading_pipeline"].retrieval_node.hybrid_index.documents.values() if doc.get("item_type") == "series"]
         results["case_1_initial_acceptance"] = "PASS"
         print("✓ Case 1: Initial acceptance (A/gen1) -> PASS")
 
@@ -154,7 +164,7 @@ def test_matrix():
         assert res_b.get("http_status") == 500, f"Expected 500 on save failure, got: {res_b}"
         # Assert active state and index were NOT polluted
         assert ns["_current_sync_generation"] == 1
-        titles_in_index = [doc["title"] for doc in index.documents.values() if doc.get("item_type") == "series"]
+        titles_in_index = [doc["title"] for doc in ns["cascading_pipeline"].retrieval_node.hybrid_index.documents.values() if doc.get("item_type") == "series"]
         assert "rejected-B" not in titles_in_index, f"Rejected B leaked into index: {titles_in_index}"
         assert "accepted-A" in titles_in_index, f"Accepted A lost from index: {titles_in_index}"
         ns["_save_sync_state"] = real_save
@@ -174,7 +184,7 @@ def test_matrix():
         res_c = call_sync(3, payload_c)
         assert res_c.get("http_status") == 500, f"Expected 500 on build failure, got: {res_c}"
         assert ns["_current_sync_generation"] == 1
-        titles_after_c = [doc["title"] for doc in index.documents.values() if doc.get("item_type") == "series"]
+        titles_after_c = [doc["title"] for doc in ns["cascading_pipeline"].retrieval_node.hybrid_index.documents.values() if doc.get("item_type") == "series"]
         assert "rejected-C" not in titles_after_c
         assert "accepted-A" in titles_after_c
         hybrid_mod.HybridMovieIndex.build_from_catalog = real_build
@@ -218,7 +228,7 @@ def test_matrix():
         res_d = call_sync(2, payload_d)
         assert res_d.get("status") == "success", f"Expected success for gen 2, got: {res_d}"
         assert ns["_current_sync_generation"] == 2
-        titles_d = [doc["title"] for doc in index.documents.values() if doc.get("item_type") == "series"]
+        titles_d = [doc["title"] for doc in ns["cascading_pipeline"].retrieval_node.hybrid_index.documents.values() if doc.get("item_type") == "series"]
         assert "accepted-D" in titles_d
         results["case_7_valid_new_generation"] = "PASS"
         print("✓ Case 7: Valid new generation acceptance (gen 2) -> PASS")
@@ -237,7 +247,7 @@ def test_matrix():
         res_gen3 = call_sync(3, payload_gen3)
         assert res_gen3.get("status") == "SKIPPED"
         assert ns["_current_sync_generation"] == 4
-        titles_after_late = [doc["title"] for doc in index.documents.values() if doc.get("item_type") == "series"]
+        titles_after_late = [doc["title"] for doc in ns["cascading_pipeline"].retrieval_node.hybrid_index.documents.values() if doc.get("item_type") == "series"]
         assert "late-gen3" not in titles_after_late
         assert "accepted-gen4" in titles_after_late
         results["case_8_out_of_order_generation_rejected"] = "PASS"
@@ -254,7 +264,7 @@ def test_matrix():
             while not stop_event.is_set():
                 try:
                     # Reader searches hybrid index
-                    docs = list(index.documents.values())
+                    docs = list(ns["cascading_pipeline"].retrieval_node.hybrid_index.documents.values())
                     # Ensure reader never sees a half-built or empty state
                     if len(docs) == 0:
                         query_errors.append("Reader observed empty documents list during sync")

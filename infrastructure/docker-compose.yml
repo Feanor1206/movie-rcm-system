@@ -26,11 +26,13 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      args:
+        SPRINGBOOT_INTERNAL_URL: http://springboot:8080
     container_name: movie_rcm_frontend
     restart: always
     environment:
       - NEXT_PUBLIC_SPRINGBOOT_API_URL=/api
-      - NEXT_PUBLIC_MODEL_API_URL=/api/chat
+      - MODEL_API_URL=http://fastapi:8000/api/chat
     expose:
       - "3000"
     networks:
@@ -51,6 +53,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-${POSTGRES_USER:-postgres}}
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - APP_JWT_SECRET=${APP_JWT_SECRET}
+      - APP_CATALOG_SYNC_URL=http://fastapi:8000/api/index/sync
+      - CATALOG_SYNC_TOKEN=${CATALOG_SYNC_TOKEN:-}
     expose:
       - "8080"
     depends_on:
@@ -86,6 +90,7 @@ services:
       - MAX_CONCURRENT_INFERENCE=1
       - MAX_NEW_TOKENS=256
       - HF_HOME=/root/.cache/huggingface
+      - CATALOG_SYNC_TOKEN=${CATALOG_SYNC_TOKEN:-}
     volumes:
       - ../ai/models:/app/models:ro
       - hf_cache:/root/.cache/huggingface

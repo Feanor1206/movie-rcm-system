@@ -1,5 +1,5 @@
 from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatMessageItem(BaseModel):
@@ -67,10 +67,23 @@ class IndexSyncResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    query: Optional[str] = None
-    messages: Optional[List[Dict[str, Any]]] = None
+    query: Optional[str] = Field(default=None, max_length=4000)
+    messages: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=40)
     availableMovies: Optional[List[MovieItem]] = None
-    sessionId: Optional[str] = "default"
+    sessionId: Optional[str] = Field(default="default", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+
+    @field_validator("messages")
+    @classmethod
+    def validate_messages(cls, messages):
+        if messages is None:
+            return None
+        normalized = []
+        for message in messages:
+            content = message.get("content") or message.get("text")
+            if message.get("role") not in ("user", "assistant") or not isinstance(content, str) or len(content) > 4000:
+                raise ValueError("Each message must have a user or assistant role and text of at most 4000 characters")
+            normalized.append({"role": message["role"], "content": content})
+        return normalized
 
 
 class ChatResponse(BaseModel):
@@ -82,8 +95,8 @@ class ChatResponse(BaseModel):
 
 
 class DiscoverRequest(BaseModel):
-    query: str
-    sessionId: Optional[str] = "default"
+    query: str = Field(max_length=4000)
+    sessionId: Optional[str] = Field(default="default", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     userId: Optional[str] = None
     availableMovies: Optional[List[MovieItem]] = None
 
@@ -100,7 +113,7 @@ class RecommendRequest(BaseModel):
     genres: Optional[List[str]] = None
     likedMovieIds: Optional[List[str]] = None
     mood: Optional[str] = None
-    limit: int = 4
+    limit: int = Field(default=4, ge=1, le=100)
 
 
 class RecommendResponse(BaseModel):

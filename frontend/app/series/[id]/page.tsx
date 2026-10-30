@@ -72,6 +72,9 @@ export default function SeriesDetailPage() {
   const [isLoadingSeries, setIsLoadingSeries] = useState<boolean>(true);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [seriesRetry, setSeriesRetry] = useState(0);
+  const [episodeError, setEpisodeError] = useState<string | null>(null);
+  const [episodeRetry, setEpisodeRetry] = useState(0);
   const [playbackWarning, setPlaybackWarning] = useState<string | null>(null);
 
   // Player state
@@ -83,6 +86,7 @@ export default function SeriesDetailPage() {
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string>('');
+  const [isResolvingStream, setIsResolvingStream] = useState(false);
   const progress = useWatchProgress();
   const [dismissedResume, setDismissedResume] = useState('');
   const [autoNext, setAutoNext] = useState(false);
@@ -159,7 +163,7 @@ export default function SeriesDetailPage() {
     return () => {
       controller.abort();
     };
-  }, [seriesId]);
+  }, [seriesId, seriesRetry]);
 
   // Synchronize selectedEpisode when targetEpisodeId in URL changes (deep-link or back/forward)
   useEffect(() => {
@@ -300,19 +304,23 @@ export default function SeriesDetailPage() {
     pendingSeekRef.current = null;
     setPlaybackWarning(null);
     setActiveSegmentId(null);
-    if (!selectedEpisode?.id) return;
-    setIsLoadingEpisode(true);
+    setEpisodeError(null);
     // Immediately clear active asset and scenes of old episode to eliminate race conditions
     setEpisodeDetail(null);
     setSelectedAsset(null);
     setActiveSceneId(null);
 
     const currentGen = ++episodeGenRef.current;
+    if (!selectedEpisode?.id) {
+      setIsLoadingEpisode(false);
+      return;
+    }
+    setIsLoadingEpisode(true);
     const controller = new AbortController();
 
     getCatalogEpisodeDetail(selectedEpisode.id, undefined, controller.signal)
       .then((detail) => {
-        if (currentGen !== episodeGenRef.current) return;
+        if (controller.signal.aborted || currentGen !== episodeGenRef.current) return;
         if (detail) {
           setEpisodeDetail(detail);
 
@@ -379,13 +387,14 @@ export default function SeriesDetailPage() {
               };
             }
           }
-        }
+        } else setEpisodeError('Không tìm thấy thông tin tập phim.');
       })
       .catch((err) => {
-        if (currentGen !== episodeGenRef.current || err?.name === 'AbortError') return;
+        if (controller.signal.aborted || currentGen !== episodeGenRef.current || err?.name === 'AbortError' || err?.isCanceled) return;
+        setEpisodeError('Không thể tải thông tin tập phim. Vui lòng thử lại.');
       })
       .finally(() => {
-        if (currentGen === episodeGenRef.current) {
+        if (!controller.signal.aborted && currentGen === episodeGenRef.current) {
           setIsLoadingEpisode(false);
         }
       });
@@ -393,13 +402,14 @@ export default function SeriesDetailPage() {
     return () => {
       controller.abort();
     };
-  }, [selectedEpisode?.id, targetAssetId, targetSceneId, targetSegmentId, targetTimeMs, seriesId, targetEpisodeId]);
+  }, [selectedEpisode?.id, targetAssetId, targetSceneId, targetSegmentId, targetTimeMs, seriesId, targetEpisodeId, episodeRetry]);
 
   // Video stream URL resolution with short-lived playback grant for protected media (H4)
 
   useEffect(() => {
     if (!selectedAsset?.id) {
       setStreamUrl('');
+      setIsResolvingStream(false);
       return;
     }
     const currentAssetId = selectedAsset.id;
@@ -409,6 +419,8 @@ export default function SeriesDetailPage() {
 
     if (token || isProtected) {
       const ac = new AbortController();
+      setStreamUrl('');
+      setIsResolvingStream(true);
       requestPlaybackGrant(currentAssetId, ac.signal)
         .then((grant) => {
           if (ac.signal.aborted) return;
@@ -430,11 +442,14 @@ export default function SeriesDetailPage() {
           } else {
             setStreamUrl(defaultUrl);
           }
+        }).finally(() => {
+          if (!ac.signal.aborted) setIsResolvingStream(false);
         });
       return () => {
         ac.abort();
       };
     } else {
+      setIsResolvingStream(false);
       setStreamUrl(defaultUrl);
     }
   }, [selectedAsset?.id, selectedAsset?.accessPolicy]);
@@ -601,9 +616,10 @@ export default function SeriesDetailPage() {
         <AlertCircle size={40} className="mx-auto text-red-400" />
         <h2 className="mt-4 text-xl font-bold text-ink">Lỗi hiển thị bộ phim</h2>
         <p className="mt-2 text-sm text-muted">{error || 'Không tìm thấy dữ liệu bộ phim.'}</p>
-        <Link href="/admin/import" className="btn-secondary mt-6 inline-flex items-center gap-2 text-xs">
+        <button onClick={() => setSeriesRetry((value) => value + 1)} className="btn-secondary mt-6 inline-flex items-center gap-2 text-xs">Thử tải lại</button>
+        <Link href="/search" className="btn-secondary mt-6 ml-2 inline-flex items-center gap-2 text-xs">
           <ArrowLeft size={14} />
-          <span>Quay lại trang quản lý</span>
+          <span>Quay lại kho phim</span>
         </Link>
       </div>
     );
@@ -693,7 +709,14 @@ export default function SeriesDetailPage() {
 
           {/* Production Video Player */}
           <div className="relative overflow-hidden rounded-xl border border-surface-border bg-black shadow-2xl aspect-video flex items-center justify-center">
-            {streamUrl ? (
+            {isLoadingEpisode || isResolvingStream ? (
+              <p role="status" className="p-6 text-center text-xs text-zinc-200">Đang tải tập phim…</p>
+            ) : episodeError ? (
+              <div role="alert" className="p-6 text-center text-xs text-zinc-200">
+                <p>{episodeError}</p>
+                <button data-testid="retry-episode" onClick={() => setEpisodeRetry((value) => value + 1)} className="btn-secondary mt-3">Thử lại</button>
+              </div>
+            ) : streamUrl ? (
               <video
                 ref={videoRef}
                 data-testid="series-video-player"
@@ -716,7 +739,7 @@ export default function SeriesDetailPage() {
             ) : (
               <div className="flex flex-col items-center justify-center text-center p-6 text-zinc-200">
                 <Film size={36} className="mb-2 text-zinc-400" />
-                <p className="text-xs">Tập này chưa có luồng video Google Drive được cấu hình.</p>
+                <p className="text-xs">{selectedAsset ? 'Không thể mở nguồn video này.' : 'Tập này chưa có video được cấu hình.'}</p>
               </div>
             )}
           </div>
