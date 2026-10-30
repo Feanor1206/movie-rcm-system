@@ -218,7 +218,7 @@ function startFixtureServer() {
     // Auth Login: POST /api/auth/login
     if (pathname === '/api/auth/login' && method === 'POST') {
       const loginKey = body.usernameOrEmail || body.username || body.email;
-      if (loginKey === 'codex_invalid' || body.password === 'not-real-password') {
+      if (loginKey === 'regression_invalid' || body.password === 'not-real-password') {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ success: false, message: 'Reviewer invalid credentials' }));
       }
@@ -981,7 +981,7 @@ async function main() {
         const u = inputs.find(i => i.placeholder.includes('tên đăng nhập') || i.type === 'text');
         const p = inputs.find(i => i.type === 'password');
         const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-        set.call(u, 'codex_invalid');
+        set.call(u, 'regression_invalid');
         u.dispatchEvent(new Event('input', { bubbles: true }));
         u.dispatchEvent(new Event('change', { bubbles: true }));
         set.call(p, 'not-real-password');

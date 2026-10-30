@@ -1292,7 +1292,7 @@ try {
 
     # Test 4.8: TC-F2-08 Exact reproduction of reviewer DRIVE_F01_stop_missing_identity scenario
     $tF2_8Sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $reproState = Join-Path ([System.IO.Path]::GetTempPath()) "codex-drive-f01-stop-test-$([Guid]::NewGuid().ToString('N')).json"
+    $reproState = Join-Path ([System.IO.Path]::GetTempPath()) "regression-drive-f01-stop-test-$([Guid]::NewGuid().ToString('N')).json"
     try {
         $reproStart = [DateTime]::UtcNow
         $reproPid = 987654
@@ -1665,7 +1665,7 @@ try {
 
     # Test 5.5: TC-R2-05 Reviewer Repro DRIVE_F02_stop_reused_identity Confirmation
     $tR2_5Sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $reproR2State = Join-Path ([System.IO.Path]::GetTempPath()) "codex-drive-f02-identity-$([Guid]::NewGuid().ToString('N')).json"
+    $reproR2State = Join-Path ([System.IO.Path]::GetTempPath()) "regression-drive-f02-identity-$([Guid]::NewGuid().ToString('N')).json"
     try {
         $reproR2Start = [DateTime]::UtcNow
         $reproR2Pid = 987654

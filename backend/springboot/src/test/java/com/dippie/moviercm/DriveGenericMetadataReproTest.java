@@ -223,7 +223,7 @@ public class DriveGenericMetadataReproTest {
     }
 
     @Test
-    @DisplayName("Codex Repro Scenario: 3 sequential calls against capacity 1 cannot produce off-budget retained obligations")
+    @DisplayName("Regression Repro Scenario: 3 sequential calls against capacity 1 cannot produce off-budget retained obligations")
     void reproScenarioThreeCallsAgainstCapacityOneCannotLeak() throws Exception {
         DriveIoExecutor executor = createExecutor(1, 1);
         DriveResourceReservation permit = executor.acquireReservation();
@@ -233,7 +233,7 @@ public class DriveGenericMetadataReproTest {
         List<FileChannel> handles = new ArrayList<>();
         try {
             for (int i = 0; i < 3; i++) {
-                Path file = Files.createTempFile("codex-f08-budget-", ".bin");
+                Path file = Files.createTempFile("regression-f08-budget-", ".bin");
                 tempFiles.add(file);
                 FileChannel handle = FileChannel.open(file, StandardOpenOption.READ);
                 handles.add(handle);

@@ -674,8 +674,8 @@ public class DriveCleanupQueueSaturationTest {
         assertTrue(mainEnteredLatch.await(3, TimeUnit.SECONDS));
 
         // Create 300 real FileChannel handles on tiny temp file (reviewer reproduction condition)
-        Path tempFile = tempDir.resolve("codex_cleanup_pressure_300.bin");
-        Files.write(tempFile, "CODEX_F04_ZERO_DISCARD_TEST_BYTES".getBytes(StandardCharsets.UTF_8));
+        Path tempFile = tempDir.resolve("regression_cleanup_pressure_300.bin");
+        Files.write(tempFile, "REGRESSION_F04_ZERO_DISCARD_TEST_BYTES".getBytes(StandardCharsets.UTF_8));
 
         CountDownLatch cleanupHoldLatch = new CountDownLatch(1);
         managedLatches.add(cleanupHoldLatch);

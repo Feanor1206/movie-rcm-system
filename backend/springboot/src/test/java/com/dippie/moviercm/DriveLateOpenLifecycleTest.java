@@ -168,7 +168,7 @@ public class DriveLateOpenLifecycleTest {
         var io = new DriveIoExecutor(40, 40, 1, new DriveCircuitBreaker(5, 100));
         var release = new CountDownLatch(1);
         var opened = new AtomicReference<FileChannel>();
-        Path file = Files.createTempFile("codex-drive-late-", ".bin");
+        Path file = Files.createTempFile("regression-drive-late-", ".bin");
         try {
             try {
                 io.executeOpen(() -> {
