@@ -22,7 +22,7 @@ export interface ChatMessage {
   movies?: Movie[];
   followUps?: string[];
   structuredIntent?: StructuredIntent | null;
-  pipelineStages?: string[];
+  pipelineStages?: Record<string, unknown>;
 }
 
 export interface ChatServiceResponse {
@@ -30,7 +30,7 @@ export interface ChatServiceResponse {
   recommendedMovies: Movie[];
   followUps: string[];
   structuredIntent?: StructuredIntent | null;
-  pipelineStages?: string[];
+  pipelineStages?: Record<string, unknown>;
 }
 
 /**
@@ -38,16 +38,19 @@ export interface ChatServiceResponse {
  */
 export async function sendChatMessage(
   message: string,
-  history: ChatMessage[] = []
+  history: ChatMessage[] = [],
+  options: { sessionId?: string; signal?: AbortSignal } = {}
 ): Promise<ChatServiceResponse> {
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
+    signal: options.signal,
     body: JSON.stringify({
       message,
-      messages: history.map((m) => ({
+      sessionId: options.sessionId,
+      messages: history.slice(-20).map((m) => ({
         role: m.sender === 'user' ? 'user' : 'assistant',
         content: m.text,
       })),

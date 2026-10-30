@@ -21,6 +21,7 @@ import re
 import time
 import math
 import copy
+import threading
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
@@ -160,6 +161,7 @@ class NLUUnderstandingNode:
     """
     def __init__(self):
         self.session_state: Dict[str, Dict[str, Any]] = {}
+        self._session_lock = threading.Lock()
 
     def apply_patch(self, base_intent: Dict[str, Any], patch_intent: Dict[str, Any]) -> Dict[str, Any]:
         merged = copy.deepcopy(base_intent)
@@ -210,13 +212,17 @@ class NLUUnderstandingNode:
 
         # The compatibility default is shared by anonymous callers, so it must not carry state.
         has_session = bool(session_id and session_id != "default")
-        if has_session and parsed.get("intent_type") == "CONVERSATIONAL_PATCH" and session_id in self.session_state:
-            effective = self.apply_patch(self.session_state[session_id], parsed)
-            self.session_state[session_id] = effective
-            return effective
-
-        if has_session and parsed.get("intent_type") == "DISCOVERY":
-            self.session_state[session_id] = copy.deepcopy(parsed)
+        if has_session:
+            with self._session_lock:
+                if parsed.get("intent_type") == "CONVERSATIONAL_PATCH" and session_id in self.session_state:
+                    effective = self.apply_patch(self.session_state[session_id], parsed)
+                    self.session_state[session_id] = effective
+                    return effective
+                if parsed.get("intent_type") == "DISCOVERY":
+                    # Keep a bounded number of process-local conversations.
+                    if session_id not in self.session_state and len(self.session_state) >= 1000:
+                        self.session_state.pop(next(iter(self.session_state)))
+                    self.session_state[session_id] = copy.deepcopy(parsed)
 
         return parsed
 
@@ -615,7 +621,7 @@ class ExplanationGeneratorNode:
 
             # Ngoại lệ franchise bên ngoài
             if any(f in q_lower for f in ["doraemon", "conan", "naruto", "one piece", "dragon ball", "shin"]):
-                return "Hệ thống hiện chỉ có dữ liệu các tập phim của bộ hoạt hình Xin Chào Jadoo. Tác phẩm bạn yêu cầu không có trong hệ thống dữ liệu hiện tại."
+                return "Hiện chưa tìm thấy nội dung phù hợp với yêu cầu của bạn trong danh mục."
             # Mùa hoặc tập ngoài khoảng trong mệnh đề khẳng định
             if re.search(r"\b(?:mùa|season)\s*0*(?:[7-9]|\d{2,})\b", pos_q_lower) or re.search(r"\b(?:tập|ep)\s*0*(?:[3-9]\d{2,}|\d{4,})\b", pos_q_lower):
                 return "Hiện danh mục phim chưa có mùa hoặc tập này."

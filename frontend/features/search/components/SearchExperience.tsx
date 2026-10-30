@@ -147,6 +147,7 @@ export function SearchExperience() {
           <Search className="shrink-0 text-muted" size={18} />
           <input
             data-testid="search-query-input"
+            aria-label="Tìm bộ, tập hoặc tình tiết"
             autoFocus
             type="text"
             value={inputValue}

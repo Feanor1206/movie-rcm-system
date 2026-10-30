@@ -1,77 +1,39 @@
-# Movie Recommendation System (`movie-rcm-system`)
+# Dippie
 
-An end-to-end cinematic movie discovery and recommendation platform architected as a modular monorepo.
+Animation discovery, catalog management, personal library and video playback.
 
----
+- **Next.js:** browsing, search, account/library, episode player and CineBot interface.
+- **Spring Boot:** authentication, catalog source of truth, library, progress and HTTP Range streaming.
+- **FastAPI:** intent parsing and catalog-grounded discovery; model optimization remains separate.
 
-## 📁 Project Structure
+## Run locally on Windows
 
-```text
-movie-rcm-system/
-│
-├── frontend/                     # Next.js Web Application
-│   ├── app/                      # App router pages & layouts
-│   ├── components/               # Shared reusable UI components
-│   ├── features/                 # Feature-specific modules (movies, search, profile, etc.)
-│   ├── lib/                      # Utilities & API helpers
-│   ├── types/                    # TypeScript interfaces
-│   ├── package.json              # Frontend dependencies & scripts
-│   ├── next.config.ts            # Next.js configuration
-│   ├── tailwind.config.ts        # Tailwind CSS configuration
-│   └── tsconfig.json             # TypeScript configuration
-│
-├── backend/                      # Backend microservices
-│   ├── springboot/               # Core business logic, auth & catalog management (Java/Spring Boot)
-│   └── fastapi/                  # Real-time recommendation inference gateway (Python/FastAPI)
-│
-├── ai/                           # AI & Machine Learning pipelines
-│   ├── models/                   # Model architectures & exported artifacts (PyTorch/ONNX)
-│   ├── training/                 # Training routines & hyperparameter tuning
-│   ├── datasets/                 # Preprocessing & feature engineering pipelines
-│   └── evaluation/               # Offline evaluation metrics & benchmarks
-│
-├── database/                     # Database management
-│   ├── migrations/               # Schema migration scripts (SQL / Liquibase / Flyway)
-│   ├── seeds/                    # Development & test seed data
-│   └── schema/                   # DDL schemas and ER diagrams
-│
-├── infrastructure/               # DevOps & Containerization
-│   └── docker-compose.yml        # Local development multi-container orchestration
-│
-├── docs/                         # Catalog schemas, fixtures & benchmark inputs
-│
-├── .github/                      # CI/CD & GitHub automation
-│   └── workflows/
-│       └── ci.yml                # Automated test & build pipeline
-│
-├── .gitignore                    # Monorepo gitignore rules
-└── README.md                     # Root project documentation
-```
+Requires Node.js 20+, Java 17+ and Python for the optional AI service. Install frontend dependencies first:
 
----
-
-## 🚀 Quick Start
-
-### 1. Frontend
-```bash
+```powershell
 cd frontend
-npm install
-npm run dev
+npm ci
+cd ..
+.\start-all.ps1 -Background
 ```
 
-### 2. Infrastructure (PostgreSQL & Redis)
-```bash
-cd infrastructure
-docker compose up -d
+The launcher builds the application, checks service readiness and keeps isolated preview state. AI is off by default, so browsing and playback do not depend on model loading. Open http://localhost:3000. Stop owned services with `.\scripts\stop_preview_stack.ps1`.
+
+The preview profile includes local demo accounts. Import a catalog through the admin screen or `scripts/import_preview_catalog.ps1`; catalog payloads are in `data/` and schema fixtures in `docs/`. Local video files or a configured Drive mount must exist for playback.
+
+For AI, provide the external catalog sync secret and model paths, then launch with `-ModelMode full` (or `light`). No credentials or model weights belong in Git. Frontend same-origin API defaults are in `frontend/.env.example`.
+
+## Verify
+
+```powershell
+cd frontend
+npm test
+npm run typecheck
+npm run build
 ```
 
-### 3. Backend Services
-- **Spring Boot**: See [backend/springboot/README.md](backend/springboot/README.md)
-- **FastAPI**: See [backend/fastapi/README.md](backend/fastapi/README.md)
+Spring: run `.\mvnw.cmd test -Dspring.profiles.active=test` from `backend/springboot`. Python: run `python -m pytest tests backend/fastapi/tests` from the root. The regression suites use lexical retrieval and mocked model serving; live GPU integration requires explicit opt-in.
 
-### 4. AI Pipelines
-- See [ai/README.md](ai/README.md)
+CI checks the frontend, Spring and offline Python suites. Docker configuration is in `infrastructure/`; supply real environment values before deployment. Live Docker/PostgreSQL deployment has not been verified on the development host.
 
-### Project files and local output
-- `docs/` currently contains executable catalog contracts, fixtures and benchmark inputs. Product documentation will be written later.
-- `graphify-out/`, `scratch/`, generated indexes and fresh review output are local files ignored by Git.
+Generated indexes, analysis graphs, temporary experiments and captured reports are ignored. Product documentation will be written after implementation.

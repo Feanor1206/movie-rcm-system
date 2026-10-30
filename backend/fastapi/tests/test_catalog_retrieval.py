@@ -18,6 +18,7 @@ import json
 import unittest
 from pathlib import Path
 from typing import Dict, Any
+from unittest.mock import patch
 
 FASTAPI_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(FASTAPI_DIR))
@@ -286,6 +287,17 @@ SAMPLE_TEST_CATALOG: Dict[str, Any] = {
 class TestCatalogRetrievalSuite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Exercise the lexical retrieval and normalization paths without model downloads.
+        from services.qwen_service import qwen_service
+        cls.encoder_patch = patch("services.hybrid_retrieval.DenseEncoder.load")
+        cls.intent_patch = patch.object(
+            qwen_service, "parse_discovery_intent",
+            side_effect=lambda query, history=None, catalog=None: qwen_service.normalize_phase23_intent({}, query, catalog),
+        )
+        cls.encoder_patch.start()
+        cls.intent_patch.start()
+        cls.addClassCleanup(cls.encoder_patch.stop)
+        cls.addClassCleanup(cls.intent_patch.stop)
         # Sync test fixture into manager and index
         cls.manager = CatalogSyncManager()
         cls.counts = cls.manager.load_from_payload(SAMPLE_TEST_CATALOG)
@@ -390,6 +402,21 @@ class TestCatalogRetrievalSuite(unittest.TestCase):
         # Must match an item that features Bảo or Chi
         chars = [c.lower() for c in top_item.get("characters", [])]
         self.assertTrue(any("bảo" in c or "chi" in c for c in chars))
+
+    def test_character_alias_with_year_filter(self):
+        query = "tìm phim có nhân vật Tiểu Bảo trước năm 2030"
+        results = self.hybrid_index.search_hybrid(
+            query_text=query, nlu_intent={"query": {"text": query}}, catalog=self.flattened
+        )
+        self.assertTrue(results)
+        self.assertIn("Tiểu Bảo", results[0]["movie"]["characters"])
+
+    def test_character_alias_does_not_validate_fabricated_plot(self):
+        query = "Tiểu Bảo lái tàu ngầm xuống đáy đại dương săn khủng long"
+        results = self.hybrid_index.search_hybrid(
+            query_text=query, nlu_intent={"query": {"text": query}}, catalog=self.flattened
+        )
+        self.assertEqual(results, [])
 
     # -------------------------------------------------------------------------
     # 5. Retrieval by Plot Fact Memory

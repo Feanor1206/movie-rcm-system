@@ -173,12 +173,12 @@ def test_06_genuine_similarity_search(explainer):
 
 
 def test_07_out_of_catalog_abstention_foreign_franchise(explainer):
-    """External franchises clearly state only Jadoo is available."""
+    """An unmatched request does not claim the catalog has only one franchise."""
     nlu = {"query": {"text": "Gợi ý phim Doraemon tập dài"}}
     res = explainer.generate_explanation([], nlu, query="Gợi ý phim Doraemon tập dài")
     
-    assert "Xin Chào Jadoo" in res
-    assert "không có trong hệ thống" in res
+    assert "chưa tìm thấy" in res
+    assert "chỉ có dữ liệu" not in res
     assert "Tôi đã kiểm tra toàn bộ kho" not in res
 
 

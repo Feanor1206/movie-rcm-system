@@ -922,6 +922,14 @@ class HybridMovieIndex:
         # Sort by hybrid score descending
         scored_candidates.sort(key=lambda x: x["score"], reverse=True)
 
+        # Without an explicit season, numbered lookups start with the earliest season.
+        if query_ep is not None and query_sea is None:
+            scored_candidates.sort(key=lambda candidate: (
+                candidate["movie"].get("episode_number") != query_ep,
+                candidate["movie"].get("season_number") or 0,
+                -candidate["score"],
+            ))
+
         # Confidence guard for unanswerable / out-of-catalog queries (Issue A2)
         if scored_candidates:
             top_item = scored_candidates[0]
@@ -931,7 +939,16 @@ class HybridMovieIndex:
             raw_top_bm25 = bm25_raw.get(top_item["movie"]["id"], 0.0)
 
             # Check if top item earned a strong exact boost (exact title, exact season/episode, or segment title)
-            has_strong_boost = (top_score - (0.6 * top_dense + 0.4 * top_bm25)) >= 0.40
+            has_dense = bool(query_dense and any(self.embeddings.get(top_item["movie"]["id"], [])))
+            retrieval_base = dense_weight * top_dense + bm25_weight * top_bm25 if has_dense else top_bm25
+            has_strong_boost = (top_score - retrieval_base) >= 0.40
+            # A catalog character name or alias is also direct evidence of a match.
+            positive_text = split_query_scopes(str(nlu_intent.get("raw_query") or query_text))[0].lower()
+            matched_characters = [
+                str(name).lower() for name in (top_item["movie"].get("characters") or [])
+                if name and re.search(r"(?<!\w)" + re.escape(str(name).lower()) + r"(?!\w)", positive_text)
+            ]
+            has_strong_boost = has_strong_boost or bool(matched_characters)
 
             # 1. Analyze query context: detect positive search target vs negation/exclusion
             raw_text = str(nlu_intent.get("raw_query") or query_text)
@@ -959,6 +976,26 @@ class HybridMovieIndex:
             matched_content = [t for t in content_tokens if t in doc_text]
             overlap_ratio = len(matched_content) / len(content_tokens) if content_tokens else 1.0
 
+            series_mentioned = any(
+                re.search(r"(?<!\w)" + re.escape(str(name).lower()) + r"(?!\w)", positive_text)
+                for item in search_catalog if item.get("item_type") == "series"
+                for name in [item.get("title"), *(item.get("aliases") or [])] if name
+            ) or any(
+                re.search(r"(?<!\w)" + re.escape(name) + r"(?!\w)", str(title).lower())
+                for name in matched_characters
+                for item in search_catalog if item.get("item_type") == "series"
+                for title in [item.get("title"), *(item.get("aliases") or [])] if title
+            )
+            if matched_characters and not series_mentioned:
+                remaining = positive_text
+                for name in sorted(matched_characters, key=len, reverse=True):
+                    remaining = re.sub(r"(?<!\w)" + re.escape(name) + r"(?!\w)", " ", remaining)
+                remaining = re.sub(r"\b(?:trước|sau|từ|đến|năm)\s+(?:năm\s+)?\d{4}\b", " ", remaining)
+                character_query_stop = generic_stop | {"nội", "dung", "nhân", "vật", "các", "một"}
+                details = [t for t in tokenize_text(remaining) if t not in character_query_stop]
+                if len(details) >= 2 and sum(t in set(tokenize_text(doc_text)) for t in details) / len(details) < 0.40:
+                    return []
+
             is_genre_or_descriptive = is_descriptive_not_franchise(pos_text) or bool(inc_genres)
 
             # Decision rules:
@@ -973,7 +1010,7 @@ class HybridMovieIndex:
                         return []
                 elif not is_jadoo_targeted:
                     # Query does NOT target Jadoo and has no exact title/segment boost
-                    if overlap_ratio < 0.45 or raw_top_bm25 < 12.0:
+                    if overlap_ratio < 0.45 or raw_top_bm25 <= 0.0:
                         return []
                 else:
                     # Query mentions Jadoo, but if user asked for a completely fabricated premise

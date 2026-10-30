@@ -5,11 +5,13 @@ RUN apk add --no-cache libc6-compat
 
 # 2. Dependencies
 FROM base AS deps
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # 3. Builder
 FROM base AS builder
+ARG SPRINGBOOT_INTERNAL_URL=http://127.0.0.1:8080
+ENV SPRINGBOOT_INTERNAL_URL=$SPRINGBOOT_INTERNAL_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -567,8 +567,12 @@ export async function validateCatalogPackage(
     body: JSON.stringify(payload),
   });
 
-  const json = await res.json();
-  return json;
+  if (!res.ok && res.status !== 400) throw new CatalogApiError(`Không thể kiểm tra gói catalog (${res.status})`, res.status);
+  const result = await res.json();
+  if (!result || typeof result.valid !== 'boolean' || !Array.isArray(result.errors)) {
+    throw new CatalogApiError('Phản hồi kiểm tra gói catalog không hợp lệ', 502);
+  }
+  return result;
 }
 
 /**
@@ -610,19 +614,17 @@ export async function importCatalogPackage(
  */
 export async function getImportHistory(
   baseUrl = SPRINGBOOT_API,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<any[]> {
   const url = `${baseUrl}/admin/catalog/history`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...getAuthHeader(),
-    },
-    signal,
-  });
-  if (!res.ok) return [];
-  return await res.json();
+  return executeWithLifecycle(async (requestSignal) => {
+    const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json', ...getAuthHeader() }, signal: requestSignal });
+    if (!res.ok) throw new CatalogApiError(`Không thể tải lịch sử nhập (${res.status})`, res.status);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new CatalogApiError('Dữ liệu lịch sử nhập không hợp lệ', 502);
+    return data;
+  }, { signal, timeoutMs });
 }
 
 /**
@@ -630,19 +632,17 @@ export async function getImportHistory(
  */
 export async function getCatalogSnapshots(
   baseUrl = SPRINGBOOT_API,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<CatalogSnapshot[]> {
   const url = `${baseUrl}/admin/catalog/snapshots`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...getAuthHeader(),
-    },
-    signal,
-  });
-  if (!res.ok) return [];
-  return await res.json();
+  return executeWithLifecycle(async (requestSignal) => {
+    const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json', ...getAuthHeader() }, signal: requestSignal });
+    if (!res.ok) throw new CatalogApiError(`Không thể tải trạng thái đồng bộ (${res.status})`, res.status);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new CatalogApiError('Dữ liệu trạng thái đồng bộ không hợp lệ', 502);
+    return data;
+  }, { signal, timeoutMs });
 }
 
 /**

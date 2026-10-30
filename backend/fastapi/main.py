@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Dippie Cascading AI Movie Recommendation Gateway",
-    description="Multi-stage Pipeline: Phase 23 Qwen Intent Parser -> Hard Constraints & Retrieval -> 0.6B Recommender -> 0.6B Ranker & MMR -> Grounded Explanation",
+    description="Multi-stage pipeline: intent parsing, constrained retrieval, candidate selection, heuristic ranking, and grounded explanation",
     version="2.3.0",
     lifespan=lifespan
 )
@@ -149,10 +149,10 @@ def read_root():
         "version": "2.3.0",
         "pipeline": [
             "1. Phase 23 Qwen Intent Parser (StructuredDiscoveryIntent v1 + Conversational Patch Merger)",
-            "2. Hard Constraint Engine & Hybrid TF-IDF / Reference Retrieval",
-            "3. Qwen 0.6B Recommender (Domain Candidate Filtering)",
-            "4. Qwen 0.6B Ranker + MMR Diversity Reranker",
-            "5. Qwen Grounded Explanation (Vietnamese Storytelling)"
+            "2. Hard constraints and hybrid BM25 / semantic retrieval",
+            "3. Candidate selection",
+            "4. Heuristic ranking and diversity",
+            "5. Grounded explanation"
         ],
         "status": "online",
         "docs": "/docs",
@@ -418,9 +418,9 @@ def sync_index(
         )
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Lỗi khi đồng bộ chỉ mục catalog: {e}")
-        raise HTTPException(status_code=500, detail=f"Lỗi đồng bộ catalog: {str(e)}")
+    except Exception:
+        logger.exception("Lỗi khi đồng bộ chỉ mục catalog")
+        raise HTTPException(status_code=500, detail="Lỗi đồng bộ catalog")
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -429,11 +429,11 @@ def chat_endpoint(request: ChatRequest):
     Chạy qua toàn bộ Cascading AI Pipeline 5 tầng tích hợp Phase 23 Intent Parser và Catalog dữ liệu thực tế.
     """
     query = request.query
-    if not query and request.messages:
+    if (not query or not query.strip()) and request.messages:
         last_msg = request.messages[-1]
         query = last_msg.get("content") or last_msg.get("text") or ""
 
-    if not query:
+    if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Thiếu trường 'query' hoặc 'messages'")
 
     available_movies = [m.model_dump() for m in request.availableMovies] if request.availableMovies else None
@@ -505,8 +505,8 @@ def recommend_endpoint(request: RecommendRequest):
 
 
     return RecommendResponse(
-        recommendedMovies=matched or active_cat[: request.limit],
-        reasoning=result.get("text") or "Gợi ý được tối ưu hóa dựa trên các thể loại yêu thích và mô hình đối sánh ngữ nghĩa."
+        recommendedMovies=matched,
+        reasoning=result.get("text") or "Không tìm thấy gợi ý phù hợp."
     )
 
 

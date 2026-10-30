@@ -294,6 +294,14 @@ function createSearchHarness(initialUrl = '', catalogMocks = {}) {
   };
 }
 
+test('Catalog search input has an accessible name', () => {
+  const h = createSearchHarness();
+  h.render();
+  const input = findNodes(h.tree, (node) => node.props?.['data-testid'] === 'search-query-input')[0];
+  assert.ok(input.props['aria-label']);
+  h.unmount();
+});
+
 // Harness to execute actual MovieCard.tsx
 function renderActualMovieCard(movie, watchlistContext = {}) {
   let slots = [];

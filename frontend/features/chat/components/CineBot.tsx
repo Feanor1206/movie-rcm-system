@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { sendChatMessage, ChatMessage } from '@/lib/services/chatService';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
+import { useAuth } from '@/lib/context/AuthContext';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import type { Movie } from '@/types/movie';
 
@@ -26,7 +27,17 @@ const QUICK_PROMPTS = [
 
 const BTN_HEAD = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer';
 
+function newConversationId() {
+  return globalThis.crypto?.randomUUID?.() ?? `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { status, user, token } = useAuth();
+  const actorKey = status === 'authenticated' && user && token ? `user:${user.id}:${token}` : `status:${status}`;
+  return <CineBotConversation key={actorKey} isOpen={isOpen} onClose={onClose} />;
+}
+
+function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { isWatchlisted, toggleWatchlist } = useWatchlist();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -38,11 +49,21 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
     },
   ]);
   const [input, setInput] = useState('');
+  const [inputError, setInputError] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const cinebotRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const conversationRef = useRef(0);
+  const sessionIdRef = useRef('');
+  const requestRef = useRef<AbortController | null>(null);
+  if (!sessionIdRef.current) sessionIdRef.current = newConversationId();
+
+  useEffect(() => () => {
+    conversationRef.current += 1;
+    requestRef.current?.abort();
+  }, []);
 
   const scrollToBottom = () => {
     const isReduced =
@@ -122,7 +143,15 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
-    if (!text) return;
+    if (!text || requestRef.current) return;
+    if (text.length > 4000) {
+      setInputError('Tin nhắn không được vượt quá 4000 ký tự.');
+      return;
+    }
+    setInputError('');
+    const conversation = conversationRef.current;
+    const controller = new AbortController();
+    requestRef.current = controller;
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -134,11 +163,13 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setInput('');
+    setInputError('');
     setIsTyping(true);
 
     try {
       // Gửi câu hỏi đến /api/chat (nơi bạn có thể cắm model Python / FastAPI / LLM)
-      const result = await sendChatMessage(text, nextMessages);
+      const result = await sendChatMessage(text, nextMessages, { sessionId: sessionIdRef.current, signal: controller.signal });
+      if (conversation !== conversationRef.current) return;
 
       const botMessage: ChatMessage = {
         id: `bot-${Date.now()}`,
@@ -153,6 +184,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (err: any) {
+      if (conversation !== conversationRef.current) return;
       console.error('Lỗi nhận phản hồi:', err);
       const errorMsg: ChatMessage = {
         id: `bot-err-${Date.now()}`,
@@ -162,7 +194,10 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
-      setIsTyping(false);
+      if (conversation === conversationRef.current) {
+        requestRef.current = null;
+        setIsTyping(false);
+      }
     }
   };
 
@@ -174,6 +209,13 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   };
 
   const resetChat = () => {
+    conversationRef.current += 1;
+    requestRef.current?.abort();
+    requestRef.current = null;
+    sessionIdRef.current = newConversationId();
+    setIsTyping(false);
+    setInput('');
+    setInputError('');
     setMessages([
       {
         id: `welcome-${Date.now()}`,
@@ -373,9 +415,11 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             <input
               ref={inputRef}
               type="text"
+              aria-label="Tin nhắn cho CineBot"
+              maxLength={4000}
               value={input}
               disabled={isTyping}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => { setInput(e.target.value); setInputError(''); }}
               onKeyDown={handleKeyDown}
               placeholder={isTyping ? "CineBot đang phản hồi..." : "Nhập câu hỏi..."}
               className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-60"
@@ -389,6 +433,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               <Send size={13} />
             </button>
           </div>
+          {inputError && <p role="alert" className="mt-2 text-xs text-red-500">{inputError}</p>}
         </div>
       </div>
     </div>
