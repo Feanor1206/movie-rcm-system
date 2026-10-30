@@ -1,3 +1,0 @@
-REPRO positionDeadlineFired=true callerStillBlockedInClose=false ioWorkers=1
-Exception in thread "main" java.lang.AssertionError: Expected production close stall
-	at DRIVE_F02_position_close.main(DRIVE_F02_position_close.java:42)

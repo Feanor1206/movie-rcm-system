@@ -1,2 +1,0 @@
-WARNING: [stop_backend_dev] INVALID_STATE: State file missing required ExecutablePath. Aborting fail-closed without signaling.
-{"missingExecutableIdentityAccepted":false,"realProcessSignals":0}

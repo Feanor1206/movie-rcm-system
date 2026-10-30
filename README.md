@@ -38,8 +38,7 @@ movie-rcm-system/
 ├── infrastructure/               # DevOps & Containerization
 │   └── docker-compose.yml        # Local development multi-container orchestration
 │
-├── docs/                         # System architecture & documentation
-│   └── architecture.md           # High-level architecture and component flow
+├── docs/                         # Catalog schemas, fixtures & benchmark inputs
 │
 ├── .github/                      # CI/CD & GitHub automation
 │   └── workflows/
@@ -72,3 +71,7 @@ docker compose up -d
 
 ### 4. AI Pipelines
 - See [ai/README.md](ai/README.md)
+
+### Project files and local output
+- `docs/` currently contains executable catalog contracts, fixtures and benchmark inputs. Product documentation will be written later.
+- `graphify-out/`, `scratch/`, generated indexes and fresh review output are local files ignored by Git.

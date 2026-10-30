@@ -100,3 +100,16 @@ frontend/public/videos/*
 /.f*_snapshot/
 /.round*_snapshot/
 /ai/phase23_package/best_adapter/
+
+# Local analysis and disposable experiments
+/graphify-out/
+/scratch/
+/artifacts/
+
+# Rebuilt search indexes and fresh review/benchmark output
+/data/indices/
+/docs/reports/*
+!/docs/reports/.gitkeep
+/docs/reviews/evidence/*
+!/docs/reviews/evidence/.gitkeep
+/docs/reviews/screenshots/

@@ -38,7 +38,7 @@ def test_reviewer_f1_negation_nonexistent_does_not_reject():
     ]
     idx = HybridMovieIndex()
     idx.build_from_catalog(fixture, save_to_disk=False)
-    
+
     res = idx.search_hybrid("Jadoo chơi bóng, không phải tập 999", nlu_intent={}, catalog=fixture)
     assert len(res) > 0
     assert res[0]["movie"]["id"] == "ep_01"
@@ -53,7 +53,7 @@ def test_reviewer_f1_conflict_requested_ep_wins_over_title():
     ]
     idx = HybridMovieIndex()
     idx.build_from_catalog(fixture, save_to_disk=False)
-    
+
     res = idx.search_hybrid("Jadoo tập 2 Jadoo chơi bóng", nlu_intent={}, catalog=fixture)
     assert len(res) > 0
     assert res[0]["movie"]["id"] == "ep_02"
@@ -68,7 +68,7 @@ def test_reviewer_f1_conflict_requested_ep_wins_over_title():
 # 2. REVIEWER F2 SCORER FAIL-CLOSED ON HTTP ERRORS
 # =============================================================================
 
-def test_reviewer_f2_scorer_http_error_is_failure():
+def test_reviewer_f2_scorer_http_error_is_failure(tmp_path):
     """
     Reviewer repro F2:
     A mock evidence with 1 unanswerable query returning HTTP 500 error.
@@ -98,23 +98,21 @@ def test_reviewer_f2_scorer_http_error_is_failure():
             }
         ]
     }
-    scratch_dir = root_dir / "scratch" / "test_f02"
-    scratch_dir.mkdir(parents=True, exist_ok=True)
-    bm_file = scratch_dir / "mock_bm.json"
-    ev_file = scratch_dir / "mock_ev.json"
+    bm_file = tmp_path / "mock_bm.json"
+    ev_file = tmp_path / "mock_ev.json"
     bm_file.write_text(json.dumps(mock_benchmark), encoding="utf-8")
     ev_file.write_text(json.dumps(mock_evidence), encoding="utf-8")
 
     score_result = score_evidence(ev_file, bm_file)
     summary = score_result["summary"]
-    
+
     assert summary["http_errors"] == 1
     # Must NOT count as successful rejection!
     assert summary["accuracy"]["unanswerable_rejection_rate"] == 0.0
     assert summary["accuracy"]["unanswerable_false_accept_count"] == 1
 
 
-def test_reviewer_f2_scorer_type_conformance():
+def test_reviewer_f2_scorer_type_conformance(tmp_path):
     """F2: Scorer properly tracks type conformance for episodes and segments."""
     mock_benchmark = {
         "queries": [
@@ -139,10 +137,8 @@ def test_reviewer_f2_scorer_type_conformance():
             }
         ]
     }
-    scratch_dir = root_dir / "scratch" / "test_f02"
-    scratch_dir.mkdir(parents=True, exist_ok=True)
-    bm_file = scratch_dir / "mock_bm2.json"
-    ev_file = scratch_dir / "mock_ev2.json"
+    bm_file = tmp_path / "mock_bm2.json"
+    ev_file = tmp_path / "mock_ev2.json"
     bm_file.write_text(json.dumps(mock_benchmark), encoding="utf-8")
     ev_file.write_text(json.dumps(mock_evidence), encoding="utf-8")
 

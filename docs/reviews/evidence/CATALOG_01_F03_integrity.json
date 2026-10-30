@@ -1,8 +1,0 @@
-{
-  "manifest_files_verified": 109,
-  "drift_during_review": [],
-  "contract_zip": "5/5 byte-identical",
-  "reverse_patch_check": "exit0; not applied",
-  "review": "docs/reviews/CATALOG_01_F03_REVIEW.md",
-  "HTTP_DB_browser_Drive_model_tests": "not run by reviewer"
-}

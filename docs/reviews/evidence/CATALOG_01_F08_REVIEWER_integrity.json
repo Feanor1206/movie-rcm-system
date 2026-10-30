@@ -1,9 +1,0 @@
-{
-  "tracked_paths": 52,
-  "drift": [],
-  "manifest_entries_verified": 31,
-  "contract_zip_identical_files": 5,
-  "patch_reverse_check_exit": 0,
-  "provided_matrix": "12/12 PASS",
-  "real_setter_retained_snapshot_mutated": true
-}

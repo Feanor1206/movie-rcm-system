@@ -1,9 +1,0 @@
-{
-    "Success":  true,
-    "Status":  "STOPPED",
-    "PID":  987654,
-    "MountPoint":  "Z:",
-    "Message":  "Successfully stopped verified rclone mount process (PID 987654).",
-    "StateFile":  "C:\\Users\\Admin\\AppData\\Local\\Temp\\codex-drive-stop-32db827a-b83b-4d2d-9e77-5c1608aaed95.json"
-}
-REPRO terminationRequestedDespiteExecutableAndStartMismatch=True

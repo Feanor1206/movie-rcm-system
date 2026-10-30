@@ -1,8 +1,0 @@
-{
-  "manifest_files": 112,
-  "drift_during_review": [],
-  "contract_original_zip": "5/5 identical",
-  "review": "docs/reviews/CATALOG_01_F04_REVIEW.md",
-  "handoff_probe_not_run": "writes and unlinks runtime sync state",
-  "verification_scope": "offline production source probes; no server/DB/model/Drive"
-}

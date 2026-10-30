@@ -1,0 +1,5 @@
+# Historical handoffs, evidence, experiments and generated analysis are not app code.
+docs/reports/
+docs/reviews/
+scratch/
+graphify-out/

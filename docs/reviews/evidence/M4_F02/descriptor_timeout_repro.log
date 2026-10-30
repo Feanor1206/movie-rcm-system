@@ -1,3 +1,0 @@
-{"serviceError":"AbortError","alertPresent":false,"retryPresent":false,"source":"production service timeout + production component via hook harness"}
-{"scenario":"missing-required-fields","alertPresent":false,"retryPresent":false}
-{"scenario":"wrong-movie-id","alertPresent":false,"retryPresent":false}

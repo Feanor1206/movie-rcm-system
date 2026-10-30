@@ -1,0 +1,436 @@
+{
+  "benchmark_version": "1.0",
+  "catalog": "data/catalog.jadoo_all.json",
+  "queries": [
+    {
+      "id": "eval_01",
+      "category": "exact_title",
+      "query": "Tìm phim hoạt hình Xin Chào Jadoo",
+      "expected_type": "series",
+      "expected_ids": [
+        "ser_jadoo"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {
+        "include_genres": [
+          "Animation"
+        ]
+      },
+      "provenance": "Exact series title Xin Chào Jadoo (ser_jadoo)"
+    },
+    {
+      "id": "eval_02",
+      "category": "exact_title",
+      "query": "Tìm tập Anh sẽ mua cho em tất cả những gì em muốn ăn",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0001"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Exact title of Season 1 Episode 1 (ep_jadoo_s01_0001)"
+    },
+    {
+      "id": "eval_03",
+      "category": "exact_title",
+      "query": "Cho tôi xem tập Muốn ăn nhưng lại sợ tăng cân",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0002"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Exact title of Season 1 Episode 2 (ep_jadoo_s01_0002)"
+    },
+    {
+      "id": "eval_04",
+      "category": "exact_title",
+      "query": "Tìm tập phim Gương kia, ai đẹp nhất thế gian？",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0008"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Exact title of Season 1 Episode 8 (ep_jadoo_s01_0008)"
+    },
+    {
+      "id": "eval_05",
+      "category": "exact_title",
+      "query": "Mở tập CHIẾC XE MƠ ƯỚC CỦA BA",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s04_0001"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Exact title of Season 4 Episode 1 (ep_jadoo_s04_0001)"
+    },
+    {
+      "id": "eval_06",
+      "category": "plot_synopsis",
+      "query": "Tập nào Jadoo muốn ăn ngon nhưng lại sợ bị mập tăng cân",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0002"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Synopsis match for ep_jadoo_s01_0002 (Muốn ăn nhưng lại sợ tăng cân)"
+    },
+    {
+      "id": "eval_07",
+      "category": "plot_synopsis",
+      "query": "Tập Jadoo đi du lịch gia đình nhớ hoài không quên",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s06_0001"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Synopsis/title match for ep_jadoo_s06_0001 (Chuyến du lịch gia đình… nhớ hoài không quên)"
+    },
+    {
+      "id": "eval_08",
+      "category": "plot_synopsis",
+      "query": "Tập phim Jadoo ước mơ làm người lớn",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s04_0005"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Title and synopsis match for ep_jadoo_s04_0005 (MÌNH MUỐN LÀM NGƯỜI LỚN)"
+    },
+    {
+      "id": "eval_09",
+      "category": "plot_synopsis",
+      "query": "Tập nào mẹ giấu bí mật khiến cả gia đình bị sốc",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s06_0005"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Synopsis/title match for ep_jadoo_s06_0005 (Bí mật mà mẹ giấu… Cả gia đình chúng tôi bị sốc!)"
+    },
+    {
+      "id": "eval_10",
+      "category": "plot_synopsis",
+      "query": "Tập phim cả nhà Jadoo ăn thịt nướng K-BBQ là nhất",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s06_0004"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Title and synopsis match for ep_jadoo_s06_0004 (Đúng là K-BBQ là nhất!)"
+    },
+    {
+      "id": "eval_11",
+      "category": "character_plot",
+      "query": "Tập Jadoo và bạn thân Minji cứu cá vàng quen chàng Romy",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0008",
+        "seg_jadoo_s01_008a"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Character Choi Jadoo, Lee Minji + plot fact Romy cá vàng in ep_jadoo_s01_0008"
+    },
+    {
+      "id": "eval_12",
+      "category": "character_plot",
+      "query": "Tập bố Ho-dol có chiếc xe hơi mơ ước",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s04_0001"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Character Choi Ho-dol + plot chiếc xe mơ ước in ep_jadoo_s04_0001"
+    },
+    {
+      "id": "eval_13",
+      "category": "character_plot",
+      "query": "Tập em gái Mimi và Jadoo làm đẹp chọc má lúm đồng tiền",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0008",
+        "seg_jadoo_s01_008c"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Character Choi Mimi, Choi Jadoo + plot làm đẹp in seg_jadoo_s01_008c / ep_jadoo_s01_0008"
+    },
+    {
+      "id": "eval_14",
+      "category": "character_plot",
+      "query": "Tập bạn mới E-cha chuyển đến lớp đãi mì gia truyền",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0011",
+        "seg_jadoo_s01_011a"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Plot student E-cha + tô mì bí truyền in seg_jadoo_s01_011a / ep_jadoo_s01_0011"
+    },
+    {
+      "id": "eval_15",
+      "category": "character_plot",
+      "query": "Tập bố mua bánh mì kem tiệm V về cho ba chị em Jadoo",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0011",
+        "seg_jadoo_s01_011b"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Plot bánh mì kem tiệm V in seg_jadoo_s01_011b / ep_jadoo_s01_0011"
+    },
+    {
+      "id": "eval_16",
+      "category": "season_episode",
+      "query": "Xin Chào Jadoo Mùa 1 Tập 1",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0001"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {
+        "season_number": 1,
+        "episode_number": 1
+      },
+      "provenance": "Direct lookup for Season 1 Episode 1 (ep_jadoo_s01_0001)"
+    },
+    {
+      "id": "eval_17",
+      "category": "season_episode",
+      "query": "Jadoo Mùa 1 Tập 2",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0002"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {
+        "season_number": 1,
+        "episode_number": 2
+      },
+      "provenance": "Direct lookup for Season 1 Episode 2 (ep_jadoo_s01_0002)"
+    },
+    {
+      "id": "eval_18",
+      "category": "season_episode",
+      "query": "Xin Chào Jadoo Mùa 3 Tập 1",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s03_0001"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {
+        "season_number": 3,
+        "episode_number": 1
+      },
+      "provenance": "Direct lookup for Season 3 Episode 1 (ep_jadoo_s03_0001)"
+    },
+    {
+      "id": "eval_19",
+      "category": "season_episode",
+      "query": "Jadoo Mùa 4 Tập 1",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s04_0001"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {
+        "season_number": 4,
+        "episode_number": 1
+      },
+      "provenance": "Direct lookup for Season 4 Episode 1 (ep_jadoo_s04_0001)"
+    },
+    {
+      "id": "eval_20",
+      "category": "season_episode",
+      "query": "Xin Chào Jadoo Mùa 6 Tập 4",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s06_0004"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {
+        "season_number": 6,
+        "episode_number": 4
+      },
+      "provenance": "Direct lookup for Season 6 Episode 4 (ep_jadoo_s06_0004)"
+    },
+    {
+      "id": "eval_21",
+      "category": "segment_short",
+      "query": "Truyện ngắn Cứu cá vàng và cuộc tình với chàng Romy",
+      "expected_type": "segment",
+      "expected_ids": [
+        "seg_jadoo_s01_008a",
+        "ep_jadoo_s01_0008"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Segment seg_jadoo_s01_008a title match"
+    },
+    {
+      "id": "eval_22",
+      "category": "segment_short",
+      "query": "Mẩu chuyện Bức thư tình bí ẩn Ngày Valentine Trắng",
+      "expected_type": "segment",
+      "expected_ids": [
+        "seg_jadoo_s01_008b",
+        "ep_jadoo_s01_0008"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Segment seg_jadoo_s01_008b title match"
+    },
+    {
+      "id": "eval_23",
+      "category": "segment_short",
+      "query": "Tiểu phẩm Bí quyết làm đẹp tại nhà và truyền thuyết đầu thai",
+      "expected_type": "segment",
+      "expected_ids": [
+        "seg_jadoo_s01_008c",
+        "ep_jadoo_s01_0008"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Segment seg_jadoo_s01_008c title match"
+    },
+    {
+      "id": "eval_24",
+      "category": "constraints",
+      "query": "Tìm tập phim Jadoo gia đình hài hước không có kinh dị",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s01_0001",
+        "ep_jadoo_s01_0002",
+        "ep_jadoo_s01_0004",
+        "ep_jadoo_s04_0001",
+        "ep_jadoo_s06_0001"
+      ],
+      "unanswerable": false,
+      "holdout": false,
+      "expected_constraints": {
+        "exclude_genres": [
+          "Horror"
+        ],
+        "include_genres": [
+          "Family",
+          "Comedy"
+        ]
+      },
+      "provenance": "Jadoo family comedy episodes excluding horror"
+    },
+    {
+      "id": "eval_25",
+      "category": "constraints",
+      "query": "Phim hoạt hình Jadoo phát hành năm 2023 không có bạo lực",
+      "expected_type": "episode",
+      "expected_ids": [
+        "ep_jadoo_s06_0001",
+        "ep_jadoo_s06_0002",
+        "ep_jadoo_s06_0003",
+        "ep_jadoo_s06_0004",
+        "ep_jadoo_s06_0005"
+      ],
+      "unanswerable": false,
+      "holdout": true,
+      "expected_constraints": {
+        "year_min": 2023,
+        "year_max": 2023
+      },
+      "provenance": "Season 6 episodes from release year 2023"
+    },
+    {
+      "id": "eval_26",
+      "category": "out_of_catalog",
+      "query": "Gợi ý phim hoạt hình Dragon Ball Bảy Viên Ngọc Rồng",
+      "expected_type": "unanswerable",
+      "expected_ids": [],
+      "unanswerable": true,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Dragon Ball is not in Jadoo animation catalog"
+    },
+    {
+      "id": "eval_27",
+      "category": "out_of_catalog",
+      "query": "Tìm tập Shin Cậu Bé Bút Chì đi công viên giải trí Kasukabe",
+      "expected_type": "unanswerable",
+      "expected_ids": [],
+      "unanswerable": true,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Crayon Shin-chan is not in Jadoo animation catalog"
+    },
+    {
+      "id": "eval_28",
+      "category": "out_of_catalog",
+      "query": "Cho tôi xem phim hoạt hình Doraemon tập dài bí mật bảo bối",
+      "expected_type": "unanswerable",
+      "expected_ids": [],
+      "unanswerable": true,
+      "holdout": false,
+      "expected_constraints": {},
+      "provenance": "Doraemon is not in Jadoo animation catalog"
+    },
+    {
+      "id": "eval_29",
+      "category": "out_of_catalog",
+      "query": "Phim hoạt hình kinh dị zombie người lớn sản xuất năm 1980",
+      "expected_type": "unanswerable",
+      "expected_ids": [],
+      "unanswerable": true,
+      "holdout": true,
+      "expected_constraints": {
+        "include_genres": [
+          "Horror"
+        ],
+        "year_max": 1980
+      },
+      "provenance": "No 1980 adult zombie horror animations in catalog"
+    },
+    {
+      "id": "eval_30",
+      "category": "out_of_catalog",
+      "query": "Tập phim Thám tử lừng danh Conan phá án trên chuyến tàu hỏa",
+      "expected_type": "unanswerable",
+      "expected_ids": [],
+      "unanswerable": true,
+      "holdout": true,
+      "expected_constraints": {},
+      "provenance": "Detective Conan is not in Jadoo animation catalog"
+    }
+  ]
+}

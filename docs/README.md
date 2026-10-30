@@ -1,10 +1,12 @@
-# Architecture & Documentation
+# Supporting project files
 
-This directory contains system architecture diagrams, API specifications, and design documents.
+This directory currently keeps files required by the application, tests or tools:
 
-## Documents
-- `START_HERE_GEMINI_PLAN.md`: Implementation order, Gemini prompts, responsibilities, and review/acceptance workflow.
-- `USER_EXPERIENCE_BLUEPRINT.md`: User journeys, decision-focused UI, personalization controls, failure behavior, usability validation, and release priorities.
-- `ENGINEERING_EXECUTION_PLAN.md`: Detailed delivery plan, service ownership, complete AI/FastAPI roadmap, user journeys, contracts, and acceptance gates.
-- `architecture.md`: High-level system architecture and component interactions.
-- `SERVING_GUIDE.md`: Comprehensive guide for Qwen3-4B LoRA & Light serving, device policies, health/readiness contracts, and resource limits.
+- `contracts/`: catalog schemas, sample payloads and the Python validator.
+- `fixtures/`: deterministic catalog and media mapping fixtures.
+- `benchmarks/`: evaluation query sets.
+- `runbooks/db/`: SQL schema for operational setup.
+
+Product documentation will be written after implementation. Historical prompts, reports, reviews and screenshots have been removed from the repository.
+
+Tools may write fresh output to `reports/` or `reviews/evidence/`; generated output is ignored by Git.

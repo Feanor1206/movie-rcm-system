@@ -1,3 +1,0 @@
-{"closeAttempts":1,"nativeOpen":true,"active":1,"pending":0,"retained":0,"lostCleanup":true}
-Exception in thread "main" java.lang.AssertionError: Confirmed: generic metadata close failure is dropped at full lifecycle budget
-	at DRIVE_F06_metadata_cleanup.main(DRIVE_F06_metadata_cleanup.java:50)

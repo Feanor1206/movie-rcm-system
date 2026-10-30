@@ -1,3 +1,0 @@
-{"error":"IllegalArgumentException","nativeOpen":true,"closeAttempts":1,"retained":0,"lostCleanup":true}
-Exception in thread "main" java.lang.AssertionError: Scalar contract rejection swallowed a failed native close
-	at DRIVE_F08_scalar_cleanup.main(DRIVE_F08_scalar_cleanup.java:26)
