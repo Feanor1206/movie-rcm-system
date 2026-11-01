@@ -14,6 +14,7 @@ import {
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { getMediaDescriptor, MediaDescriptor, resolveStreamUrl } from '@/lib/services/mediaService';
+import * as movieProgress from '@/lib/services/movieProgress';
 
 const BTN_ACT = 'min-h-[44px] inline-flex items-center justify-center rounded border cursor-pointer disabled:opacity-60';
 const BTN_PLAY = 'min-h-[44px] px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer';
@@ -42,6 +43,33 @@ const FAV_DEF = `${BTN_FAV_BASE} border-ink/30 bg-surface text-muted hover:text-
 const FAV_UNCONF = `${BTN_FAV_BASE} ${UNCONF_CLS}`;
 const pad = (n: number) => (n < 10 ? '0' : '') + (n | 0);
 const formatTime = (s: number) => s > 0 ? `${pad(s / 60)}:${pad(s % 60)}` : '00:00';
+
+function readResumeSeconds(movieId: string): number {
+  if (typeof movieProgress.readFilmResumeSeconds !== 'function') return 0;
+  try {
+    const seconds = movieProgress.readFilmResumeSeconds(movieId);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function rememberFilm(movie: Movie, seconds: number, durationSeconds: number, completed: boolean) {
+  if (typeof movieProgress.saveMovieProgress !== 'function') return;
+  const positionMs = Math.max(0, Math.round(seconds * 1000));
+  const durationMs = Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds * 1000) : null;
+  try {
+    movieProgress.saveMovieProgress({
+      movieId: movie.id,
+      title: movie.title,
+      positionMs,
+      durationMs,
+      completed,
+    });
+  } catch {
+    // Playback continues when this browser cannot store the resume point.
+  }
+}
 const CARD = 'rounded-lg border border-surface-border bg-surface p-4';
 const BORDER_T = 'pt-2 border-t border-surface-border';
 const STREAM_ERR = 'Lỗi nạp video.';
@@ -93,6 +121,8 @@ export function MovieDetail({
   const videoModalRef = useRef<HTMLDivElement>(null);
   const playButtonRef = useRef<HTMLButtonElement>(null);
   const playerOpenerRef = useRef<HTMLElement | null>(null);
+  const resumeSecondsRef = useRef(0);
+  const lastSavedMsRef = useRef(0);
 
   // Fetch descriptor for movie
   useEffect(() => {
@@ -154,12 +184,23 @@ export function MovieDetail({
     setActiveMediaKind(kind);
     const url = kind === 'feature' ? descriptor?.feature?.streamUrl : (descriptor?.trailer?.streamUrl || movie.videoUrl);
     if (!url) return;
+    const resumeSeconds = kind === 'feature' ? readResumeSeconds(movie.id) : 0;
+    resumeSecondsRef.current = resumeSeconds;
+    lastSavedMsRef.current = Math.round(resumeSeconds * 1000);
     setActiveMediaUrl(resolveStreamUrl(url));
     setPlayerState('buffering');
     setPlaybackError(null);
-    setCurrentTime(0);
+    setCurrentTime(resumeSeconds);
     setRetryTime(0);
     setIsPlaying(true);
+  };
+
+  const rememberPosition = (seconds: number, durationSeconds: number, completed: boolean, force = false) => {
+    if (activeMediaKind !== 'feature') return;
+    const positionMs = Math.max(0, Math.round(seconds * 1000));
+    if (!force && !completed && Math.abs(positionMs - lastSavedMsRef.current) < 5000) return;
+    lastSavedMsRef.current = positionMs;
+    rememberFilm(movie, seconds, durationSeconds, completed);
   };
 
   const handleRetry = () => {
@@ -357,14 +398,31 @@ export function MovieDetail({
                 preload="metadata"
                 onLoadedMetadata={(e) => {
                   const v = videoRef.current;
-                  setDuration(e?.currentTarget?.duration || v?.duration || 0);
-                  if (retryTime > 0 && v) v.currentTime = retryTime;
+                  const nextDuration = e?.currentTarget?.duration || v?.duration || 0;
+                  setDuration(nextDuration);
+                  const startAt = retryTime > 0 ? retryTime : resumeSecondsRef.current;
+                  if (startAt > 0 && v && startAt < (nextDuration || startAt + 1)) {
+                    try { v.currentTime = startAt; } catch { /* the file may not accept a seek yet */ }
+                    setCurrentTime(startAt);
+                  }
                 }}
-                onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
+                onTimeUpdate={() => {
+                  const seconds = videoRef.current?.currentTime || 0;
+                  setCurrentTime(seconds);
+                  rememberPosition(seconds, videoRef.current?.duration || duration, false);
+                }}
                 onWaiting={() => setPlayerState('buffering')}
                 onPlaying={() => setPlayerState('playing')}
-                onPause={() => playerState !== 'buffering' && playerState !== 'error' && setPlayerState('paused')}
-                onEnded={() => setPlayerState('paused')}
+                onPause={() => {
+                  if (playerState !== 'buffering' && playerState !== 'error') setPlayerState('paused');
+                  const seconds = videoRef.current?.currentTime || 0;
+                  rememberPosition(seconds, videoRef.current?.duration || duration, false, true);
+                }}
+                onEnded={() => {
+                  setPlayerState('paused');
+                  const seconds = videoRef.current?.duration || duration || 0;
+                  rememberPosition(seconds, seconds, true, true);
+                }}
                 onError={() => {
                   setPlayerState('error');
                   setRetryTime(videoRef.current?.currentTime || 0);

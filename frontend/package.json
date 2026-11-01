@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/catalog_service_suite.mjs tests/m1_behavior_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs tests/modal_a11y_suite.mjs tests/media_playback_suite.mjs tests/media_descriptor_boundary_suite.mjs tests/media_routing_suite.mjs tests/chat_gateway_suite.mjs tests/chat_client_suite.mjs tests/animation_navigation_suite.mjs tests/watch_progress_suite.mjs tests/series_error_suite.mjs tests/navigation_accessibility_suite.mjs tests/admin_access_suite.mjs"
+    "test": "node --test tests/catalog_service_suite.mjs tests/m1_behavior_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs tests/modal_a11y_suite.mjs tests/media_playback_suite.mjs tests/media_descriptor_boundary_suite.mjs tests/media_routing_suite.mjs tests/chat_gateway_suite.mjs tests/chat_client_suite.mjs tests/animation_navigation_suite.mjs tests/watch_progress_suite.mjs tests/movie_progress_suite.mjs tests/series_error_suite.mjs tests/navigation_accessibility_suite.mjs tests/admin_access_suite.mjs"
   },
   "dependencies": {
     "@types/node": "22.10.2",

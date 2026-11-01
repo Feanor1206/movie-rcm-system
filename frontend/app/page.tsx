@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { ArrowUpRight, ArrowRight, BookOpen, Bookmark, MessageCircle, RefreshCw } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { SeriesShelf } from '@/features/series/SeriesShelf';
-import { ContinueWatching } from '@/features/series/ContinueWatching';
-import { getCatalogSeriesList, type CatalogSeriesSummary } from '@/lib/services/catalogService';
+import { FilmShelf } from '@/features/movies/components/FilmShelf';
+import { ContinueWatching } from '@/features/movies/components/ContinueWatching';
+import { browseCatalog } from '@/lib/services/catalogService';
+import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
 const chapters = [
@@ -18,15 +19,15 @@ const chapters = [
 
 export default function HomePage() {
   const { openChat, watchlist } = useWatchlist();
-  const [series, setSeries] = useState<CatalogSeriesSummary[]>([]);
+  const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(false);
-    getCatalogSeriesList(undefined, controller.signal)
-      .then((items) => { if (!controller.signal.aborted) { setSeries(items); setLoading(false); } })
+    browseCatalog({ animationOnly: true, size: 24, signal: controller.signal })
+      .then((page) => { if (!controller.signal.aborted) { setMovies(page.items); setLoading(false); } })
       .catch((e) => { if (!controller.signal.aborted && e?.name !== 'AbortError' && !e?.isCanceled) { setError(true); setLoading(false); } });
     return () => controller.abort();
   }, [retry]);
@@ -50,7 +51,7 @@ export default function HomePage() {
       </section>
       <ContinueWatching />
       <div className="catalog-chapter-head"><span className="chapter-kicker">TRÊN KỆ HOẠT HÌNH</span><span className="page-number">BỘ · MÙA · TẬP</span></div>
-      {loading ? <div className="comic-loading" role="status"><BookOpen size={26}/><p>Đang sắp những câu chuyện lên kệ…</p></div> : error ? <div className="comic-loading" role="alert"><BookOpen size={26}/><p>Kệ truyện đang nghỉ một chút. Bạn thử mở lại nhé.</p><button className="btn-secondary" onClick={() => setRetry(n=>n+1)}><RefreshCw size={15}/>Tải lại kệ truyện</button></div> : <SeriesShelf series={series} title="Những bộ hoạt hình trong kho" subtitle="Chọn một bộ để xem mùa và tập." />}
+      {loading ? <div className="comic-loading" role="status"><BookOpen size={26}/><p>Đang sắp những phim lên kệ…</p></div> : error ? <div className="comic-loading" role="alert"><BookOpen size={26}/><p>Kệ phim đang nghỉ một chút. Bạn thử mở lại nhé.</p><button className="btn-secondary" onClick={() => setRetry(n=>n+1)}><RefreshCw size={15}/>Tải lại kệ phim</button></div> : <FilmShelf movies={movies} title="Phim hoạt hình trong kho" subtitle="Chọn một phim để xem." />}
       <section className="closing-panels">
         <div className="reading-note"><span className="chapter-kicker">GHI CHÚ BÊN LỀ</span><h2>Chưa biết xem gì?<br/><em>Kể tớ nghe.</em></h2><p>Một tình tiết bạn nhớ, một nhân vật bạn thích.<br/>CineBot sẽ cùng bạn tìm lại câu chuyện ấy.</p><button className="text-action" onClick={openChat}>Trò chuyện với CineBot <MessageCircle size={18}/></button><span className="note-doodle" aria-hidden="true">✳</span></div>
         <Link href="/profile" className="bookmark-note"><Bookmark size={30} strokeWidth={1.3}/><span className="chapter-kicker">KẸP TRANG CỦA BẠN</span><h2>Hẹn ở<br/>chương sau.</h2><p>{watchlist.length ? `${watchlist.length} câu chuyện đang chờ bạn quay lại.` : 'Giữ lại những bộ hoạt hình bạn muốn xem.'}</p><span className="text-action">Mở danh sách xem <ArrowRight size={18}/></span></Link>
