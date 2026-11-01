@@ -213,8 +213,15 @@ function createSearchHarness(initialUrl = '', catalogMocks = {}) {
       if (mod.includes('mediaRouting')) return mediaRoutingModule.exports;
       if (mod.includes('catalogService')) {
         return {
-          getCatalogSeriesList: mocks.seriesList || (async () => []),
-          searchAnimationCatalog: mocks.search || (async () => []),
+          browseCatalog: mocks.browse || (async () => ({
+            items: [],
+            page: 0,
+            size: 12,
+            totalElements: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrevious: false,
+          })),
         };
       }
       if (mod.includes('WatchlistContext')) {
@@ -448,90 +455,96 @@ test('3. S1 (P2): Clear button resets input draft and triggers push with query r
 test('4. Catalog search: pending query does not render a false empty state', async () => {
   let resolveSearch;
   const h = createSearchHarness('q=new', {
-    seriesList: async () => [],
-    search: async () => new Promise((resolve) => { resolveSearch = resolve; }),
+    browse: async () => new Promise((resolve) => { resolveSearch = resolve; }),
   });
   h.render();
   await h.settle();
 
   assert.equal(findNodes(h.tree, (node) => node.props?.['data-testid'] === 'catalog-skeleton').length, 1);
-  assert.equal(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'), false);
+  assert.equal(getText(h.tree).includes('Không tìm thấy phim phù hợp'), false);
 
-  resolveSearch([]);
+  resolveSearch({ items: [], page: 0, size: 12, totalElements: 0, totalPages: 0, hasNext: false, hasPrevious: false });
   await h.settle();
-  assert.ok(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'));
-  assert.ok(getText(h.tree).includes('Không có bộ, tập hoặc phân cảnh khớp'));
+  assert.ok(getText(h.tree).includes('Không tìm thấy phim phù hợp'));
+  assert.ok(getText(h.tree).includes('Không có phim hoạt hình khớp'));
 });
 
 test('5. Catalog search: query navigation never labels old results as the new query', async () => {
   let resolveSecond;
+  const page = (movie) => ({ items: [movie], page: 0, size: 12, totalElements: 1, totalPages: 1, hasNext: false, hasPrevious: false });
   const h = createSearchHarness('q=first', {
-    seriesList: async () => [],
-    search: async (query) => {
-      if (query === 'second') return new Promise((resolve) => { resolveSecond = resolve; });
-      return [{ id: 'series-first', type: 'series', title: 'First Story', seriesId: 'series-first' }];
+    browse: async (options) => {
+      if (options.query === 'second') return new Promise((resolve) => { resolveSecond = resolve; });
+      return page({ id: 'film-first', title: 'First Film', year: 2001, description: 'First' });
     },
   });
   h.render();
   await h.settle();
-  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-first').length, 1);
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'film-first').length, 1);
 
   h.navigate('q=second');
   await h.settle();
   assert.equal(findNodes(h.tree, (node) => node.props?.['data-testid'] === 'catalog-skeleton').length, 1);
-  assert.equal(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'), false);
+  assert.equal(getText(h.tree).includes('Không tìm thấy phim phù hợp'), false);
 
-  resolveSecond([{ id: 'series-second', type: 'series', title: 'Second Story', seriesId: 'series-second' }]);
+  resolveSecond(page({ id: 'film-second', title: 'Second Film', year: 2002, description: 'Second' }));
   await h.settle();
-  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-second').length, 1);
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'film-second').length, 1);
 });
 
-test('6. Catalog list: renders SQL series only, paginates client-side, and explains legacy film filters', async () => {
-  const series = Array.from({ length: 13 }, (_, index) => ({
-    id: 'series-' + index,
-    type: 'series',
-    title: 'Story ' + index,
-    seriesId: 'series-' + index,
-    synopsis: 'Catalog synopsis ' + index,
-    releaseYearStart: 2000 + index,
+test('6. Catalog list: renders standalone films and asks the server for the URL page', async () => {
+  const films = Array.from({ length: 13 }, (_, index) => ({
+    id: 'film-' + index,
+    title: 'Film ' + index,
+    description: 'Catalog synopsis ' + index,
+    year: 2000 + index,
   }));
   let listCalls = 0;
-  const h = createSearchHarness('page=1&size=2&sort=rating', {
-    seriesList: async () => { listCalls++; return series; },
-    search: async () => [],
+  const h = createSearchHarness('page=1&size=2', {
+    browse: async (options) => {
+      listCalls++;
+      const start = options.page * options.size;
+      const items = films.slice(start, start + options.size);
+      return {
+        items,
+        page: options.page,
+        size: options.size,
+        totalElements: films.length,
+        totalPages: Math.ceil(films.length / options.size),
+        hasNext: start + options.size < films.length,
+        hasPrevious: options.page > 0,
+      };
+    },
   });
   h.render();
   await h.settle();
 
   const cards = findNodes(h.tree, (node) => node.props?.['data-testid'] === 'search-result-card');
   assert.equal(listCalls, 1);
-  assert.equal(cards.length, 2, 'URL page and size slice the bounded catalog on the client');
-  assert.equal(cards[0].props['data-result-id'], 'series-2');
-  assert.equal(cards[0].props.href, '/series/series-2');
+  assert.equal(cards.length, 2, 'URL page and size select one server page');
+  assert.equal(cards[0].props['data-result-id'], 'film-2');
+  assert.equal(cards[0].props.href, '/movies/film-2');
   assert.ok(getText(cards[0]).includes('Catalog synopsis 2'));
   assert.ok(getText(cards[0]).includes('2002'));
-  assert.ok(getText(h.tree).includes('Bộ lọc phim cũ không áp dụng'));
-  assert.equal(getText(h.tree).includes('Điểm cao nhất'), false, 'Unsupported movie sort controls are not shown');
-
-  const clearOldFilters = findNodes(h.tree, (node) => node.type === 'button' && getText(node).includes('Xóa bộ lọc cũ'))[0];
-  clearOldFilters.props.onClick();
-  assert.ok(h.pushes.some((url) => !url.includes('sort=')), 'The old filter notice can clear stale movie URL fields');
+  assert.equal(getText(h.tree).includes('Điểm cao nhất'), false, 'Sort controls stay off this screen');
 });
 
 test('7. Catalog search: API failure stays an error and retry can recover', async () => {
   let shouldFail = true;
   const h = createSearchHarness('q=jadoo', {
-    seriesList: async () => [],
-    search: async () => {
+    browse: async () => {
       if (shouldFail) throw new Error('HTTP 503 catalog unavailable');
-      return [{ id: 'jadoo', type: 'series', title: 'Jadoo', seriesId: 'jadoo' }];
+      return {
+        items: [{ id: 'jadoo', title: 'Jadoo', year: 2010, description: 'A film' }],
+        page: 0, size: 12, totalElements: 1, totalPages: 1, hasNext: false, hasPrevious: false,
+      };
     },
   });
   h.render();
   await h.settle();
 
   assert.ok(getText(h.tree).includes('HTTP 503 catalog unavailable'));
-  assert.equal(getText(h.tree).includes('Không tìm thấy câu chuyện phù hợp'), false);
+  assert.equal(getText(h.tree).includes('Không tìm thấy phim phù hợp'), false);
   const retry = findNodes(h.tree, (node) => node.type === 'button' && getText(node).includes('Thử lại'))[0];
   assert.ok(retry);
   shouldFail = false;
@@ -543,10 +556,10 @@ test('7. Catalog search: API failure stays an error and retry can recover', asyn
 test('8. Catalog search: slow response cannot overwrite the latest query', async () => {
   let resolveSlow;
   let resolveFast;
+  const page = (movie) => ({ items: [movie], page: 0, size: 12, totalElements: 1, totalPages: 1, hasNext: false, hasPrevious: false });
   const h = createSearchHarness('q=slow', {
-    seriesList: async () => [],
-    search: async (query) => {
-      if (query === 'slow') return new Promise((resolve) => { resolveSlow = resolve; });
+    browse: async (options) => {
+      if (options.query === 'slow') return new Promise((resolve) => { resolveSlow = resolve; });
       return new Promise((resolve) => { resolveFast = resolve; });
     },
   });
@@ -555,19 +568,18 @@ test('8. Catalog search: slow response cannot overwrite the latest query', async
 
   h.navigate('q=fast');
   await h.settle();
-  resolveFast([{ id: 'series-fast', type: 'series', title: 'Fast Story', seriesId: 'series-fast' }]);
+  resolveFast(page({ id: 'film-fast', title: 'Fast Film', year: 2011, description: 'Fast' }));
   await h.settle();
-  resolveSlow([{ id: 'series-slow', type: 'series', title: 'Slow Story', seriesId: 'series-slow' }]);
+  resolveSlow(page({ id: 'film-slow', title: 'Slow Film', year: 2010, description: 'Slow' }));
   await h.settle();
 
-  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-fast').length, 1);
-  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'series-slow').length, 0);
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'film-fast').length, 1);
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'film-slow').length, 0);
 });
 
 test('9. Catalog search: unmount cancels the active request', async () => {
   const h = createSearchHarness('q=cancel-test', {
-    seriesList: async () => [],
-    search: async () => new Promise(() => {}),
+    browse: async () => new Promise(() => {}),
   });
   h.render();
   await h.settle();

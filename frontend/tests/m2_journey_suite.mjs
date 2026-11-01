@@ -101,7 +101,7 @@ function getText(node) {
 }
 
 // Harness to execute actual HomePage
-function createHomeHarness(seriesListMock) {
+function createHomeHarness(moviesMock) {
   let slots = [];
   let hookIndex = 0;
   let effects = [];
@@ -175,11 +175,26 @@ function createHomeHarness(seriesListMock) {
           MovieSection: 'MovieSection',
         };
       }
-      if (mod.includes('SeriesShelf')) {
-        return { SeriesShelf: 'SeriesShelf' };
+      if (mod.includes('FilmShelf')) {
+        return { FilmShelf: 'FilmShelf' };
       }
       if (mod.includes('catalogService')) {
-        return { getCatalogSeriesList: (_baseUrl, _signal) => seriesListMock() };
+        return {
+          browseCatalog: async () => {
+            const value = await moviesMock();
+            if (value && Array.isArray(value.items)) return value;
+            const items = Array.isArray(value) ? value : [];
+            return {
+              items,
+              page: 0,
+              size: 24,
+              totalElements: items.length,
+              totalPages: items.length ? 1 : 0,
+              hasNext: false,
+              hasPrevious: false,
+            };
+          },
+        };
       }
       if (mod.includes('WatchlistContext')) {
         return { useWatchlist: () => ({ openChat: () => {}, watchlist: ['totoro'] }) };
@@ -696,39 +711,39 @@ function mountProductionProvider(fetcher, customAuth = {}) {
 // TEST CASES: ROUND 6 CUTOVER & JOURNEY INTEGRATION
 // ============================================================================
 
-test('1. Home: Loads real catalog series once and preserves loading, empty, error, retry, and cover states', async () => {
+test('1. Home: Loads standalone films once and preserves loading, empty, error, retry, and cover states', async () => {
   let listCalls = 0;
-  const jadooSeries = {
+  const jadooFilm = {
     id: 'jadoo',
     title: 'Jadoo',
-    synopsis: 'A real catalog synopsis.',
-    releaseYearStart: 2000,
+    description: 'A real catalog synopsis.',
+    year: 2000,
   };
-  const h = createHomeHarness(async () => { listCalls++; return [jadooSeries]; });
+  const h = createHomeHarness(async () => { listCalls++; return [jadooFilm]; });
   h.render();
   await h.settle();
 
-  assert.equal(listCalls, 1, 'Home asks the SQL-backed series endpoint once');
-  const shelf = findNodes(h.tree, (n) => n.type === 'SeriesShelf')[0];
-  assert.ok(shelf, 'Home renders the real series shelf');
-  assert.equal(shelf.props.series[0].id, 'jadoo');
-  assert.equal(shelf.props.series[0].synopsis, 'A real catalog synopsis.');
+  assert.equal(listCalls, 1, 'Home asks the movie catalog once');
+  const shelf = findNodes(h.tree, (n) => n.type === 'FilmShelf')[0];
+  assert.ok(shelf, 'Home renders the film shelf');
+  assert.equal(shelf.props.movies[0].id, 'jadoo');
+  assert.equal(shelf.props.movies[0].description, 'A real catalog synopsis.');
   assert.ok(findNodes(h.tree, (n) => n.type === 'h1').length, 'The illustrated cover remains visible');
 
   const emptyHarness = createHomeHarness(async () => []);
   emptyHarness.render();
   await emptyHarness.settle();
 
-  const emptyShelf = findNodes(emptyHarness.tree, (n) => n.type === 'SeriesShelf')[0];
+  const emptyShelf = findNodes(emptyHarness.tree, (n) => n.type === 'FilmShelf')[0];
   assert.ok(emptyShelf, 'An empty catalog still renders the shelf container');
-  assert.deepEqual(emptyShelf.props.series, []);
+  assert.deepEqual(emptyShelf.props.movies, []);
   assert.ok(findNodes(emptyHarness.tree, (n) => n.type === 'h1').length, 'The cover stays visible for an empty catalog');
 
   // Catalog errors stay visible and a retry reloads the endpoint.
   let retryTriggered = false;
   const errorHarness = createHomeHarness(async () => {
     if (retryTriggered) {
-      return [{ id: 'retry-series', title: 'Retry Animation' }];
+      return [{ id: 'retry-film', title: 'Retry Animation' }];
     }
     throw new Error('Máy chủ danh mục không phản hồi');
   });
@@ -737,18 +752,18 @@ test('1. Home: Loads real catalog series once and preserves loading, empty, erro
 
   const errorText = getText(errorHarness.tree);
   assert.ok(
-    errorText.includes('Kệ truyện đang nghỉ một chút'),
+    errorText.includes('Kệ phim đang nghỉ một chút'),
     'Must render error state when catalog service is down'
   );
 
   // Retry button
-  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Tải lại kệ truyện'))[0];
+  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Tải lại kệ phim'))[0];
   assert.ok(retryBtn, 'Retry button must be provided');
   retryTriggered = true;
   retryBtn.props.onClick();
   await errorHarness.settle();
 
-  assert.equal(findNodes(errorHarness.tree, (n) => n.type === 'SeriesShelf')[0].props.series[0].id, 'retry-series', 'Retry restores real series records');
+  assert.equal(findNodes(errorHarness.tree, (n) => n.type === 'FilmShelf')[0].props.movies[0].id, 'retry-film', 'Retry restores real film records');
 });
 
 test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministic similar rail (D1 decoupled)', async () => {
@@ -1008,7 +1023,7 @@ test('5. Profile: Enforces 5-min TTL, clears stale IDs on library update, and pr
   assert.ok(getText(p.tree).includes('Thử tải lại'), 'Network error provides retry button');
 });
 
-test('6. Home uses the real series catalog while legacy movie detail and Profile keep canonical IDs', async () => {
+test('6. Home uses the standalone film catalog while detail and Profile keep canonical IDs', async () => {
   const canonicalMovie = sampleMovie({
     id: 'totoro',
     title: 'My Neighbor Totoro',
@@ -1017,20 +1032,14 @@ test('6. Home uses the real series catalog while legacy movie detail and Profile
     genres: ['Animation', 'Family'],
   });
 
-  // Home renders canonical SQL series records rather than the legacy movie response.
-  const home = createHomeHarness(async () => ([{
-    id: 'totoro-series',
-    title: 'My Neighbor Totoro',
-    synopsis: 'Two girls discover friendly spirits.',
-    releaseYearStart: 1988,
-  }]));
+  const home = createHomeHarness(async () => ([canonicalMovie]));
   home.render();
   await home.settle();
 
-  const shelf = findNodes(home.tree, (n) => n.type === 'SeriesShelf')[0];
-  assert.ok(shelf, 'Home must render a catalog shelf');
-  assert.equal(shelf.props.series[0].id, 'totoro-series');
-  assert.equal(shelf.props.series[0].releaseYearStart, 1988);
+  const shelf = findNodes(home.tree, (n) => n.type === 'FilmShelf')[0];
+  assert.ok(shelf, 'Home must render a film shelf');
+  assert.equal(shelf.props.movies[0].id, 'totoro');
+  assert.equal(shelf.props.movies[0].year, 1988);
 
   // Detail renders exact same canonical ID 'totoro'
   const detail = createDetailHarness('totoro', async () => canonicalMovie);
