@@ -1,0 +1,760 @@
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/dto/MovieResponse.java b/backend/springboot/src/main/java/com/dippie/moviercm/dto/MovieResponse.java
+index 4d3ee86..05740eb 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/dto/MovieResponse.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/dto/MovieResponse.java
+@@ -36,7 +36,10 @@ public class MovieResponse {
+     public static MovieResponse fromEntity(Movie movie) {
+         List<String> genreList = Collections.emptyList();
+         if (movie.getGenres() != null && !movie.getGenres().trim().isEmpty()) {
+-            genreList = Arrays.asList(movie.getGenres().split(","));
++            genreList = java.util.Arrays.stream(movie.getGenres().split(","))
++                    .map(String::trim)
++                    .filter(s -> !s.isEmpty())
++                    .collect(java.util.stream.Collectors.toList());
+         }
+ 
+         return builder()
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/repository/MovieRepository.java b/backend/springboot/src/main/java/com/dippie/moviercm/repository/MovieRepository.java
+index eb244da..2697335 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/repository/MovieRepository.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/repository/MovieRepository.java
+@@ -2,6 +2,7 @@ package com.dippie.moviercm.repository;
+ 
+ import com.dippie.moviercm.entity.Movie;
+ import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+ import org.springframework.data.jpa.repository.Query;
+ import org.springframework.data.repository.query.Param;
+ import org.springframework.stereotype.Repository;
+@@ -9,7 +10,7 @@ import org.springframework.stereotype.Repository;
+ import java.util.List;
+ 
+ @Repository
+-public interface MovieRepository extends JpaRepository<Movie, String> {
++public interface MovieRepository extends JpaRepository<Movie, String>, JpaSpecificationExecutor<Movie> {
+ 
+     List<Movie> findAllByOrderByRatingDesc();
+ 
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/MovieService.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/MovieService.java
+index 0b99c87..97c2179 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/service/MovieService.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/MovieService.java
+@@ -1,17 +1,29 @@
+ package com.dippie.moviercm.service;
+ 
+ import com.dippie.moviercm.dto.MovieResponse;
++import com.dippie.moviercm.dto.PageResponse;
+ import com.dippie.moviercm.entity.Movie;
+ import com.dippie.moviercm.repository.MovieRepository;
++import jakarta.persistence.criteria.Predicate;
++import org.springframework.data.domain.Page;
++import org.springframework.data.domain.PageRequest;
++import org.springframework.data.domain.Pageable;
++import org.springframework.data.domain.Sort;
++import org.springframework.data.jpa.domain.Specification;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
++import java.util.ArrayList;
++import java.util.Arrays;
+ import java.util.List;
++import java.util.Set;
+ import java.util.stream.Collectors;
+ 
+ @Service
+ public class MovieService {
+ 
++    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("rating", "year", "title");
++
+     private final MovieRepository movieRepository;
+ 
+     public MovieService(MovieRepository movieRepository) {
+@@ -25,6 +37,34 @@ public class MovieService {
+                 .collect(Collectors.toList());
+     }
+ 
++    @Transactional(readOnly = true)
++    public List<MovieResponse> getAllMovies(String search, String genre) {
++        boolean hasSearch = search != null && !search.trim().isEmpty();
++        boolean hasGenre = genre != null && !genre.trim().isEmpty();
++
++        if (hasSearch && hasGenre) {
++            String q = search.trim().toLowerCase();
++            String g = genre.trim().toLowerCase();
++            Specification<Movie> spec = (root, query, cb) -> {
++                Predicate pSearch = cb.or(
++                        cb.like(cb.lower(root.get("title")), "%" + q + "%"),
++                        cb.like(cb.lower(root.get("description")), "%" + q + "%")
++                );
++                Predicate pGenre = cb.like(cb.lower(root.get("genres")), "%" + g + "%");
++                return cb.and(pSearch, pGenre);
++            };
++            return movieRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "rating").and(Sort.by(Sort.Direction.ASC, "id"))).stream()
++                    .map(MovieResponse::fromEntity)
++                    .collect(Collectors.toList());
++        } else if (hasSearch) {
++            return searchMovies(search);
++        } else if (hasGenre) {
++            return filterByGenre(genre);
++        } else {
++            return getAllMovies();
++        }
++    }
++
+     @Transactional(readOnly = true)
+     public MovieResponse getMovieById(String id) {
+         Movie movie = movieRepository.findById(id)
+@@ -51,4 +91,99 @@ public class MovieService {
+                 .map(MovieResponse::fromEntity)
+                 .collect(Collectors.toList());
+     }
++
++    @Transactional(readOnly = true)
++    public PageResponse<MovieResponse> browseMovies(
++            String query,
++            String genre,
++            String genres,
++            Boolean animationOnly,
++            Integer yearMin,
++            Integer yearMax,
++            String sort,
++            String direction,
++            int page,
++            int size
++    ) {
++        // 1. Validation
++        if (page < 0) {
++            throw new IllegalArgumentException("Chỉ số trang (page) không được âm: " + page);
++        }
++        if (size < 1 || size > 100) {
++            throw new IllegalArgumentException("Kích thước trang (size) phải nằm trong khoảng 1 đến 100: " + size);
++        }
++        if (yearMin != null && yearMax != null && yearMin > yearMax) {
++            throw new IllegalArgumentException("Năm tối thiểu (yearMin: " + yearMin + ") không được lớn hơn năm tối đa (yearMax: " + yearMax + ")");
++        }
++
++        String sortField = (sort == null || sort.trim().isEmpty()) ? "rating" : sort.trim().toLowerCase();
++        if (!ALLOWED_SORT_FIELDS.contains(sortField)) {
++            throw new IllegalArgumentException("Trường sắp xếp không hợp lệ: '" + sort + "'. Các trường được hỗ trợ: " + ALLOWED_SORT_FIELDS);
++        }
++
++        String sortDirStr = (direction == null || direction.trim().isEmpty()) ? "desc" : direction.trim().toLowerCase();
++        if (!"asc".equals(sortDirStr) && !"desc".equals(sortDirStr)) {
++            throw new IllegalArgumentException("Chiều sắp xếp không hợp lệ: '" + direction + "'. Phải là 'asc' hoặc 'desc'");
++        }
++
++        // 2. Build Specification
++        Specification<Movie> spec = (root, q, cb) -> {
++            List<Predicate> predicates = new ArrayList<>();
++
++            if (query != null && !query.trim().isEmpty()) {
++                String term = "%" + query.trim().toLowerCase() + "%";
++                predicates.add(cb.or(
++                        cb.like(cb.lower(root.get("title")), term),
++                        cb.like(cb.lower(root.get("description")), term)
++                ));
++            }
++
++            if (genre != null && !genre.trim().isEmpty()) {
++                String gTerm = "%" + genre.trim().toLowerCase() + "%";
++                predicates.add(cb.like(cb.lower(root.get("genres")), gTerm));
++            }
++
++            if (genres != null && !genres.trim().isEmpty()) {
++                Arrays.stream(genres.split(","))
++                        .map(String::trim)
++                        .filter(token -> !token.isEmpty())
++                        .forEach(token -> predicates.add(cb.like(cb.lower(root.get("genres")), "%" + token.toLowerCase() + "%")));
++            }
++
++            if (Boolean.TRUE.equals(animationOnly)) {
++                predicates.add(cb.like(cb.lower(root.get("genres")), "%animation%"));
++            }
++
++            if (yearMin != null) {
++                predicates.add(cb.greaterThanOrEqualTo(root.get("year"), yearMin));
++            }
++
++            if (yearMax != null) {
++                predicates.add(cb.lessThanOrEqualTo(root.get("year"), yearMax));
++            }
++
++            return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
++        };
++
++        // 3. Stable Sort Tie-Break
++        Sort.Direction dir = "asc".equals(sortDirStr) ? Sort.Direction.ASC : Sort.Direction.DESC;
++        Sort sortObj = Sort.by(dir, sortField).and(Sort.by(Sort.Direction.ASC, "id"));
++        Pageable pageable = PageRequest.of(page, size, sortObj);
++
++        // 4. Query & Map
++        Page<Movie> moviePage = movieRepository.findAll(spec, pageable);
++        List<MovieResponse> items = moviePage.getContent().stream()
++                .map(MovieResponse::fromEntity)
++                .collect(Collectors.toList());
++
++        return new PageResponse<>(
++                items,
++                moviePage.getNumber(),
++                moviePage.getSize(),
++                moviePage.getTotalElements(),
++                moviePage.getTotalPages(),
++                moviePage.hasNext(),
++                moviePage.hasPrevious()
++        );
++    }
+ }
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java
+index c7ae642..cb57a78 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java
+@@ -2,6 +2,7 @@ package com.dippie.moviercm.controller;
+ 
+ import com.dippie.moviercm.dto.ApiResponse;
+ import com.dippie.moviercm.dto.MovieResponse;
++import com.dippie.moviercm.dto.PageResponse;
+ import com.dippie.moviercm.service.MovieService;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+@@ -23,17 +24,39 @@ public class MovieController {
+     public ResponseEntity<ApiResponse<List<MovieResponse>>> getAllMovies(
+             @RequestParam(required = false) String search,
+             @RequestParam(required = false) String genre) {
+-        List<MovieResponse> movies;
+-        if (search != null && !search.trim().isEmpty()) {
+-            movies = movieService.searchMovies(search);
+-        } else if (genre != null && !genre.trim().isEmpty()) {
+-            movies = movieService.filterByGenre(genre);
+-        } else {
+-            movies = movieService.getAllMovies();
+-        }
++        List<MovieResponse> movies = movieService.getAllMovies(search, genre);
+         return ResponseEntity.ok(ApiResponse.success(movies));
+     }
+ 
++    @GetMapping("/browse")
++    public ResponseEntity<ApiResponse<PageResponse<MovieResponse>>> browseMovies(
++            @RequestParam(required = false) String search,
++            @RequestParam(required = false) String query,
++            @RequestParam(required = false) String genre,
++            @RequestParam(required = false) String genres,
++            @RequestParam(required = false, defaultValue = "false") Boolean animationOnly,
++            @RequestParam(required = false) Integer yearMin,
++            @RequestParam(required = false) Integer yearMax,
++            @RequestParam(required = false, defaultValue = "rating") String sort,
++            @RequestParam(required = false, defaultValue = "desc") String direction,
++            @RequestParam(required = false, defaultValue = "0") int page,
++            @RequestParam(required = false, defaultValue = "12") int size) {
++        String effectiveQuery = (query != null && !query.trim().isEmpty()) ? query : search;
++        PageResponse<MovieResponse> pageResponse = movieService.browseMovies(
++                effectiveQuery,
++                genre,
++                genres,
++                animationOnly,
++                yearMin,
++                yearMax,
++                sort,
++                direction,
++                page,
++                size
++        );
++        return ResponseEntity.ok(ApiResponse.success(pageResponse));
++    }
++
+     @GetMapping("/{id}")
+     public ResponseEntity<ApiResponse<MovieResponse>> getMovieById(@PathVariable String id) {
+         try {
+diff --git a/docs/contracts/M2_CATALOG_CONTRACT.md b/docs/contracts/M2_CATALOG_CONTRACT.md
+new file mode 100644
+index 0000000..4d8a32a
+--- /dev/null
++++ b/docs/contracts/M2_CATALOG_CONTRACT.md
+@@ -0,0 +1,168 @@
++# M2 Catalog & Animation Discovery Contract Specification
++
++> **Milestone:** M2 — Catalog backend và hành trình khám phá hoạt hình  
++> **Repository:** `D:\Class\movie-rcm-system`  
++> **Version:** 1.0.0 (Round 1 Baseline)  
++> **Status:** APPROVED FOR IMPLEMENTATION  
++
++---
++
++## 1. Mục đích & Nguyên tắc cốt lõi
++
++Tài liệu này định nghĩa chuẩn giao tiếp kỹ thuật (API Contract) cho toàn bộ hệ thống Catalog phim thuộc Milestone M2, bảo đảm tính nhất quán xuyên suốt giữa Spring Boot backend, Next.js frontend, AI recommender pipeline, và các module thư viện/tài khoản cá nhân đã nghiệm thu tại M1.
++
++### 1.1 Nguyên tắc Canonical ID
++1. **Định danh duy nhất và bất biến (Immutable):**
++   - Mã phim `movieId` (ví dụ: `the-last-orbit`, `spirited-away`, `your-name`, `spider-verse`) là chuỗi slug chuẩn (lowercase kebab-case), tồn tại duy nhất trong toàn hệ thống.
++   - Tuyệt đối không tự động đổi ID, không map mờ (fuzzy-matching) tiêu đề sang một ID khác để tránh lưu sai tác phẩm trong Watchlist/Favorites/Ratings.
++2. **Xử lý tác phẩm không tồn tại (404 Non-existent):**
++   - Khi truy vấn một `movieId` không tồn tại trong cơ sở dữ liệu, backend trả về mã `HTTP 404 Not Found` với body có cấu trúc rõ ràng.
++   - Tuyệt đối không tạo bản ghi phim giả (phantom movie) hoặc ngầm định tạo mới khi gặp ID lạ.
++
++### 1.2 Quản lý Nullable Metadata
++- **Trường bắt buộc (Non-nullable):** `id` (String), `title` (String), `year` (Integer), `rating` (Double), `genres` (List<String>).
++- **Trường cho phép null (Nullable):** `runtime` (String), `description` (String), `poster` (String URL), `backdrop` (String URL), `videoUrl` (String URL).
++- **Chuẩn hóa thể loại (Genres):**
++  - Trong DB, thể loại được lưu trữ dưới dạng chuỗi phân cách bởi dấu phẩy (ví dụ: `"Animation,Adventure,Family,Fantasy"` hoặc `"Animation, Adventure, Family"`).
++  - Khi serialize qua DTO `MovieResponse`, các token được `trim()` sạch sẽ thành mảng các chuỗi chuẩn không chứa khoảng trắng thừa: `["Animation", "Adventure", "Family", "Fantasy"]`.
++
++---
++
++## 2. API Endpoints Specification
++
++### 2.1 Legacy List Endpoint — `GET /api/movies` (Giữ tương thích 100%)
++Bảo lưu toàn diện giao tiếp cho các client hiện hữu và CineBot AI chat service.
++
++- **URL:** `/api/movies`
++- **Method:** `GET`
++- **Query Parameters:**
++  - `search` (String, tùy chọn): Tìm kiếm không phân biệt hoa thường trong `title` và `description`.
++  - `genre` (String, tùy chọn): Lọc theo token thể loại (ví dụ: `Animation`).
++- **Quy tắc phối hợp điều kiện (Combined Filter):**
++  - Khi cả `search` và `genre` cùng xuất hiện: Backend thực thi phép kết hợp **AND** (tìm kiếm chứa từ khóa `search` VÀ thuộc thể loại `genre`), thay thế logic `else-if` cũ.
++- **Response Format (200 OK):**
++  ```json
++  {
++    "success": true,
++    "message": "Movies retrieved successfully",
++    "data": [
++      {
++        "id": "spirited-away",
++        "title": "Spirited Away",
++        "year": 2001,
++        "rating": 8.6,
++        "runtime": "2h 05m",
++        "genres": ["Animation", "Adventure", "Family", "Fantasy"],
++        "description": "A young girl wanders into a magical bathhouse...",
++        "poster": "https://images.unsplash.com/...",
++        "backdrop": "https://images.unsplash.com/...",
++        "videoUrl": "/videos/the-last-orbit.mp4"
++      }
++    ]
++  }
++  ```
++
++### 2.2 Detail Endpoint — `GET /api/movies/{id}`
++- **URL:** `/api/movies/{id}`
++- **Method:** `GET`
++- **Response (200 OK):**
++  ```json
++  {
++    "success": true,
++    "message": "Movie retrieved successfully",
++    "data": {
++      "id": "spirited-away",
++      "title": "Spirited Away",
++      "year": 2001,
++      "rating": 8.6,
++      "runtime": "2h 05m",
++      "genres": ["Animation", "Adventure", "Family", "Fantasy"],
++      "description": "...",
++      "poster": "...",
++      "backdrop": "...",
++      "videoUrl": "..."
++    }
++  }
++  ```
++- **Response (404 NOT FOUND):**
++  ```json
++  {
++    "success": false,
++    "message": "Movie not found with id: nonexistent-id",
++    "data": null
++  }
++  ```
++
++### 2.3 Paginated & Filtered Browse Endpoint — `GET /api/movies/browse` [NEW]
++Endpoint chuẩn cho trải nghiệm duyệt danh mục, tìm kiếm và phân trang website hoạt hình M2.
++
++- **URL:** `/api/movies/browse`
++- **Method:** `GET`
++- **Query Parameters:**
++  | Tham số | Kiểu | Mặc định | Mô tả & Validation |
++  | :--- | :--- | :--- | :--- |
++  | `search` hoặc `query` | String | null | Tìm kiếm không phân biệt hoa thường trong `title` và `description`. |
++  | `genre` | String | null | Lọc theo 1 thể loại (token match). |
++  | `genres` | String | null | Lọc nhiều thể loại phân cách bằng dấu phẩy (kết hợp AND - tất cả phải khớp). |
++  | `animationOnly` | Boolean | false | Ràng buộc tác phẩm phải chứa thể loại `Animation`. |
++  | `yearMin` | Integer | null | Năm phát hành tối thiểu (`year >= yearMin`). |
++  | `yearMax` | Integer | null | Năm phát hành tối đa (`year <= yearMax`). Phải thỏa mãn `yearMin <= yearMax`. |
++  | `sort` | String | `"rating"` | Whitelist: `["rating", "year", "title"]`. Trường hợp không hợp lệ trả về `400 Bad Request`. |
++  | `direction` | String | `"desc"` | Whitelist: `["asc", "desc"]` (không phân biệt hoa thường). |
++  | `page` | Integer | `0` | Chỉ số trang 0-indexed. Phải `>= 0`. |
++  | `size` | Integer | `12` | Kích thước trang. Bắt buộc `1 <= size <= 100`. |
++
++- **Quy tắc Sắp xếp ổn định (Stable Sort Tie-break):**
++  - Mọi câu truy vấn sắp xếp theo `rating`, `year` hoặc `title` đều được bổ sung thứ tự phụ bất biến: **`id ASC`**.
++  - Đảm bảo kết quả phân trang không bị trôi hàng (row jumping / duplicate items across pages).
++
++- **Phản hồi thành công (200 OK):**
++  ```json
++  {
++    "success": true,
++    "message": "Movies retrieved successfully",
++    "data": {
++      "items": [
++        {
++          "id": "spirited-away",
++          "title": "Spirited Away",
++          "year": 2001,
++          "rating": 8.6,
++          "runtime": "2h 05m",
++          "genres": ["Animation", "Adventure", "Family", "Fantasy"],
++          "description": "...",
++          "poster": "...",
++          "backdrop": "...",
++          "videoUrl": "..."
++        }
++      ],
++      "page": 0,
++      "size": 12,
++      "totalElements": 1,
++      "totalPages": 1,
++      "hasNext": false,
++      "hasPrevious": false
++    }
++  }
++  ```
++
++- **Lỗi Validation (400 Bad Request):**
++  Khi `page < 0`, `size < 1`, `size > 100`, `yearMin > yearMax`, hoặc `sort` nằm ngoài whitelist:
++  ```json
++  {
++    "success": false,
++    "message": "Tham số tìm kiếm không hợp lệ: <chi tiết lỗi>",
++    "data": null
++  }
++  ```
++
++---
++
++## 3. Chính sách Dữ liệu & Animation Fixture
++
++1. **Website Hoạt hình (Animation-First Portal):**
++   - Khi client truy cập trang chủ hoặc bộ lọc khám phá hoạt hình, yêu cầu gửi `animationOnly=true` hoặc `genre=Animation`.
++   - Nếu cơ sở dữ liệu không có tác phẩm hoạt hình nào thỏa mãn, API phản hồi danh sách rỗng (`items: []`, `totalElements: 0`), tuyệt đối không tự động nạp phim live-action (fiction) để che mắt người dùng.
++2. **Provenance & Seed Data:**
++   - Dữ liệu test/dev được quản lý thông qua fixture chuẩn, nguồn gốc minh bạch từ bộ dữ liệu của dự án.
++   - Không áp dụng tự động chèn dữ liệu bừa bãi vào môi trường production.
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/dto/PageResponse.java b/backend/springboot/src/main/java/com/dippie/moviercm/dto/PageResponse.java
+new file mode 100644
+index 0000000..f020e92
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/dto/PageResponse.java
+@@ -0,0 +1,81 @@
++package com.dippie.moviercm.dto;
++
++import java.util.List;
++
++public class PageResponse<T> {
++    private List<T> items;
++    private int page;
++    private int size;
++    private long totalElements;
++    private int totalPages;
++    private boolean hasNext;
++    private boolean hasPrevious;
++
++    public PageResponse() {}
++
++    public PageResponse(List<T> items, int page, int size, long totalElements, int totalPages, boolean hasNext, boolean hasPrevious) {
++        this.items = items;
++        this.page = page;
++        this.size = size;
++        this.totalElements = totalElements;
++        this.totalPages = totalPages;
++        this.hasNext = hasNext;
++        this.hasPrevious = hasPrevious;
++    }
++
++    public List<T> getItems() {
++        return items;
++    }
++
++    public void setItems(List<T> items) {
++        this.items = items;
++    }
++
++    public int getPage() {
++        return page;
++    }
++
++    public void setPage(int page) {
++        this.page = page;
++    }
++
++    public int getSize() {
++        return size;
++    }
++
++    public void setSize(int size) {
++        this.size = size;
++    }
++
++    public long getTotalElements() {
++        return totalElements;
++    }
++
++    public void setTotalElements(long totalElements) {
++        this.totalElements = totalElements;
++    }
++
++    public int getTotalPages() {
++        return totalPages;
++    }
++
++    public void setTotalPages(int totalPages) {
++        this.totalPages = totalPages;
++    }
++
++    public boolean isHasNext() {
++        return hasNext;
++    }
++
++    public void setHasNext(boolean hasNext) {
++        this.hasNext = hasNext;
++    }
++
++    public boolean isHasPrevious() {
++        return hasPrevious;
++    }
++
++    public void setHasPrevious(boolean hasPrevious) {
++        this.hasPrevious = hasPrevious;
++    }
++}
+diff --git a/backend/springboot/src/test/java/com/dippie/moviercm/CatalogIntegrationTest.java b/backend/springboot/src/test/java/com/dippie/moviercm/CatalogIntegrationTest.java
+new file mode 100644
+index 0000000..67a7023
+--- /dev/null
++++ b/backend/springboot/src/test/java/com/dippie/moviercm/CatalogIntegrationTest.java
+@@ -0,0 +1,227 @@
++package com.dippie.moviercm;
++
++import com.dippie.moviercm.entity.Movie;
++import com.dippie.moviercm.repository.MovieRatingRepository;
++import com.dippie.moviercm.repository.MovieRepository;
++import com.dippie.moviercm.repository.WatchlistItemRepository;
++import com.dippie.moviercm.repository.FavoriteItemRepository;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.http.MediaType;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.test.web.servlet.MockMvc;
++
++import static org.hamcrest.Matchers.*;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++@SpringBootTest
++@AutoConfigureMockMvc
++@ActiveProfiles("test")
++public class CatalogIntegrationTest {
++
++    @Autowired
++    private MockMvc mockMvc;
++
++    @Autowired
++    private MovieRepository movieRepository;
++
++    @Autowired
++    private WatchlistItemRepository watchlistRepository;
++
++    @Autowired
++    private FavoriteItemRepository favoriteRepository;
++
++    @Autowired
++    private MovieRatingRepository ratingRepository;
++
++    @BeforeEach
++    void setupFixtures() {
++        favoriteRepository.deleteAll();
++        watchlistRepository.deleteAll();
++        ratingRepository.deleteAll();
++        movieRepository.deleteAll();
++
++        // Seed 3 animation movies + 2 live-action fiction movies
++        saveMovie("spirited-away", "Spirited Away", 2001, 8.6, "Animation,Adventure,Family,Fantasy",
++                "A young girl wanders into a magical bathhouse ruled by spirits and witches.");
++        saveMovie("your-name", "Your Name", 2016, 8.4, "Animation, Romance, Drama, Fantasy",
++                "Two teenagers share a magical connection swapping bodies across time and space.");
++        saveMovie("isle-of-dogs", "Isle of Dogs", 2018, 7.8, "Animation,Adventure,Comedy,Drama",
++                "A boy embarks on a stop-motion quest to rescue his exiled dog.");
++
++        saveMovie("the-last-orbit", "The Last Orbit", 2026, 8.7, "Sci-Fi,Drama",
++                "A lone astronaut discovers the signal guiding her home is the final memory.");
++        saveMovie("afterlight", "Afterlight", 2025, 8.3, "Drama,Mystery",
++                "In a city where night never ends, a photographer follows a beam of light.");
++    }
++
++    private void saveMovie(String id, String title, int year, double rating, String genres, String description) {
++        movieRepository.save(Movie.builder()
++                .id(id)
++                .title(title)
++                .year(year)
++                .rating(rating)
++                .runtime("2h")
++                .genres(genres)
++                .description(description)
++                .poster("https://img.test/" + id + ".jpg")
++                .backdrop("https://img.test/" + id + "-bg.jpg")
++                .videoUrl("/videos/" + id + ".mp4")
++                .build());
++    }
++
++    @Test
++    @DisplayName("1. Legacy /api/movies combines search and genre via AND logic")
++    void testLegacyCombinedFilter() throws Exception {
++        // "time" appears in description of your-name ("time and space") and afterlight ("night never ends" -> no).
++        // Combined with genre=Animation: MUST return only your-name.
++        mockMvc.perform(get("/api/movies")
++                        .param("search", "time")
++                        .param("genre", "Animation")
++                        .contentType(MediaType.APPLICATION_JSON))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.success").value(true))
++                .andExpect(jsonPath("$.data", hasSize(1)))
++                .andExpect(jsonPath("$.data[0].id").value("your-name"));
++    }
++
++    @Test
++    @DisplayName("2. Legacy /api/movies backward compatibility without params returns all items")
++    void testLegacyAllMovies() throws Exception {
++        mockMvc.perform(get("/api/movies")
++                        .contentType(MediaType.APPLICATION_JSON))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.success").value(true))
++                .andExpect(jsonPath("$.data", hasSize(5)));
++    }
++
++    @Test
++    @DisplayName("3. /api/movies/browse paginates stably with tie-breaker id ASC")
++    void testBrowsePaginationAndSorting() throws Exception {
++        // Page 0, size 2, sorted by rating desc:
++        // Expected order:
++        // 1. the-last-orbit (8.7)
++        // 2. spirited-away (8.6)
++        mockMvc.perform(get("/api/movies/browse")
++                        .param("page", "0")
++                        .param("size", "2")
++                        .param("sort", "rating")
++                        .param("direction", "desc")
++                        .contentType(MediaType.APPLICATION_JSON))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.success").value(true))
++                .andExpect(jsonPath("$.data.page").value(0))
++                .andExpect(jsonPath("$.data.size").value(2))
++                .andExpect(jsonPath("$.data.totalElements").value(5))
++                .andExpect(jsonPath("$.data.totalPages").value(3))
++                .andExpect(jsonPath("$.data.hasNext").value(true))
++                .andExpect(jsonPath("$.data.hasPrevious").value(false))
++                .andExpect(jsonPath("$.data.items", hasSize(2)))
++                .andExpect(jsonPath("$.data.items[0].id").value("the-last-orbit"))
++                .andExpect(jsonPath("$.data.items[1].id").value("spirited-away"));
++
++        // Page 1, size 2:
++        // Expected:
++        // 3. your-name (8.4)
++        // 4. afterlight (8.3)
++        mockMvc.perform(get("/api/movies/browse")
++                        .param("page", "1")
++                        .param("size", "2")
++                        .param("sort", "rating")
++                        .param("direction", "desc")
++                        .contentType(MediaType.APPLICATION_JSON))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.data.page").value(1))
++                .andExpect(jsonPath("$.data.items", hasSize(2)))
++                .andExpect(jsonPath("$.data.items[0].id").value("your-name"))
++                .andExpect(jsonPath("$.data.items[1].id").value("afterlight"));
++    }
++
++    @Test
++    @DisplayName("4. /api/movies/browse with animationOnly=true excludes non-animation movies")
++    void testBrowseAnimationOnly() throws Exception {
++        mockMvc.perform(get("/api/movies/browse")
++                        .param("animationOnly", "true")
++                        .contentType(MediaType.APPLICATION_JSON))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.success").value(true))
++                .andExpect(jsonPath("$.data.totalElements").value(3))
++                .andExpect(jsonPath("$.data.items", hasSize(3)))
++                .andExpect(jsonPath("$.data.items[*].id", containsInAnyOrder("spirited-away", "your-name", "isle-of-dogs")));
++    }
++
++    @Test
++    @DisplayName("5. /api/movies/browse combines genre and year bounds (yearMin, yearMax)")
++    void testBrowseCombinedGenreAndYearRange() throws Exception {
++        // Adventure movies: spirited-away (2001), isle-of-dogs (2018)
++        // Filter: genre=Adventure, yearMin=2010, yearMax=2020 -> only isle-of-dogs (2018)
++        mockMvc.perform(get("/api/movies/browse")
++                        .param("genre", "Adventure")
++                        .param("yearMin", "2010")
++                        .param("yearMax", "2020")
++                        .contentType(MediaType.APPLICATION_JSON))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.success").value(true))
++                .andExpect(jsonPath("$.data.totalElements").value(1))
++                .andExpect(jsonPath("$.data.items[0].id").value("isle-of-dogs"));
++    }
++
++    @Test
++    @DisplayName("6. /api/movies/browse rejects invalid parameters with 400 Bad Request")
++    void testBrowseValidation() throws Exception {
++        // Negative page
++        mockMvc.perform(get("/api/movies/browse").param("page", "-1"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false));
++
++        // Size < 1
++        mockMvc.perform(get("/api/movies/browse").param("size", "0"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false));
++
++        // Size > 100
++        mockMvc.perform(get("/api/movies/browse").param("size", "101"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false));
++
++        // Inverted year bounds
++        mockMvc.perform(get("/api/movies/browse")
++                        .param("yearMin", "2025")
++                        .param("yearMax", "2010"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false));
++
++        // Sort whitelist violation
++        mockMvc.perform(get("/api/movies/browse").param("sort", "unapproved_field"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false));
++
++        // Invalid direction
++        mockMvc.perform(get("/api/movies/browse").param("direction", "diagonal"))
++                .andExpect(status().isBadRequest())
++                .andExpect(jsonPath("$.success").value(false));
++    }
++
++    @Test
++    @DisplayName("7. Detail endpoint returns 200 OK with trimmed genres, and 404 for nonexistent ID")
++    void testMovieDetail() throws Exception {
++        // Existing movie
++        mockMvc.perform(get("/api/movies/spirited-away"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.success").value(true))
++                .andExpect(jsonPath("$.data.id").value("spirited-away"))
++                .andExpect(jsonPath("$.data.genres[0]").value("Animation"))
++                .andExpect(jsonPath("$.data.genres[1]").value("Adventure"));
++
++        // Nonexistent movie returns 404
++        mockMvc.perform(get("/api/movies/unknown-phantom-movie"))
++                .andExpect(status().isNotFound())
++                .andExpect(jsonPath("$.success").value(false))
++                .andExpect(jsonPath("$.message").value(containsString("not found")));
++    }
++}

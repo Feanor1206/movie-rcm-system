@@ -1,0 +1,187 @@
+[
+  {
+    "path": "backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaStreamController.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/LocalMediaStorageAdapter.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStorageAdapter.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveFaultIsolationTest.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveMediaStorageAdapterTest.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveMediaStreamingIntegrationTest.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/test/java/com/dippie/moviercm/DrivePathSecurityTest.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveWalkthroughServer.java",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/contracts/DRIVE_STORAGE_CONTRACT.md",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/fixtures/drive_media_mapping.example.json",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/DRIVE_01.patch",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/DRIVE_01_REPORT.md",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/DRIVE_01_STATUS.json",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/DRIVE_01_WORKLOG.md",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/agent-d/test_results.log",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/agent-e/TOOLKIT_VERIFICATION_REPORT.md",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/agent-e/toolkit_test_evidence.json",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/screenshots/00_desktop_drive_unmounted_alert.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/screenshots/01_desktop_drive_playback_playing.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/screenshots/02_desktop_drive_seek_near_end.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/screenshots/03_desktop_drive_retry_recovery.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/screenshots/04_mobile_drive_playback_375px.png",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/reports/drive/DRIVE_01/walkthrough_results.json",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive-tests/test_drive_security_seams.ps1",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive-tests/test_drive_toolkit_comprehensive.ps1",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive/mount_drive.ps1",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive/preflight_drive.ps1",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive/status_drive.ps1",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive/stop_drive.ps1",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive/test_drive_tooling.ps1",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/drive_mapping_suite.cjs",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/preview_drive_media_mapping.cjs",
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  {
+    "path": "scripts/run_drive_media_walkthrough.cjs",
+    "hashMatch": true,
+    "sizeMatch": true
+  }
+]

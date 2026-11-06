@@ -1,0 +1,80 @@
+
+> dippie@0.1.0 test
+> node --test tests/catalog_service_suite.mjs tests/m1_behavior_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs tests/modal_a11y_suite.mjs tests/media_playback_suite.mjs
+
+✔ 1. Catalog Client: browseCatalog constructs correct query string and normalizes PageResponse (156.4235ms)
+✔ 2. C1: External abort after headers received while body is pending aborts transport and throws cancellation (48.0545ms)
+✔ 3. C1: Slow body triggers timeout and cleans up timers (76.8798ms)
+✔ 4. C1: Pre-aborted external signal rejects immediately without setting timer (28.6694ms)
+✔ 5. C2: Malformed paginated payload (data={} or missing items) throws 502 (32.7768ms)
+✔ 6. C2: normalizeCatalogMovie rejects missing required fields and never fabricates phantom zeros (20.644ms)
+✔ 7. C2: getCatalogMovieById verifies response ID matches requested canonical ID (43.1909ms)
+✔ 8. C2: getCatalogMovieById returns null on 404 HTML body without syntax error (19.3318ms)
+✔ 9. C2: Search/Query precedence: blank query falls back to search parameter (18.0398ms)
+✔ 1. Auth login sends verbatim raw password with spaces (145.9891ms)
+✔ 2. R1 (P1): Logout while response JSON is pending does NOT resurrect session (46.2182ms)
+✔ 3. R1: Runtime validation rejects malformed auth payloads (40.7983ms)
+✔ 4. F1 (P1): Late A 401 response after B login does NOT trigger handleSessionExpired on B (109.7335ms)
+✔ 5. F1 (P1): Old A finally does NOT release B synchronous lock for the same item (110.1556ms)
+✔ 6. F2 (P1): First render of User B derives empty state before passive effects flush (73.7903ms)
+✔ 7. F3 (P2): Same-actor refresh does NOT invalidate pending mutation or leave pending stuck (48.1722ms)
+✔ 8. F4 (P2): Slow JSON body parsing after headers triggers timeout and aborts (46.3693ms)
+✔ 9. R3: Targeted rollback: X failure retains successfully added Y (38.1963ms)
+✔ 10. R4: Unavailable sessions do NOT write to guest storage (34.7038ms)
+✔ 11. R7: removeRating removes rating and sends DELETE request without mutating watchlist (37.7457ms)
+✔ 12. G1 (P1): Boot checking to verified A restores nonempty library (watchlist, favorites, ratings) (46.2835ms)
+✔ 13. G1 (P1): A -> logout -> B loads B nonempty library without leaking A library (31.4859ms)
+✔ 14. G2 (P2): Older refresh body arriving after successful add preserves newly added items (31.0256ms)
+✔ 15. G2 (P2): Refresh during delete followed by delete success keeps item deleted (43.6531ms)
+✔ 16. G2 (P2): Rating update is protected against stale read returning old score (37.8557ms)
+✔ 17. G3 (P2): Unknown write outcome (network error) triggers background reconcile (32.1992ms)
+✔ 18. H1 (P2): Read initiated while write was pending cannot overwrite subsequent commit when read body arrives late (45.9871ms)
+✔ 19. H2 (P2): Unknown outcome on write network loss marks operation uncertain and retrying toggle maintains POST intent (45.8382ms)
+✔ 20. H2 (P2): Unknown outcome on DELETE maintains delete intent on retry without inverting to POST (44.6317ms)
+✔ 21. UI H2: MovieCard renders unconfirmed ADD badge/label and click triggers retry POST, returning to normal on confirm (45.4033ms)
+✔ 22. UI H2: MovieCard renders unconfirmed DELETE label and click triggers retry DELETE, returning to normal on confirm (45.8207ms)
+✔ 23. UI H2: MovieDetail renders unconfirmed Watchlist, Favorite, and Rating with explicit retry buttons and handles new rating selection (26.1302ms)
+✔ 24. UI H2: ProfileOverview renders persistent library error banner and orphan retry actions for Watchlist, Favorites, and Ratings (34.6535ms)
+✔ 25. UI H2: ProfileOverview rating retry with production provider executes POST rating without deleting, and respects remove intent and confirmed transition across found/error/not_found rows (141.5397ms)
+✔ 1. Home: Enforces animationOnly=true across all queries, handles empty and error states (10.3711ms)
+✔ 2. Detail: Canonical ID lookup, real 404 vs server error, and deterministic similar rail (D1 decoupled) (6.8712ms)
+✔ 3. MovieDetail: Safe media fallbacks (missing backdrop, missing poster, and video playback capability) (4.6263ms)
+✔ 4. EditorialHero: Preserves M1 pending feedback and uncertain retry intent (D2) (4.7634ms)
+✔ 5. Profile: Enforces 5-min TTL, clears stale IDs on library update, and preserves items on network error (D3) (6.1931ms)
+✔ 6. Cross-surface consistency: Canonical ID and attributes match across Home, Detail, and Profile (3.3472ms)
+✔ 7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Reload Profile (Cross-surface integration) (14.9535ms)
+✔ 8. Hero uncertain ADD/DELETE retry integration with production provider (commit response drop, reconcile error, retry recovery) (10.0177ms)
+(node:4936) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/Class/movie-rcm-system/frontend/lib/services/mediaService.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\D:\Class\movie-rcm-system\frontend\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 1. resolveStreamUrl correctly handles relative and absolute URLs (1.5058ms)
+✔ 2. getMediaDescriptor normalizes valid descriptor response (0.814ms)
+✔ 3. getMediaDescriptor rejects on server error (2.2126ms)
+✔ 4. MovieDetail: Play buttons distinguish Feature ("Xem phim") from Trailer ("Xem trailer") (0.3636ms)
+✔ 5. MovieDetail: Video player controls, timeline scrubber, and touch targets >=44px (0.3887ms)
+✔ 6. MovieDetail: Buffering spinner and error recovery with retry preserving currentTime (0.2506ms)
+✔ 7. MovieDetail: Video player keyboard shortcuts (0.2651ms)
+✔ 1. AuthModal: Accessibility attributes, focus trapping, opener restoration, and >=44px touch targets (2.0163ms)
+✔ 2. MovieDetail Video Player Modal: Accessibility, initial focus, Tab trapping, opener restore, and touch targets (0.4195ms)
+✔ 3. CineBot Shell: Reduced motion JS policy, focus trap, opener restoration, and touch targets (0.4019ms)
+✔ 1. S1 (P2): Delayed router navigation does NOT overwrite user typing draft (17.5236ms)
+✔ 2. S1 (P2): External navigation (browser back/forward or deep link) syncs draft input (3.1196ms)
+✔ 3. S1 (P2): Clear button resets input draft and triggers push with query removed (4.0927ms)
+✔ 4. S2 (P2): Snapshot query key binding prevents false no-results on pending query transition (4.5309ms)
+✔ 5. S2 (P2): Query transition from results to pending preserves previous results labeled as updating (4.5451ms)
+✔ 6. S3 (P2): URL yearMin, yearMax, and size parameters are parsed, validated, and forwarded to browseCatalog (2.9563ms)
+✔ 7. S3 (P2): Invalid year range (yearMin > yearMax) renders warning and resets cleanly (3.6545ms)
+✔ 8. S4 (P2): Generation guard - Slow response A does NOT overwrite subsequent response B (4.95ms)
+✔ 9. S4 (P2): Cancellation and cleanup on unmount (3.1427ms)
+✔ 10. S4 (P2): MovieCard renders fallback placeholder when poster is missing or empty (3.8058ms)
+✔ 11. S4 (P2): MovieCard renders Next Image with correct src and alt when poster is valid (1.7353ms)
+✔ 12. S4 (P2): MovieCard renders unconfirmed watchlist status badge and executes retry action (2.2382ms)
+ℹ tests 64
+ℹ suites 0
+ℹ pass 64
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1783.6391

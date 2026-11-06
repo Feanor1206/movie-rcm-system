@@ -1,0 +1,19 @@
+▶ DRIVE-01: Drive Media Mapping & Validation Suite
+  ✔ 1. Authoritative sample manifest passes 100% validation (90.0368ms)
+  ✔ 2. Detects schema violations (missing required fields, invalid data types) (0.8036ms)
+  ✔ 3. Detects duplicate assetId conflicts across manifest entries (0.4827ms)
+  ✔ 4. Detects duplicate (movieId, kind) conflicts (two features for same movie) (0.4489ms)
+  ✔ 5. Strictly rejects directory traversal and absolute paths in relativePath (0.4675ms)
+  ✔ 6. Mode --mount correctly matches file sizes on mount and flags missing files (19.2849ms)
+  ✔ 7. Validation is purely idempotent across consecutive executions (deep equality) (12.9088ms)
+  ✔ 8. Strictly rejects NTFS Alternate Data Streams (ADS) and device namespace paths (0.712ms)
+  ✔ 9. Strictly rejects Windows junction and symlink boundary escapes outside mount root (Finding D6) (10.4235ms)
+✔ DRIVE-01: Drive Media Mapping & Validation Suite (138.0366ms)
+ℹ tests 9
+ℹ suites 1
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 268.5449

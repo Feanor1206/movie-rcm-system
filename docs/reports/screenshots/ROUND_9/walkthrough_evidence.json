@@ -1,0 +1,170 @@
+[
+  {
+    "step": "01_home_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "browser_user",
+    "expected": "Home loads top synthetic animation \"The Quantum Garden\", green theme styled, authenticated",
+    "actual": "Rendered hero with title \"The Quantum Garden\", brand color rgb(16, 185, 129)",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 0,
+      "ratingsCount": 0
+    }
+  },
+  {
+    "step": "02_keyboard_focus_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "browser_user",
+    "expected": "Tab key activates interactive element with visible focus outline",
+    "actual": "Active tag A with focus ring classes: text-sm font-medium transition-colors text-zinc-40...",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 0,
+      "ratingsCount": 0
+    }
+  },
+  {
+    "step": "03_detail_desktop",
+    "url": "http://127.0.0.1:3005/movies/m2-synthetic-anim-001",
+    "actor": "browser_user",
+    "expected": "Detail page renders synthetic movie metadata (year 2026, rating 9.1, rating stars)",
+    "actual": "Found \"The Quantum Garden\", year 2026, and interactive star rating buttons",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 0,
+      "ratingsCount": 0
+    }
+  },
+  {
+    "step": "04_detail_saved_rated_desktop",
+    "url": "http://127.0.0.1:3005/movies/m2-synthetic-anim-001",
+    "actor": "browser_user",
+    "expected": "Watchlist transitions to \"Đã lưu Watchlist\", rating 9 recorded in fixture backend",
+    "actual": "Fixture has watchlist=m2-synthetic-anim-001 and rating=9",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "05_profile_desktop",
+    "url": "http://127.0.0.1:3005/profile",
+    "actor": "browser_user",
+    "expected": "Profile renders persisted movie in Watchlist, and Ratings tab displays score 9/10 in the DOM",
+    "actual": "Watchlist and Ratings tabs verified with \"The Quantum Garden\" and score 9/10",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "06_search_deep_link_back_desktop",
+    "url": "http://127.0.0.1:3005/search?q=quantum",
+    "actor": "browser_user",
+    "expected": "history.back() returns to search page with input draft and results preserved without re-navigation",
+    "actual": "Verified URL /search?q=quantum, input value \"quantum\", and results rendered after back",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "07_detail_404_desktop",
+    "url": "http://127.0.0.1:3005/movies/nonexistent-movie-uuid-404",
+    "actor": "browser_user",
+    "expected": "Non-existent movie triggers clean 404 error with home link",
+    "actual": "Rendered \"Không tìm thấy phim hoạt hình\" with \"Về trang chủ\" link button",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "08_search_empty_desktop",
+    "url": "http://127.0.0.1:3005/search?q=xyznonexistentword999",
+    "actor": "browser_user",
+    "expected": "Unmatched search query displays friendly empty state guidance banner",
+    "actual": "Rendered \"Không tìm thấy bộ phim hoạt hình nào\" guidance banner",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "09_catalog_error_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "browser_user",
+    "expected": "Backend failure renders error banner with retry button",
+    "actual": "Rendered error state with \"Thử kết nối lại\" retry action",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "10_hero_uncertain_retry_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "browser_user",
+    "expected": "Hero uncertain state shows amber badge & \"Thử lưu lại\"; retry click confirms to \"Đã lưu Watchlist\"",
+    "actual": "Captured uncertain state with badge and verified transition back to confirmed \"Đã lưu Watchlist\"",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "11_home_mobile",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "browser_user",
+    "expected": "Mobile responsive Home renders stacked hero with touch targets (375x667)",
+    "actual": "Verified viewport width 375 and mobile hero banner",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "12_detail_mobile",
+    "url": "http://127.0.0.1:3005/movies/m2-synthetic-anim-001",
+    "actor": "browser_user",
+    "expected": "Mobile detail displays vertically stacked poster, metadata, and full-width actions",
+    "actual": "Verified mobile detail layout and interactive buttons on 375px viewport",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "13_search_mobile",
+    "url": "http://127.0.0.1:3005/search?q=quantum",
+    "actor": "browser_user",
+    "expected": "Mobile search input and card grid scaled for touch mobile display",
+    "actual": "Verified mobile search input with draft \"quantum\" and responsive card layout",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  },
+  {
+    "step": "14_profile_mobile",
+    "url": "http://127.0.0.1:3005/profile",
+    "actor": "browser_user",
+    "expected": "Mobile profile displays responsive tab strip and library cards",
+    "actual": "Verified mobile profile tabs and card layout on 375px viewport",
+    "pass": true,
+    "fixtureState": {
+      "watchlistCount": 1,
+      "ratingsCount": 1
+    }
+  }
+]

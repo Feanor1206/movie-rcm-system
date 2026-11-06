@@ -1,0 +1,3 @@
+{"capacity":1,"active":1,"pending":0,"retained":3,"nativeOpen":3}
+Exception in thread "main" java.lang.AssertionError: Confirmed: retained native cleanup obligations exceed lifecycle capacity
+	at DRIVE_F07_metadata_budget.main(DRIVE_F07_metadata_budget.java:45)

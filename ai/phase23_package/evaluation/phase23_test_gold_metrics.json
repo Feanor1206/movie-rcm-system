@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen3-4B + Phase23 Best LoRA (checkpoint-200)",
+  "total_test_samples": 500,
+  "json_validity_rate": 100.0,
+  "intent_type_accuracy": 82.0,
+  "year_constraint_accuracy": 92.0,
+  "exclude_genres_accuracy": 97.8,
+  "requested_k_accuracy": 96.2,
+  "clarification_accuracy": 89.4,
+  "no_op_accuracy": 86.0
+}

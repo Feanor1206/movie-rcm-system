@@ -1,0 +1,49 @@
+[
+  {
+    "scenario": "headers received, body pending, caller aborts",
+    "activeTimers": 0,
+    "transportAborted": false
+  },
+  {
+    "scenario": "malformed paginated success accepted",
+    "result": {
+      "items": [],
+      "page": 0,
+      "size": 0,
+      "totalElements": 0,
+      "totalPages": 1,
+      "hasNext": false,
+      "hasPrevious": false
+    }
+  },
+  {
+    "scenario": "missing movie fields normalized",
+    "result": {
+      "id": "",
+      "title": "Chưa có tiêu đề",
+      "year": 0,
+      "rating": 0,
+      "runtime": "",
+      "genres": [],
+      "description": "",
+      "poster": "",
+      "backdrop": ""
+    }
+  },
+  {
+    "scenario": "requested movie ID not equal response movie ID",
+    "result": {
+      "id": "other-movie",
+      "title": "Other",
+      "year": 2001,
+      "rating": 8,
+      "runtime": "",
+      "genres": [
+        "Animation"
+      ],
+      "description": "",
+      "poster": "",
+      "backdrop": ""
+    }
+  }
+]

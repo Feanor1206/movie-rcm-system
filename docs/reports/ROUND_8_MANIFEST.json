@@ -1,0 +1,126 @@
+{
+  "protocolVersion": 1,
+  "roundId": 8,
+  "promptVersion": 8,
+  "runId": "run-round8-20261014-0925",
+  "createdAt": "2026-10-14T09:40:00+07:00",
+  "ownChangedFiles": [
+    {
+      "path": "frontend/tests/m2_journey_suite.mjs",
+      "status": "modified",
+      "sha256": "fbe7460b4c6efacda6990180b560b692072f565a56dd63085880228762803fae",
+      "sizeBytes": 54941
+    },
+    {
+      "path": "docs/contracts/M2_CATALOG_CONTRACT.md",
+      "status": "modified",
+      "sha256": "915f572ea4354136980372c8a537ed27b6c0d8fe825682b25ee20710f36b7c86",
+      "sizeBytes": 14835
+    },
+    {
+      "path": "scripts/preview_animation_catalog.cjs",
+      "status": "modified",
+      "sha256": "00302631fa0a622352dea49281458f5c3cc602b2dcfc8bdfff388807f73e8fdd",
+      "sizeBytes": 7762
+    },
+    {
+      "path": "scripts/run_browser_walkthrough.cjs",
+      "status": "added",
+      "sha256": "3738b1d3e4038c98e0898089c18787cfe2aa0a7d680034e485f8e77a8ec43f25",
+      "sizeBytes": 23900
+    },
+    {
+      "path": "docs/reports/screenshots/01_home_desktop.png",
+      "status": "added",
+      "sha256": "0b1ef14f993faecd2f536475d5519866df6e3909aef454f6f84d24e1b46e59a2",
+      "sizeBytes": 47574
+    },
+    {
+      "path": "docs/reports/screenshots/02_keyboard_focus_desktop.png",
+      "status": "added",
+      "sha256": "3bdd1e464603e815da364f3a7515e6e42a94a5250b8e2d2f938b2e4f99ebe197",
+      "sizeBytes": 47852
+    },
+    {
+      "path": "docs/reports/screenshots/03_detail_desktop.png",
+      "status": "added",
+      "sha256": "0e698b38428847daa41b487bb072543690aa430d36f34d09adbb12645af696a8",
+      "sizeBytes": 30060
+    },
+    {
+      "path": "docs/reports/screenshots/04_detail_saved_rated_desktop.png",
+      "status": "added",
+      "sha256": "0e698b38428847daa41b487bb072543690aa430d36f34d09adbb12645af696a8",
+      "sizeBytes": 30060
+    },
+    {
+      "path": "docs/reports/screenshots/05_profile_desktop.png",
+      "status": "added",
+      "sha256": "952d681a5e58e7506f61df93d885a293930732b124b9232e5066c30638ae68f9",
+      "sizeBytes": 36528
+    },
+    {
+      "path": "docs/reports/screenshots/06_search_deep_link_back_desktop.png",
+      "status": "added",
+      "sha256": "cf7de73371e622d43aa89758165b4b0b2ac3ea8f4257370aef1e9af94d517733",
+      "sizeBytes": 31176
+    },
+    {
+      "path": "docs/reports/screenshots/07_detail_404_desktop.png",
+      "status": "added",
+      "sha256": "0e698b38428847daa41b487bb072543690aa430d36f34d09adbb12645af696a8",
+      "sizeBytes": 30060
+    },
+    {
+      "path": "docs/reports/screenshots/08_search_empty_desktop.png",
+      "status": "added",
+      "sha256": "cf7de73371e622d43aa89758165b4b0b2ac3ea8f4257370aef1e9af94d517733",
+      "sizeBytes": 31176
+    },
+    {
+      "path": "docs/reports/screenshots/09_catalog_error_desktop.png",
+      "status": "added",
+      "sha256": "0b1ef14f993faecd2f536475d5519866df6e3909aef454f6f84d24e1b46e59a2",
+      "sizeBytes": 47574
+    },
+    {
+      "path": "docs/reports/screenshots/10_hero_uncertain_retry_desktop.png",
+      "status": "added",
+      "sha256": "0b1ef14f993faecd2f536475d5519866df6e3909aef454f6f84d24e1b46e59a2",
+      "sizeBytes": 47574
+    },
+    {
+      "path": "docs/reports/screenshots/11_home_mobile.png",
+      "status": "added",
+      "sha256": "40af637769e18bf94de290498844f75581b7d01fe3cb150e3efec9a2e320602d",
+      "sizeBytes": 29374
+    },
+    {
+      "path": "docs/reports/screenshots/12_detail_mobile.png",
+      "status": "added",
+      "sha256": "516ffe3c1e3e8890d157dc5894e2a03cce6ac46331e8e097bd224dba3b4dfacc",
+      "sizeBytes": 24011
+    },
+    {
+      "path": "docs/reports/screenshots/13_search_mobile.png",
+      "status": "added",
+      "sha256": "97c96d6d10a000a416afd733b9a5f2f1b1c909648895d3a15c2d5134016a1b08",
+      "sizeBytes": 25013
+    },
+    {
+      "path": "docs/reports/screenshots/14_profile_mobile.png",
+      "status": "added",
+      "sha256": "56da2ef5bac1c5c0a180af5338a954a5401694a8087930e93036dd98224590a3",
+      "sizeBytes": 24706
+    }
+  ],
+  "gitStatusSummary": [
+    " M docs/contracts/M2_CATALOG_CONTRACT.md",
+    " M docs/reports/M2_M3_STATUS.json",
+    " M frontend/tests/m2_journey_suite.mjs",
+    " M scripts/preview_animation_catalog.cjs",
+    "?? docs/reports/ROUND_8.patch",
+    "?? docs/reports/screenshots/",
+    "?? scripts/run_browser_walkthrough.cjs"
+  ]
+}

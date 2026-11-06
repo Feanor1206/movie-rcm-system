@@ -1,0 +1,73 @@
+{
+  "protocolVersion": 1,
+  "roundId": 1,
+  "promptVersion": 1,
+  "runId": "run-round1-20261014-0245",
+  "createdAt": "2026-10-14T02:50:00+07:00",
+  "ownChangedFiles": [
+    {
+      "path": "docs/contracts/M2_CATALOG_CONTRACT.md",
+      "status": "added",
+      "sha256": "d9f1588efe3e1a79f5646e8b2d6679dbc89853a853d45d29c70c487b19d6ef94",
+      "sizeBytes": 7821
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/PageResponse.java",
+      "status": "added",
+      "sha256": "fff66af15f87a038bb94aef61b45b61a470a17d9edc0d3dbabcd9f9fd13229d9",
+      "sizeBytes": 1738
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/dto/MovieResponse.java",
+      "status": "modified",
+      "sha256": "0b65991310797d997e4011e91591892ce7f34d8926b599ff2e9734f249f3a19e",
+      "sizeBytes": 4582
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/repository/MovieRepository.java",
+      "status": "modified",
+      "sha256": "e7113abc5167e0d6e807af80c0eb74735907ca6801bdacde143e5bb3df778193",
+      "sizeBytes": 1169
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/MovieService.java",
+      "status": "modified",
+      "sha256": "142f7a77b0bc1aec4c98d648aee4712f42d1f8ca3536027f41f33f9b9a74d257",
+      "sizeBytes": 7776
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java",
+      "status": "modified",
+      "sha256": "2b46cf526cbe4e05205d4f32d4fcbe0ec71b2697558b44bab4efaeeba8c42e6f",
+      "sizeBytes": 2836
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/CatalogIntegrationTest.java",
+      "status": "added",
+      "sha256": "8f212c7b722ee750725a264e4ee3a92ce51c53fa3f0ffc084b856e738a7ac3cb",
+      "sizeBytes": 10529
+    }
+  ],
+  "gitStatusSummary": [
+    "M .gitignore",
+    " M backend/fastapi/main.py",
+    " M backend/fastapi/requirements.txt",
+    " M backend/fastapi/schemas.py",
+    " M backend/fastapi/services/ai_pipeline.py",
+    " M backend/fastapi/services/qwen_service.py",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/controller/AuthController.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/controller/MovieController.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/controller/RatingController.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/dto/MovieResponse.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/repository/MovieRatingRepository.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/repository/MovieRepository.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/service/MovieService.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/service/RatingService.java",
+    " M backend/springboot/src/main/java/com/dippie/moviercm/service/WatchlistService.java",
+    " M backend/springboot/src/main/resources/application.yml",
+    " M backend/springboot/src/main/resources/schema.sql",
+    " M docs/README.md",
+    " M frontend/app/api/chat/route.ts",
+    " M frontend/app/globals.css"
+  ]
+}

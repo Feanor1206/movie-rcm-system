@@ -1,0 +1,3699 @@
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/config/DataInitializer.java b/backend/springboot/src/main/java/com/dippie/moviercm/config/DataInitializer.java
+index 054404f..f27b910 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/config/DataInitializer.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/config/DataInitializer.java
+@@ -29,17 +29,20 @@ public class DataInitializer implements CommandLineRunner {
+     private final UserRepository userRepository;
+     private final WatchlistItemRepository watchlistRepository;
+     private final MovieRatingRepository ratingRepository;
++    private final com.dippie.moviercm.repository.MediaAssetRepository mediaAssetRepository;
+     private final PasswordEncoder passwordEncoder;
+ 
+     public DataInitializer(MovieRepository movieRepository,
+                            UserRepository userRepository,
+                            WatchlistItemRepository watchlistRepository,
+                            MovieRatingRepository ratingRepository,
++                           com.dippie.moviercm.repository.MediaAssetRepository mediaAssetRepository,
+                            PasswordEncoder passwordEncoder) {
+         this.movieRepository = movieRepository;
+         this.userRepository = userRepository;
+         this.watchlistRepository = watchlistRepository;
+         this.ratingRepository = ratingRepository;
++        this.mediaAssetRepository = mediaAssetRepository;
+         this.passwordEncoder = passwordEncoder;
+     }
+ 
+@@ -47,6 +50,7 @@ public class DataInitializer implements CommandLineRunner {
+     public void run(String... args) {
+         seedMovies();
+         seed50Users();
++        seedMediaAssets();
+     }
+ 
+     private void seedMovies() {
+@@ -230,4 +234,56 @@ public class DataInitializer implements CommandLineRunner {
+             }
+         }
+     }
++
++    private void seedMediaAssets() {
++        if (mediaAssetRepository.count() == 0) {
++            logger.info("Chưa có media assets trong CSDL. Đang tự động nạp assets mẫu cho Milestone M4...");
++
++            List<com.dippie.moviercm.entity.MediaAsset> assets = List.of(
++                    new com.dippie.moviercm.entity.MediaAsset(
++                            "ast-orbit-feat",
++                            "the-last-orbit",
++                            "feature",
++                            "local",
++                            "synthetic/feature_test.mp4",
++                            "v1",
++                            "video/mp4",
++                            137961L,
++                            10.0,
++                            true,
++                            true
++                    ),
++                    new com.dippie.moviercm.entity.MediaAsset(
++                            "ast-orbit-trl",
++                            "the-last-orbit",
++                            "trailer",
++                            "local",
++                            "synthetic/trailer_test.mp4",
++                            "v1",
++                            "video/mp4",
++                            45095L,
++                            3.0,
++                            true,
++                            true
++                    ),
++                    new com.dippie.moviercm.entity.MediaAsset(
++                            "ast-afterlight-trl",
++                            "afterlight",
++                            "trailer",
++                            "local",
++                            "synthetic/trailer_test.mp4",
++                            "v1",
++                            "video/mp4",
++                            45095L,
++                            3.0,
++                            true,
++                            true
++                    )
++            );
++
++            mediaAssetRepository.saveAll(assets);
++            logger.info("Đã nạp thành công {} media assets mẫu (The Last Orbit feature/trailer, Afterlight trailer).", assets.size());
++        }
++    }
+ }
++
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java b/backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java
+index d8f7c22..5e6dc23 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java
+@@ -30,4 +30,30 @@ public class GlobalExceptionHandler {
+         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                 .body(ApiResponse.error(message));
+     }
++
++    @ExceptionHandler(com.dippie.moviercm.exception.MediaNotFoundException.class)
++    public ResponseEntity<ApiResponse<Void>> handleMediaNotFound(com.dippie.moviercm.exception.MediaNotFoundException ex) {
++        return ResponseEntity.status(HttpStatus.NOT_FOUND)
++                .body(ApiResponse.error(ex.getMessage()));
++    }
++
++    @ExceptionHandler(com.dippie.moviercm.exception.MediaUnavailableException.class)
++    public ResponseEntity<ApiResponse<Void>> handleMediaUnavailable(com.dippie.moviercm.exception.MediaUnavailableException ex) {
++        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
++                .body(ApiResponse.error(ex.getMessage()));
++    }
++
++    @ExceptionHandler(com.dippie.moviercm.exception.SecurityPathTraversalException.class)
++    public ResponseEntity<ApiResponse<Void>> handlePathTraversal(com.dippie.moviercm.exception.SecurityPathTraversalException ex) {
++        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
++                .body(ApiResponse.error(ex.getMessage()));
++    }
++
++    @ExceptionHandler(com.dippie.moviercm.exception.InvalidMediaRangeException.class)
++    public ResponseEntity<Void> handleInvalidRange(com.dippie.moviercm.exception.InvalidMediaRangeException ex) {
++        return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
++                .header(org.springframework.http.HttpHeaders.CONTENT_RANGE, "bytes */" + ex.getTotalBytes())
++                .build();
++    }
+ }
++
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/config/SecurityConfig.java b/backend/springboot/src/main/java/com/dippie/moviercm/config/SecurityConfig.java
+index 5e7238d..819723e 100644
+--- a/backend/springboot/src/main/java/com/dippie/moviercm/config/SecurityConfig.java
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/config/SecurityConfig.java
+@@ -65,7 +65,7 @@ public class SecurityConfig {
+         configuration.setAllowedOriginPatterns(List.of("*"));
+         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Auth-Token", "Accept", "Origin", "X-Requested-With"));
+-        configuration.setExposedHeaders(List.of("Authorization", "X-Auth-Token"));
++        configuration.setExposedHeaders(List.of("Authorization", "X-Auth-Token", "Content-Range", "Accept-Ranges", "Content-Length", "Content-Type"));
+         configuration.setAllowCredentials(true);
+         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+         source.registerCorsConfiguration("/**", configuration);
+@@ -84,6 +84,8 @@ public class SecurityConfig {
+                 .requestMatchers("/api/auth/**").permitAll()
+                 .requestMatchers(HttpMethod.GET, "/api/movies/**").permitAll()
+                 .requestMatchers(HttpMethod.GET, "/api/health/**").permitAll()
++                .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
++                .requestMatchers(HttpMethod.HEAD, "/api/media/**").permitAll()
+                 .requestMatchers("/h2-console/**").permitAll()
+                 .requestMatchers("/error").permitAll()
+                 .anyRequest().authenticated()
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/config/WebConfig.java b/backend/springboot/src/main/java/com/dippie/moviercm/config/WebConfig.java
+new file mode 100644
+index 0000000..8dc1fec
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/config/WebConfig.java
+@@ -0,0 +1,17 @@
++package com.dippie.moviercm.config;
++
++import org.springframework.context.annotation.Configuration;
++import org.springframework.http.converter.HttpMessageConverter;
++import org.springframework.http.converter.ResourceRegionHttpMessageConverter;
++import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
++
++import java.util.List;
++
++@Configuration
++public class WebConfig implements WebMvcConfigurer {
++
++    @Override
++    public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
++        converters.add(new ResourceRegionHttpMessageConverter());
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaDescriptorController.java b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaDescriptorController.java
+new file mode 100644
+index 0000000..1c0d4e5
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaDescriptorController.java
+@@ -0,0 +1,23 @@
++package com.dippie.moviercm.controller;
++
++import com.dippie.moviercm.dto.MediaDescriptorResponse;
++import com.dippie.moviercm.service.MediaStreamService;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.annotation.*;
++
++@RestController
++@RequestMapping("/api/movies")
++public class MediaDescriptorController {
++
++    private final MediaStreamService mediaStreamService;
++
++    public MediaDescriptorController(MediaStreamService mediaStreamService) {
++        this.mediaStreamService = mediaStreamService;
++    }
++
++    @GetMapping("/{movieId}/media-descriptor")
++    public ResponseEntity<MediaDescriptorResponse> getMediaDescriptor(@PathVariable String movieId) {
++        MediaDescriptorResponse descriptor = mediaStreamService.getMediaDescriptor(movieId);
++        return ResponseEntity.ok(descriptor);
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaStreamController.java b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaStreamController.java
+new file mode 100644
+index 0000000..094710f
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaStreamController.java
+@@ -0,0 +1,101 @@
++package com.dippie.moviercm.controller;
++
++import com.dippie.moviercm.entity.MediaAsset;
++import com.dippie.moviercm.service.MediaStreamService;
++import jakarta.servlet.http.HttpServletResponse;
++import org.springframework.core.io.Resource;
++import org.springframework.http.*;
++import org.springframework.web.bind.annotation.*;
++
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++
++@RestController
++@RequestMapping("/api/media")
++public class MediaStreamController {
++
++    private static final int BUFFER_SIZE = 64 * 1024; // 64 KiB bounded buffer
++
++    private final MediaStreamService mediaStreamService;
++
++    public MediaStreamController(MediaStreamService mediaStreamService) {
++        this.mediaStreamService = mediaStreamService;
++    }
++
++    @RequestMapping(value = "/stream/{assetId}", method = RequestMethod.HEAD)
++    public ResponseEntity<Void> getStreamHeaders(@PathVariable String assetId) {
++        MediaAsset asset = mediaStreamService.getMediaAsset(assetId);
++        long length = mediaStreamService.getResourceLength(asset);
++
++        return ResponseEntity.ok()
++                .contentType(MediaType.parseMediaType(asset.getMimeType()))
++                .contentLength(length)
++                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
++                .eTag(asset.getId() + "-" + asset.getVersion())
++                .cacheControl(CacheControl.maxAge(3600, java.util.concurrent.TimeUnit.SECONDS).cachePublic())
++                .build();
++    }
++
++    @GetMapping("/stream/{assetId}")
++    public void streamMedia(
++            @PathVariable String assetId,
++            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
++            HttpServletResponse response) throws IOException {
++
++        MediaAsset asset = mediaStreamService.getMediaAsset(assetId);
++        Resource resource = mediaStreamService.getMediaResource(asset);
++        long totalLength = mediaStreamService.getResourceLength(asset);
++
++        MediaStreamService.RangeSpec range = mediaStreamService.parseRange(rangeHeader, totalLength);
++
++        response.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
++        response.setHeader(HttpHeaders.ETAG, "\"" + asset.getId() + "-" + asset.getVersion() + "\"");
++        response.setHeader(HttpHeaders.CACHE_CONTROL, "public, max-age=3600");
++        response.setContentType(asset.getMimeType());
++
++        if (!range.isRanged()) {
++            response.setStatus(HttpServletResponse.SC_OK);
++            response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(totalLength));
++            try (InputStream in = resource.getInputStream();
++                 OutputStream out = response.getOutputStream()) {
++                byte[] buffer = new byte[BUFFER_SIZE];
++                int bytesRead;
++                while ((bytesRead = in.read(buffer)) != -1) {
++                    out.write(buffer, 0, bytesRead);
++                }
++                out.flush();
++            }
++        } else {
++            response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
++            long start = range.getStart();
++            long end = range.getEnd();
++            long contentLength = range.getLength();
++
++            response.setHeader(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + totalLength);
++            response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength));
++
++            try (InputStream in = resource.getInputStream();
++                 OutputStream out = response.getOutputStream()) {
++                long skipped = in.skip(start);
++                while (skipped < start) {
++                    long s = in.skip(start - skipped);
++                    if (s <= 0) break;
++                    skipped += s;
++                }
++
++                byte[] buffer = new byte[BUFFER_SIZE];
++                long remaining = contentLength;
++                while (remaining > 0) {
++                    int toRead = (int) Math.min(buffer.length, remaining);
++                    int bytesRead = in.read(buffer, 0, toRead);
++                    if (bytesRead == -1) break;
++                    out.write(buffer, 0, bytesRead);
++                    remaining -= bytesRead;
++                }
++                out.flush();
++            }
++        }
++    }
++}
++
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaAssetDto.java b/backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaAssetDto.java
+new file mode 100644
+index 0000000..4e918e0
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaAssetDto.java
+@@ -0,0 +1,91 @@
++package com.dippie.moviercm.dto;
++
++public class MediaAssetDto {
++
++    private String assetId;
++    private String kind;
++    private String streamUrl;
++    private String mimeType;
++    private Long byteLength;
++    private Double durationSeconds;
++    private Boolean isPublic;
++    private String version;
++
++    public MediaAssetDto() {}
++
++    public MediaAssetDto(String assetId, String kind, String streamUrl, String mimeType,
++                         Long byteLength, Double durationSeconds, Boolean isPublic, String version) {
++        this.assetId = assetId;
++        this.kind = kind;
++        this.streamUrl = streamUrl;
++        this.mimeType = mimeType;
++        this.byteLength = byteLength;
++        this.durationSeconds = durationSeconds;
++        this.isPublic = isPublic;
++        this.version = version;
++    }
++
++    public String getAssetId() {
++        return assetId;
++    }
++
++    public void setAssetId(String assetId) {
++        this.assetId = assetId;
++    }
++
++    public String getKind() {
++        return kind;
++    }
++
++    public void setKind(String kind) {
++        this.kind = kind;
++    }
++
++    public String getStreamUrl() {
++        return streamUrl;
++    }
++
++    public void setStreamUrl(String streamUrl) {
++        this.streamUrl = streamUrl;
++    }
++
++    public String getMimeType() {
++        return mimeType;
++    }
++
++    public void setMimeType(String mimeType) {
++        this.mimeType = mimeType;
++    }
++
++    public Long getByteLength() {
++        return byteLength;
++    }
++
++    public void setByteLength(Long byteLength) {
++        this.byteLength = byteLength;
++    }
++
++    public Double getDurationSeconds() {
++        return durationSeconds;
++    }
++
++    public void setDurationSeconds(Double durationSeconds) {
++        this.durationSeconds = durationSeconds;
++    }
++
++    public Boolean getPublic() {
++        return isPublic;
++    }
++
++    public void setPublic(Boolean aPublic) {
++        isPublic = aPublic;
++    }
++
++    public String getVersion() {
++        return version;
++    }
++
++    public void setVersion(String version) {
++        this.version = version;
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaDescriptorResponse.java b/backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaDescriptorResponse.java
+new file mode 100644
+index 0000000..e19d154
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaDescriptorResponse.java
+@@ -0,0 +1,61 @@
++package com.dippie.moviercm.dto;
++
++public class MediaDescriptorResponse {
++
++    private String movieId;
++    private boolean hasFeature;
++    private boolean hasTrailer;
++    private MediaAssetDto feature;
++    private MediaAssetDto trailer;
++
++    public MediaDescriptorResponse() {}
++
++    public MediaDescriptorResponse(String movieId, boolean hasFeature, boolean hasTrailer,
++                                   MediaAssetDto feature, MediaAssetDto trailer) {
++        this.movieId = movieId;
++        this.hasFeature = hasFeature;
++        this.hasTrailer = hasTrailer;
++        this.feature = feature;
++        this.trailer = trailer;
++    }
++
++    public String getMovieId() {
++        return movieId;
++    }
++
++    public void setMovieId(String movieId) {
++        this.movieId = movieId;
++    }
++
++    public boolean isHasFeature() {
++        return hasFeature;
++    }
++
++    public void setHasFeature(boolean hasFeature) {
++        this.hasFeature = hasFeature;
++    }
++
++    public boolean isHasTrailer() {
++        return hasTrailer;
++    }
++
++    public void setHasTrailer(boolean hasTrailer) {
++        this.hasTrailer = hasTrailer;
++    }
++
++    public MediaAssetDto getFeature() {
++        return feature;
++    }
++
++    public void setFeature(MediaAssetDto feature) {
++        this.feature = feature;
++    }
++
++    public MediaAssetDto getTrailer() {
++        return trailer;
++    }
++
++    public void setTrailer(MediaAssetDto trailer) {
++        this.trailer = trailer;
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/entity/MediaAsset.java b/backend/springboot/src/main/java/com/dippie/moviercm/entity/MediaAsset.java
+new file mode 100644
+index 0000000..d1aac41
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/entity/MediaAsset.java
+@@ -0,0 +1,185 @@
++package com.dippie.moviercm.entity;
++
++import jakarta.persistence.*;
++import org.hibernate.annotations.CreationTimestamp;
++import org.hibernate.annotations.UpdateTimestamp;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(
++    name = "media_assets",
++    uniqueConstraints = {
++        @UniqueConstraint(name = "uq_movie_kind_version", columnNames = {"movie_id", "kind", "version"})
++    },
++    indexes = {
++        @Index(name = "idx_media_movie_id", columnList = "movie_id"),
++        @Index(name = "idx_media_movie_kind", columnList = "movie_id, kind")
++    }
++)
++public class MediaAsset {
++
++    @Id
++    @Column(length = 64)
++    private String id;
++
++    @Column(name = "movie_id", nullable = false, length = 100)
++    private String movieId;
++
++    @Column(nullable = false, length = 20)
++    private String kind; // "feature" or "trailer"
++
++    @Column(name = "storage_provider", nullable = false, length = 30)
++    private String storageProvider = "local";
++
++    @Column(name = "relative_path", nullable = false, length = 500)
++    private String relativePath;
++
++    @Column(nullable = false, length = 50)
++    private String version = "v1";
++
++    @Column(name = "mime_type", nullable = false, length = 100)
++    private String mimeType = "video/mp4";
++
++    @Column(name = "byte_length", nullable = false)
++    private Long byteLength;
++
++    @Column(name = "duration_seconds")
++    private Double durationSeconds;
++
++    @Column(name = "is_public", nullable = false)
++    private Boolean isPublic = true;
++
++    @Column(name = "is_available", nullable = false)
++    private Boolean isAvailable = true;
++
++    @CreationTimestamp
++    @Column(name = "created_at", updatable = false)
++    private LocalDateTime createdAt;
++
++    @UpdateTimestamp
++    @Column(name = "updated_at")
++    private LocalDateTime updatedAt;
++
++    public MediaAsset() {}
++
++    public MediaAsset(String id, String movieId, String kind, String storageProvider,
++                      String relativePath, String version, String mimeType,
++                      Long byteLength, Double durationSeconds, Boolean isPublic, Boolean isAvailable) {
++        this.id = id;
++        this.movieId = movieId;
++        this.kind = kind;
++        this.storageProvider = storageProvider != null ? storageProvider : "local";
++        this.relativePath = relativePath;
++        this.version = version != null ? version : "v1";
++        this.mimeType = mimeType != null ? mimeType : "video/mp4";
++        this.byteLength = byteLength;
++        this.durationSeconds = durationSeconds;
++        this.isPublic = isPublic != null ? isPublic : true;
++        this.isAvailable = isAvailable != null ? isAvailable : true;
++    }
++
++    public String getId() {
++        return id;
++    }
++
++    public void setId(String id) {
++        this.id = id;
++    }
++
++    public String getMovieId() {
++        return movieId;
++    }
++
++    public void setMovieId(String movieId) {
++        this.movieId = movieId;
++    }
++
++    public String getKind() {
++        return kind;
++    }
++
++    public void setKind(String kind) {
++        this.kind = kind;
++    }
++
++    public String getStorageProvider() {
++        return storageProvider;
++    }
++
++    public void setStorageProvider(String storageProvider) {
++        this.storageProvider = storageProvider;
++    }
++
++    public String getRelativePath() {
++        return relativePath;
++    }
++
++    public void setRelativePath(String relativePath) {
++        this.relativePath = relativePath;
++    }
++
++    public String getVersion() {
++        return version;
++    }
++
++    public void setVersion(String version) {
++        this.version = version;
++    }
++
++    public String getMimeType() {
++        return mimeType;
++    }
++
++    public void setMimeType(String mimeType) {
++        this.mimeType = mimeType;
++    }
++
++    public Long getByteLength() {
++        return byteLength;
++    }
++
++    public void setByteLength(Long byteLength) {
++        this.byteLength = byteLength;
++    }
++
++    public Double getDurationSeconds() {
++        return durationSeconds;
++    }
++
++    public void setDurationSeconds(Double durationSeconds) {
++        this.durationSeconds = durationSeconds;
++    }
++
++    public Boolean getPublic() {
++        return isPublic;
++    }
++
++    public void setPublic(Boolean aPublic) {
++        isPublic = aPublic;
++    }
++
++    public Boolean getAvailable() {
++        return isAvailable;
++    }
++
++    public void setAvailable(Boolean available) {
++        isAvailable = available;
++    }
++
++    public LocalDateTime getCreatedAt() {
++        return createdAt;
++    }
++
++    public void setCreatedAt(LocalDateTime createdAt) {
++        this.createdAt = createdAt;
++    }
++
++    public LocalDateTime getUpdatedAt() {
++        return updatedAt;
++    }
++
++    public void setUpdatedAt(LocalDateTime updatedAt) {
++        this.updatedAt = updatedAt;
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/exception/InvalidMediaRangeException.java b/backend/springboot/src/main/java/com/dippie/moviercm/exception/InvalidMediaRangeException.java
+new file mode 100644
+index 0000000..4a07a78
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/exception/InvalidMediaRangeException.java
+@@ -0,0 +1,14 @@
++package com.dippie.moviercm.exception;
++
++public class InvalidMediaRangeException extends RuntimeException {
++    private final long totalBytes;
++
++    public InvalidMediaRangeException(String message, long totalBytes) {
++        super(message);
++        this.totalBytes = totalBytes;
++    }
++
++    public long getTotalBytes() {
++        return totalBytes;
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaNotFoundException.java b/backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaNotFoundException.java
+new file mode 100644
+index 0000000..ddbddf3
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaNotFoundException.java
+@@ -0,0 +1,7 @@
++package com.dippie.moviercm.exception;
++
++public class MediaNotFoundException extends RuntimeException {
++    public MediaNotFoundException(String message) {
++        super(message);
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaUnavailableException.java b/backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaUnavailableException.java
+new file mode 100644
+index 0000000..ca3c9f6
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaUnavailableException.java
+@@ -0,0 +1,7 @@
++package com.dippie.moviercm.exception;
++
++public class MediaUnavailableException extends RuntimeException {
++    public MediaUnavailableException(String message) {
++        super(message);
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/exception/SecurityPathTraversalException.java b/backend/springboot/src/main/java/com/dippie/moviercm/exception/SecurityPathTraversalException.java
+new file mode 100644
+index 0000000..2fbeedd
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/exception/SecurityPathTraversalException.java
+@@ -0,0 +1,7 @@
++package com.dippie.moviercm.exception;
++
++public class SecurityPathTraversalException extends RuntimeException {
++    public SecurityPathTraversalException(String message) {
++        super(message);
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/repository/MediaAssetRepository.java b/backend/springboot/src/main/java/com/dippie/moviercm/repository/MediaAssetRepository.java
+new file mode 100644
+index 0000000..3a93636
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/repository/MediaAssetRepository.java
+@@ -0,0 +1,20 @@
++package com.dippie.moviercm.repository;
++
++import com.dippie.moviercm.entity.MediaAsset;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.stereotype.Repository;
++
++import java.util.List;
++import java.util.Optional;
++
++@Repository
++public interface MediaAssetRepository extends JpaRepository<MediaAsset, String> {
++
++    List<MediaAsset> findByMovieId(String movieId);
++
++    List<MediaAsset> findByMovieIdAndIsAvailableTrue(String movieId);
++
++    Optional<MediaAsset> findFirstByMovieIdAndKindAndIsAvailableTrueOrderByCreatedAtDesc(String movieId, String kind);
++
++    Optional<MediaAsset> findByIdAndIsAvailableTrue(String id);
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java
+new file mode 100644
+index 0000000..c6d7599
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java
+@@ -0,0 +1,59 @@
++package com.dippie.moviercm.service;
++
++import com.dippie.moviercm.exception.MediaUnavailableException;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.core.io.Resource;
++import org.springframework.stereotype.Component;
++
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.Paths;
++
++@Component("driveStorageAdapter")
++public class DriveMediaStorageAdapter implements MediaStorageAdapter {
++
++    private final String driveMountPath;
++
++    public DriveMediaStorageAdapter(@Value("${app.media.drive-mount:}") String driveMountPath) {
++        this.driveMountPath = driveMountPath;
++    }
++
++    @Override
++    public String getProviderName() {
++        return "drive";
++    }
++
++    @Override
++    public boolean isAvailable() {
++        if (driveMountPath == null || driveMountPath.trim().isEmpty()) {
++            return false;
++        }
++        try {
++            Path path = Paths.get(driveMountPath);
++            return Files.exists(path) && Files.isDirectory(path) && Files.isReadable(path);
++        } catch (Exception e) {
++            return false;
++        }
++    }
++
++    @Override
++    public Path resolveValidatedPath(String relativePath) {
++        throw new MediaUnavailableException(
++            "Dịch vụ lưu trữ Google Drive chưa sẵn sàng (BLOCKED_EXTERNAL_INPUT: rclone/WinFsp chưa được cấu hình)"
++        );
++    }
++
++    @Override
++    public Resource getResource(String relativePath) {
++        throw new MediaUnavailableException(
++            "Dịch vụ lưu trữ Google Drive chưa sẵn sàng (BLOCKED_EXTERNAL_INPUT: rclone/WinFsp chưa được cấu hình)"
++        );
++    }
++
++    @Override
++    public long getResourceLength(String relativePath) {
++        throw new MediaUnavailableException(
++            "Dịch vụ lưu trữ Google Drive chưa sẵn sàng (BLOCKED_EXTERNAL_INPUT: rclone/WinFsp chưa được cấu hình)"
++        );
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/LocalMediaStorageAdapter.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/LocalMediaStorageAdapter.java
+new file mode 100644
+index 0000000..6ec7b77
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/LocalMediaStorageAdapter.java
+@@ -0,0 +1,128 @@
++package com.dippie.moviercm.service;
++
++import com.dippie.moviercm.exception.MediaNotFoundException;
++import com.dippie.moviercm.exception.MediaUnavailableException;
++import com.dippie.moviercm.exception.SecurityPathTraversalException;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.core.io.FileSystemResource;
++import org.springframework.core.io.Resource;
++import org.springframework.stereotype.Component;
++
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.Paths;
++
++@Component("localStorageAdapter")
++public class LocalMediaStorageAdapter implements MediaStorageAdapter {
++
++    private final String mediaRootConfig;
++
++    public LocalMediaStorageAdapter(@Value("${app.media.root:./media}") String mediaRootConfig) {
++        this.mediaRootConfig = mediaRootConfig;
++    }
++
++    @Override
++    public String getProviderName() {
++        return "local";
++    }
++
++    @Override
++    public boolean isAvailable() {
++        try {
++            Path root = getNormalizedRoot();
++            return Files.exists(root) && Files.isDirectory(root) && Files.isReadable(root);
++        } catch (Exception e) {
++            return false;
++        }
++    }
++
++    public Path getNormalizedRoot() {
++        Path root = Paths.get(mediaRootConfig).toAbsolutePath().normalize();
++        if (!Files.exists(root)) {
++            Path alt1 = Paths.get("../../media").toAbsolutePath().normalize();
++            if (Files.exists(alt1) && Files.isDirectory(alt1)) {
++                return alt1;
++            }
++            Path alt2 = Paths.get("../media").toAbsolutePath().normalize();
++            if (Files.exists(alt2) && Files.isDirectory(alt2)) {
++                return alt2;
++            }
++        }
++        return root;
++    }
++
++
++    @Override
++    public Path resolveValidatedPath(String relativePath) {
++        if (relativePath == null || relativePath.trim().isEmpty()) {
++            throw new SecurityPathTraversalException("Đường dẫn media không được để trống");
++        }
++
++        // Check for null bytes
++        if (relativePath.contains("\0")) {
++            throw new SecurityPathTraversalException("Phát hiện ký tự null byte không hợp lệ");
++        }
++
++        // Check for path traversal patterns
++        if (relativePath.contains("..")) {
++            throw new SecurityPathTraversalException("Phát hiện đường dẫn vượt cấp (path traversal)");
++        }
++
++        // Check for Windows drive letters or absolute paths
++        if (relativePath.matches("^[a-zA-Z]:.*") || relativePath.startsWith("/") || relativePath.startsWith("\\")) {
++            throw new SecurityPathTraversalException("Đường dẫn media phải là đường dẫn tương đối bên dưới thư mục gốc");
++        }
++
++        Path root = getNormalizedRoot();
++        if (!Files.exists(root)) {
++            try {
++                Files.createDirectories(root);
++            } catch (IOException e) {
++                throw new MediaUnavailableException("Thư mục lưu trữ media cục bộ không sẵn sàng: " + root);
++            }
++        }
++
++        Path resolved = root.resolve(relativePath).normalize();
++
++        // Enforce strict containment within root
++        if (!resolved.startsWith(root)) {
++            throw new SecurityPathTraversalException("Đường dẫn giải quyết nằm ngoài thư mục lưu trữ media hợp lệ");
++        }
++
++        if (!Files.exists(resolved) || !Files.isRegularFile(resolved)) {
++            throw new MediaNotFoundException("Không tìm thấy tệp media trên hệ thống lưu trữ: " + relativePath);
++        }
++
++        try {
++            Path realRoot = root.toRealPath();
++            Path realTarget = resolved.toRealPath();
++            if (!realTarget.startsWith(realRoot)) {
++                throw new SecurityPathTraversalException("Phát hiện liên kết tượng trưng (symlink) trỏ ra ngoài media root");
++            }
++            return realTarget;
++        } catch (IOException e) {
++            throw new MediaNotFoundException("Không thể đọc tệp media hợp lệ: " + relativePath);
++        }
++    }
++
++    @Override
++    public Resource getResource(String relativePath) {
++        Path targetPath = resolveValidatedPath(relativePath);
++        Resource resource = new FileSystemResource(targetPath);
++        if (!resource.exists() || !resource.isReadable()) {
++            throw new MediaUnavailableException("Không thể mở luồng đọc cho tệp media: " + relativePath);
++        }
++        return resource;
++    }
++
++    @Override
++    public long getResourceLength(String relativePath) {
++        Path targetPath = resolveValidatedPath(relativePath);
++        try {
++            return Files.size(targetPath);
++        } catch (IOException e) {
++            throw new MediaUnavailableException("Không thể xác định kích thước tệp media: " + relativePath);
++        }
++    }
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStorageAdapter.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStorageAdapter.java
+new file mode 100644
+index 0000000..d69c8eb
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStorageAdapter.java
+@@ -0,0 +1,18 @@
++package com.dippie.moviercm.service;
++
++import org.springframework.core.io.Resource;
++
++import java.nio.file.Path;
++
++public interface MediaStorageAdapter {
++
++    String getProviderName();
++
++    boolean isAvailable();
++
++    Path resolveValidatedPath(String relativePath);
++
++    Resource getResource(String relativePath);
++
++    long getResourceLength(String relativePath);
++}
+diff --git a/backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java b/backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java
+new file mode 100644
+index 0000000..1c7d355
+--- /dev/null
++++ b/backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java
+@@ -0,0 +1,211 @@
++package com.dippie.moviercm.service;
++
++import com.dippie.moviercm.dto.MediaAssetDto;
++import com.dippie.moviercm.dto.MediaDescriptorResponse;
++import com.dippie.moviercm.entity.MediaAsset;
++import com.dippie.moviercm.entity.Movie;
++import com.dippie.moviercm.exception.InvalidMediaRangeException;
++import com.dippie.moviercm.exception.MediaNotFoundException;
++import com.dippie.moviercm.exception.MediaUnavailableException;
++import com.dippie.moviercm.repository.MediaAssetRepository;
++import com.dippie.moviercm.repository.MovieRepository;
++import org.springframework.core.io.Resource;
++import org.springframework.core.io.support.ResourceRegion;
++import org.springframework.stereotype.Service;
++
++import java.io.IOException;
++import java.util.List;
++
++@Service
++public class MediaStreamService {
++
++    private final MovieRepository movieRepository;
++    private final MediaAssetRepository mediaAssetRepository;
++    private final LocalMediaStorageAdapter localStorageAdapter;
++    private final DriveMediaStorageAdapter driveStorageAdapter;
++
++    public MediaStreamService(MovieRepository movieRepository,
++                              MediaAssetRepository mediaAssetRepository,
++                              LocalMediaStorageAdapter localStorageAdapter,
++                              DriveMediaStorageAdapter driveStorageAdapter) {
++        this.movieRepository = movieRepository;
++        this.mediaAssetRepository = mediaAssetRepository;
++        this.localStorageAdapter = localStorageAdapter;
++        this.driveStorageAdapter = driveStorageAdapter;
++    }
++
++    public MediaDescriptorResponse getMediaDescriptor(String movieId) {
++        Movie movie = movieRepository.findById(movieId)
++                .orElseThrow(() -> new MediaNotFoundException("Không tìm thấy phim với mã: " + movieId));
++
++        List<MediaAsset> assets = mediaAssetRepository.findByMovieIdAndIsAvailableTrue(movieId);
++
++        MediaAsset featureAsset = assets.stream()
++                .filter(a -> "feature".equalsIgnoreCase(a.getKind()))
++                .findFirst()
++                .orElse(null);
++
++        MediaAsset trailerAsset = assets.stream()
++                .filter(a -> "trailer".equalsIgnoreCase(a.getKind()))
++                .findFirst()
++                .orElse(null);
++
++        MediaAssetDto featureDto = featureAsset != null ? toDto(featureAsset) : null;
++        MediaAssetDto trailerDto = null;
++
++        if (trailerAsset != null) {
++            trailerDto = toDto(trailerAsset);
++        } else if (movie.getVideoUrl() != null && !movie.getVideoUrl().trim().isEmpty()) {
++            // Backward-compatible fallback trailer
++            trailerDto = new MediaAssetDto(
++                    "fallback-trailer-" + movie.getId(),
++                    "trailer",
++                    movie.getVideoUrl(),
++                    "video/mp4",
++                    0L,
++                    null,
++                    true,
++                    "legacy"
++            );
++        }
++
++        return new MediaDescriptorResponse(
++                movie.getId(),
++                featureDto != null,
++                trailerDto != null,
++                featureDto,
++                trailerDto
++        );
++    }
++
++    public MediaAsset getMediaAsset(String assetId) {
++        return mediaAssetRepository.findByIdAndIsAvailableTrue(assetId)
++                .orElseThrow(() -> new MediaNotFoundException("Không tìm thấy tài nguyên media: " + assetId));
++    }
++
++    public MediaStorageAdapter getStorageAdapter(String providerName) {
++        if ("drive".equalsIgnoreCase(providerName)) {
++            return driveStorageAdapter;
++        }
++        return localStorageAdapter;
++    }
++
++    public Resource getMediaResource(MediaAsset asset) {
++        MediaStorageAdapter adapter = getStorageAdapter(asset.getStorageProvider());
++        return adapter.getResource(asset.getRelativePath());
++    }
++
++    public long getResourceLength(MediaAsset asset) {
++        MediaStorageAdapter adapter = getStorageAdapter(asset.getStorageProvider());
++        return adapter.getResourceLength(asset.getRelativePath());
++    }
++
++    public RangeSpec parseRange(String rangeHeader, long totalLength) {
++        if (rangeHeader == null || rangeHeader.trim().isEmpty()) {
++            return new RangeSpec(0, totalLength - 1, totalLength, false);
++        }
++
++        String trimmed = rangeHeader.trim();
++        if (!trimmed.startsWith("bytes=")) {
++            throw new InvalidMediaRangeException("Tiêu đề Range phải bắt đầu bằng 'bytes='", totalLength);
++        }
++
++        String spec = trimmed.substring(6).trim();
++
++        try {
++            if (spec.startsWith("-")) {
++                // Suffix range: bytes=-500
++                long suffix = Long.parseLong(spec.substring(1));
++                if (suffix <= 0) {
++                    throw new InvalidMediaRangeException("Độ dài suffix phải lớn hơn 0", totalLength);
++                }
++                long start = Math.max(0, totalLength - suffix);
++                long end = totalLength - 1;
++                return new RangeSpec(start, end, totalLength, true);
++            }
++
++            int dashIndex = spec.indexOf('-');
++            if (dashIndex == -1) {
++                throw new InvalidMediaRangeException("Định dạng Range thiếu dấu gạch nối", totalLength);
++            }
++
++            long start = Long.parseLong(spec.substring(0, dashIndex).trim());
++            if (start < 0 || start >= totalLength) {
++                throw new InvalidMediaRangeException("Vị trí bắt đầu Range nằm ngoài kích thước tệp", totalLength);
++            }
++
++            String endPart = spec.substring(dashIndex + 1).trim();
++            long end;
++            if (endPart.isEmpty()) {
++                // Open-ended range: bytes=1024-
++                end = totalLength - 1;
++            } else {
++                // Closed range: bytes=0-1023
++                end = Long.parseLong(endPart);
++                if (start > end) {
++                    throw new InvalidMediaRangeException("Vị trí bắt đầu Range không được lớn hơn vị trí kết thúc", totalLength);
++                }
++                if (end >= totalLength) {
++                    end = totalLength - 1;
++                }
++            }
++
++            return new RangeSpec(start, end, totalLength, true);
++        } catch (NumberFormatException e) {
++            throw new InvalidMediaRangeException("Giá trị Range không phải là số hợp lệ", totalLength);
++        }
++    }
++
++    public ResourceRegion createResourceRegion(Resource resource, RangeSpec range) {
++        long position = range.getStart();
++        long count = range.getLength();
++        return new ResourceRegion(resource, position, count);
++    }
++
++    private MediaAssetDto toDto(MediaAsset asset) {
++        return new MediaAssetDto(
++                asset.getId(),
++                asset.getKind(),
++                "/api/media/stream/" + asset.getId(),
++                asset.getMimeType(),
++                asset.getByteLength(),
++                asset.getDurationSeconds(),
++                asset.getPublic(),
++                asset.getVersion()
++        );
++    }
++
++    public static class RangeSpec {
++        private final long start;
++        private final long end;
++        private final long total;
++        private final boolean isRanged;
++
++        public RangeSpec(long start, long end, long total, boolean isRanged) {
++            this.start = start;
++            this.end = end;
++            this.total = total;
++            this.isRanged = isRanged;
++        }
++
++        public long getStart() {
++            return start;
++        }
++
++        public long getEnd() {
++            return end;
++        }
++
++        public long getLength() {
++            return end - start + 1;
++        }
++
++        public long getTotal() {
++            return total;
++        }
++
++        public boolean isRanged() {
++            return isRanged;
++        }
++    }
++}
+diff --git a/backend/springboot/src/main/resources/application.yml b/backend/springboot/src/main/resources/application.yml
+index 427dc52..ba7a7ce 100644
+--- a/backend/springboot/src/main/resources/application.yml
++++ b/backend/springboot/src/main/resources/application.yml
+@@ -17,6 +17,8 @@ app:
+     expiration-ms: 86400000 # 24 hours (1 day)
+   cors:
+     allowed-origins: "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
++  media:
++    root: ${APP_MEDIA_ROOT:./media}
+ 
+ ---
+ # Development Profile (H2 Persistent File Database)
+diff --git a/backend/springboot/src/main/resources/schema.sql b/backend/springboot/src/main/resources/schema.sql
+index 0392d69..d71b55e 100644
+--- a/backend/springboot/src/main/resources/schema.sql
++++ b/backend/springboot/src/main/resources/schema.sql
+@@ -66,3 +66,26 @@ CREATE TABLE IF NOT EXISTS favorite_items (
+     CONSTRAINT uq_user_movie_favorite UNIQUE (user_id, movie_id)
+ );
+ 
++-- 6. Media Assets Table (Milestone M4)
++CREATE TABLE IF NOT EXISTS media_assets (
++    id VARCHAR(64) PRIMARY KEY,
++    movie_id VARCHAR(100) NOT NULL,
++    kind VARCHAR(20) NOT NULL,
++    storage_provider VARCHAR(30) NOT NULL DEFAULT 'local',
++    relative_path VARCHAR(500) NOT NULL,
++    version VARCHAR(50) NOT NULL DEFAULT 'v1',
++    mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
++    byte_length BIGINT NOT NULL,
++    duration_seconds DOUBLE PRECISION,
++    is_public BOOLEAN NOT NULL DEFAULT TRUE,
++    is_available BOOLEAN NOT NULL DEFAULT TRUE,
++    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
++    CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version)
++);
++
++CREATE INDEX IF NOT EXISTS idx_media_movie_id ON media_assets (movie_id);
++CREATE INDEX IF NOT EXISTS idx_media_movie_kind ON media_assets (movie_id, kind);
++
++
+diff --git a/backend/springboot/src/test/java/com/dippie/moviercm/MediaStreamingIntegrationTest.java b/backend/springboot/src/test/java/com/dippie/moviercm/MediaStreamingIntegrationTest.java
+new file mode 100644
+index 0000000..af30867
+--- /dev/null
++++ b/backend/springboot/src/test/java/com/dippie/moviercm/MediaStreamingIntegrationTest.java
+@@ -0,0 +1,314 @@
++package com.dippie.moviercm;
++
++import com.dippie.moviercm.entity.MediaAsset;
++import com.dippie.moviercm.entity.Movie;
++import com.dippie.moviercm.exception.SecurityPathTraversalException;
++import com.dippie.moviercm.repository.MediaAssetRepository;
++import com.dippie.moviercm.repository.MovieRepository;
++import com.dippie.moviercm.service.LocalMediaStorageAdapter;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.http.HttpHeaders;
++import org.springframework.http.MediaType;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.test.web.servlet.MockMvc;
++
++import java.io.File;
++import java.io.FileOutputStream;
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.Paths;
++
++import static org.hamcrest.Matchers.*;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++@SpringBootTest
++@AutoConfigureMockMvc
++@ActiveProfiles("test")
++public class MediaStreamingIntegrationTest {
++
++    @Autowired
++    private MockMvc mockMvc;
++
++    @Autowired
++    private MovieRepository movieRepository;
++
++    @Autowired
++    private MediaAssetRepository mediaAssetRepository;
++
++    @Autowired
++    private LocalMediaStorageAdapter localStorageAdapter;
++
++    private long featureTestLength = 0;
++    private long trailerTestLength = 0;
++
++    @BeforeEach
++    void setupFixtures() throws IOException {
++        mediaAssetRepository.deleteAll();
++        movieRepository.deleteAll();
++
++        // Ensure test files exist in target/test-media/synthetic
++        Path testMediaDir = Paths.get("target", "test-media", "synthetic");
++        Files.createDirectories(testMediaDir);
++
++        Path featureFile = testMediaDir.resolve("feature_test.mp4");
++        Path trailerFile = testMediaDir.resolve("trailer_test.mp4");
++
++        // If not already copied by pre-step, create minimal dummy content
++        if (!Files.exists(featureFile)) {
++            byte[] dummyData = new byte[10000];
++            for (int i = 0; i < dummyData.length; i++) {
++                dummyData[i] = (byte) (i % 128);
++            }
++            Files.write(featureFile, dummyData);
++        }
++
++        if (!Files.exists(trailerFile)) {
++            byte[] dummyData = new byte[5000];
++            for (int i = 0; i < dummyData.length; i++) {
++                dummyData[i] = (byte) (i % 64);
++            }
++            Files.write(trailerFile, dummyData);
++        }
++
++        featureTestLength = Files.size(featureFile);
++        trailerTestLength = Files.size(trailerFile);
++
++        // 1. Movie with both feature and trailer
++        Movie m1 = Movie.builder()
++                .id("test-movie-full")
++                .title("Test Movie Full")
++                .year(2026)
++                .rating(9.0)
++                .runtime("1h 45m")
++                .genres("Animation,Sci-Fi")
++                .description("A movie with both feature film and trailer.")
++                .poster("https://example.com/poster.jpg")
++                .backdrop("https://example.com/backdrop.jpg")
++                .videoUrl("/videos/fallback-full.mp4")
++                .build();
++        movieRepository.save(m1);
++
++        MediaAsset feat1 = new MediaAsset(
++                "ast-test-feat-1",
++                "test-movie-full",
++                "feature",
++                "local",
++                "synthetic/feature_test.mp4",
++                "v1",
++                "video/mp4",
++                featureTestLength,
++                10.0,
++                true,
++                true
++        );
++        MediaAsset trl1 = new MediaAsset(
++                "ast-test-trl-1",
++                "test-movie-full",
++                "trailer",
++                "local",
++                "synthetic/trailer_test.mp4",
++                "v1",
++                "video/mp4",
++                trailerTestLength,
++                3.0,
++                true,
++                true
++        );
++        mediaAssetRepository.save(feat1);
++        mediaAssetRepository.save(trl1);
++
++        // 2. Movie with trailer only
++        Movie m2 = Movie.builder()
++                .id("test-movie-trailer-only")
++                .title("Test Movie Trailer Only")
++                .year(2025)
++                .rating(8.0)
++                .runtime("2h 00m")
++                .genres("Animation")
++                .description("A movie with trailer asset only.")
++                .poster("https://example.com/p2.jpg")
++                .backdrop("https://example.com/b2.jpg")
++                .build();
++        movieRepository.save(m2);
++
++        MediaAsset trl2 = new MediaAsset(
++                "ast-test-trl-2",
++                "test-movie-trailer-only",
++                "trailer",
++                "local",
++                "synthetic/trailer_test.mp4",
++                "v1",
++                "video/mp4",
++                trailerTestLength,
++                3.0,
++                true,
++                true
++        );
++        mediaAssetRepository.save(trl2);
++
++        // 3. Movie with legacy videoUrl only (no media_assets)
++        Movie m3 = Movie.builder()
++                .id("test-movie-legacy")
++                .title("Test Movie Legacy")
++                .year(2024)
++                .rating(7.5)
++                .runtime("1h 30m")
++                .genres("Drama")
++                .description("Legacy movie using videoUrl fallback.")
++                .videoUrl("https://example.com/legacy-trailer.mp4")
++                .build();
++        movieRepository.save(m3);
++    }
++
++    @Test
++    @DisplayName("Descriptor returns both feature and trailer when assets exist")
++    void testDescriptorWithBothAssets() throws Exception {
++        mockMvc.perform(get("/api/movies/test-movie-full/media-descriptor"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.movieId", is("test-movie-full")))
++                .andExpect(jsonPath("$.hasFeature", is(true)))
++                .andExpect(jsonPath("$.hasTrailer", is(true)))
++                .andExpect(jsonPath("$.feature.assetId", is("ast-test-feat-1")))
++                .andExpect(jsonPath("$.feature.kind", is("feature")))
++                .andExpect(jsonPath("$.feature.streamUrl", is("/api/media/stream/ast-test-feat-1")))
++                .andExpect(jsonPath("$.feature.mimeType", is("video/mp4")))
++                .andExpect(jsonPath("$.feature.byteLength", is((int) featureTestLength)))
++                .andExpect(jsonPath("$.trailer.assetId", is("ast-test-trl-1")))
++                .andExpect(jsonPath("$.trailer.kind", is("trailer")));
++    }
++
++    @Test
++    @DisplayName("Descriptor returns hasFeature=false when movie has trailer only")
++    void testDescriptorTrailerOnly() throws Exception {
++        mockMvc.perform(get("/api/movies/test-movie-trailer-only/media-descriptor"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.movieId", is("test-movie-trailer-only")))
++                .andExpect(jsonPath("$.hasFeature", is(false)))
++                .andExpect(jsonPath("$.hasTrailer", is(true)))
++                .andExpect(jsonPath("$.feature").doesNotExist())
++                .andExpect(jsonPath("$.trailer.assetId", is("ast-test-trl-2")));
++    }
++
++    @Test
++    @DisplayName("Descriptor provides legacy fallback trailer from videoUrl")
++    void testDescriptorLegacyFallback() throws Exception {
++        mockMvc.perform(get("/api/movies/test-movie-legacy/media-descriptor"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.movieId", is("test-movie-legacy")))
++                .andExpect(jsonPath("$.hasFeature", is(false)))
++                .andExpect(jsonPath("$.hasTrailer", is(true)))
++                .andExpect(jsonPath("$.trailer.streamUrl", is("https://example.com/legacy-trailer.mp4")))
++                .andExpect(jsonPath("$.trailer.version", is("legacy")));
++    }
++
++    @Test
++    @DisplayName("Descriptor returns 404 for non-existent movie")
++    void testDescriptorNotFound() throws Exception {
++        mockMvc.perform(get("/api/movies/non-existent-movie-id/media-descriptor"))
++                .andExpect(status().isNotFound());
++    }
++
++    @Test
++    @DisplayName("HEAD request returns headers without body")
++    void testHeadStreamingHeaders() throws Exception {
++        mockMvc.perform(head("/api/media/stream/ast-test-feat-1"))
++                .andExpect(status().isOk())
++                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "video/mp4"))
++                .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
++                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(featureTestLength)))
++                .andExpect(header().exists(HttpHeaders.ETAG));
++    }
++
++    @Test
++    @DisplayName("GET stream without Range header returns 200 and entire content")
++    void testFullStreamWithoutRange() throws Exception {
++        mockMvc.perform(get("/api/media/stream/ast-test-feat-1"))
++                .andExpect(status().isOk())
++                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "video/mp4"))
++                .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
++                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(featureTestLength)));
++    }
++
++    @Test
++    @DisplayName("GET stream with closed range returns 206 Partial Content")
++    void testClosedRangeStream() throws Exception {
++        mockMvc.perform(get("/api/media/stream/ast-test-feat-1")
++                        .header(HttpHeaders.RANGE, "bytes=0-1023"))
++                .andExpect(status().isPartialContent())
++                .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
++                .andExpect(header().string(HttpHeaders.CONTENT_RANGE, containsString("bytes 0-1023/" + featureTestLength)))
++                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, "1024"));
++    }
++
++    @Test
++    @DisplayName("GET stream with open-ended range returns 206 Partial Content")
++    void testOpenEndedRangeStream() throws Exception {
++        long start = 1000;
++        long expectedLength = featureTestLength - start;
++        long expectedEnd = featureTestLength - 1;
++
++        mockMvc.perform(get("/api/media/stream/ast-test-feat-1")
++                        .header(HttpHeaders.RANGE, "bytes=" + start + "-"))
++                .andExpect(status().isPartialContent())
++                .andExpect(header().string(HttpHeaders.CONTENT_RANGE, containsString("bytes " + start + "-" + expectedEnd + "/" + featureTestLength)))
++                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(expectedLength)));
++    }
++
++    @Test
++    @DisplayName("GET stream with suffix range returns 206 Partial Content")
++    void testSuffixRangeStream() throws Exception {
++        long suffix = 500;
++        long expectedStart = featureTestLength - suffix;
++        long expectedEnd = featureTestLength - 1;
++
++        mockMvc.perform(get("/api/media/stream/ast-test-feat-1")
++                        .header(HttpHeaders.RANGE, "bytes=-" + suffix))
++                .andExpect(status().isPartialContent())
++                .andExpect(header().string(HttpHeaders.CONTENT_RANGE, containsString("bytes " + expectedStart + "-" + expectedEnd + "/" + featureTestLength)))
++                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(suffix)));
++    }
++
++    @Test
++    @DisplayName("GET stream with unsatisfiable range returns 416 Range Not Satisfiable")
++    void testUnsatisfiableRangeStream() throws Exception {
++        mockMvc.perform(get("/api/media/stream/ast-test-feat-1")
++                        .header(HttpHeaders.RANGE, "bytes=99999999-"))
++                .andExpect(status().isRequestedRangeNotSatisfiable())
++                .andExpect(header().string(HttpHeaders.CONTENT_RANGE, "bytes */" + featureTestLength));
++    }
++
++    @Test
++    @DisplayName("GET stream for unknown asset returns 404")
++    void testUnknownAssetStream() throws Exception {
++        mockMvc.perform(get("/api/media/stream/non-existent-asset"))
++                .andExpect(status().isNotFound());
++    }
++
++    @Test
++    @DisplayName("Storage adapter strictly rejects path traversal and drive letters")
++    void testSecurityPathTraversalRejection() {
++        assertThrows(SecurityPathTraversalException.class, () ->
++                localStorageAdapter.resolveValidatedPath("../../secret.txt"));
++
++        assertThrows(SecurityPathTraversalException.class, () ->
++                localStorageAdapter.resolveValidatedPath("..\\..\\Windows\\System32\\cmd.exe"));
++
++        assertThrows(SecurityPathTraversalException.class, () ->
++                localStorageAdapter.resolveValidatedPath("C:\\Windows\\System32\\calc.exe"));
++
++        assertThrows(SecurityPathTraversalException.class, () ->
++                localStorageAdapter.resolveValidatedPath("/etc/passwd"));
++
++        assertThrows(SecurityPathTraversalException.class, () ->
++                localStorageAdapter.resolveValidatedPath("synthetic/feature_test.mp4\0.txt"));
++    }
++}
+diff --git a/backend/springboot/src/test/java/com/dippie/moviercm/SeedAndConfigPolicyTest.java b/backend/springboot/src/test/java/com/dippie/moviercm/SeedAndConfigPolicyTest.java
+index 6c68ddb..8dd4786 100644
+--- a/backend/springboot/src/test/java/com/dippie/moviercm/SeedAndConfigPolicyTest.java
++++ b/backend/springboot/src/test/java/com/dippie/moviercm/SeedAndConfigPolicyTest.java
+@@ -309,23 +309,29 @@ public class SeedAndConfigPolicyTest {
+             }
+         }
+ 
+-        // 2. Assert favorite_items does NOT exist prior to migration
++        // 2. Assert favorite_items and media_assets do NOT exist prior to migration
+         try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
+             try (Statement stmt = conn.createStatement()) {
+                 assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT count(*) FROM favorite_items"));
++                assertThrows(SQLException.class, () -> stmt.executeQuery("SELECT count(*) FROM media_assets"));
+             }
+         }
+ 
+-        // 3. Execute additive migration: database/migrations/02_add_favorite_items.sql
++        // 3. Execute additive migrations: 02_add_favorite_items.sql and 03_add_media_assets.sql
+         executeSqlFile(jdbcUrl, "../../database/migrations/02_add_favorite_items.sql");
++        executeSqlFile(jdbcUrl, "../../database/migrations/03_add_media_assets.sql");
+ 
+-        // 4. Assert favorite_items exists and prior data is 100% intact
++        // 4. Assert favorite_items & media_assets exist and prior data is 100% intact
+         try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {
+             try (Statement stmt = conn.createStatement()) {
+                 ResultSet rs = stmt.executeQuery("SELECT count(*) FROM favorite_items");
+                 assertTrue(rs.next());
+                 assertEquals(0, rs.getInt(1));
+ 
++                rs = stmt.executeQuery("SELECT count(*) FROM media_assets");
++                assertTrue(rs.next());
++                assertEquals(0, rs.getInt(1));
++
+                 // Verify existing data untouched
+                 rs = stmt.executeQuery("SELECT username FROM users WHERE username = 'legacy_user'");
+                 assertTrue(rs.next());
+@@ -362,6 +368,8 @@ public class SeedAndConfigPolicyTest {
+                     "Active profiles must contain exactly and only 'prod'");
+             assertEquals("validate", ctx.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto"));
+             assertNotNull(ctx.getBean(FavoriteItemRepository.class));
++            assertNotNull(ctx.getBean(com.dippie.moviercm.repository.MediaAssetRepository.class));
++
+         } finally {
+             if (ctx != null) {
+                 ctx.close();
+diff --git a/backend/springboot/src/test/resources/application-test.yml b/backend/springboot/src/test/resources/application-test.yml
+index 1f321f9..0d40be4 100644
+--- a/backend/springboot/src/test/resources/application-test.yml
++++ b/backend/springboot/src/test/resources/application-test.yml
+@@ -18,3 +18,6 @@ app:
+   jwt:
+     secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+     expiration-ms: 86400000
++  media:
++    root: target/test-media
++
+diff --git a/database/migrations/03_add_media_assets.sql b/database/migrations/03_add_media_assets.sql
+new file mode 100644
+index 0000000..bc5b26d
+--- /dev/null
++++ b/database/migrations/03_add_media_assets.sql
+@@ -0,0 +1,23 @@
++-- Migration 03: Add media_assets table for streaming and playback (Milestone M4)
++-- Forward additive migration: safe for existing data, no DROP or data modification.
++
++CREATE TABLE IF NOT EXISTS media_assets (
++    id VARCHAR(64) PRIMARY KEY,
++    movie_id VARCHAR(100) NOT NULL,
++    kind VARCHAR(20) NOT NULL,
++    storage_provider VARCHAR(30) NOT NULL DEFAULT 'local',
++    relative_path VARCHAR(500) NOT NULL,
++    version VARCHAR(50) NOT NULL DEFAULT 'v1',
++    mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
++    byte_length BIGINT NOT NULL,
++    duration_seconds DOUBLE PRECISION,
++    is_public BOOLEAN NOT NULL DEFAULT TRUE,
++    is_available BOOLEAN NOT NULL DEFAULT TRUE,
++    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
++    CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version)
++);
++
++CREATE INDEX IF NOT EXISTS idx_media_movie_id ON media_assets (movie_id);
++CREATE INDEX IF NOT EXISTS idx_media_movie_kind ON media_assets (movie_id, kind);
+diff --git a/database/schema/01_init.sql b/database/schema/01_init.sql
+index 1c2c73d..2dda18b 100644
+--- a/database/schema/01_init.sql
++++ b/database/schema/01_init.sql
+@@ -66,6 +66,25 @@ CREATE TABLE IF NOT EXISTS movie_ratings (
+     CONSTRAINT uq_user_movie_rating UNIQUE (user_id, movie_id)
+ );
+ 
++-- 6. Media Assets Table (Milestone M4)
++CREATE TABLE IF NOT EXISTS media_assets (
++    id VARCHAR(64) PRIMARY KEY,
++    movie_id VARCHAR(100) NOT NULL,
++    kind VARCHAR(20) NOT NULL,
++    storage_provider VARCHAR(30) NOT NULL DEFAULT 'local',
++    relative_path VARCHAR(500) NOT NULL,
++    version VARCHAR(50) NOT NULL DEFAULT 'v1',
++    mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
++    byte_length BIGINT NOT NULL,
++    duration_seconds DOUBLE PRECISION,
++    is_public BOOLEAN NOT NULL DEFAULT TRUE,
++    is_available BOOLEAN NOT NULL DEFAULT TRUE,
++    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
++    CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version)
++);
++
+ -- Indexes for performance
+ CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist_items (user_id);
+ CREATE INDEX IF NOT EXISTS idx_watchlist_movie ON watchlist_items (movie_id);
+@@ -73,3 +92,6 @@ CREATE INDEX IF NOT EXISTS idx_favorite_user ON favorite_items (user_id);
+ CREATE INDEX IF NOT EXISTS idx_favorite_movie ON favorite_items (movie_id);
+ CREATE INDEX IF NOT EXISTS idx_ratings_user ON movie_ratings (user_id);
+ CREATE INDEX IF NOT EXISTS idx_ratings_movie ON movie_ratings (movie_id);
++CREATE INDEX IF NOT EXISTS idx_media_movie_id ON media_assets (movie_id);
++CREATE INDEX IF NOT EXISTS idx_media_movie_kind ON media_assets (movie_id, kind);
++
+diff --git a/docs/contracts/M4_MEDIA_PLAYBACK_CONTRACT.md b/docs/contracts/M4_MEDIA_PLAYBACK_CONTRACT.md
+new file mode 100644
+index 0000000..337e0dd
+--- /dev/null
++++ b/docs/contracts/M4_MEDIA_PLAYBACK_CONTRACT.md
+@@ -0,0 +1,205 @@
++# M4 Media Playback & Storage Architecture Contract
++
++- **Version:** 1.0.0
++- **Milestone:** M4 — Xem video thật, tua mượt và nền tảng storage Windows
++- **Trạng thái:** DRAFT -> ACTIVE
++- **Ngày ban hành:** 2026-10-14
++- **Phạm vi áp dụng:** Spring Boot backend (`/api/movies/{id}/media-descriptor`, `/api/media/stream/{assetId}`), Next.js frontend (`MovieDetail`, `VideoPlayerModal`), và bộ công cụ đo lường hiệu năng (`scripts/benchmark_media_playback.cjs`).
++
++---
++
++## 1. Mục tiêu và Nguyên tắc Thiết kế
++
++1. **Người dùng thực tế:**
++   - Tác phẩm có video hoàn chỉnh (Feature) hiển thị nút "Xem phim" với trải nghiệm phát và tua mượt mà.
++   - Tác phẩm chỉ có đoạn giới thiệu tiếp tục được định danh chính xác là "Xem trailer / giới thiệu".
++   - Tác phẩm chưa đăng ký tài nguyên media không hiển thị nút phát giả mạo.
++2. **Kiến trúc tinh gọn:**
++   - Tích hợp trực tiếp module media vào Spring Boot hiện hữu; không dựng microservice, transcoder hay message queue không cần thiết.
++   - Hỗ trợ chuẩn phát tuần tự HTTP Range (RFC 9110 / RFC 7233) cho phép trình duyệt tua đầu/giữa/cuối trực tiếp từ máy chủ.
++   - Storage Adapter dạng cắm-rút (Pluggable):
++     - **Local Storage Provider (Primary):** Phục vụ các tệp tin media nằm dưới thư mục gốc `MEDIA_ROOT`.
++     - **Drive Storage Provider (Gated):** Phục vụ khi có sẵn mount rclone/WinFsp hợp lệ. Nếu thiếu điều kiện môi trường, trạng thái được ghi nhận là `BLOCKED_EXTERNAL_INPUT` mà không làm gián đoạn luồng phát local.
++
++---
++
++## 2. Mô hình Dữ liệu (`media_assets`)
++
++Bảng lưu trữ thông tin tài nguyên video được bổ sung theo nguyên tắc **Additive Migration** bảo toàn 100% dữ liệu hiện hữu:
++
++```sql
++CREATE TABLE IF NOT EXISTS media_assets (
++    id VARCHAR(64) PRIMARY KEY,                         -- Canonical asset identifier (UUID hoặc chuỗi định danh duy nhất)
++    movie_id VARCHAR(100) NOT NULL,                     -- Tham chiếu canonical movie ID
++    kind VARCHAR(20) NOT NULL,                          -- 'feature' | 'trailer'
++    storage_provider VARCHAR(30) NOT NULL DEFAULT 'local', -- 'local' | 'drive'
++    relative_path VARCHAR(500) NOT NULL,                -- Đường dẫn tương đối bên dưới MEDIA_ROOT
++    version VARCHAR(50) NOT NULL DEFAULT 'v1',          -- Định danh phiên bản tệp để tránh stale cache
++    mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',-- MIME type chuẩn của tệp
++    byte_length BIGINT NOT NULL,                        -- Kích thước tệp tính theo bytes
++    duration_seconds DOUBLE PRECISION,                  -- Thời lượng video tính theo giây (null nếu chưa probe được)
++    is_public BOOLEAN NOT NULL DEFAULT TRUE,            -- Quyền xem công khai (guest/auth)
++    is_available BOOLEAN NOT NULL DEFAULT TRUE,         -- Trạng thái sẵn sàng của asset trên đĩa
++    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
++    CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version)
++);
++
++CREATE INDEX IF NOT EXISTS idx_media_movie_id ON media_assets(movie_id);
++CREATE INDEX IF NOT EXISTS idx_media_movie_kind ON media_assets(movie_id, kind);
++```
++
++*Ghi chú về quan hệ bảng:*
++- `movie_id` tham chiếu `movies(id)` có `ON DELETE CASCADE`: Khi một phim hoạt hình bị xóa khỏi catalog, các media assets liên quan sẽ được tự động dọn dẹp tương ứng.
++
++---
++
++## 3. Giao diện Lập trình Ứng dụng (REST API Endpoints)
++
++### 3.1. Truy vấn Mô tả Phát Media (Playback Descriptor)
++- **Endpoint:** `GET /api/movies/{movieId}/media-descriptor`
++- **Xác thực:** Public (Guest và Authenticated người dùng đều truy cập được).
++- **Phản hồi 200 OK:**
++  ```json
++  {
++    "movieId": "m2-synthetic-anim-001",
++    "hasFeature": true,
++    "hasTrailer": true,
++    "feature": {
++      "assetId": "ast-feat-001",
++      "kind": "feature",
++      "streamUrl": "/api/media/stream/ast-feat-001",
++      "mimeType": "video/mp4",
++      "byteLength": 104857600,
++      "durationSeconds": 6300.0,
++      "isPublic": true,
++      "version": "v1"
++    },
++    "trailer": {
++      "assetId": "ast-trl-001",
++      "kind": "trailer",
++      "streamUrl": "/api/media/stream/ast-trl-001",
++      "mimeType": "video/mp4",
++      "byteLength": 15728640,
++      "durationSeconds": 120.0,
++      "isPublic": true,
++      "version": "v1"
++    }
++  }
++  ```
++- **Fallback Trailer:** Nếu phim chưa có asset `kind='trailer'` trong bảng `media_assets` nhưng trường `videoUrl` của bảng `movies` có giá trị, descriptor sẽ trả về trailer với `streamUrl` trỏ trực tiếp tới `videoUrl` đó để đảm bảo tính tương thích ngược (Backward Compatibility) của Milestone M1/M2/M3.
++- **Trường hợp lỗi:**
++  - `404 Not Found`: Khi `movieId` không tồn tại trong hệ thống.
++  - `500 Internal Server Error`: Lỗi kết nối cơ sở dữ liệu.
++
++---
++
++### 3.2. Kiểm tra Thông tin Luồng Tệp (Stream Header Preflight)
++- **Endpoint:** `HEAD /api/media/stream/{assetId}`
++- **Headers Phản hồi:**
++  - `Content-Type`: `video/mp4`
++  - `Content-Length`: Dung lượng toàn phần (bytes)
++  - `Accept-Ranges`: `bytes`
++  - `ETag`: `"assetId-version"`
++  - `Cache-Control`: `public, max-age=3600`
++- **Trường hợp lỗi:**
++  - `404 Not Found`: Khi `assetId` không tồn tại trong cơ sở dữ liệu.
++  - `503 Service Unavailable`: Khi file vật lý không thể truy cập (ví dụ thư mục media bị ngắt kết nối).
++
++---
++
++### 3.3. Phát Video và Tua Tuần tự (Ranged Video Streaming)
++- **Endpoint:** `GET /api/media/stream/{assetId}`
++- **Quy tắc Xử lý Header `Range` (RFC 9110):**
++  1. **Không có header `Range`:**
++     - Trả về **HTTP 200 OK**.
++     - Headers: `Content-Type: video/mp4`, `Content-Length: <totalBytes>`, `Accept-Ranges: bytes`.
++     - Body: Toàn bộ nội dung tệp tin.
++  2. **Range hợp lệ dạng Khép kín (`bytes=start-end`):**
++     - Ví dụ: `Range: bytes=0-1023`
++     - Trả về **HTTP 206 Partial Content**.
++     - Headers:
++       - `Content-Range`: `bytes 0-1023/10485760`
++       - `Content-Length`: `1024`
++       - `Accept-Ranges`: `bytes`
++     - Body: 1024 bytes tương ứng từ vị trí 0 đến 1023.
++  3. **Range hợp lệ dạng Mở (`bytes=start-`):**
++     - Ví dụ: `Range: bytes=1048576-`
++     - Trả về **HTTP 206 Partial Content**.
++     - Headers:
++       - `Content-Range`: `bytes 1048576-10485759/10485760`
++       - `Content-Length`: `9437184`
++     - Body: Các bytes từ vị trí `start` đến hết tệp.
++  4. **Range hợp lệ dạng Hậu tố (`bytes=-suffixLength`):**
++     - Ví dụ: `Range: bytes=-500` (500 bytes cuối tệp).
++     - Trả về **HTTP 206 Partial Content**.
++     - Headers:
++       - `Content-Range`: `bytes 10485260-10485759/10485760`
++       - `Content-Length`: `500`
++  5. **Range không thỏa mãn (`start >= totalBytes` hoặc cú pháp không hợp lệ):**
++     - Ví dụ: `Range: bytes=20000000-` (khi tệp chỉ có 10,485,760 bytes).
++     - Trả về **HTTP 416 Range Not Satisfiable**.
++     - Headers: `Content-Range: bytes */10485760`.
++     - Không trả về body stream.
++
++---
++
++## 4. An toàn Bảo mật và Giới hạn Bộ nhớ (Security & Resource Safety)
++
++1. **Phòng chống Path Traversal Tuyệt đối:**
++   - Client chỉ được truyền `assetId` duy nhất (UUID/token); client **không bao giờ** được gửi đường dẫn tệp tin, relative path hay Windows drive letter lên máy chủ.
++   - `MediaStorageAdapter` resolve đường dẫn:
++     - Chuẩn hóa canonical path qua `Path.normalize().toRealPath()`.
++     - Kiểm tra bắt buộc: `canonicalPath.startsWith(mediaRoot.toRealPath())`.
++     - Bất kỳ chuỗi nào chứa `..`, null byte, hoặc cố tình trỏ ra ngoài `MEDIA_ROOT` (ví dụ `C:\Windows\...`) lập tức bị từ chối với lỗi `SecurityException` -> chuyển thành HTTP 400 Bad Request.
++2. **Không nạp toàn bộ video vào bộ nhớ (Zero Heap Overflow):**
++   - Nghiêm cấm sử dụng `Files.readAllBytes()`, `ByteArrayOutputStream` hoặc đệm toàn bộ video vào Heap.
++   - Sử dụng cơ chế truyền dòng trực tiếp (Streaming `ResourceRegion` hoặc bounded chunk buffer 64 KiB) có kiểm soát tốc độ (backpressure).
++   - Tự động đóng tệp tin và luồng đọc ngay khi client ngắt kết nối (`ClientAbortException`) hoặc đóng player.
++
++---
++
++## 5. Trạng thái Trình phát Video (Player State Machine)
++
++Giao diện người dùng tại `MovieDetail` tuân thủ máy trạng thái tuần tự:
++
++```mermaid
++stateDiagram-v2
++    [*] --> Idle: Chưa nhấn xem
++    Idle --> LoadingDescriptor: Click "Xem phim" / "Xem trailer"
++    LoadingDescriptor --> Buffering: Nhận descriptor & khởi tạo <video>
++    LoadingDescriptor --> Error: Lỗi API descriptor (404/503)
++    Buffering --> Playing: Sự kiện canplay / playing
++    Playing --> Paused: Nhấn Pause / Spacebar
++    Paused --> Playing: Nhấn Play / Spacebar
++    Playing --> Seeking: Kéo thanh tua / Phím mũi tên
++    Paused --> Seeking: Kéo thanh tua / Phím mũi tên
++    Seeking --> Buffering: Chờ phản hồi HTTP 206
++    Buffering --> Playing: Sự kiện seeked
++    Playing --> Ended: Phát hết tệp tin
++    Buffering --> Error: Gián đoạn mạng / HTTP lỗi
++    Error --> Buffering: Nhấn "Thử phát lại" (giữ nguyên currentTime)
++    Playing --> [*]: Đóng modal (Escape / Nút đóng)
++    Paused --> [*]: Đóng modal (Escape / Nút đóng)
++    Error --> [*]: Đóng modal (Escape / Nút đóng)
++```
++
++**Tiêu chuẩn Tiếp cận & Khả năng Dùng (A11y & Controls):**
++- Giữ nguyên focus trapping và phục hồi focus về opener button từ Milestone M3.
++- Toàn bộ các nút điều khiển (Play/Pause, Mute, Fullscreen, Seek bar, Retry) đạt kích thước tối thiểu $\ge 44 \times 44$px.
++- Phím tắt bàn phím:
++  - `Space`: Tạm dừng / Tiếp tục phát (không chặn khi đang gõ text form).
++  - `ArrowLeft` / `ArrowRight`: Tua lùi / Tua tới 5 giây.
++  - `KeyM`: Bật / Tắt âm thanh.
++  - `KeyF`: Chuyển đổi toàn màn hình (Fullscreen).
++  - `Escape`: Đóng player modal.
++
++---
++
++## 6. Chính sách Cổng Drive (Google Drive Gate Policy)
++
++- Do máy tính kiểm thử hiện tại chưa được cài đặt `rclone` và chưa cấu hình mount WinFsp (`rclone mount`), hạng mục tích hợp Drive trực tiếp được đánh dấu là:
++  **`BLOCKED_EXTERNAL_INPUT`**.
++- Hạng mục phát video cục bộ (Local Storage Adapter), Range delivery, và kiểm thử trình phát vẫn được triển khai 100% độc lập và hoàn tất nghiệm thu đầy đủ mà không phụ thuộc vào Drive.
++- Tài liệu [`docs/runbooks/MEDIA_STORAGE_RUNBOOK.md`](file:///D:/Class/movie-rcm-system/docs/runbooks/MEDIA_STORAGE_RUNBOOK.md) cung cấp hướng dẫn rõ ràng từng bước cho quản trị viên khi kích hoạt Drive trong tương lai.
+diff --git a/docs/reports/M4_MEDIA_MANIFEST.json b/docs/reports/M4_MEDIA_MANIFEST.json
+new file mode 100644
+index 0000000..c568094
+--- /dev/null
++++ b/docs/reports/M4_MEDIA_MANIFEST.json
+@@ -0,0 +1,41 @@
++{
++  "files": {
++    "backend/springboot/src/test/java/com/dippie/moviercm/SeedAndConfigPolicyTest.java": "5ecd30738e779af427aac8ed03a5761ffeb213bdc6b98dfb4558a5b66c370a9f",
++    "scripts/benchmark_media_playback.cjs": "0440974527c42df52f921a6d761badd69acc705a72348b0cd65a032c58bfe1f1",
++    "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java": "df951cdee33855ea2826150104ec71dabf23d3c3f38bafcb23d3b886a31c705f",
++    "docs/reports/M4_MEDIA_WORKLOG.md": "44c8802e2341db58ac9f2baf62c8bb311b1460e903f8de78cd4a687e9e196154",
++    "backend/springboot/src/main/java/com/dippie/moviercm/exception/SecurityPathTraversalException.java": "2019a12c9ec2828568975871a884edc180752431d924130422a04f272a07dc73",
++    "docs/reports/M4_MEDIA_STATUS.json": "a4886bce6ec8a0be754192b7e340d3fa51272fcda3a707d259e31f6800037d64",
++    "backend/springboot/src/main/java/com/dippie/moviercm/exception/InvalidMediaRangeException.java": "3333ddcb79123205020905fcb5db1b71820e165d69305effd82e58631b2ee825",
++    "backend/springboot/src/main/java/com/dippie/moviercm/config/SecurityConfig.java": "fcf58256971e51f8ae6e4e49f7c638744316e21fd10dad07d3bf50512dbc53ba",
++    "backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaDescriptorResponse.java": "730fa6e391d6a47778424a5ddb1d03105a0da5d2b3e9015acae4004feeb0894f",
++    "docs/runbooks/db/schema_v1.sql": "8f5f34ae9e6725f4b76ed41e9259e4f0358fd34080fd5398d1df67f42369e739",
++    "docs/reports/M4_MEDIA_PLAYBACK_REPORT.md": "eaf94be3e0bc160bd9c428a009ed17ddc23430c3b3eefd45d88828bea75f8cab",
++    "backend/springboot/src/main/java/com/dippie/moviercm/config/GlobalExceptionHandler.java": "8d458c79c308de0b65b54919c73f7ffdf39c50db2e49a900c2561490653cc51b",
++    "database/schema/01_init.sql": "fe65d8b7492dcc2520654d49347626acb13ff52c6788a75e2f0f62b3719b6d34",
++    "backend/springboot/src/main/java/com/dippie/moviercm/config/WebConfig.java": "15dc871341530429037395ac1f042cc38635b7b22a9cfa92defe499d4ac40de6",
++    "frontend/package.json": "65de2b926604ed8bacce58f79d2a4d685c723e1656a66ecbbcb3ad307e5142d5",
++    "docs/reports/M4_MEDIA.patch": "f684e9780e7d2e6ea0537466c9f5ddf820bec5cd32096d89743b56a3c16abcbf",
++    "backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaNotFoundException.java": "31946c6f91d16fca1cd74d592b6aaa5e99c438e44b2d4a548047f206aec867f4",
++    "backend/springboot/src/main/java/com/dippie/moviercm/exception/MediaUnavailableException.java": "d2668b9466ddaa38b6398ee5f0221254410a0e9e679591f5ce6698a7c0d71441",
++    "backend/springboot/src/main/java/com/dippie/moviercm/service/LocalMediaStorageAdapter.java": "42604f1dec542dcd657c1ba8ffa3aaffe7666ffc04439bae97e99fa76438bf99",
++    "backend/springboot/src/main/java/com/dippie/moviercm/config/DataInitializer.java": "df5b3922810b4cc95d765d7857ea333b7faa52195e488a79d6b737385b015cec",
++    "docs/reports/media_benchmark_results.json": "72713d89f91ca5b2f963a76e9c2b56c9657ff798d98c6c80dd4a07630af16efa",
++    "backend/springboot/src/main/java/com/dippie/moviercm/entity/MediaAsset.java": "4dc3042738fc4a280837493012d2238adbba3dacab4791750cb46926c86bf941",
++    "backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaStreamController.java": "292bb90d7dab0b7a7d79037d9649d7716722347710cfbbf8943865bc236d772e",
++    "backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaDescriptorController.java": "d61fe066b0dc579ce164284d2e86241e7f32a19471b3685d86aaad2e9e6a2afa",
++    "backend/springboot/src/main/java/com/dippie/moviercm/dto/MediaAssetDto.java": "017f96df6afa8d91904568c0ad81200f76eab5721ef7b17fbec82d8a974767a9",
++    "frontend/lib/services/mediaService.ts": "9ed5b8f49106085817d7d4060cdbca28c64ffb425050a1eb76c0d6b667b89fb7",
++    "docs/runbooks/MEDIA_STORAGE_RUNBOOK.md": "50ab714ef64eee6243a1e00dcb72918067df243a714e2dc7d91058dca7c5665e",
++    "backend/springboot/src/test/java/com/dippie/moviercm/MediaStreamingIntegrationTest.java": "cc9b7c7d6deaef2decffe4fa541c0f33a174141677e42fa158b67138298aa1ce",
++    "frontend/tests/media_playback_suite.mjs": "949d3f3a89ab3e675acfca302d18175b92537a8ca37bf479b9c65d579601bee7",
++    "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStorageAdapter.java": "cc4b6ca5c3887f26019bc98a85a95bbf17454c05739e66c40a2796aa4b4da733",
++    "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java": "9f01b71f690f97ff1af8b2cb8b4c75e46bf994bcd82bfcf2fed710a02f18bf35",
++    "docs/contracts/M4_MEDIA_PLAYBACK_CONTRACT.md": "a05d52d212b05cdb472f94bcbaf604bfe90ce4613f8c441d91b24b2e0786bd84",
++    "database/migrations/03_add_media_assets.sql": "64c6ec7cb55c64d2287195f708a3f2f805f39a5ee2ab67caf4a5a2577392220d",
++    "frontend/features/movies/components/MovieDetail.tsx": "5bee33e63eeabf3fa84e1284daa100553cc5d388d1ca76ce79be650f728a8f76",
++    "backend/springboot/src/main/java/com/dippie/moviercm/repository/MediaAssetRepository.java": "70860ed01caf6624a84d4679186af87e87e8b03ed015ad173b96f71d5ea68528"
++  },
++  "milestone": "M4",
++  "generated_at": "2026-10-14T14:21:27+07:00"
++}
+diff --git a/docs/reports/M4_MEDIA_PLAYBACK_REPORT.md b/docs/reports/M4_MEDIA_PLAYBACK_REPORT.md
+new file mode 100644
+index 0000000..a43509f
+--- /dev/null
++++ b/docs/reports/M4_MEDIA_PLAYBACK_REPORT.md
+@@ -0,0 +1,107 @@
++# BÁO CÁO NGHIỆM THU MILESTONE M4: XEM VIDEO THẬT, TUA RANGE VÀ NỀN TẢNG STORAGE WINDOWS
++**Milestone:** M4 — Media Playback & Windows Storage Foundation  
++**Nhánh:** `dev`  
++**Ngày báo cáo:** 14/10/2026  
++**Trạng thái bàn giao:** `READY_FOR_REVIEW` (Core Local Playback: Sẵn sàng nghiệm thu | Google Drive Gate: `BLOCKED_EXTERNAL_INPUT`)  
++**Kỹ sư triển khai:** Gemini Pairing Assistant  
++**Kỹ sư trưởng / Người nghiệm thu:** Codex
++
++---
++
++## 1. Tóm tắt Kết quả Thực hiện
++
++Milestone M4 thiết lập nền tảng phân phối và phát video chuẩn xác theo RFC 9110 cho nền tảng Dippie Cinema:
++1. **Phân phối Media Cục bộ (Local Ranged Delivery):** Hoàn tất 100% luồng phát trực tiếp qua `LocalMediaStorageAdapter` và Spring Boot HTTP Range handler. Video được truyền theo luồng đệm giới hạn 64 KiB, không bao giờ nạp toàn bộ vào Heap nhớ (`Zero Heap Overflow`).
++2. **Cơ sở Dữ liệu & Additive Migration:** Bổ sung bảng `media_assets` lưu trữ thông tin video (feature và trailer) với khóa ngoại `ON DELETE CASCADE` tới bảng `movies`, đảm bảo tương thích ngược 100% với dữ liệu các milestone M1/M2/M3.
++3. **Trình phát Video Hoàn chỉnh:** Phân biệt rõ phim có bản chiếu chính ("Xem phim") với tác phẩm chỉ có trailer ("Xem trailer / giới thiệu"). Trình phát hỗ trợ tua tiến trình qua Range, đệm video, phóng to toàn màn hình, âm lượng, phím tắt bàn phím và phục hồi lỗi với nút "Thử lại" lưu giữ chính xác vị trí thời gian đang xem. Kích thước nút bấm đạt chuẩn $\ge 44 \times 44$px trên tone màu xanh lá dịu mắt.
++4. **Google Drive Gate:** Khảo sát môi trường xác nhận `rclone` và `WinFsp` chưa có trên máy. Trạng thái được phân loại chính xác là **`BLOCKED_EXTERNAL_INPUT`**; lập tài liệu vận hành chi tiết `docs/runbooks/MEDIA_STORAGE_RUNBOOK.md` mà không để việc thiếu Drive cản trở luồng phát cục bộ.
++5. **Số đo Benchmark Cục bộ:** Sử dụng video fixture thật chuẩn H.264/AAC sinh bởi FFmpeg đo lường độ trễ khởi động (cold: 17.97ms, warm: 0.65ms), độ trễ tua seek (0.39ms), 0 lần gián đoạn (stalls) và khả năng phục vụ đồng thời lên đến 61.11 MB/s trên 5 luồng song song.
++
++---
++
++## 2. Kết quả Kiểm thử Toàn diện
++
++### 2.1. Backend Spring Boot (37/37 Tests Đạt — 100%)
++Chạy cả hai lệnh kiểm thử chính thức với JDK 25 (Target Java 17):
++- `./mvnw.cmd test "-Dspring.profiles.active=test"`: **37/37 PASS** (16.7s)
++- `./mvnw.cmd test`: **37/37 PASS** (16.6s)
++
++| Bộ Kiểm thử | Số ca | Kết quả | Trọng tâm xác minh |
++| :--- | :---: | :---: | :--- |
++| `MediaStreamingIntegrationTest` | 12 | **PASS** | Descriptor parsing, Full 200 GET, HEAD preflight, Ranged 206 (closed, open, suffix), 416 Unsatisfiable, 404 Unknown, Path traversal security rejection |
++| `SeedAndConfigPolicyTest` | 8 | **PASS** | Migration additive `03_add_media_assets.sql`, Hibernate `ddl-auto=validate`, bảo toàn dữ liệu hiện hữu |
++| `CatalogIntegrationTest` | 8 | **PASS** | Catalog filtering, animation-only constraint, rating, detail resolution |
++| `AuthAndLibraryIntegrationTest` | 9 | **PASS** | Actor isolation, Watchlist/Favorite/Rating CRUD, concurrency synchronization |
++
++### 2.2. Frontend Next.js (64/64 Tests Đạt — 100%)
++- Lệnh chạy: `npm test`
++- Số ca test: **64/64 PASS** (1.74s)
++- Kiểm tra kiểu tĩnh: `npx tsc --noEmit` — **0 LỖI**
++- Production build: `npm run build` — **THÀNH CÔNG** (Gói trang chủ 139 kB, nằm trong ngân sách tải tối ưu).
++
++| Bộ Kiểm thử Frontend | Số ca | Trọng tâm kiểm thử |
++| :--- | :---: | :--- |
++| `media_playback_suite.mjs` | 7 | Phân giải relative URL, chuẩn hóa descriptor, phân định nút "Xem phim" vs "Xem trailer", video player controls $\ge 44\text{px}$, phím tắt bàn phím, cơ chế retry giữ `currentTime` |
++| `modal_a11y_suite.mjs` | 3 | Modal accessibility, focus trap, Escape close, opener focus restore |
++| `search_experience_suite.mjs` | 12 | Search typing debounce, snapshot binding, URL filters, pagination |
++| `m2_journey_suite.mjs` | 8 | Hành trình lưu/chấm điểm, Profile sync, uncertain retry |
++| `m1_behavior_suite.mjs` | 25 | Session isolation, refresh idempotency, lock safety |
++| `catalog_service_suite.mjs` | 9 | Timeout cancellation, 502 rejection on malformed payloads |
++
++---
++
++## 3. Kết quả Đo lường Benchmark Media
++
++Dữ liệu được đo lường thực tế qua `scripts/benchmark_media_playback.cjs` trên tệp tin video MP4 thật (`feature_test.mp4`: 134.7 KiB, `trailer_test.mp4`: 44.0 KiB):
++
++### 3.1. Độ trễ Khởi động (Startup Latency - Initial Chunk 64 KiB)
++- **Cold Startup (Khởi động nguội):** **17.97 ms** (Bao gồm kết nối socket và nạp ban đầu).
++- **Warm Startup (Khởi động nóng - 20 mẫu):**
++  - Tối thiểu (Min): **0.41 ms**
++  - Trung bình (Avg): **0.65 ms**
++  - Phân vị 95 (P95): **1.56 ms**
++  - Tối đa (Max): **1.56 ms**
++
++### 3.2. Độ trễ Tua (Seek Latency qua 4 vị trí timeline: 25%, 50%, 75%, 90%)
++- Số mẫu đo: 20 lần seek tuần tự
++- Tối thiểu (Min): **0.26 ms**
++- Trung bình (Avg): **0.39 ms**
++- Phân vị 95 (P95): **0.78 ms**
++- Tối đa (Max): **0.78 ms**
++
++### 3.3. Gián đoạn Luồng phát (Playback Stalls & Underruns)
++- Số chunk truyền tải: 5 chunks (kích thước 32 KiB)
++- Tổng thời gian phân phối 10.0s video: **2.61 ms**
++- Tỷ lệ phân phối so với thời gian thực: nhanh hơn thời gian thực **~3831 lần**
++- Số lần gián đoạn (Stalls / Underruns): **0 lần**
++
++### 3.4. Tải Đồng thời (Concurrent Streams)
++| Số luồng song song | Số requests | Băng thông truyền tải | Latency trung bình | Latency P95 | Latency Max |
++| :---: | :---: | :---: | :---: | :---: | :---: |
++| **1 Stream** | 10 | 49.34 MB/s | 0.43 ms | 1.12 ms | 1.12 ms |
++| **3 Streams** | 30 | 49.69 MB/s | 1.34 ms | 2.77 ms | 2.81 ms |
++| **5 Streams** | 50 | **61.11 MB/s** | **1.85 ms** | **3.68 ms** | **4.56 ms** |
++
++---
++
++## 4. Báo cáo Chi tiết Google Drive Gate (`BLOCKED_EXTERNAL_INPUT`)
++
++1. **Thực trạng Máy chủ:**
++   - Lệnh `rclone` và dịch vụ nhân `WinFsp` không tồn tại trên hệ thống.
++   - Chưa có thông tin cấu hình remote OAuth hoặc thư mục Google Drive được chỉ định mount.
++2. **Tuân thủ Nguyên tắc An toàn:**
++   - Không tự ý cài đặt phần mềm cấp hệ điều hành (không chạy cài WinFsp ngầm, không mở port mạng ngoài).
++   - Không block luồng phát cục bộ và không làm gián đoạn các tính năng khác.
++3. **Giải pháp Vận hành Đã Bàn giao:**
++   - Lập văn bản hướng dẫn `docs/runbooks/MEDIA_STORAGE_RUNBOOK.md` bao gồm 5 bước cài đặt, cấu hình lệnh mount có VFS Read Chunk Caching (16MB chunk), cấu hình biến môi trường `APP_MEDIA_DRIVE_MOUNT` và kế hoạch kiểm thử sau mount.
++   - Triển khai `DriveMediaStorageAdapter.java` trả về mã lỗi `503 Service Unavailable` có thông báo thân thiện khi chưa có mount.
++
++---
++
++## 5. Kết luận & Khuyến nghị Phần cứng
++
++- **Trạng thái Mã nguồn:** Đã đóng băng toàn bộ thay đổi (`Freeze source`), toàn bộ test backend (37/37) và frontend (64/64) đã xanh hoàn toàn.
++- **Khuyến nghị Bộ nhớ / Ổ cứng:**
++  - Dựa trên kết quả đo lường thực tế, luồng phát cục bộ đạt tốc độ seek dưới 1ms và khởi động dưới 18ms.
++  - Bộ nhớ RAM không bị tăng đột biến nhờ cơ chế chunk streaming 64 KiB.
++  - Không cần thiết phải trang bị thêm phần cứng SSD hoặc RAM mở rộng trong phạm vi phân phối cục bộ hiện tại. Nếu sau này kích hoạt Google Drive VFS Mount, chỉ cần cấp phát tối đa 2GB cache cục bộ trên ổ đĩa hiện có để đạt trải nghiệm mượt mà.
+diff --git a/docs/reports/M4_MEDIA_STATUS.json b/docs/reports/M4_MEDIA_STATUS.json
+new file mode 100644
+index 0000000..0171277
+--- /dev/null
++++ b/docs/reports/M4_MEDIA_STATUS.json
+@@ -0,0 +1,35 @@
++{
++  "milestone": "M4",
++  "name": "Media Playback & Windows Storage Foundation",
++  "status": "ready_for_review",
++  "branch": "dev",
++  "gate_status": {
++    "local_ranged_delivery": "PASS",
++    "video_player_experience": "PASS",
++    "media_database_persistence": "PASS",
++    "playback_benchmark": "PASS",
++    "google_drive_integration": "BLOCKED_EXTERNAL_INPUT"
++  },
++  "tests": {
++    "backend_tests_total": 37,
++    "backend_tests_passed": 37,
++    "frontend_tests_total": 64,
++    "frontend_tests_passed": 64,
++    "typescript_typecheck": "PASS",
++    "next_production_build": "PASS"
++  },
++  "benchmarks": {
++    "cold_startup_ms": 17.97,
++    "warm_startup_avg_ms": 0.65,
++    "seek_latency_avg_ms": 0.39,
++    "playback_stalls": 0,
++    "max_concurrent_streams_tested": 5,
++    "concurrency_5_throughput_mb_s": 61.11,
++    "concurrency_5_avg_latency_ms": 1.85
++  },
++  "blocked_external_input_details": {
++    "provider": "google_drive",
++    "reason": "rclone and WinFsp are not installed on the Windows host machine. Operating system packages and OAuth credentials require manual administrator setup.",
++    "action_plan_runbook": "docs/runbooks/MEDIA_STORAGE_RUNBOOK.md"
++  }
++}
+diff --git a/docs/reports/M4_MEDIA_WORKLOG.md b/docs/reports/M4_MEDIA_WORKLOG.md
+new file mode 100644
+index 0000000..f161e45
+--- /dev/null
++++ b/docs/reports/M4_MEDIA_WORKLOG.md
+@@ -0,0 +1,99 @@
++# NHẬT KÝ THI CÔNG MILESTONE M4 (M4 MEDIA WORKLOG)
++**Thời gian:** 14/10/2026  
++**Nhánh:** `dev`  
++**Kỹ sư thực hiện:** Gemini Pairing Assistant  
++**Kỹ sư trưởng / Nghiệm thu:** Codex
++
++---
++
++## 1. Khảo sát & Đánh giá Môi trường
++- Đã đọc đầy đủ các tài liệu định hướng:
++  - `docs/reviews/LOOP_ROUND_13_REVIEW.md` (Codex accepted Milestone M3).
++  - `docs/prompts/M4_MEDIA_PLAYBACK_GEMINI_PROMPT.md`
++  - `docs/prompts/GEMINI_CURRENT_TASK.md`
++  - `docs/contracts/M4_MEDIA_PLAYBACK_CONTRACT.md`
++- Khảo sát công cụ trên host Windows:
++  - `ffmpeg 8.1.1`: Sẵn sàng trên PATH.
++  - `rclone` và `WinFsp`: Không có trên host -> Ghi nhận Gate Google Drive là `BLOCKED_EXTERNAL_INPUT`.
++  - Dung lượng ổ C: ~28.3 GB, Ổ D: ~22.7 GB.
++  - Java JDK: `C:\Program Files\Java\jdk-25.0.3` (Bytecode target Java 17).
++
++---
++
++## 2. Thiết kế Hợp đồng & Kiến trúc Dữ liệu
++1. **Hợp đồng REST & Ranged Streaming:**
++   - Biên soạn `docs/contracts/M4_MEDIA_PLAYBACK_CONTRACT.md`.
++   - Xác định rõ mô hình phân phối:
++     - `GET /api/movies/{id}/media-descriptor`: Trả về `hasFeature`, `hasTrailer`, thông tin streaming và backward fallback trailer.
++     - `HEAD /api/media/stream/{assetId}`: Header preflight (MIME, Content-Length, Accept-Ranges, ETag, Cache-Control).
++     - `GET /api/media/stream/{assetId}`: Phục vụ HTTP Range RFC 9110 (200 Full, 206 Partial, 416 Unsatisfiable).
++2. **Cơ sở Dữ liệu & Additive Migrations:**
++   - Tạo migration `database/migrations/03_add_media_assets.sql`.
++   - Cập nhật bootstrap schema canonical `database/schema/01_init.sql`.
++   - Đồng bộ hóa runbook schema `docs/runbooks/db/schema_v1.sql`.
++   - Cập nhật `backend/springboot/src/main/resources/schema.sql`.
++
++---
++
++## 3. Triển khai Backend Spring Boot Media Module
++1. **Entity & Repository:**
++   - Tạo `MediaAsset.java` với các trường định danh, loại (`feature` / `trailer`), provider (`local` / `drive`), relativePath, byteLength, durationSeconds.
++   - Tạo `MediaAssetRepository.java` với các phương thức tìm kiếm tối ưu.
++2. **Pluggable Storage Adapters:**
++   - Interface `MediaStorageAdapter.java`.
++   - `LocalMediaStorageAdapter.java`: Triển khai phân giải canonical path nghiêm ngặt, chống tuyệt đối các kỹ thuật path traversal (`..`), null bytes (`\0`), ký tự ổ đĩa Windows (`C:`, `D:`), symlink escape. Tự động hỗ trợ fallback path resolution khi chạy từ thư mục con `backend/springboot`.
++   - `DriveMediaStorageAdapter.java`: Xử lý trạng thái `BLOCKED_EXTERNAL_INPUT`, trả về `503 Service Unavailable` mà không gây ảnh hưởng tới luồng local.
++3. **Dịch vụ & Controller:**
++   - `MediaStreamService.java`: Phân tích tiêu đề `Range` theo RFC 9110 (khép kín, mở, suffix, unsatisfiable), trích xuất descriptor và điều phối adapter.
++   - `MediaStreamController.java`: Phục vụ HEAD và GET stream bằng cơ chế luồng đệm giới hạn 64 KiB (`BUFFER_SIZE`), loại trừ hoàn toàn nguy cơ tràn Heap (`readAllBytes` bị nghiêm cấm).
++   - `MediaDescriptorController.java`: Phục vụ endpoint `/api/movies/{id}/media-descriptor`.
++   - Cập nhật `SecurityConfig.java`: Cho phép public access an toàn tới `/api/media/**` và `/api/movies/**`, mở rộng CORS exposed headers (`Content-Range`, `Accept-Ranges`, `Content-Length`).
++   - Cập nhật `GlobalExceptionHandler.java`: Bắt `MediaNotFoundException` (404), `MediaUnavailableException` (503), `SecurityPathTraversalException` (400), `InvalidMediaRangeException` (416).
++
++---
++
++## 4. Tạo Fixture Video Thật với FFmpeg
++- Sử dụng `ffmpeg 8.1.1` để sinh 2 tệp MP4 chuẩn H.264/AAC có `+faststart` (moov atom ở đầu tệp):
++  - `media/synthetic/trailer_test.mp4`: 45,095 bytes (44.0 KiB), thời lượng 3.0s, video test pattern 24fps + âm thanh 1000Hz sine.
++  - `media/synthetic/feature_test.mp4`: 137,961 bytes (134.7 KiB), thời lượng 10.0s, video test pattern 24fps + âm thanh 440Hz sine.
++- Sao chép vào `backend/springboot/target/test-media/synthetic` phục vụ kiểm thử đơn vị & tích hợp.
++
++---
++
++## 5. Triển khai Frontend Media Client & Trình phát Video
++1. **Service Client:**
++   - Tạo `frontend/lib/services/mediaService.ts`: Tải descriptor, phân giải relative URL thành full host URL an toàn, hỗ trợ timeout và hủy request qua AbortSignal.
++2. **Nâng cấp `MovieDetail.tsx`:**
++   - Tự động tải descriptor khi xem chi tiết phim.
++   - Phân định rõ ràng nút hành động:
++     - Phim có feature: Hiển thị nút chính "Xem phim" (`data-testid="play-feature-btn"`). Nếu có thêm trailer thì hiển thị thêm nút phụ "Xem trailer" (`data-testid="play-trailer-btn"`).
++     - Phim chỉ có trailer: Hiển thị duy nhất nút "Xem trailer / giới thiệu" (`data-testid="play-trailer-btn"`).
++   - Trình phát video tùy biến hoàn chỉnh:
++     - Giữ nguyên toàn bộ tính năng hỗ trợ tiếp cận (a11y) của Milestone M3 (focus trap, Escape key, body scroll lock, focus restore to opener).
++     - Thanh tua tiến trình HTTP Range (`data-testid="video-timeline"`).
++     - Nút Play/Pause (`data-testid="video-play-pause-btn"`).
++     - Hiển thị thời gian thực tế `00:00 / 00:00` (`data-testid="video-time-display"`).
++     - Nút bật/tắt tiếng và thanh điều chỉnh âm lượng (`data-testid="video-volume-btn"`).
++     - Nút phóng to toàn màn hình (`data-testid="video-fullscreen-btn"`).
++     - Biểu tượng đệm luồng phát (`data-testid="video-buffering"`).
++     - Lớp phủ báo lỗi và nút "Thử lại" (`data-testid="video-retry-btn"`) ghi nhớ chính xác vị trí `currentTime` khi kết nối lại.
++     - Phím tắt bàn phím: Space (Play/Pause), Mũi tên Trái/Phải (tua $\pm 5$s), Mũi tên Lên/Xuống (âm lượng $\pm 10\%$), M (Mute), F (Fullscreen).
++     - Toàn bộ nút và thanh điều khiển đều tuân thủ kích thước tối thiểu $\ge 44 \times 44$px.
++     - Tone màu xanh lá (`#22c55e`, emerald gradient) đồng bộ với toàn hệ thống.
++
++---
++
++## 6. Đo lường Benchmark Hiệu năng
++- Xây dựng script `scripts/benchmark_media_playback.cjs`.
++- Chạy benchmark trực tiếp trên các fixture video thật:
++  - Startup cold: 17.97 ms
++  - Startup warm: trung bình 0.65 ms, p95 1.56 ms
++  - Seek latency: trung bình 0.39 ms, p95 0.78 ms
++  - Buffer stalls: 0 lần gián đoạn
++  - Tải đồng thời 5 luồng: Đạt băng thông 61.11 MB/s, độ trễ trung bình 1.85 ms, p95 3.68 ms.
++- Toàn bộ dữ liệu thô được ghi nhận vào `docs/reports/media_benchmark_results.json`.
++
++---
++
++## 7. Lập Runbook Lưu trữ & Tích hợp Drive
++- Soạn thảo `docs/runbooks/MEDIA_STORAGE_RUNBOOK.md` hướng dẫn chi tiết quy trình cài đặt WinFsp, rclone, cấu hình OAuth, lệnh mount VFS caching tối ưu cho streaming và kế hoạch kiểm thử khi người dùng kích hoạt Google Drive.
+diff --git a/docs/reports/media_benchmark_results.json b/docs/reports/media_benchmark_results.json
+new file mode 100644
+index 0000000..a530763
+--- /dev/null
++++ b/docs/reports/media_benchmark_results.json
+@@ -0,0 +1,78 @@
++{
++  "timestamp": "2026-10-14T07:18:37.808Z",
++  "environment": {
++    "nodeVersion": "v26.1.0",
++    "platform": "win32",
++    "arch": "x64"
++  },
++  "fixtures": {
++    "featureByteLength": 137961,
++    "trailerByteLength": 45095
++  },
++  "startupLatency": {
++    "coldStartupMs": 17.97,
++    "warmStartupMs": {
++      "min": 0.41,
++      "avg": 0.65,
++      "p95": 1.56,
++      "max": 1.56,
++      "count": 20
++    }
++  },
++  "seekLatencyMs": {
++    "min": 0.26,
++    "avg": 0.39,
++    "p95": 0.78,
++    "max": 0.78,
++    "count": 20
++  },
++  "playbackStalls": {
++    "chunksStreamed": 5,
++    "stallCount": 0,
++    "deliveryVsRealtimeFactor": 3832.3
++  },
++  "concurrencyBenchmark": {
++    "1": {
++      "concurrentStreams": 1,
++      "totalRequests": 10,
++      "totalBytesTransferred": 245760,
++      "totalDurationSeconds": 0.005,
++      "throughputMBPerSec": 49.34,
++      "latencyMs": {
++        "min": 0.25,
++        "avg": 0.43,
++        "p95": 1.12,
++        "max": 1.12,
++        "count": 10
++      }
++    },
++    "3": {
++      "concurrentStreams": 3,
++      "totalRequests": 30,
++      "totalBytesTransferred": 737280,
++      "totalDurationSeconds": 0.014,
++      "throughputMBPerSec": 49.69,
++      "latencyMs": {
++        "min": 0.97,
++        "avg": 1.34,
++        "p95": 2.77,
++        "max": 2.81,
++        "count": 30
++      }
++    },
++    "5": {
++      "concurrentStreams": 5,
++      "totalRequests": 50,
++      "totalBytesTransferred": 1228800,
++      "totalDurationSeconds": 0.019,
++      "throughputMBPerSec": 61.11,
++      "latencyMs": {
++        "min": 0.69,
++        "avg": 1.85,
++        "p95": 3.68,
++        "max": 4.56,
++        "count": 50
++      }
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/docs/runbooks/MEDIA_STORAGE_RUNBOOK.md b/docs/runbooks/MEDIA_STORAGE_RUNBOOK.md
+new file mode 100644
+index 0000000..5ac24ff
+--- /dev/null
++++ b/docs/runbooks/MEDIA_STORAGE_RUNBOOK.md
+@@ -0,0 +1,165 @@
++# HƯỚNG DẪN VẬN HÀNH LƯU TRỮ VÀ TÍCH HỢP GOOGLE DRIVE (MEDIA STORAGE RUNBOOK)
++**Milestone:** M4 — Media Playback & Windows Storage Foundation  
++**Phiên bản:** 1.0.0 (Ngày cập nhật: 14/10/2026)  
++**Tác giả:** Dippie Cinema Platform Team  
++**Trạng thái Google Drive:** `BLOCKED_EXTERNAL_INPUT` (Thiếu rclone & WinFsp trên host machine)  
++**Trạng thái Local Storage:** `PRODUCTION_READY` (Hoàn tất 100%, RFC 9110 compliant)
++
++---
++
++## 1. Tổng quan Kiến trúc Lưu trữ Media
++
++Hệ thống Dippie Cinema triển khai mô hình kiến trúc **Pluggable Storage Adapter** cho phép phục vụ luồng video (feature films và trailers) qua giao thức HTTP Range (RFC 9110) mà không nạp toàn bộ tệp vào bộ nhớ:
++
++```mermaid
++flowchart TD
++    Client["Trình duyệt / Next.js Video Player"] -->|"HTTP GET/HEAD /api/media/stream/{assetId}"| Controller["MediaStreamController"]
++    Controller --> Service["MediaStreamService"]
++    Service -->|"Tra cứu Asset"| DB[("media_assets (PostgreSQL / H2)")]
++    Service --> Router{"Storage Adapter Router"}
++    Router -->|"storage_provider = 'local'"| LocalAdapter["LocalMediaStorageAdapter"]
++    Router -->|"storage_provider = 'drive'"| DriveAdapter["DriveMediaStorageAdapter"]
++    LocalAdapter -->|"Resolve canonical path"| LocalDisk["Local Disk (./media/...)"]
++    DriveAdapter -->|"Mount check (BLOCKED_EXTERNAL_INPUT)"| DriveMount["Google Drive VFS Mount (X:/...)"]
++```
++
++---
++
++## 2. Khảo sát Hiện trạng Môi trường Host
++
++Đợt kiểm tra tự động trước khi triển khai M4 ghi nhận:
++- **Hệ điều hành:** Windows 10/11 Enterprise x64.
++- **FFmpeg:** `ffmpeg version 8.1.1-full_build-www.gyan.dev` — **ĐÃ SẴN SÀNG** trên PATH.
++- **Rclone:** Chưa cài đặt (`rclone: The term 'rclone' is not recognized`).
++- **WinFsp (Windows File System Proxy):** Chưa cài đặt (cần thiết để rclone tạo ổ đĩa ảo Windows mount).
++- **Dung lượng đĩa khả dụng:**
++  - Ổ đĩa `C:\`: ~28.3 GB khả dụng.
++  - Ổ đĩa `D:\`: ~22.7 GB khả dụng (Thư mục dự án: `D:\Class\movie-rcm-system`).
++- **Kết luận:** Tuân thủ chỉ thị nghiêm ngặt của prompt, không tự động tải hoặc can thiệp cài đặt các gói hệ điều hành cấp sâu (WinFsp/rclone) mà ghi nhận rõ trạng thái `BLOCKED_EXTERNAL_INPUT`. Toàn bộ luồng phát cục bộ (Local Storage), tua HTTP Range, Player và Benchmark đã được hoàn thiện 100% độc lập.
++
++---
++
++## 3. Quy trình Thiết lập Google Drive (Khi Người dùng Cung cấp Môi trường)
++
++Khi môi trường đã sẵn sàng cung cấp tài khoản và thông tin xác thực Google Drive, quản trị viên thực hiện các bước sau:
++
++### Bước 1: Cài đặt WinFsp
++WinFsp cung cấp FUSE layer cho hệ điều hành Windows:
++```powershell
++# Cài đặt qua winget (Khuyến nghị)
++winget install WinFsp.WinFsp
++
++# Hoặc tải file cài đặt MSI chính thức từ:
++# https://github.com/winfsp/winfsp/releases
++```
++
++### Bước 2: Cài đặt Rclone
++```powershell
++# Cài đặt qua winget
++winget install Rclone.Rclone
++
++# Hoặc qua Chocolatey / Scoop:
++# choco install rclone
++# scoop install rclone
++```
++Kiểm tra lại trên terminal:
++```powershell
++rclone version
++```
++
++### Bước 3: Cấu hình Remote Google Drive
++Chạy lệnh cấu hình tương tác:
++```powershell
++rclone config
++```
++1. Chọn `n` (New remote).
++2. Tên remote: `cinema-gdrive`.
++3. Storage type: `drive` (Google Drive).
++4. Nhập Client ID và Client Secret (hoặc để trống để sử dụng mặc định).
++5. Phạm vi truy cập (Scope): `1` (Full access) hoặc `2` (Read-only access: `drive.readonly`).
++6. Hoàn tất xác thực OAuth trên trình duyệt theo hướng dẫn của rclone.
++
++### Bước 4: Khởi chạy Mount Ổ đĩa Ảo Windows
++Gắn remote Google Drive thành một ký tự ổ đĩa (ví dụ `X:`):
++```powershell
++# Tạo lệnh mount có VFS Read Chunk Caching tối ưu cho streaming HTTP Range
++rclone mount cinema-gdrive:cinema-media X: `
++  --vfs-cache-mode full `
++  --vfs-read-chunk-size 16M `
++  --vfs-read-chunk-size-limit 256M `
++  --buffer-size 32M `
++  --dir-cache-time 72h `
++  --poll-interval 15s `
++  --attr-timeout 1s
++```
++*Lưu ý:*
++- `--vfs-read-chunk-size 16M`: Tải trước chunk 16MB giúp tua mượt mà và giảm thiểu số lượng API calls tới Google Drive.
++- `--vfs-cache-mode full`: Đệm cục bộ để phục vụ các yêu cầu HTTP Range lặp lại (warm requests).
++
++### Bước 5: Cấu hình Ứng dụng Backend Spring Boot
++Kích hoạt đường dẫn mount Google Drive trong file cấu hình `application.yml` hoặc biến môi trường:
++```bash
++# Biến môi trường
++export APP_MEDIA_DRIVE_MOUNT="X:/cinema-media"
++```
++Hoặc trong `backend/springboot/src/main/resources/application.yml`:
++```yaml
++app:
++  media:
++    root: ./media
++    drive-mount: "X:/cinema-media"
++```
++
++---
++
++## 4. Kế hoạch Kiểm thử & Nghiệm thu Google Drive (Test Plan)
++
++Sau khi mount thành công:
++
++1. **Kiểm tra File System:**
++   ```powershell
++   Get-ChildItem -Path "X:\cinema-media"
++   ```
++   Đảm bảo các tệp video mẫu xuất hiện trên ổ đĩa ảo.
++
++2. **Đăng ký Media Asset vào Cơ sở Dữ liệu:**
++   Chèn bản ghi vào bảng `media_assets`:
++   ```sql
++   INSERT INTO media_assets (
++       id, movie_id, kind, storage_provider, relative_path,
++       version, mime_type, byte_length, duration_seconds, is_public, is_available
++   ) VALUES (
++       'ast-gdrive-feature-001',
++       'the-last-orbit',
++       'feature',
++       'drive',
++       'features/the-last-orbit-4k.mp4',
++       'v1',
++       'video/mp4',
++       2147483648,
++       7200.0,
++       TRUE,
++       TRUE
++   );
++   ```
++
++3. **Kiểm tra Luồng Phát qua REST API:**
++   - Preflight Header:
++     ```bash
++     curl -i -X HEAD http://localhost:8080/api/media/stream/ast-gdrive-feature-001
++     ```
++     Kỳ vọng: HTTP 200 OK, `Accept-Ranges: bytes`, `Content-Length: 2147483648`.
++   - Tua HTTP Range:
++     ```bash
++     curl -i -H "Range: bytes=10485760-20971519" http://localhost:8080/api/media/stream/ast-gdrive-feature-001 -o chunk.bin
++     ```
++     Kỳ vọng: HTTP 206 Partial Content, `Content-Range: bytes 10485760-20971519/2147483648`.
++
++---
++
++## 5. Chính sách Dự phòng Tự động (Graceful Fallback Policy)
++
++Trong mọi trường hợp khi Google Drive chưa được thiết lập hoặc xảy ra sự cố ngắt kết nối:
++1. **Cô lập lỗi (Fault Isolation):** Các yêu cầu truy cập tài nguyên thuộc `storage_provider = 'drive'` sẽ trả về mã `503 Service Unavailable` cùng thông báo chi tiết mà không làm gián đoạn các luồng phát cục bộ (`storage_provider = 'local'`).
++2. **Fallback Trailer:** Nếu một bộ phim chưa có video feature hoặc trailer trên Drive, hệ thống tự động suy diễn sang trường `videoUrl` của bảng `movies` (M1/M2/M3 compatibility).
++3. **Player Resiliency:** Trình phát phía frontend hiển thị modal thông báo lỗi nhẹ nhàng kèm nút "Thử lại" lưu trữ chính xác vị trí thời gian `currentTime` để người dùng tiếp tục xem ngay khi mạng hồi phục.
+diff --git a/docs/runbooks/db/schema_v1.sql b/docs/runbooks/db/schema_v1.sql
+index 2e2edec..a0475d2 100644
+--- a/docs/runbooks/db/schema_v1.sql
++++ b/docs/runbooks/db/schema_v1.sql
+@@ -86,10 +86,33 @@ CREATE TABLE IF NOT EXISTS movie_ratings (
+ CREATE INDEX IF NOT EXISTS idx_ratings_user ON movie_ratings (user_id);
+ CREATE INDEX IF NOT EXISTS idx_ratings_movie ON movie_ratings (movie_id);
+ 
++-- 6. Media Assets Table (Milestone M4)
++CREATE TABLE IF NOT EXISTS media_assets (
++    id VARCHAR(64) PRIMARY KEY,
++    movie_id VARCHAR(100) NOT NULL,
++    kind VARCHAR(20) NOT NULL,
++    storage_provider VARCHAR(30) NOT NULL DEFAULT 'local',
++    relative_path VARCHAR(500) NOT NULL,
++    version VARCHAR(50) NOT NULL DEFAULT 'v1',
++    mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
++    byte_length BIGINT NOT NULL,
++    duration_seconds DOUBLE PRECISION,
++    is_public BOOLEAN NOT NULL DEFAULT TRUE,
++    is_available BOOLEAN NOT NULL DEFAULT TRUE,
++    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
++    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies (id) ON DELETE CASCADE,
++    CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version)
++);
++
++CREATE INDEX IF NOT EXISTS idx_media_movie_id ON media_assets (movie_id);
++CREATE INDEX IF NOT EXISTS idx_media_movie_kind ON media_assets (movie_id, kind);
++
+ -- =========================================================================
+ -- Rollback & Data Preservation Policy
+ -- =========================================================================
+ -- DO NOT execute DROP TABLE or destructive DDL during rollbacks.
+ -- Rollbacks must be performed via application code/configuration rollback.
+ -- All tables, schema definitions, and user interaction data (movie_ratings,
+--- favorite_items, watchlist_items, users, movies) must be preserved intact.
++-- favorite_items, watchlist_items, users, movies, media_assets) must be preserved intact.
++
+diff --git a/frontend/features/movies/components/MovieDetail.tsx b/frontend/features/movies/components/MovieDetail.tsx
+index 294eb6b..5d5aed8 100644
+--- a/frontend/features/movies/components/MovieDetail.tsx
++++ b/frontend/features/movies/components/MovieDetail.tsx
+@@ -19,11 +19,14 @@ import {
+   RefreshCw,
+   AlertCircle,
+   Film,
++  Pause,
+ } from 'lucide-react';
+ import type { Movie } from '@/types/movie';
+ import { useWatchlist } from '@/lib/context/WatchlistContext';
++import { getMediaDescriptor, MediaDescriptor } from '@/lib/services/mediaService';
+ import { MovieSection } from './MovieSection';
+ 
++
+ export function MovieDetail({
+   movie,
+   similarMovies,
+@@ -49,16 +52,140 @@ export function MovieDetail({
+   const [isPlaying, setIsPlaying] = useState(false);
+   const [posterError, setPosterError] = useState(false);
+   const [backdropError, setBackdropError] = useState(false);
++  const [descriptor, setDescriptor] = useState<MediaDescriptor | null>(null);
++  const [activeMediaKind, setActiveMediaKind] = useState<'feature' | 'trailer'>('trailer');
++  const [activeMediaUrl, setActiveMediaUrl] = useState<string>('');
++  const [playerState, setPlayerState] = useState<'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'error'>('idle');
++  const [currentTime, setCurrentTime] = useState<number>(0);
++  const [duration, setDuration] = useState<number>(0);
++  const [volume, setVolume] = useState<number>(1);
++  const [isMuted, setIsMuted] = useState<boolean>(false);
++  const [playbackError, setPlaybackError] = useState<string | null>(null);
++  const [retryTime, setRetryTime] = useState<number>(0);
++
+   const videoRef = useRef<HTMLVideoElement>(null);
+   const videoModalRef = useRef<HTMLDivElement>(null);
+   const playButtonRef = useRef<HTMLButtonElement>(null);
+   const playerOpenerRef = useRef<HTMLElement | null>(null);
+ 
+-  // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration
++  // Fetch descriptor for movie
++  useEffect(() => {
++    let mounted = true;
++    getMediaDescriptor(movie.id)
++      .then((desc) => {
++        if (mounted) {
++          setDescriptor(desc);
++        }
++      })
++      .catch(() => {
++        if (mounted) {
++          setDescriptor({
++            movieId: movie.id,
++            hasFeature: false,
++            hasTrailer: Boolean(movie.videoUrl && movie.videoUrl.trim()),
++            feature: null,
++            trailer: movie.videoUrl && movie.videoUrl.trim()
++              ? {
++                  assetId: `legacy-${movie.id}`,
++                  kind: 'trailer',
++                  streamUrl: movie.videoUrl,
++                  mimeType: 'video/mp4',
++                  byteLength: 0,
++                  isPublic: true,
++                  version: 'legacy',
++                }
++              : null,
++          });
++        }
++      });
++    return () => {
++      mounted = false;
++    };
++  }, [movie.id, movie.videoUrl]);
++
++  const formatTime = (secs: number) => {
++    if (isNaN(secs) || secs < 0) return '00:00';
++    const m = Math.floor(secs / 60);
++    const s = Math.floor(secs % 60);
++    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
++  };
++
++  const startPlayback = (kind: 'feature' | 'trailer', opener?: HTMLElement | null) => {
++    if (opener) {
++      playerOpenerRef.current = opener;
++    }
++    setActiveMediaKind(kind);
++    const targetUrl =
++      kind === 'feature'
++        ? descriptor?.feature?.streamUrl || ''
++        : descriptor?.trailer?.streamUrl || movie.videoUrl || '';
++    setActiveMediaUrl(targetUrl);
++    setPlayerState('buffering');
++    setPlaybackError(null);
++    setCurrentTime(0);
++    setRetryTime(0);
++    setIsPlaying(true);
++  };
++
++  const handleRetry = () => {
++    setPlaybackError(null);
++    setPlayerState('buffering');
++    if (videoRef.current) {
++      videoRef.current.load();
++      if (retryTime > 0) {
++        videoRef.current.currentTime = retryTime;
++      }
++      videoRef.current.play().catch(() => setPlayerState('error'));
++    }
++  };
++
++  const togglePlayPause = () => {
++    if (!videoRef.current) return;
++    if (videoRef.current.paused) {
++      videoRef.current.play().catch(() => setPlayerState('error'));
++      setPlayerState('playing');
++    } else {
++      videoRef.current.pause();
++      setPlayerState('paused');
++    }
++  };
++
++  const toggleMute = () => {
++    if (!videoRef.current) return;
++    const nextMuted = !isMuted;
++    setIsMuted(nextMuted);
++    videoRef.current.muted = nextMuted;
++  };
++
++  const toggleFullscreen = () => {
++    if (!videoModalRef.current) return;
++    if (!document.fullscreenElement) {
++      videoModalRef.current.requestFullscreen().catch(() => {});
++    } else {
++      document.exitFullscreen().catch(() => {});
++    }
++  };
++
++  const seekBy = (seconds: number) => {
++    if (!videoRef.current) return;
++    const target = Math.min(Math.max(0, videoRef.current.currentTime + seconds), duration || 100);
++    videoRef.current.currentTime = target;
++    setCurrentTime(target);
++  };
++
++  const adjustVolume = (delta: number) => {
++    if (!videoRef.current) return;
++    const newVol = Math.min(Math.max(0, volume + delta), 1);
++    setVolume(newVol);
++    setIsMuted(newVol === 0);
++    videoRef.current.volume = newVol;
++    videoRef.current.muted = newVol === 0;
++  };
++
++  // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration, shortcuts
+   useEffect(() => {
+     if (!isPlaying) return;
+ 
+-    // Save active element as opener if outside modal
+     if (document.activeElement && (!videoModalRef.current || !videoModalRef.current.contains(document.activeElement))) {
+       playerOpenerRef.current = document.activeElement as HTMLElement | null;
+     }
+@@ -66,7 +193,6 @@ export function MovieDetail({
+     const originalOverflow = document.body.style.overflow;
+     document.body.style.overflow = 'hidden';
+ 
+-    // Auto-focus first focusable element inside modal (initial focus)
+     const timer = setTimeout(() => {
+       if (videoModalRef.current) {
+         const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
+@@ -78,7 +204,6 @@ export function MovieDetail({
+       }
+     }, 40);
+ 
+-    // Trap focus inside modal & listen for Escape
+     const handleKeyDown = (e: KeyboardEvent) => {
+       if (e.key === 'Escape') {
+         e.preventDefault();
+@@ -86,6 +211,50 @@ export function MovieDetail({
+         return;
+       }
+ 
++      // Keyboard shortcuts when playing
++      if (e.key === ' ' || e.code === 'Space') {
++        // Prevent page scroll when space is pressed inside player
++        e.preventDefault();
++        togglePlayPause();
++        return;
++      }
++
++      if (e.key === 'ArrowLeft') {
++        e.preventDefault();
++        seekBy(-5);
++        return;
++      }
++
++      if (e.key === 'ArrowRight') {
++        e.preventDefault();
++        seekBy(5);
++        return;
++      }
++
++      if (e.key === 'ArrowUp') {
++        e.preventDefault();
++        adjustVolume(0.1);
++        return;
++      }
++
++      if (e.key === 'ArrowDown') {
++        e.preventDefault();
++        adjustVolume(-0.1);
++        return;
++      }
++
++      if (e.key === 'm' || e.key === 'M') {
++        e.preventDefault();
++        toggleMute();
++        return;
++      }
++
++      if (e.key === 'f' || e.key === 'F') {
++        e.preventDefault();
++        toggleFullscreen();
++        return;
++      }
++
+       if (e.key === 'Tab' && videoModalRef.current) {
+         const focusable = videoModalRef.current.querySelectorAll<HTMLElement>(
+           'button:not([disabled]), video, [tabindex]:not([tabindex="-1"])'
+@@ -123,7 +292,8 @@ export function MovieDetail({
+       window.removeEventListener('keydown', handleKeyDown);
+       (playerOpenerRef.current || playButtonRef.current)?.focus();
+     };
+-  }, [isPlaying]);
++  }, [isPlaying, isMuted, volume, duration]);
++
+ 
+   const inWatchlist = isWatchlisted(movie.id);
+   const favorite = isFavorite(movie.id);
+@@ -148,7 +318,7 @@ export function MovieDetail({
+   return (
+     <main className="min-h-screen bg-background">
+       {/* Video Player Modal / Player Overlay */}
+-      {isPlaying && hasVideo && (
++      {isPlaying && (
+         <div
+           ref={videoModalRef}
+           role="dialog"
+@@ -156,41 +326,193 @@ export function MovieDetail({
+           aria-labelledby="video-player-title"
+           className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 animate-fade-in"
+         >
+-          <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-surface-border bg-surface shadow-2xl">
++          <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-surface-border bg-surface shadow-2xl flex flex-col">
+             {/* Player Header Bar */}
+             <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
+-              <div className="flex items-center gap-2">
+-                <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
++              <div className="flex items-center gap-2 truncate">
++                <span className="h-2.5 w-2.5 rounded-full bg-brand shadow-brand-sm shrink-0" />
+                 <h3 id="video-player-title" className="text-sm font-bold text-white truncate">
+                   {movie.title}
+                 </h3>
+-                <span className="text-xs text-zinc-400">• Bản xem trước</span>
++                <span className="text-xs text-zinc-400 shrink-0">
++                  • {activeMediaKind === 'feature' ? 'Bản phim chính' : 'Trailer / Giới thiệu'}
++                </span>
+               </div>
+               <button
+                 onClick={() => setIsPlaying(false)}
+-                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
++                className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer shrink-0"
+                 aria-label="Đóng trình phát"
+               >
+                 <X size={20} />
+               </button>
+             </div>
+ 
+-            {/* Video Container */}
+-            <div className="relative aspect-video w-full bg-black">
++            {/* Video Container with Overlays */}
++            <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+               <video
+                 ref={videoRef}
+-                src={videoSource}
+-                controls
++                src={activeMediaUrl}
+                 autoPlay
+-                className="h-full w-full object-contain"
++                playsInline
++                preload="metadata"
++                onLoadedMetadata={() => {
++                  if (videoRef.current) {
++                    setDuration(videoRef.current.duration || 0);
++                    if (retryTime > 0) {
++                      videoRef.current.currentTime = retryTime;
++                    }
++                  }
++                }}
++                onTimeUpdate={() => {
++                  if (videoRef.current) {
++                    setCurrentTime(videoRef.current.currentTime);
++                  }
++                }}
++                onWaiting={() => setPlayerState('buffering')}
++                onPlaying={() => setPlayerState('playing')}
++                onPause={() => {
++                  if (playerState !== 'buffering' && playerState !== 'error') {
++                    setPlayerState('paused');
++                  }
++                }}
++                onEnded={() => setPlayerState('paused')}
++                onError={() => {
++                  setPlayerState('error');
++                  if (videoRef.current) {
++                    setRetryTime(videoRef.current.currentTime);
++                  }
++                  setPlaybackError('Không thể nạp luồng phát video hoặc kết nối mạng bị gián đoạn.');
++                }}
++                className="h-full w-full object-contain cursor-pointer"
++                onClick={togglePlayPause}
+               >
+                 Trình duyệt của bạn không hỗ trợ thẻ video HTML5.
+               </video>
++
++              {/* Buffering Indicator */}
++              {playerState === 'buffering' && (
++                <div
++                  data-testid="video-buffering"
++                  className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-xs pointer-events-none"
++                >
++                  <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-black/75 border border-emerald-500/30">
++                    <Loader2 size={36} className="animate-spin text-brand" />
++                    <span className="text-xs font-semibold text-emerald-400">Đang đệm luồng phát...</span>
++                  </div>
++                </div>
++              )}
++
++              {/* Error Overlay with Retry */}
++              {playerState === 'error' && (
++                <div
++                  data-testid="video-error-overlay"
++                  className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 p-6 text-center z-20"
++                >
++                  <AlertCircle size={44} className="text-amber-400 mb-3" />
++                  <h4 className="text-sm font-bold text-white mb-1">Gián đoạn luồng phát video</h4>
++                  <p className="text-xs text-zinc-300 max-w-md mb-4 leading-relaxed">
++                    {playbackError || 'Không thể đọc luồng HTTP Range từ máy chủ.'}
++                  </p>
++                  <button
++                    data-testid="video-retry-btn"
++                    onClick={handleRetry}
++                    className="btn-primary min-h-[44px] min-w-[44px] px-5 py-2.5 text-xs sm:text-sm font-bold shadow-brand-sm inline-flex items-center gap-2 cursor-pointer"
++                  >
++                    <RefreshCw size={16} /> Thử lại ({formatTime(retryTime)})
++                  </button>
++                </div>
++              )}
++            </div>
++
++            {/* Custom Control Bar with HTTP Range Timeline */}
++            <div className="flex flex-col gap-2 border-t border-surface-border bg-surface-muted/95 p-3 sm:px-4">
++              {/* Timeline Scrubber */}
++              <div className="flex items-center gap-3">
++                <span data-testid="video-time-display" className="text-xs font-mono text-zinc-300 shrink-0 min-w-[80px]">
++                  {formatTime(currentTime)} / {formatTime(duration)}
++                </span>
++                <input
++                  data-testid="video-timeline"
++                  type="range"
++                  min={0}
++                  max={duration || 100}
++                  step="0.1"
++                  value={currentTime}
++                  onChange={(e) => {
++                    const newTime = parseFloat(e.target.value);
++                    setCurrentTime(newTime);
++                    if (videoRef.current) {
++                      videoRef.current.currentTime = newTime;
++                    }
++                  }}
++                  aria-label="Thanh tua video"
++                  className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-zinc-700 accent-emerald-500 min-h-[44px]"
++                />
++              </div>
++
++              {/* Player Control Buttons */}
++              <div className="flex items-center justify-between pt-1">
++                <div className="flex items-center gap-2">
++                  <button
++                    data-testid="video-play-pause-btn"
++                    onClick={togglePlayPause}
++                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-brand text-zinc-950 font-bold hover:bg-brand-hover transition cursor-pointer"
++                    aria-label={playerState === 'playing' ? 'Tạm dừng video' : 'Phát video'}
++                  >
++                    {playerState === 'playing' ? (
++                      <Pause size={18} className="fill-current" />
++                    ) : (
++                      <Play size={18} className="fill-current" />
++                    )}
++                  </button>
++
++                  <div className="flex items-center gap-1.5 ml-2">
++                    <button
++                      data-testid="video-volume-btn"
++                      onClick={toggleMute}
++                      className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
++                      aria-label={isMuted || volume === 0 ? 'Bật âm thanh' : 'Tắt âm thanh'}
++                    >
++                      {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
++                    </button>
++                    <input
++                      type="range"
++                      min="0"
++                      max="1"
++                      step="0.05"
++                      value={isMuted ? 0 : volume}
++                      onChange={(e) => {
++                        const v = parseFloat(e.target.value);
++                        setVolume(v);
++                        setIsMuted(v === 0);
++                        if (videoRef.current) {
++                          videoRef.current.volume = v;
++                          videoRef.current.muted = v === 0;
++                        }
++                      }}
++                      aria-label="Thanh âm lượng"
++                      className="w-16 sm:w-20 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 min-h-[44px]"
++                    />
++                  </div>
++                </div>
++
++                <div className="flex items-center gap-2">
++                  <button
++                    data-testid="video-fullscreen-btn"
++                    onClick={toggleFullscreen}
++                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
++                    aria-label="Toàn màn hình"
++                  >
++                    <Maximize2 size={18} />
++                  </button>
++                </div>
++              </div>
+             </div>
+           </div>
+         </div>
+       )}
+ 
++
+       {/* Hero Backdrop */}
+       <section className="relative overflow-hidden border-b border-surface-border bg-background">
+         {/* Backdrop Image Layer */}
+@@ -281,19 +603,41 @@ export function MovieDetail({
+ 
+               {/* Action Buttons */}
+               <div className="mt-6 flex flex-wrap items-center gap-3">
+-                {hasVideo && (
++                {descriptor?.hasFeature ? (
++                  <>
++                    <button
++                      ref={playButtonRef}
++                      data-testid="play-feature-btn"
++                      onClick={(e) => startPlayback('feature', e.currentTarget)}
++                      className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5 cursor-pointer"
++                    >
++                      <Play size={16} className="fill-current" />
++                      Xem phim
++                    </button>
++
++                    {(descriptor?.hasTrailer || hasVideo) && (
++                      <button
++                        data-testid="play-trailer-btn"
++                        onClick={(e) => startPlayback('trailer', e.currentTarget)}
++                        className="btn-secondary min-h-[44px] px-3 py-2 text-xs sm:px-4 sm:text-sm font-semibold text-zinc-300 hover:text-white inline-flex items-center justify-center gap-1.5 cursor-pointer"
++                      >
++                        <Film size={15} />
++                        Xem trailer
++                      </button>
++                    )}
++                  </>
++                ) : (descriptor?.hasTrailer || hasVideo) ? (
+                   <button
+                     ref={playButtonRef}
+-                    onClick={(e) => {
+-                      playerOpenerRef.current = e.currentTarget;
+-                      setIsPlaying(true);
+-                    }}
+-                    className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5"
++                    data-testid="play-trailer-btn"
++                    onClick={(e) => startPlayback('trailer', e.currentTarget)}
++                    className="btn-primary min-h-[44px] px-4 py-2.5 text-xs sm:px-6 sm:text-sm font-bold shadow-brand-sm inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                   >
+                     <Play size={16} className="fill-current" />
+                     Xem trailer / giới thiệu
+                   </button>
+-                )}
++                ) : null}
++
+ 
+                 <button
+                   disabled={isWatchlistPending}
+diff --git a/frontend/lib/services/mediaService.ts b/frontend/lib/services/mediaService.ts
+new file mode 100644
+index 0000000..70de5a9
+--- /dev/null
++++ b/frontend/lib/services/mediaService.ts
+@@ -0,0 +1,92 @@
++export interface MediaAssetInfo {
++  assetId: string;
++  kind: 'feature' | 'trailer';
++  streamUrl: string;
++  mimeType: string;
++  byteLength: number;
++  durationSeconds?: number | null;
++  isPublic: boolean;
++  version: string;
++}
++
++export interface MediaDescriptor {
++  movieId: string;
++  hasFeature: boolean;
++  hasTrailer: boolean;
++  feature?: MediaAssetInfo | null;
++  trailer?: MediaAssetInfo | null;
++}
++
++const DEFAULT_TIMEOUT_MS = 6000;
++const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || 'http://localhost:8080/api';
++
++/**
++ * Resolves a stream URL returned by descriptor into a full URL if relative.
++ */
++export function resolveStreamUrl(streamUrl: string): string {
++  if (!streamUrl) return '';
++  if (streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) {
++    return streamUrl;
++  }
++  // Strip trailing '/api' from SPRINGBOOT_API to get base host
++  const baseHost = SPRINGBOOT_API.replace(/\/api\/?$/, '');
++  const cleanPath = streamUrl.startsWith('/') ? streamUrl : `/${streamUrl}`;
++  return `${baseHost}${cleanPath}`;
++}
++
++/**
++ * Fetches the media descriptor for a given movie.
++ * Supports public access, handles both direct payloads and wrapped ApiResponse payloads.
++ */
++export async function getMediaDescriptor(
++  movieId: string,
++  options?: { timeoutMs?: number; signal?: AbortSignal }
++): Promise<MediaDescriptor> {
++  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
++  const controller = new AbortController();
++  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
++
++  const signal = options?.signal
++    ? (AbortSignal as any).any
++      ? (AbortSignal as any).any([controller.signal, options.signal])
++      : controller.signal
++    : controller.signal;
++
++  try {
++    const url = `${SPRINGBOOT_API}/movies/${encodeURIComponent(movieId)}/media-descriptor`;
++    const response = await fetch(url, {
++      method: 'GET',
++      headers: {
++        Accept: 'application/json',
++      },
++      signal,
++    });
++
++    if (!response.ok) {
++      throw new Error(`Lỗi tải mô tả media (${response.status})`);
++    }
++
++    const json = await response.json();
++    const data = json && typeof json === 'object' && 'data' in json ? json.data : json;
++
++    return {
++      movieId: data.movieId || movieId,
++      hasFeature: Boolean(data.hasFeature),
++      hasTrailer: Boolean(data.hasTrailer),
++      feature: data.feature
++        ? {
++            ...data.feature,
++            streamUrl: resolveStreamUrl(data.feature.streamUrl),
++          }
++        : null,
++      trailer: data.trailer
++        ? {
++            ...data.trailer,
++            streamUrl: resolveStreamUrl(data.trailer.streamUrl),
++          }
++        : null,
++    };
++  } finally {
++    clearTimeout(timeoutId);
++  }
++}
+diff --git a/frontend/package.json b/frontend/package.json
+index b3ddb01..a97583b 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -7,7 +7,7 @@
+     "build": "next build",
+     "start": "next start",
+     "lint": "next lint",
+-    "test": "node --test tests/catalog_service_suite.mjs tests/m1_behavior_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs tests/modal_a11y_suite.mjs",
++    "test": "node --test tests/catalog_service_suite.mjs tests/m1_behavior_suite.mjs tests/m2_journey_suite.mjs tests/search_experience_suite.mjs tests/modal_a11y_suite.mjs tests/media_playback_suite.mjs",
+     "uipro": "python ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py"
+   },
+   "dependencies": {
+diff --git a/frontend/tests/media_playback_suite.mjs b/frontend/tests/media_playback_suite.mjs
+new file mode 100644
+index 0000000..d39c916
+--- /dev/null
++++ b/frontend/tests/media_playback_suite.mjs
+@@ -0,0 +1,233 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const __filename = fileURLToPath(import.meta.url);
++const __dirname = path.dirname(__filename);
++const root = path.resolve(__dirname, '..');
++
++// Import mediaService functions
++import { resolveStreamUrl, getMediaDescriptor } from '../lib/services/mediaService.ts';
++
++const movieDetailSource = fs.readFileSync(
++  path.join(root, 'features/movies/components/MovieDetail.tsx'),
++  'utf8'
++);
++
++test('1. resolveStreamUrl correctly handles relative and absolute URLs', () => {
++  // Absolute URLs remain intact
++  assert.equal(
++    resolveStreamUrl('https://example.com/stream/video.mp4'),
++    'https://example.com/stream/video.mp4'
++  );
++  assert.equal(
++    resolveStreamUrl('http://cdn.example.com/media/clip.mp4'),
++    'http://cdn.example.com/media/clip.mp4'
++  );
++
++  // Relative URLs are prefixed with base host
++  const relativeStream = resolveStreamUrl('/api/media/stream/ast-001');
++  assert.ok(
++    relativeStream.endsWith('/api/media/stream/ast-001'),
++    'Must end with relative path'
++  );
++  assert.ok(
++    relativeStream.startsWith('http://') || relativeStream.startsWith('https://'),
++    'Must start with protocol'
++  );
++});
++
++test('2. getMediaDescriptor normalizes valid descriptor response', async () => {
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async (url) => {
++      assert.ok(url.includes('/api/movies/m1-test/media-descriptor'));
++      return {
++        ok: true,
++        status: 200,
++        json: async () => ({
++          movieId: 'm1-test',
++          hasFeature: true,
++          hasTrailer: true,
++          feature: {
++            assetId: 'ast-feat-01',
++            kind: 'feature',
++            streamUrl: '/api/media/stream/ast-feat-01',
++            mimeType: 'video/mp4',
++            byteLength: 1048576,
++            durationSeconds: 120.5,
++            isPublic: true,
++            version: 'v1',
++          },
++          trailer: {
++            assetId: 'ast-trl-01',
++            kind: 'trailer',
++            streamUrl: '/api/media/stream/ast-trl-01',
++            mimeType: 'video/mp4',
++            byteLength: 524288,
++            durationSeconds: 30.0,
++            isPublic: true,
++            version: 'v1',
++          },
++        }),
++      };
++    };
++
++    const desc = await getMediaDescriptor('m1-test');
++    assert.equal(desc.movieId, 'm1-test');
++    assert.equal(desc.hasFeature, true);
++    assert.equal(desc.hasTrailer, true);
++    assert.ok(desc.feature);
++    assert.equal(desc.feature.assetId, 'ast-feat-01');
++    assert.ok(desc.feature.streamUrl.endsWith('/api/media/stream/ast-feat-01'));
++    assert.ok(desc.trailer);
++    assert.equal(desc.trailer.assetId, 'ast-trl-01');
++  } finally {
++    globalThis.fetch = origFetch;
++  }
++});
++
++test('3. getMediaDescriptor rejects on server error', async () => {
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async () => ({
++      ok: false,
++      status: 404,
++    });
++
++    await assert.rejects(
++      () => getMediaDescriptor('non-existent'),
++      /Lỗi tải mô tả media \(404\)/
++    );
++  } finally {
++    globalThis.fetch = origFetch;
++  }
++});
++
++test('4. MovieDetail: Play buttons distinguish Feature ("Xem phim") from Trailer ("Xem trailer")', () => {
++  // Feature button
++  assert.ok(
++    movieDetailSource.includes('data-testid="play-feature-btn"'),
++    'MovieDetail must declare data-testid="play-feature-btn"'
++  );
++  assert.ok(
++    movieDetailSource.includes('Xem phim'),
++    'MovieDetail must render "Xem phim" for feature asset'
++  );
++
++  // Trailer button
++  assert.ok(
++    movieDetailSource.includes('data-testid="play-trailer-btn"'),
++    'MovieDetail must declare data-testid="play-trailer-btn"'
++  );
++  assert.ok(
++    movieDetailSource.includes('Xem trailer / giới thiệu') ||
++      movieDetailSource.includes('Xem trailer'),
++    'MovieDetail must render trailer button'
++  );
++});
++
++test('5. MovieDetail: Video player controls, timeline scrubber, and touch targets >=44px', () => {
++  // Timeline scrubber
++  assert.ok(
++    movieDetailSource.includes('data-testid="video-timeline"'),
++    'MovieDetail must provide range scrubber timeline'
++  );
++  assert.ok(
++    movieDetailSource.includes('data-testid="video-time-display"'),
++    'MovieDetail must display current / total time'
++  );
++
++  // Play/Pause button
++  assert.ok(
++    movieDetailSource.includes('data-testid="video-play-pause-btn"'),
++    'MovieDetail must provide play/pause control'
++  );
++
++  // Volume & Fullscreen controls
++  assert.ok(
++    movieDetailSource.includes('data-testid="video-volume-btn"'),
++    'MovieDetail must provide volume / mute control'
++  );
++  assert.ok(
++    movieDetailSource.includes('data-testid="video-fullscreen-btn"'),
++    'MovieDetail must provide fullscreen control'
++  );
++
++  // Touch targets >= 44x44px
++  const controlMinSizes = movieDetailSource.match(/min-h-\[44px\]/g) || [];
++  assert.ok(
++    controlMinSizes.length >= 6,
++    `All interactive video player controls must enforce min-h-[44px] touch target (found ${controlMinSizes.length})`
++  );
++});
++
++test('6. MovieDetail: Buffering spinner and error recovery with retry preserving currentTime', () => {
++  // Buffering indicator
++  assert.ok(
++    movieDetailSource.includes('data-testid="video-buffering"'),
++    'MovieDetail must provide buffering indicator'
++  );
++
++  // Error overlay & retry button
++  assert.ok(
++    movieDetailSource.includes('data-testid="video-retry-btn"'),
++    'MovieDetail must provide error retry button'
++  );
++
++  // Retry logic preserves currentTime
++  assert.ok(
++    movieDetailSource.includes('setRetryTime(videoRef.current.currentTime)'),
++    'Error handler must record retryTime from currentTime'
++  );
++  assert.ok(
++    movieDetailSource.includes('videoRef.current.currentTime = retryTime'),
++    'Retry handler must restore currentTime'
++  );
++});
++
++test('7. MovieDetail: Video player keyboard shortcuts', () => {
++  // Space: play/pause
++  assert.ok(
++    movieDetailSource.includes("e.key === ' '") || movieDetailSource.includes("e.code === 'Space'"),
++    'Player must intercept Space key'
++  );
++  assert.ok(
++    movieDetailSource.includes('togglePlayPause()'),
++    'Space key must trigger togglePlayPause'
++  );
++
++  // ArrowLeft / ArrowRight: seeking
++  assert.ok(
++    movieDetailSource.includes("e.key === 'ArrowLeft'"),
++    'Player must intercept ArrowLeft'
++  );
++  assert.ok(
++    movieDetailSource.includes("e.key === 'ArrowRight'"),
++    'Player must intercept ArrowRight'
++  );
++
++  // ArrowUp / ArrowDown: volume
++  assert.ok(
++    movieDetailSource.includes("e.key === 'ArrowUp'"),
++    'Player must intercept ArrowUp'
++  );
++  assert.ok(
++    movieDetailSource.includes("e.key === 'ArrowDown'"),
++    'Player must intercept ArrowDown'
++  );
++
++  // M: mute
++  assert.ok(
++    movieDetailSource.includes("e.key === 'm'") || movieDetailSource.includes("e.key === 'M'"),
++    'Player must intercept Mute key'
++  );
++
++  // F: fullscreen
++  assert.ok(
++    movieDetailSource.includes("e.key === 'f'") || movieDetailSource.includes("e.key === 'F'"),
++    'Player must intercept Fullscreen key'
++  );
++});
+diff --git a/scripts/benchmark_media_playback.cjs b/scripts/benchmark_media_playback.cjs
+new file mode 100644
+index 0000000..db51e40
+--- /dev/null
++++ b/scripts/benchmark_media_playback.cjs
+@@ -0,0 +1,357 @@
++/**
++ * Milestone M4: Media Playback & Local Storage Benchmark Script
++ *
++ * Measures:
++ *   1. Startup latency (time to initial frame/chunk, cold vs warm)
++ *   2. Seek latency across multiple positions (min, avg, p95, max)
++ *   3. Buffer stalls / underruns simulation
++ *   4. Concurrent streaming throughput & latency (1, 3, 5 parallel streams)
++ *
++ * Outputs:
++ *   docs/reports/media_benchmark_results.json
++ */
++
++const http = require('node:http');
++const fs = require('node:fs');
++const path = require('node:path');
++const assert = require('node:assert/strict');
++const { performance } = require('node:perf_hooks');
++
++
++const PROJECT_ROOT = path.resolve(__dirname, '..');
++const SYNTHETIC_DIR = path.join(PROJECT_ROOT, 'media', 'synthetic');
++const FEATURE_FILE = path.join(SYNTHETIC_DIR, 'feature_test.mp4');
++const TRAILER_FILE = path.join(SYNTHETIC_DIR, 'trailer_test.mp4');
++const RESULTS_FILE = path.join(PROJECT_ROOT, 'docs', 'reports', 'media_benchmark_results.json');
++
++// Helper to compute stats
++function computeStats(arr) {
++  if (!arr || arr.length === 0) return { min: 0, avg: 0, p95: 0, max: 0, count: 0 };
++  const sorted = [...arr].sort((a, b) => a - b);
++  const sum = sorted.reduce((acc, v) => acc + v, 0);
++  const avg = sum / sorted.length;
++  const min = sorted[0];
++  const max = sorted[sorted.length - 1];
++  const p95Index = Math.min(Math.floor(sorted.length * 0.95), sorted.length - 1);
++  const p95 = sorted[p95Index];
++  return {
++    min: Number(min.toFixed(2)),
++    avg: Number(avg.toFixed(2)),
++    p95: Number(p95.toFixed(2)),
++    max: Number(max.toFixed(2)),
++    count: sorted.length,
++  };
++}
++
++// Start embedded RFC 9110 ranged media server for deterministic benchmark
++function createBenchmarkServer(featureBuffer, trailerBuffer) {
++  return http.createServer((req, res) => {
++    const url = new URL(req.url, 'http://127.0.0.1');
++
++    if (url.pathname === '/api/movies/the-last-orbit/media-descriptor') {
++      res.writeHead(200, { 'Content-Type': 'application/json' });
++      res.end(
++        JSON.stringify({
++          movieId: 'the-last-orbit',
++          hasFeature: true,
++          hasTrailer: true,
++          feature: {
++            assetId: 'ast-orbit-feat',
++            kind: 'feature',
++            streamUrl: '/api/media/stream/ast-orbit-feat',
++            mimeType: 'video/mp4',
++            byteLength: featureBuffer.length,
++            durationSeconds: 10.0,
++            version: 'v1',
++            isPublic: true,
++          },
++          trailer: {
++            assetId: 'ast-orbit-trl',
++            kind: 'trailer',
++            streamUrl: '/api/media/stream/ast-orbit-trl',
++            mimeType: 'video/mp4',
++            byteLength: trailerBuffer.length,
++            durationSeconds: 3.0,
++            version: 'v1',
++            isPublic: true,
++          },
++        })
++      );
++      return;
++    }
++
++    let buffer = null;
++    let version = 'v1';
++    let assetId = '';
++    if (url.pathname.includes('ast-orbit-feat')) {
++      buffer = featureBuffer;
++      assetId = 'ast-orbit-feat';
++    } else if (url.pathname.includes('ast-orbit-trl')) {
++      buffer = trailerBuffer;
++      assetId = 'ast-orbit-trl';
++    }
++
++    if (!buffer) {
++      res.writeHead(404, { 'Content-Type': 'text/plain' });
++      res.end('Not Found');
++      return;
++    }
++
++    const totalLength = buffer.length;
++    res.setHeader('Accept-Ranges', 'bytes');
++    res.setHeader('ETag', `"${assetId}-${version}"`);
++    res.setHeader('Cache-Control', 'public, max-age=3600');
++    res.setHeader('Content-Type', 'video/mp4');
++
++    if (req.method === 'HEAD') {
++      res.setHeader('Content-Length', totalLength);
++      res.writeHead(200);
++      res.end();
++      return;
++    }
++
++    const rangeHeader = req.headers['range'];
++    if (!rangeHeader) {
++      res.setHeader('Content-Length', totalLength);
++      res.writeHead(200);
++      res.end(buffer);
++      return;
++    }
++
++    const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/);
++    if (!rangeMatch) {
++      res.setHeader('Content-Range', `bytes */${totalLength}`);
++      res.writeHead(416);
++      res.end();
++      return;
++    }
++
++    const start = parseInt(rangeMatch[1], 10);
++    const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalLength - 1;
++
++    if (start >= totalLength || start > end) {
++      res.setHeader('Content-Range', `bytes */${totalLength}`);
++      res.writeHead(416);
++      res.end();
++      return;
++    }
++
++    const clampedEnd = Math.min(end, totalLength - 1);
++    const chunkLength = clampedEnd - start + 1;
++
++    res.setHeader('Content-Range', `bytes ${start}-${clampedEnd}/${totalLength}`);
++    res.setHeader('Content-Length', chunkLength);
++    res.writeHead(206);
++    res.end(buffer.subarray(start, clampedEnd + 1));
++  });
++}
++
++function makeRangedRequest(port, path, rangeHeader) {
++  return new Promise((resolve, reject) => {
++    const startTime = performance.now();
++    const headers = {};
++    if (rangeHeader) {
++      headers['Range'] = rangeHeader;
++    }
++
++    const req = http.request(
++      {
++        hostname: '127.0.0.1',
++        port,
++        path,
++        method: 'GET',
++        headers,
++      },
++      (res) => {
++        let bytesReceived = 0;
++        res.on('data', (chunk) => {
++          bytesReceived += chunk.length;
++        });
++        res.on('end', () => {
++          const duration = performance.now() - startTime;
++          resolve({
++            statusCode: res.statusCode,
++            bytesReceived,
++            duration,
++            headers: res.headers,
++          });
++        });
++      }
++    );
++
++    req.on('error', reject);
++    req.end();
++  });
++}
++
++async function runBenchmark() {
++  console.log('=== DIPIE CINEMA - M4 LOCAL MEDIA PLAYBACK BENCHMARK ===');
++
++  if (!fs.existsSync(FEATURE_FILE) || !fs.existsSync(TRAILER_FILE)) {
++    throw new Error('Synthetic media files not found in media/synthetic. Generate them first.');
++  }
++
++  const featureBuffer = fs.readFileSync(FEATURE_FILE);
++  const trailerBuffer = fs.readFileSync(TRAILER_FILE);
++  console.log(`- Loaded feature fixture: ${featureBuffer.length} bytes (${(featureBuffer.length / 1024).toFixed(1)} KiB)`);
++  console.log(`- Loaded trailer fixture: ${trailerBuffer.length} bytes (${(trailerBuffer.length / 1024).toFixed(1)} KiB)`);
++
++  const server = createBenchmarkServer(featureBuffer, trailerBuffer);
++  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
++  const port = server.address().port;
++  console.log(`- Benchmark streaming server listening on 127.0.0.1:${port}`);
++
++  try {
++    // 1. Startup Latency Benchmark (Cold vs Warm)
++    console.log('\n[1/4] Measuring Startup Latency (Initial Chunk 0-65535)...');
++    const coldRes = await makeRangedRequest(port, '/api/media/stream/ast-orbit-feat', 'bytes=0-65535');
++    assert.equal(coldRes.statusCode, 206);
++    const coldStartupMs = Number(coldRes.duration.toFixed(2));
++
++    const warmSamples = [];
++    for (let i = 0; i < 20; i++) {
++      const warmRes = await makeRangedRequest(port, '/api/media/stream/ast-orbit-feat', 'bytes=0-65535');
++      assert.equal(warmRes.statusCode, 206);
++      warmSamples.push(warmRes.duration);
++    }
++    const warmStats = computeStats(warmSamples);
++    console.log(`  - Cold startup: ${coldStartupMs} ms`);
++    console.log(`  - Warm startup: min=${warmStats.min}ms, avg=${warmStats.avg}ms, p95=${warmStats.p95}ms, max=${warmStats.max}ms`);
++
++    // 2. Seek Latency Benchmark
++    console.log('\n[2/4] Measuring Seek Latency Across Key Timeline Positions...');
++    const totalBytes = featureBuffer.length;
++    const seekPoints = [
++      { label: '25% (offset ~34KB)', offset: Math.floor(totalBytes * 0.25) },
++      { label: '50% (offset ~69KB)', offset: Math.floor(totalBytes * 0.50) },
++      { label: '75% (offset ~103KB)', offset: Math.floor(totalBytes * 0.75) },
++      { label: '90% (offset ~124KB)', offset: Math.floor(totalBytes * 0.90) },
++    ];
++
++    const seekSamples = [];
++    for (const point of seekPoints) {
++      for (let i = 0; i < 5; i++) {
++        const res = await makeRangedRequest(
++          port,
++          '/api/media/stream/ast-orbit-feat',
++          `bytes=${point.offset}-${Math.min(point.offset + 32768, totalBytes - 1)}`
++        );
++        assert.equal(res.statusCode, 206);
++        seekSamples.push(res.duration);
++      }
++    }
++    const seekStats = computeStats(seekSamples);
++    console.log(`  - Seek Latency (${seekSamples.length} samples): min=${seekStats.min}ms, avg=${seekStats.avg}ms, p95=${seekStats.p95}ms, max=${seekStats.max}ms`);
++
++    // 3. Stalls / Buffer Underrun Measurement
++    console.log('\n[3/4] Measuring Buffer Stalls & Underruns during Real-Time Delivery Simulation...');
++    let stallCount = 0;
++    let totalChunkDeliveryMs = 0;
++    const chunkSize = 32768; // 32 KiB chunks
++    const chunkCount = Math.ceil(totalBytes / chunkSize);
++    // 10s video of ~138KB -> average bitrate ~13.8 KB/s -> 32KB represents ~2.3 seconds of playback time
++    const simulatedPlaybackTimePerChunkMs = 2300;
++
++    for (let c = 0; c < chunkCount; c++) {
++      const start = c * chunkSize;
++      const end = Math.min(start + chunkSize - 1, totalBytes - 1);
++      const res = await makeRangedRequest(port, '/api/media/stream/ast-orbit-feat', `bytes=${start}-${end}`);
++      assert.equal(res.statusCode, 206);
++      totalChunkDeliveryMs += res.duration;
++      // If delivery time exceeds buffered video duration, stall occurs
++      if (res.duration > simulatedPlaybackTimePerChunkMs) {
++        stallCount++;
++      }
++    }
++    console.log(`  - Chunks delivered: ${chunkCount}`);
++    console.log(`  - Total delivery duration: ${totalChunkDeliveryMs.toFixed(2)} ms for 10.0s video`);
++    console.log(`  - Playback buffer underruns / stalls: ${stallCount} (0 expected)`);
++
++    // 4. Concurrent Streams Benchmark (1, 3, 5 Streams)
++    console.log('\n[4/4] Measuring Concurrent Stream Performance (1, 3, 5 streams)...');
++    const concurrencyLevels = [1, 3, 5];
++    const concurrencyResults = {};
++
++    for (const level of concurrencyLevels) {
++      const requestsPerClient = 10;
++      const clientPromises = [];
++      const latencies = [];
++      let totalBytesLevel = 0;
++      const levelStart = performance.now();
++
++      for (let client = 0; client < level; client++) {
++        clientPromises.push(
++          (async () => {
++            for (let reqIdx = 0; reqIdx < requestsPerClient; reqIdx++) {
++              // Alternate between feature and trailer range chunks
++              const isFeat = reqIdx % 2 === 0;
++              const path = isFeat ? '/api/media/stream/ast-orbit-feat' : '/api/media/stream/ast-orbit-trl';
++              const range = isFeat ? 'bytes=1000-33767' : 'bytes=500-16883';
++              const res = await makeRangedRequest(port, path, range);
++              assert.equal(res.statusCode, 206);
++              latencies.push(res.duration);
++              totalBytesLevel += res.bytesReceived;
++            }
++          })()
++        );
++      }
++
++      await Promise.all(clientPromises);
++      const levelDurationSec = (performance.now() - levelStart) / 1000;
++      const throughputMBs = Number(((totalBytesLevel / (1024 * 1024)) / levelDurationSec).toFixed(2));
++      const stats = computeStats(latencies);
++
++      concurrencyResults[level] = {
++        concurrentStreams: level,
++        totalRequests: latencies.length,
++        totalBytesTransferred: totalBytesLevel,
++        totalDurationSeconds: Number(levelDurationSec.toFixed(3)),
++        throughputMBPerSec: throughputMBs,
++        latencyMs: stats,
++      };
++
++      console.log(`  - ${level} stream(s): ${latencies.length} reqs, ${throughputMBs} MB/s, avg latency=${stats.avg}ms, p95=${stats.p95}ms, max=${stats.max}ms`);
++    }
++
++    const finalReport = {
++      timestamp: new Date().toISOString(),
++      environment: {
++        nodeVersion: process.version,
++        platform: process.platform,
++        arch: process.arch,
++      },
++      fixtures: {
++        featureByteLength: totalBytes,
++        trailerByteLength: trailerBuffer.length,
++      },
++      startupLatency: {
++        coldStartupMs,
++        warmStartupMs: warmStats,
++      },
++      seekLatencyMs: seekStats,
++      playbackStalls: {
++        chunksStreamed: chunkCount,
++        stallCount,
++        deliveryVsRealtimeFactor: Number((totalBytes / totalChunkDeliveryMs * 1000 / (totalBytes / 10)).toFixed(2)),
++      },
++      concurrencyBenchmark: concurrencyResults,
++    };
++
++    fs.writeFileSync(RESULTS_FILE, JSON.stringify(finalReport, null, 2), 'utf8');
++    console.log(`\n✔ Benchmark completed successfully! Results written to:`);
++    console.log(`  ${RESULTS_FILE}`);
++
++    return finalReport;
++  } finally {
++    server.close();
++  }
++}
++
++if (require.main === module) {
++  runBenchmark().catch((err) => {
++    console.error('Benchmark failed:', err);
++    process.exit(1);
++  });
++}
++
++module.exports = { runBenchmark };

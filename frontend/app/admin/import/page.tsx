@@ -1,0 +1,405 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  Database,
+  Film,
+  Calendar,
+  Layers,
+  ArrowRight,
+  Clock,
+  Sparkles,
+  RefreshCw,
+  RotateCcw,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Activity,
+} from 'lucide-react';
+import { CatalogImportModal } from '@/features/admin/components/CatalogImportModal';
+import {
+  getCatalogSeriesList,
+  getImportHistory,
+  getCatalogSnapshots,
+  retryCatalogSnapshot,
+  CatalogSeriesSummary,
+  CatalogImportResponse,
+  CatalogSnapshot,
+} from '@/lib/services/catalogService';
+
+export default function AdminImportPage() {
+  const [seriesList, setSeriesList] = useState<CatalogSeriesSummary[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [snapshots, setSnapshots] = useState<CatalogSnapshot[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [refreshNonce, setRefreshNonce] = useState<number>(0);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+
+    Promise.all([
+      getCatalogSeriesList().catch(() => []),
+      getImportHistory().catch(() => []),
+      getCatalogSnapshots().catch(() => []),
+    ]).then(([series, hist, snaps]) => {
+      if (mounted) {
+        setSeriesList(series);
+        setHistory(hist);
+        setSnapshots(snaps);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [refreshNonce]);
+
+  const handleImportSuccess = (_res: CatalogImportResponse) => {
+    setRefreshNonce((n) => n + 1);
+  };
+
+  const handleRetrySnapshot = async (id: string) => {
+    setRetryingId(id);
+    setActionMessage(null);
+    try {
+      const updated = await retryCatalogSnapshot(id);
+      setActionMessage({
+        text: `Đã kích hoạt thử lại cho Snapshot [${id}] (Thế hệ ${updated.snapshotVersion}).`,
+        type: 'success',
+      });
+      setRefreshNonce((n) => n + 1);
+    } catch (err: any) {
+      setActionMessage({
+        text: err?.message || `Lỗi khi thử lại snapshot [${id}]`,
+        type: 'error',
+      });
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-surface-border pb-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand">
+            <Database size={14} />
+            <span>Quản trị danh mục</span>
+          </div>
+          <h1 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">
+            Nhập Dữ Liệu Hoạt Hình (dippie.catalog.v1)
+          </h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            Nhập dữ liệu JSON từ bên ngoài, kiểm tra tính hợp lệ trước khi lưu trữ bền vững trong cơ sở dữ liệu.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setRefreshNonce((n) => n + 1)}
+            className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-zinc-300"
+          >
+            <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+            <span>Làm mới</span>
+          </button>
+          <Link
+            href="/search"
+            className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-zinc-300"
+          >
+            <Film size={14} />
+            <span>Xem kho phim</span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Left 2 Cols: Import Tool */}
+        <div className="lg:col-span-2 space-y-8">
+          <CatalogImportModal onImportSuccess={handleImportSuccess} />
+
+          {/* Currently Imported Series Section */}
+          <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-sm">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <div className="flex items-center gap-2">
+                <Film size={18} className="text-brand" />
+                <h2 className="text-base font-bold text-white">
+                  Các bộ hoạt hình đã nhập ({seriesList.length})
+                </h2>
+              </div>
+              <span className="text-xs text-zinc-400">Xem chi tiết các phần, tập và cảnh</span>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-10 text-xs text-zinc-400">
+                <RefreshCw size={16} className="animate-spin text-brand mr-2" />
+                <span>Đang tải danh sách bộ phim...</span>
+              </div>
+            ) : seriesList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-zinc-400">
+                Chưa có bộ hoạt hình nào được nhập. Hãy tải tệp JSON lên để bắt đầu.
+              </div>
+            ) : (
+              <div className="mt-4 divide-y divide-surface-border">
+                {seriesList.map((ser) => (
+                  <div
+                    key={ser.id}
+                    className="flex flex-wrap items-center justify-between gap-4 py-3.5 transition-colors hover:bg-surface-hover/50 rounded-lg px-2"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/series/${encodeURIComponent(ser.id)}`}
+                          className="text-sm font-bold text-white hover:text-brand transition-colors"
+                        >
+                          {ser.title}
+                        </Link>
+                        {ser.releaseYearStart && (
+                          <span className="rounded bg-surface-elevated px-1.5 py-0.5 text-[10px] text-zinc-400 border border-surface-border">
+                            {ser.releaseYearStart}
+                          </span>
+                        )}
+                        <span className="font-mono text-[11px] text-zinc-500">
+                          [{ser.id}]
+                        </span>
+                      </div>
+                      {ser.synopsis && (
+                        <p className="mt-1 line-clamp-1 text-xs text-zinc-400 max-w-xl">
+                          {ser.synopsis}
+                        </p>
+                      )}
+                    </div>
+
+                    <Link
+                      href={`/series/${encodeURIComponent(ser.id)}`}
+                      className="btn-secondary flex items-center gap-1.5 text-xs font-semibold shrink-0"
+                    >
+                      <span>Xem tập & cảnh</span>
+                      <ArrowRight size={13} />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action Message Banner */}
+          {actionMessage && (
+            <div
+              className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-xs ${
+                actionMessage.type === 'success'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                  : 'border-red-500/30 bg-red-500/10 text-red-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {actionMessage.type === 'success' ? (
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                ) : (
+                  <XCircle size={16} className="text-red-400 shrink-0" />
+                )}
+                <span>{actionMessage.text}</span>
+              </div>
+              <button
+                onClick={() => setActionMessage(null)}
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Outbox Snapshots & AI Index Sync Section */}
+          <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-sm">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <div className="flex items-center gap-2">
+                <Activity size={18} className="text-brand" />
+                <h2 className="text-base font-bold text-white">
+                  Hàng đợi Outbox & Đồng bộ Chỉ mục AI ({snapshots.length})
+                </h2>
+              </div>
+              <span className="text-xs text-zinc-400">Trạng thái đồng bộ tự động giữa Spring Boot và FastAPI</span>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8 text-xs text-zinc-400">
+                <RefreshCw size={16} className="animate-spin text-brand mr-2" />
+                <span>Đang kiểm tra hàng đợi outbox...</span>
+              </div>
+            ) : snapshots.length === 0 ? (
+              <div className="py-6 text-center text-xs text-zinc-400">
+                Chưa có snapshot nào được tạo. Khi bạn nhập gói catalog, snapshot sẽ được ghi nhận tại đây.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {snapshots.map((snap) => {
+                  const isRetrying = retryingId === snap.id;
+                  const canRetry = snap.status === 'SYNC_FAILED' || snap.status === 'BLOCKED' || snap.status === 'PENDING';
+                  return (
+                    <div
+                      key={snap.id}
+                      className="rounded-lg border border-surface-border bg-surface-elevated p-3.5 text-xs space-y-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-brand">
+                            Thế hệ {snap.snapshotVersion}
+                          </span>
+                          <span className="font-mono text-zinc-400">[{snap.id}]</span>
+                          <span className="text-zinc-400">({snap.totalItems} mục)</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {snap.status === 'READY' && (
+                            <span className="flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/30">
+                              <CheckCircle2 size={12} /> READY (Đã chỉ mục)
+                            </span>
+                          )}
+                          {snap.status === 'SYNCING' && (
+                            <span className="flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[11px] font-bold text-blue-400 border border-blue-500/30 animate-pulse">
+                              <RefreshCw size={12} className="animate-spin" /> SYNCING (Đang đồng bộ)
+                            </span>
+                          )}
+                          {snap.status === 'PENDING' && (
+                            <span className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-amber-500/30">
+                              <Clock size={12} /> PENDING (Chờ xử lý)
+                            </span>
+                          )}
+                          {snap.status === 'BLOCKED' && (
+                            <span className="flex items-center gap-1 rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-bold text-orange-400 border border-orange-500/30">
+                              <AlertTriangle size={12} /> BLOCKED (Thiếu token)
+                            </span>
+                          )}
+                          {snap.status === 'SYNC_FAILED' && (
+                            <span className="flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-400 border border-red-500/30">
+                              <XCircle size={12} /> SYNC_FAILED (Lỗi đồng bộ)
+                            </span>
+                          )}
+
+                          {canRetry && (
+                            <button
+                              type="button"
+                              onClick={() => handleRetrySnapshot(snap.id)}
+                              disabled={isRetrying}
+                              className="btn-secondary flex items-center gap-1 text-[11px] py-1 px-2.5 font-semibold text-brand hover:text-white disabled:opacity-50"
+                            >
+                              <RotateCcw size={11} className={isRetrying ? 'animate-spin' : ''} />
+                              <span>{isRetrying ? 'Đang gửi...' : 'Thử lại'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {snap.errorMessage && (
+                        <p className="rounded bg-red-500/10 p-2 font-mono text-[11px] text-red-400 border border-red-500/20">
+                          {snap.errorMessage}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+                        <span title={snap.contentHash}>SHA-256: {snap.contentHash.slice(0, 16)}...</span>
+                        {snap.retryCount !== undefined && snap.retryCount > 0 && (
+                          <span>Số lần thử lại: {snap.retryCount}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Col: Info & Import History */}
+        <div className="space-y-6">
+          {/* Workflow Guide Card */}
+          <div className="rounded-xl border border-surface-border bg-surface p-5">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+              <Sparkles size={16} className="text-brand" />
+              <span>Quy trình nhập dữ liệu</span>
+            </h3>
+            <ol className="mt-3 space-y-2.5 text-xs text-zinc-300">
+              <li className="flex gap-2">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
+                  1
+                </span>
+                <span>
+                  <strong>JSON bên ngoài:</strong> Chuẩn hóa theo hợp đồng{' '}
+                  <code className="text-zinc-400">dippie.catalog.v1</code>.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
+                  2
+                </span>
+                <span>
+                  <strong>Xác thực & Preview:</strong> Kiểm tra ràng buộc tham chiếu, tính SHA-256 và diff toCreate/toUpdate.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
+                  3
+                </span>
+                <span>
+                  <strong>Atomic Transaction:</strong> Nhập 12 bảng thực thể và ánh xạ video Google Drive vào Media Service.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
+                  4
+                </span>
+                <span>
+                  <strong>AI Index Sync:</strong> Tự động cập nhật chỉ mục Hybrid Retrieval và CineBot.
+                </span>
+              </li>
+            </ol>
+          </div>
+
+          {/* Import History */}
+          <div className="rounded-xl border border-surface-border bg-surface p-5">
+            <div className="flex items-center gap-2 border-b border-surface-border pb-3">
+              <Clock size={16} className="text-brand" />
+              <h3 className="text-sm font-bold text-white">Lịch sử gói nhập</h3>
+            </div>
+
+            {history.length === 0 ? (
+              <p className="mt-3 text-xs text-zinc-500">Chưa có lịch sử nhập gói.</p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {history.map((pkg: any) => (
+                  <div
+                    key={pkg.id}
+                    className="rounded-lg border border-surface-border bg-surface-elevated p-3 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <strong className="text-white font-mono">{pkg.id}</strong>
+                      <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand border border-brand/20">
+                        Rev {pkg.revision}
+                      </span>
+                    </div>
+                    {pkg.description && (
+                      <p className="mt-1 text-[11px] text-zinc-400 line-clamp-2">
+                        {pkg.description}
+                      </p>
+                    )}
+                    <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+                      <span>{pkg.defaultLanguage?.toUpperCase()}</span>
+                      <span title={pkg.contentHash}>
+                        {pkg.contentHash ? `SHA: ${pkg.contentHash.slice(0, 10)}...` : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

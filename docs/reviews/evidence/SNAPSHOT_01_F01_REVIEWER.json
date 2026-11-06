@@ -1,0 +1,13 @@
+{
+  "command": "powershell.exe -NoProfile -File scripts/start_preview_stack.ps1 -Background -TestInjectFailureAfter FastApiSpawn",
+  "exit_code": 1,
+  "duration_seconds": 10.63,
+  "ports_free": {
+    "8000": true,
+    "8080": true,
+    "3000": true
+  },
+  "state_absent": true,
+  "log": "C:\\Users\\Admin\\AppData\\Local\\Temp\\snapshot-f01-review-failure.log",
+  "mount_test": "NOT_RUN"
+}

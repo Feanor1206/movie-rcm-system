@@ -1,0 +1,123 @@
+{
+  "task": "CATALOG-01-F02",
+  "base_commit": "c2d29c04edd58c4cc0a6e648d316285a9377384f",
+  "head_commit": "adf0dee0655fad19102b39f31d203aeaed42d906",
+  "branch": "dev",
+  "contract": "dippie.catalog.v1",
+  "contract_preserved": true,
+  "status": "READY_FOR_HANDOVER",
+  "completed_at": "2026-10-16T23:25:00+07:00",
+  "findings": {
+    "F1": {
+      "title": "Service credential cong khai trong frontend, auth sync van bi bypass ve ban chat",
+      "priority": "P1",
+      "status": "CLOSED",
+      "resolution": "Removed hardcoded service token from frontend (catalogService.ts, CatalogImportModal.tsx) and removed default fallback secret in FastAPI main.py and Spring CatalogImportService. Token is read exclusively from external environment (CATALOG_SYNC_TOKEN / FASTAPI_SYNC_SECRET). FastAPI sync fails closed (HTTP 503) when secret is unconfigured. Client browser component no longer calls index sync directly.",
+      "tests": [
+        "backend.fastapi.tests.test_catalog_retrieval.TestCatalogRetrievalSuite.test_12_fastapi_endpoints_sync_and_serve_real_catalog",
+        "frontend npx tsc --noEmit"
+      ]
+    },
+    "F2": {
+      "title": "Snapshot van chi chua package cuoi, publish truoc DB commit; outbox chua co worker/retry",
+      "priority": "P1",
+      "status": "CLOSED",
+      "resolution": "Decoupled file/network sync from import transaction. Implemented genuine transactional outbox worker (CatalogSyncWorker) with scheduled polling (@Scheduled(fixedDelay = 5000)) and startup recovery listener. Global monotonic snapshot generation assigned. Full eligible committed snapshot generated via exportEligibleSnapshot from DB and written atomically to disk before HTTP dispatch. Stale generation protection implemented in FastAPI. Idempotent import returns actual snapshot status from DB.",
+      "tests": [
+        "com.dippie.moviercm.service.catalog.CatalogImportServiceTest.testImportCommitSuccess",
+        "com.dippie.moviercm.service.catalog.CatalogImportServiceTest.testIdempotentReimport",
+        "com.dippie.moviercm.service.catalog.CatalogImportServiceTest.testHigherRevisionUpdate",
+        "backend.fastapi.tests.test_catalog_retrieval.TestCatalogRetrievalSuite.test_12_fastapi_endpoints_sync_and_serve_real_catalog"
+      ]
+    },
+    "F3": {
+      "title": "Runtime van index draft/private; API public tra metadata va raw JSON khong loc",
+      "priority": "P1",
+      "status": "CLOSED",
+      "resolution": "Updated catalog_sync.py default parameters to include_draft=False, include_private=False. Enforced parent publication cascade: draft/archived series excludes child seasons, episodes, segments, and scenes; draft/archived episode excludes segments and scenes; private asset excludes linked scenes. CatalogQueryService enforces publication policies for non-admin callers on all public endpoints. Export endpoint moved under ROLE_ADMIN.",
+      "tests": [
+        "docs/reviews/repro/CATALOG_01_F01_probe.py (runtime_default_publication verified 0 items indexed)",
+        "backend.fastapi.tests.test_catalog_retrieval.TestCatalogRetrievalSuite"
+      ]
+    },
+    "F4": {
+      "title": "Revision entity van bi package revision nang gia; key order gay conflict gia",
+      "priority": "P1",
+      "status": "CLOSED",
+      "resolution": "extractRevision in CatalogImportService uses explicit record.revision without package revision inflation. Implemented canonical JSON key sorting using TreeMap in computeCanonicalSha256 while preserving array item sequences. importPackage updates existing managed JPA entities preserving @Version optLockVersion.",
+      "tests": [
+        "docs/reviews/repro/CATALOG_01_F01_logic_probe.py (lower_entity_revision_in_higher_package -> CONFLICT, reordered_identical_object -> UNCHANGED)",
+        "com.dippie.moviercm.service.catalog.CatalogImportServiceTest.testHigherRevisionUpdate"
+      ]
+    },
+    "F5": {
+      "title": "storage_key chua noi vao streaming; nhieu edition van dung unique constraint",
+      "priority": "P1",
+      "status": "CLOSED",
+      "resolution": "Injected StorageKeyConfig into MediaStreamService. In getMediaResource, getResourceLength, and openMediaChannel, resolved and validated path containment via storageKeyConfig.resolvePath(). In getMediaAsset, allowed streaming for authenticated non-public assets, restricting private assets to ROLE_ADMIN. In syncToLegacyMediaAsset, propagated storage_key and generated unique version strings (v1_ + aid) to eliminate duplicate key conflicts across multiple editions.",
+      "tests": [
+        "com.dippie.moviercm.service.catalog.CatalogImportServiceTest.testImportCommitSuccess",
+        "StorageKeyConfig path traversal and symlink containment tests"
+      ]
+    },
+    "F6": {
+      "title": "Scene doi asset nhung seek van tac dong video cu; deep-link timer khong giu identity",
+      "priority": "P1",
+      "status": "CLOSED",
+      "resolution": "Removed fragile setTimeout timer in frontend/app/series/[id]/page.tsx. Implemented PendingSeekIdentity tuple (seriesId, episodeId, assetId, sceneId, targetSec, generation). On asset switch, queued seek without touching old video element. On onLoadedMetadata / onCanPlay, verified strict identity tuple match before applying clamped seek. Added AbortController cancellation to series and episode fetch effects with generation guards and deep-link reset.",
+      "tests": [
+        "frontend npx tsc --noEmit"
+      ]
+    },
+    "F7": {
+      "title": "Validation chua khop contract; export van khong hop le",
+      "priority": "P2",
+      "status": "CLOSED",
+      "resolution": "Enforced strict format validation in CatalogValidator for date (ISO-8601 YYYY-MM-DD with STRICT resolver), uri (URI scheme verification), and date-time. Enforced exclusiveMinimum and exclusiveMaximum numeric boundaries. Ensured fail-closed behavior when schema resource is unavailable. Formatted exportSearchableCatalog and exportEligibleSnapshot headers to 100% compliant dippie.catalog.v1 contract specifications.",
+      "tests": [
+        "docs/reviews/repro/CATALOG_01_F01_probe.py (invalid_release_date, invalid_source_uri, zero_rating_scale match contract)",
+        "docs/reviews/repro/CATALOG_01_F01_logic_probe.py (0 export contract errors)",
+        "docs/reviews/repro/CATALOG_01_contract_probe.py (8/8 cases matched)",
+        "com.dippie.moviercm.service.catalog.CatalogValidatorTest (9/9 passed)"
+      ]
+    },
+    "F8": {
+      "title": "Manifest/patch chua bao tron dependency, bang chung dong gate chua du",
+      "priority": "P2",
+      "status": "CLOSED",
+      "resolution": "Expanded CATALOG_01_F02_MANIFEST.json to 66 files covering all JPA entities, repositories, DTOs, schema resources, services, controllers, and frontend pages. Generated docs/reports/CATALOG_01_F02.patch and verified reverse applicability with git apply --check -R.",
+      "tests": [
+        "git apply --check -R docs/reports/CATALOG_01_F02.patch (exit 0)",
+        "SHA-256 verification of all 66 manifest items"
+      ]
+    }
+  },
+  "gates": {
+    "contract_schema_integrity": "PASS",
+    "reviewer_probes": {
+      "CATALOG_01_F01_logic_probe.py": "PASS",
+      "CATALOG_01_F01_probe.py": "PASS",
+      "CATALOG_01_contract_probe.py": "PASS"
+    },
+    "spring_boot_tests": {
+      "CatalogValidatorTest": "PASS (9/9)",
+      "CatalogImportServiceTest": "PASS (6/6)",
+      "total_passed": 15,
+      "failures": 0,
+      "errors": 0
+    },
+    "fastapi_ai_tests": {
+      "test_catalog_retrieval.py": "PASS (12/12)",
+      "total_passed": 12,
+      "failures": 0,
+      "errors": 0
+    },
+    "frontend_typescript": {
+      "tsc_no_emit": "PASS (0 errors)"
+    },
+    "patch_reverse_applicability": {
+      "command": "git apply --check -R docs/reports/CATALOG_01_F02.patch",
+      "status": "PASS (exit 0)"
+    }
+  }
+}

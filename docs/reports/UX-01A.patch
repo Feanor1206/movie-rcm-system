@@ -1,0 +1,1615 @@
+diff --git a/frontend/app/globals.css b/frontend/app/globals.css
+index c8e66d5..7d1ef5a 100644
+--- a/frontend/app/globals.css
++++ b/frontend/app/globals.css
+@@ -12,13 +12,13 @@
+ 
+ html {
+   scroll-behavior: smooth;
+-  background-color: #000000;
++  background-color: #090d0b;
+ }
+ 
+ body {
+   margin: 0;
+-  background-color: #000000;
+-  color: #ffffff;
++  background-color: #090d0b;
++  color: #f3f4f6;
+   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+   font-size: 15px;
+   line-height: 1.5;
+@@ -27,7 +27,7 @@ body {
+ }
+ 
+ ::selection {
+-  background: #e50914;
++  background: #10b981;
+   color: #ffffff;
+ }
+ 
+@@ -38,16 +38,16 @@ body {
+ }
+ 
+ ::-webkit-scrollbar-track {
+-  background: #000000;
++  background: #090d0b;
+ }
+ 
+ ::-webkit-scrollbar-thumb {
+-  background: #27272a;
++  background: #1d2a23;
+   border-radius: 3px;
+ }
+ 
+ ::-webkit-scrollbar-thumb:hover {
+-  background: #3f3f46;
++  background: #27382f;
+ }
+ 
+ .movie-row {
+@@ -62,7 +62,7 @@ body {
+ /* Clear, accessible keyboard focus rings */
+ :focus-visible {
+   outline: none;
+-  box-shadow: 0 0 0 2px #000000, 0 0 0 4px #e50914;
++  box-shadow: 0 0 0 2px #090d0b, 0 0 0 4px #10b981;
+ }
+ 
+ @layer components {
+@@ -75,19 +75,19 @@ body {
+   }
+ 
+   .btn-primary {
+-    @apply inline-flex items-center justify-center gap-2 rounded-md bg-cinema-red px-5 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-cinema-red-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer;
++    @apply inline-flex items-center justify-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-brand-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer shadow-brand-sm;
+   }
+ 
+   .btn-secondary {
+-    @apply inline-flex items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/90 px-5 py-2.5 text-sm font-semibold text-zinc-100 transition-all duration-150 hover:border-zinc-500 hover:bg-zinc-800 active:scale-[0.98] cursor-pointer;
++    @apply inline-flex items-center justify-center gap-2 rounded-md border border-surface-border bg-surface-elevated/90 px-5 py-2.5 text-sm font-semibold text-zinc-100 transition-all duration-150 hover:border-brand/40 hover:bg-surface-hover active:scale-[0.98] cursor-pointer;
+   }
+ 
+   .btn-ghost {
+-    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/80 hover:text-white cursor-pointer;
++    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-surface-hover hover:text-white cursor-pointer;
+   }
+ 
+   .surface-card {
+-    @apply rounded-xl border border-zinc-800 bg-zinc-950 transition-all duration-200;
++    @apply rounded-xl border border-surface-border bg-surface transition-all duration-200;
+   }
+ }
+ 
+diff --git a/frontend/app/layout.tsx b/frontend/app/layout.tsx
+index 203d73e..3966a90 100644
+--- a/frontend/app/layout.tsx
++++ b/frontend/app/layout.tsx
+@@ -11,15 +11,15 @@ const inter = Inter({
+ });
+ 
+ export const metadata: Metadata = {
+-  title: 'Dippie — Nền tảng gợi ý & khám phá phim điện ảnh',
++  title: 'Dippie — Khám phá phim hoạt hình & gợi ý thông minh',
+   description:
+-    'Dippie là nền tảng khám phá phim chuẩn điện ảnh với trợ lý gợi ý phim thông minh CineBot và giao diện tối giản Đen/Đỏ/Trắng.',
+-  keywords: ['movies', 'cinema', 'gợi ý phim', 'xem phim', 'film discovery', 'CineBot'],
+-  authors: [{ name: 'Dippie Cinema' }],
++    'Dippie là nền tảng khám phá phim hoạt hình nhẹ nhàng, không spoil, hỗ trợ chọn phim nhanh với trợ lý thông minh CineBot và giao diện xanh lá tinh tế.',
++  keywords: ['hoạt hình', 'animation', 'anime', 'gợi ý hoạt hình', 'khám phá phim', 'CineBot'],
++  authors: [{ name: 'Dippie Animation' }],
+ };
+ 
+ export const viewport: Viewport = {
+-  themeColor: '#000000',
++  themeColor: '#090d0b',
+   colorScheme: 'dark',
+   width: 'device-width',
+   initialScale: 1,
+@@ -32,7 +32,7 @@ export default function RootLayout({
+ }>) {
+   return (
+     <html lang="vi" className={`${inter.variable} dark`}>
+-      <body className="min-h-screen bg-black font-sans text-foreground antialiased selection:bg-cinema-red selection:text-white">
++      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-brand selection:text-white">
+         <AuthProvider>
+           <WatchlistProvider>{children}</WatchlistProvider>
+         </AuthProvider>
+diff --git a/frontend/app/movies/[id]/page.tsx b/frontend/app/movies/[id]/page.tsx
+index 7f63a3c..7297b39 100644
+--- a/frontend/app/movies/[id]/page.tsx
++++ b/frontend/app/movies/[id]/page.tsx
+@@ -8,5 +8,21 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ id
+   const { id } = await params;
+   const movie = movies.find((item) => item.id === id);
+   if (!movie) notFound();
+-  return <><Navbar/><MovieDetail movie={movie} similarMovies={movies.filter((item) => item.id !== movie.id).slice(0, 5)}/><Footer/></>;
++
++  const similarMovies = movies
++    .filter((item) => item.id !== movie.id)
++    .sort((a, b) => {
++      const aCommon = a.genres.filter((g) => movie.genres.includes(g)).length;
++      const bCommon = b.genres.filter((g) => movie.genres.includes(g)).length;
++      return bCommon - aCommon;
++    })
++    .slice(0, 6);
++
++  return (
++    <>
++      <Navbar />
++      <MovieDetail movie={movie} similarMovies={similarMovies} />
++      <Footer />
++    </>
++  );
+ }
+diff --git a/frontend/app/page.tsx b/frontend/app/page.tsx
+index 7e5f2b8..8dcf39d 100644
+--- a/frontend/app/page.tsx
++++ b/frontend/app/page.tsx
+@@ -1,66 +1,185 @@
++'use client';
++
+ import React from 'react';
++import Link from 'next/link';
++import { Sparkles, Compass, BookmarkCheck, ArrowRight } from 'lucide-react';
+ import { Footer } from '@/components/layout/Footer';
+ import { Navbar } from '@/components/layout/Navbar';
+ import { EditorialHero } from '@/features/home/components/EditorialHero';
+ import { MovieSection } from '@/features/movies/components/MovieSection';
+-import { featuredMovie, movies } from '@/lib/data/movies';
+-import Link from 'next/link';
++import { animationMovies, featuredMovie } from '@/lib/data/movies';
++import { useWatchlist } from '@/lib/context/WatchlistContext';
+ 
+ export default function HomePage() {
+-  const trendingMovies = movies;
+-  const recommendedMovies = [...movies].reverse();
+-  const topRatedMovies = [...movies].sort((a, b) => b.rating - a.rating);
++  const { openChat, watchlist } = useWatchlist();
++
++  // Danh mục hoạt hình dựa trên metadata thực tế:
++  // 1. Toàn bộ hoạt hình tuyển chọn
++  const allCurated = animationMovies;
++
++  // 2. Phiêu lưu & Kỳ ảo gia đình (Family, Fantasy, Adventure)
++  const familyAndFantasy = animationMovies.filter(
++    (m) =>
++      m.genres.includes('Family') ||
++      m.genres.includes('Fantasy') ||
++      m.genres.includes('Adventure')
++  );
++
++  // 3. Đánh giá cao (rating >= 8.0)
++  const highRated = animationMovies.filter((m) => m.rating >= 8.0);
++
++  const animationGenreTabs = [
++    { label: 'Tất cả hoạt hình', genre: 'Animation' },
++    { label: 'Phiêu lưu', genre: 'Adventure' },
++    { label: 'Kỳ ảo', genre: 'Fantasy' },
++    { label: 'Gia đình', genre: 'Family' },
++    { label: 'Lãng mạn & Cảm xúc', genre: 'Romance' },
++    { label: 'Hài hước', genre: 'Comedy' },
++  ];
+ 
+   return (
+     <>
+       <Navbar />
+-      <main className="bg-black">
+-        {/* Spotlight Hero with prominent backdrop */}
++      <main className="bg-background min-h-screen text-foreground">
++        {/* Spotlight Hero with Animation feature */}
+         <EditorialHero movie={featuredMovie} />
+ 
+-        {/* Categories Bar: Clean rectangular tabs (No pill badges) */}
+-        <div className="border-b border-zinc-800 bg-zinc-950 py-3">
++        {/* Quick Discovery Pathways (Hành động khám phá thấy sớm trên mobile mà không phải cuộn sâu) */}
++        <section className="border-b border-surface-border bg-surface/60 py-6 sm:py-8">
++          <div className="page-shell">
++            <div className="mb-4">
++              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
++                <span className="h-2 w-2 rounded-full bg-brand" />
++                Hôm nay bạn muốn xem phim hoạt hình nào?
++              </h2>
++              <p className="mt-1 text-xs sm:text-sm text-zinc-400">
++                Lựa chọn nhanh theo nhu cầu thực tế hoặc trò chuyện tự nhiên với trợ lý CineBot.
++              </p>
++            </div>
++
++            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
++              {/* Pathway 1: Explore full animation catalog */}
++              <Link
++                href="/search?genre=Animation"
++                className="group flex flex-col justify-between rounded-xl border border-surface-border bg-surface p-4 transition-all hover:border-brand/40 hover:bg-surface-elevated hover:shadow-brand-sm"
++              >
++                <div className="flex items-center gap-3">
++                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand/15 text-brand border border-brand/25">
++                    <Compass size={18} />
++                  </div>
++                  <div>
++                    <h3 className="text-xs sm:text-sm font-semibold text-white group-hover:text-brand transition-colors">
++                      Khám phá kho hoạt hình
++                    </h3>
++                    <p className="mt-0.5 text-[11px] sm:text-xs text-zinc-400">
++                      Duyệt tuyển tập hoạt hình 2D, 3D, Anime có sẵn
++                    </p>
++                  </div>
++                </div>
++                <div className="mt-3 flex items-center gap-1 text-[11px] font-medium text-brand">
++                  <span>Mở danh mục</span>
++                  <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
++                </div>
++              </Link>
++
++              {/* Pathway 2: Ask CineBot with natural language */}
++              <button
++                type="button"
++                onClick={openChat}
++                className="group flex flex-col justify-between text-left rounded-xl border border-surface-border bg-surface p-4 transition-all hover:border-brand/40 hover:bg-surface-elevated hover:shadow-brand-sm cursor-pointer"
++              >
++                <div className="flex items-center gap-3">
++                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand/15 text-brand border border-brand/25">
++                    <Sparkles size={18} />
++                  </div>
++                  <div>
++                    <h3 className="text-xs sm:text-sm font-semibold text-white group-hover:text-brand transition-colors">
++                      Gợi ý cùng CineBot
++                    </h3>
++                    <p className="mt-0.5 text-[11px] sm:text-xs text-zinc-400">
++                      Tìm theo cảm xúc, thời lượng hoặc loại trừ thể loại
++                    </p>
++                  </div>
++                </div>
++                <div className="mt-3 flex items-center gap-1 text-[11px] font-medium text-brand">
++                  <span>Mở trợ lý</span>
++                  <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
++                </div>
++              </button>
++
++              {/* Pathway 3: Saved Watchlist */}
++              <Link
++                href="/profile"
++                className="group flex flex-col justify-between rounded-xl border border-surface-border bg-surface p-4 transition-all hover:border-brand/40 hover:bg-surface-elevated hover:shadow-brand-sm"
++              >
++                <div className="flex items-center gap-3">
++                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand/15 text-brand border border-brand/25">
++                    <BookmarkCheck size={18} />
++                  </div>
++                  <div>
++                    <h3 className="text-xs sm:text-sm font-semibold text-white group-hover:text-brand transition-colors">
++                      Danh sách đã lưu
++                    </h3>
++                    <p className="mt-0.5 text-[11px] sm:text-xs text-zinc-400">
++                      Xem lại các phim bạn đã đánh dấu ({watchlist.length} phim)
++                    </p>
++                  </div>
++                </div>
++                <div className="mt-3 flex items-center gap-1 text-[11px] font-medium text-brand">
++                  <span>Xem danh sách</span>
++                  <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
++                </div>
++              </Link>
++            </div>
++          </div>
++        </section>
++
++        {/* Categories Bar: Clean rectangular tabs for Animation facets */}
++        <div className="border-b border-surface-border bg-surface/40 py-3">
+           <div className="page-shell flex items-center justify-between overflow-x-auto gap-4 scrollbar-none">
+             <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 shrink-0">
+-              Thể loại:
++              Chủ đề hoạt hình:
+             </span>
+             <div className="flex items-center gap-1.5">
+-              {['Sci-Fi', 'Drama', 'Mystery', 'Thriller', 'Adventure', 'Romance', 'Crime'].map((genre) => (
++              {animationGenreTabs.map((tab) => (
+                 <Link
+-                  key={genre}
+-                  href={`/search?genre=${encodeURIComponent(genre)}`}
+-                  className="rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white shrink-0 cursor-pointer"
++                  key={tab.genre}
++                  href={`/search?genre=${encodeURIComponent(tab.genre)}`}
++                  className="rounded-md border border-surface-border bg-surface-elevated px-3 py-1 text-xs text-zinc-300 transition-colors hover:border-brand/40 hover:text-white shrink-0 cursor-pointer"
+                 >
+-                  {genre}
++                  {tab.label}
+                 </Link>
+               ))}
+             </div>
+           </div>
+         </div>
+ 
+-        {/* Main Content Sections */}
+-        <div className="page-shell space-y-4 pt-6 pb-16">
+-          {/* Trending */}
++        {/* Main Animation Rails */}
++        <div className="page-shell space-y-4 pt-4 pb-16">
++          {/* Section 1: All Curated Animation */}
+           <MovieSection
+-            title="Thịnh hành hôm nay"
+-            subtitle="Các bộ phim được cộng đồng xem nhiều nhất trong tuần"
+-            movies={trendingMovies}
++            title="Khám phá phim hoạt hình"
++            subtitle="Các tác phẩm hoạt hình chọn lọc có sẵn trong kho dữ liệu"
++            movies={allCurated}
++            exploreHref="/search?genre=Animation"
+           />
+ 
+-          {/* Recommended */}
+-          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6">
++          {/* Section 2: Family & Fantasy Animation */}
++          <div className="rounded-xl border border-surface-border bg-surface/50 p-4 sm:p-6">
+             <MovieSection
+-              title="Đề xuất dành riêng cho bạn"
+-              subtitle="Lựa chọn dựa trên thể loại và lịch sử xem của bạn"
+-              movies={recommendedMovies}
++              title="Phiêu lưu & Kỳ ảo gia đình"
++              subtitle="Những chuyến phiêu lưu ấm áp, kỳ thú phù hợp xem cùng người thân"
++              movies={familyAndFantasy}
++              exploreHref="/search?genre=Fantasy"
+             />
+           </div>
+ 
+-          {/* Top Rated */}
++          {/* Section 3: High-rated Classic Animation */}
+           <MovieSection
+-            title="Được đánh giá cao nhất"
+-            subtitle="Các kiệt tác điện ảnh đạt từ 8.0/10 điểm trở lên"
+-            movies={topRatedMovies}
++            title="Tuyệt tác hoạt hình đánh giá cao"
++            subtitle="Các kiệt tác điện ảnh hoạt hình đạt điểm đánh giá từ 8.0/10 trở lên"
++            movies={highRated}
++            exploreHref="/search?genre=Animation"
+           />
+         </div>
+       </main>
+diff --git a/frontend/app/search/page.tsx b/frontend/app/search/page.tsx
+index ea9d3d9..ae4ccb9 100644
+--- a/frontend/app/search/page.tsx
++++ b/frontend/app/search/page.tsx
+@@ -10,8 +10,8 @@ export default function SearchPage() {
+       <Suspense
+         fallback={
+           <div className="page-shell min-h-[75vh] py-16 flex items-center justify-center">
+-            <div className="font-mono text-sm text-cinema-400 animate-pulse">
+-              Loading Film Archive...
++            <div className="font-mono text-sm text-brand animate-pulse">
++              Đang tải kho phim hoạt hình...
+             </div>
+           </div>
+         }
+diff --git a/frontend/components/layout/Footer.tsx b/frontend/components/layout/Footer.tsx
+index af1de81..56309f2 100644
+--- a/frontend/components/layout/Footer.tsx
++++ b/frontend/components/layout/Footer.tsx
+@@ -3,42 +3,42 @@ import Link from 'next/link';
+ 
+ export function Footer() {
+   return (
+-    <footer className="border-t border-zinc-850 bg-black">
++    <footer className="border-t border-surface-border bg-background">
+       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">
+           {/* Logo & Intro */}
+           <div className="sm:col-span-2">
+             <Link href="/" className="inline-flex items-center gap-1.5 font-bold tracking-tight text-xl text-white">
+               <span className="font-extrabold tracking-tighter text-2xl">DIPPIE</span>
+-              <span className="h-2 w-2 rounded-full bg-cinema-red" />
++              <span className="h-2 w-2 rounded-full bg-brand" />
+             </Link>
+             <p className="mt-2.5 max-w-md text-xs leading-relaxed text-zinc-400">
+-              Nền tảng tuyển chọn và gợi ý phim điện ảnh thông minh, đem lại trải nghiệm khám phá phim sâu sắc và tinh tế.
++              Nền tảng tuyển chọn và gợi ý phim hoạt hình thông minh, đem lại trải nghiệm khám phá nhẹ nhàng, không spoil và tôn trọng người xem.
+             </p>
+           </div>
+ 
+           {/* Quick links */}
+           <div>
+-            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">Khám phá</h4>
++            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">Khám phá hoạt hình</h4>
+             <ul className="mt-2.5 space-y-1.5 text-xs">
+               <li>
+-                <Link href="/" className="text-zinc-400 hover:text-white transition-colors">
+-                  Phim thịnh hành
++                <Link href="/search?genre=Animation" className="text-zinc-400 hover:text-white transition-colors">
++                  Toàn bộ phim hoạt hình
+                 </Link>
+               </li>
+               <li>
+-                <Link href="/search" className="text-zinc-400 hover:text-white transition-colors">
+-                  Tất cả kho phim
++                <Link href="/search?genre=Fantasy" className="text-zinc-400 hover:text-white transition-colors">
++                  Kỳ ảo & Thần tiên
+                 </Link>
+               </li>
+               <li>
+-                <Link href="/search?genre=Sci-Fi" className="text-zinc-400 hover:text-white transition-colors">
+-                  Phim Khoa học viễn tưởng
++                <Link href="/search?genre=Family" className="text-zinc-400 hover:text-white transition-colors">
++                  Hoạt hình gia đình
+                 </Link>
+               </li>
+               <li>
+-                <Link href="/search?genre=Drama" className="text-zinc-400 hover:text-white transition-colors">
+-                  Phim Tâm lý - Xã hội
++                <Link href="/search?genre=Adventure" className="text-zinc-400 hover:text-white transition-colors">
++                  Phiêu lưu kỳ thú
+                 </Link>
+               </li>
+             </ul>
+@@ -60,17 +60,17 @@ export function Footer() {
+               </li>
+               <li>
+                 <Link href="/profile" className="text-zinc-400 hover:text-white transition-colors">
+-                  Lịch sử đánh giá
++                  Hồ sơ & Đánh giá
+                 </Link>
+               </li>
+             </ul>
+           </div>
+         </div>
+ 
+-        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-zinc-850 pt-6 text-xs text-zinc-500 sm:flex-row">
+-          <p>© {new Date().getFullYear()} Dippie Cinema. Mọi quyền được bảo lưu.</p>
++        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-surface-border pt-6 text-xs text-zinc-500 sm:flex-row">
++          <p>© {new Date().getFullYear()} Dippie Animation. Mọi quyền được bảo lưu.</p>
+           <div className="flex items-center gap-4">
+-            <span>Tone Đen · Đỏ · Trắng Chuẩn Điện Ảnh</span>
++            <span className="text-brand font-medium">Tone Xanh Lá Nhẹ Nhàng · Khám Phá Hoạt Hình</span>
+           </div>
+         </div>
+       </div>
+diff --git a/frontend/components/layout/Navbar.tsx b/frontend/components/layout/Navbar.tsx
+index 2b86f86..9a9efbf 100644
+--- a/frontend/components/layout/Navbar.tsx
++++ b/frontend/components/layout/Navbar.tsx
+@@ -40,16 +40,16 @@ export function Navbar() {
+   };
+ 
+   return (
+-    <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/90 backdrop-blur-md">
++    <header className="sticky top-0 z-40 border-b border-surface-border bg-background/90 backdrop-blur-md">
+       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+         {/* Left: Brand Logo & Links */}
+         <div className="flex items-center gap-8">
+           <Link
+             href="/"
+-            className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white outline-none focus-visible:ring-2 focus-visible:ring-cinema-red rounded px-1"
++            className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
+           >
+             <span className="tracking-tighter font-extrabold text-2xl">DIPPIE</span>
+-            <span className="h-2 w-2 rounded-full bg-cinema-red" />
++            <span className="h-2 w-2 rounded-full bg-brand" />
+           </Link>
+ 
+           {/* Desktop Nav Items */}
+@@ -81,7 +81,7 @@ export function Navbar() {
+           {/* Chatbot Trigger */}
+           <button
+             onClick={openChat}
+-            className="rounded-md border border-zinc-700 bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-cinema-red hover:text-white cursor-pointer"
++            className="rounded-md border border-surface-border bg-surface-elevated px-3.5 py-1.5 text-xs font-semibold text-zinc-200 transition-colors hover:border-brand hover:text-white cursor-pointer"
+           >
+             Hỏi CineBot
+           </button>
+@@ -90,7 +90,7 @@ export function Navbar() {
+           <Link
+             href="/search"
+             aria-label="Tìm kiếm phim"
+-            className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer"
++            className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-white cursor-pointer"
+           >
+             <Search size={14} />
+             <span>Tìm kiếm</span>
+@@ -101,9 +101,9 @@ export function Navbar() {
+             <div className="relative" ref={dropdownRef}>
+               <button
+                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+-                className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer"
++                className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1 text-xs text-zinc-200 hover:border-zinc-600 hover:text-white transition-colors cursor-pointer"
+               >
+-                <div className="grid h-6 w-6 place-items-center rounded bg-cinema-red text-[11px] font-bold text-white">
++                <div className="grid h-6 w-6 place-items-center rounded bg-brand text-[11px] font-bold text-white shadow-brand-sm">
+                   {getInitials(user.fullName || user.username)}
+                 </div>
+                 <span className="font-medium max-w-[100px] truncate">
+@@ -113,8 +113,8 @@ export function Navbar() {
+ 
+               {/* Dropdown Menu */}
+               {userDropdownOpen && (
+-                <div className="absolute right-0 mt-2 w-52 rounded-lg border border-zinc-800 bg-zinc-950 p-2 shadow-2xl animate-fade-in z-50">
+-                  <div className="px-2.5 py-2 border-b border-zinc-850">
++                <div className="absolute right-0 mt-2 w-52 rounded-lg border border-surface-border bg-surface-elevated p-2 shadow-2xl animate-fade-in z-50">
++                  <div className="px-2.5 py-2 border-b border-surface-border">
+                     <p className="text-xs font-bold text-white truncate">{user.fullName || user.username}</p>
+                     <p className="text-[11px] text-zinc-400 truncate">{user.email}</p>
+                   </div>
+@@ -123,20 +123,20 @@ export function Navbar() {
+                     <Link
+                       href="/profile"
+                       onClick={() => setUserDropdownOpen(false)}
+-                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
++                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-surface-hover hover:text-white transition-colors"
+                     >
+                       <UserCheck size={14} /> Hồ sơ cá nhân
+                     </Link>
+                     <Link
+                       href="/profile"
+                       onClick={() => setUserDropdownOpen(false)}
+-                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
++                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-surface-hover hover:text-white transition-colors"
+                     >
+                       <Bookmark size={14} /> Watchlist ({watchlist.length})
+                     </Link>
+                   </div>
+ 
+-                  <div className="mt-1.5 pt-1.5 border-t border-zinc-850">
++                  <div className="mt-1.5 pt-1.5 border-t border-surface-border">
+                     <button
+                       onClick={() => {
+                         setUserDropdownOpen(false);
+@@ -153,7 +153,7 @@ export function Navbar() {
+           ) : (
+             <button
+               onClick={() => openAuthModal('login')}
+-              className="rounded-md bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-white hover:border-cinema-red hover:bg-cinema-red transition-all cursor-pointer"
++              className="rounded-md bg-surface border border-surface-border px-3 py-1.5 text-xs font-semibold text-white hover:border-brand hover:bg-brand transition-all cursor-pointer shadow-sm hover:shadow-brand-sm"
+             >
+               Đăng nhập
+             </button>
+@@ -165,14 +165,14 @@ export function Navbar() {
+           {isAuthenticated ? (
+             <Link
+               href="/profile"
+-              className="grid h-8 w-8 place-items-center rounded bg-cinema-red text-xs font-bold text-white"
++              className="grid h-8 w-8 place-items-center rounded bg-brand text-xs font-bold text-white shadow-brand-sm"
+             >
+               {getInitials(user?.fullName || user?.username)}
+             </Link>
+           ) : (
+             <button
+               onClick={() => openAuthModal('login')}
+-              className="rounded bg-cinema-red px-2.5 py-1 text-xs font-bold text-white cursor-pointer"
++              className="rounded bg-brand px-2.5 py-1 text-xs font-bold text-white cursor-pointer shadow-brand-sm"
+             >
+               Đăng nhập
+             </button>
+@@ -181,7 +181,7 @@ export function Navbar() {
+           <button
+             aria-label={open ? 'Đóng menu' : 'Mở menu'}
+             onClick={() => setOpen(!open)}
+-            className="rounded-md border border-zinc-800 bg-zinc-900 p-2 text-zinc-300 hover:text-white cursor-pointer"
++            className="rounded-md border border-surface-border bg-surface p-2 text-zinc-300 hover:text-white cursor-pointer"
+           >
+             {open ? <X size={18} /> : <Menu size={18} />}
+           </button>
+@@ -190,7 +190,7 @@ export function Navbar() {
+ 
+       {/* Mobile Drawer */}
+       {open && (
+-        <div className="border-b border-zinc-800 bg-black px-5 py-5 md:hidden animate-slide-up">
++        <div className="border-b border-surface-border bg-background px-5 py-5 md:hidden animate-slide-up">
+           <div className="flex flex-col gap-3">
+             {navLinks.map((link) => {
+               const isActive = pathname === link.href;
+@@ -200,12 +200,12 @@ export function Navbar() {
+                   href={link.href}
+                   onClick={() => setOpen(false)}
+                   className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium ${
+-                    isActive ? 'bg-zinc-900 text-white font-bold' : 'text-zinc-300 hover:bg-zinc-900/60'
++                    isActive ? 'bg-surface-elevated text-white font-bold border border-surface-border' : 'text-zinc-300 hover:bg-surface-hover'
+                   }`}
+                 >
+                   <span>{link.name}</span>
+                   {link.count !== undefined && link.count > 0 && (
+-                    <span className="text-xs text-zinc-400 font-semibold">
++                    <span className="text-xs text-brand font-semibold">
+                       ({link.count})
+                     </span>
+                   )}
+@@ -213,7 +213,7 @@ export function Navbar() {
+               );
+             })}
+ 
+-            <div className="pt-3 mt-2 border-t border-zinc-800 flex flex-col gap-2">
++            <div className="pt-3 mt-2 border-t border-surface-border flex flex-col gap-2">
+               <button
+                 onClick={() => {
+                   setOpen(false);
+@@ -221,14 +221,14 @@ export function Navbar() {
+                 }}
+                 className="btn-primary w-full justify-center text-xs"
+               >
+-                Hỏi CineBot gợi ý phim
++                Hỏi CineBot gợi ý hoạt hình
+               </button>
+               <Link
+                 href="/search"
+                 onClick={() => setOpen(false)}
+                 className="btn-secondary w-full justify-center text-xs"
+               >
+-                Tìm kiếm phim
++                Tìm kiếm hoạt hình
+               </Link>
+             </div>
+           </div>
+diff --git a/frontend/features/auth/components/AuthModal.tsx b/frontend/features/auth/components/AuthModal.tsx
+index 25521b5..84c7f05 100644
+--- a/frontend/features/auth/components/AuthModal.tsx
++++ b/frontend/features/auth/components/AuthModal.tsx
+@@ -56,11 +56,11 @@ export function AuthModal() {
+ 
+   return (
+     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+-      <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 p-6 sm:p-8 shadow-2xl">
++      <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-surface-border bg-surface p-6 sm:p-8 shadow-2xl">
+         {/* Close Button */}
+         <button
+           onClick={closeAuthModal}
+-          className="absolute right-4 top-4 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-850 hover:text-white transition-colors cursor-pointer"
++          className="absolute right-4 top-4 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+           aria-label="Đóng popup"
+         >
+           <X size={18} />
+@@ -70,7 +70,7 @@ export function AuthModal() {
+         <div className="mb-6">
+           <div className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-white">
+             <span className="tracking-tighter font-extrabold text-2xl">DIPPIE</span>
+-            <span className="h-2 w-2 rounded-full bg-cinema-red" />
++            <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
+           </div>
+           <h2 className="mt-2 text-xl font-bold tracking-tight text-white">
+             {isLogin ? 'Đăng nhập tài khoản' : 'Tạo tài khoản mới'}
+@@ -78,12 +78,12 @@ export function AuthModal() {
+           <p className="mt-1 text-xs text-zinc-400">
+             {isLogin
+               ? 'Lưu trữ Watchlist và đồng bộ điểm đánh giá phim của bạn'
+-              : 'Tham gia cộng đồng yêu điện ảnh và nhận đề xuất phim cá nhân hóa'}
++              : 'Tham gia khám phá phim hoạt hình và nhận đề xuất cá nhân hóa'}
+           </p>
+         </div>
+ 
+         {/* Tab Switcher (Clean rectangular tabs) */}
+-        <div className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1 mb-6">
++        <div className="grid grid-cols-2 gap-1 rounded-lg border border-surface-border bg-surface-muted p-1 mb-6">
+           <button
+             type="button"
+             onClick={() => {
+@@ -91,7 +91,7 @@ export function AuthModal() {
+               openAuthModal('login');
+             }}
+             className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+-              isLogin ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
++              isLogin ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+             }`}
+           >
+             Đăng nhập
+@@ -103,7 +103,7 @@ export function AuthModal() {
+               openAuthModal('register');
+             }}
+             className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+-              !isLogin ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
++              !isLogin ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-400 hover:text-white'
+             }`}
+           >
+             Đăng ký
+@@ -124,7 +124,7 @@ export function AuthModal() {
+               <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                 Họ và tên
+               </label>
+-              <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
++              <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+                 <User size={15} className="text-zinc-500 mr-2 shrink-0" />
+                 <input
+                   type="text"
+@@ -142,7 +142,7 @@ export function AuthModal() {
+             <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+               {isLogin ? 'Tên đăng nhập hoặc Email' : 'Tên đăng nhập'}
+             </label>
+-            <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
++            <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+               <User size={15} className="text-zinc-500 mr-2 shrink-0" />
+               <input
+                 type="text"
+@@ -160,7 +160,7 @@ export function AuthModal() {
+               <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                 Email
+               </label>
+-              <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
++              <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+                 <Mail size={15} className="text-zinc-500 mr-2 shrink-0" />
+                 <input
+                   type="email"
+@@ -178,7 +178,7 @@ export function AuthModal() {
+             <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+               Mật khẩu
+             </label>
+-            <div className="relative flex items-center rounded-md border border-zinc-750 bg-zinc-900 px-3 py-2 focus-within:border-cinema-red">
++            <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+               <Lock size={15} className="text-zinc-500 mr-2 shrink-0" />
+               <input
+                 type="password"
+@@ -194,7 +194,7 @@ export function AuthModal() {
+           <button
+             type="submit"
+             disabled={isSubmitting}
+-            className="btn-primary w-full justify-center py-2.5 text-xs sm:text-sm font-bold shadow-red-sm disabled:opacity-50 cursor-pointer"
++            className="btn-primary w-full justify-center py-2.5 text-xs sm:text-sm font-bold shadow-brand-sm disabled:opacity-50 cursor-pointer"
+           >
+             {isSubmitting ? (
+               <span className="flex items-center gap-2">
+@@ -214,14 +214,14 @@ export function AuthModal() {
+ 
+         {/* Demo Account Quick Fill (Helper for testing) */}
+         {isLogin && (
+-          <div className="mt-5 pt-4 border-t border-zinc-850">
++          <div className="mt-5 pt-4 border-t border-surface-border">
+             <button
+               type="button"
+               onClick={fillDemoAccount}
+-              className="flex items-center justify-between w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-left text-xs text-zinc-400 hover:border-zinc-700 hover:text-white transition-colors cursor-pointer"
++              className="flex items-center justify-between w-full rounded-md border border-surface-border bg-surface-muted px-3 py-2 text-left text-xs text-zinc-400 hover:border-zinc-700 hover:text-white transition-colors cursor-pointer"
+             >
+               <span>Điền nhanh tài khoản Demo: <strong>alex / password123</strong></span>
+-              <Sparkles size={13} className="text-cinema-red shrink-0 ml-1" />
++              <Sparkles size={13} className="text-brand shrink-0 ml-1" />
+             </button>
+           </div>
+         )}
+diff --git a/frontend/features/chat/components/CineBot.tsx b/frontend/features/chat/components/CineBot.tsx
+index 0c57952..590fede 100644
+--- a/frontend/features/chat/components/CineBot.tsx
++++ b/frontend/features/chat/components/CineBot.tsx
+@@ -111,13 +111,13 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+ 
+   return (
+     <div className="fixed inset-0 z-50 flex items-end justify-end p-0 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in pointer-events-auto">
+-      <div className="flex h-full w-full flex-col overflow-hidden bg-zinc-950 border-0 sm:border sm:border-zinc-800 sm:rounded-xl sm:h-[620px] sm:w-[440px] sm:shadow-2xl">
++      <div className="flex h-full w-full flex-col overflow-hidden bg-surface border-0 sm:border sm:border-surface-border sm:rounded-xl sm:h-[620px] sm:w-[440px] sm:shadow-2xl">
+         {/* Chatbot Header */}
+-        <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-3">
++        <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
+           <div>
+             <div className="flex items-center gap-2">
+               <h2 className="text-sm font-bold text-white">CineBot</h2>
+-              <span className="rounded bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] text-emerald-400 font-semibold">
++              <span className="rounded bg-brand/15 border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand font-semibold">
+                 Qwen Phase 23
+               </span>
+             </div>
+@@ -153,8 +153,8 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+               <div
+                 className={`max-w-[90%] rounded-lg px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
+                   msg.sender === 'user'
+-                    ? 'bg-cinema-red text-white'
+-                    : 'bg-zinc-900 text-zinc-100 border border-zinc-800'
++                    ? 'bg-brand text-white shadow-brand-sm'
++                    : 'bg-surface-muted text-zinc-100 border border-surface-border'
+                 }`}
+               >
+                 <p>{msg.text}</p>
+@@ -209,10 +209,10 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+                     return (
+                       <div
+                         key={movie.id}
+-                        className="flex gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-2.5 transition-colors hover:border-zinc-700"
++                        className="flex gap-3 rounded-lg border border-surface-border bg-surface-muted p-2.5 transition-colors hover:border-zinc-700"
+                       >
+                         {/* Poster */}
+-                        <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-zinc-800 bg-zinc-950">
++                        <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-surface-border bg-surface">
+                           <Image
+                             src={movie.poster}
+                             alt={movie.title}
+@@ -229,7 +229,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+                               <Link
+                                 href={`/movies/${movie.id}`}
+                                 onClick={onClose}
+-                                className="truncate text-xs sm:text-sm font-semibold text-white hover:text-cinema-red transition-colors"
++                                className="truncate text-xs sm:text-sm font-semibold text-white hover:text-brand transition-colors"
+                               >
+                                 {movie.title}
+                               </Link>
+@@ -247,7 +247,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+                             <Link
+                               href={`/movies/${movie.id}`}
+                               onClick={onClose}
+-                              className="inline-flex items-center gap-1 rounded bg-cinema-red px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-cinema-red-hover cursor-pointer"
++                              className="inline-flex items-center gap-1 rounded bg-brand px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-brand-hover shadow-brand-sm cursor-pointer"
+                             >
+                               <Play size={10} className="fill-current" /> Xem chi tiết
+                             </Link>
+@@ -258,7 +258,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+                             >
+                               {inWatchlist ? (
+                                 <>
+-                                  <Check size={10} className="text-cinema-red" /> Đã lưu
++                                  <Check size={10} className="text-brand" /> Đã lưu
+                                 </>
+                               ) : (
+                                 '+ Watchlist'
+@@ -291,11 +291,11 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+ 
+           {/* Typing indicator */}
+           {isTyping && (
+-            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-md px-3 py-1.5 w-fit">
++            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-surface-muted border border-surface-border rounded-md px-3 py-1.5 w-fit">
+               <span className="flex gap-1">
+-                <span className="h-1.5 w-1.5 rounded-full bg-cinema-red animate-bounce" style={{ animationDelay: '0ms' }} />
+-                <span className="h-1.5 w-1.5 rounded-full bg-cinema-red animate-bounce" style={{ animationDelay: '150ms' }} />
+-                <span className="h-1.5 w-1.5 rounded-full bg-cinema-red animate-bounce" style={{ animationDelay: '300ms' }} />
++                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '0ms' }} />
++                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
++                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
+               </span>
+               <span>CineBot đang tìm kiếm...</span>
+             </div>
+@@ -305,8 +305,8 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+         </div>
+ 
+         {/* Input Bar */}
+-        <div className="border-t border-zinc-800 bg-zinc-900 p-3">
+-          <div className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 focus-within:border-cinema-red">
++        <div className="border-t border-surface-border bg-surface-muted p-3">
++          <div className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-2 focus-within:border-brand">
+             <input
+               type="text"
+               value={input}
+@@ -318,7 +318,7 @@ export function CineBot({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
+             <button
+               onClick={() => handleSend()}
+               disabled={!input.trim()}
+-              className="grid h-7 w-7 place-items-center rounded bg-cinema-red text-white transition hover:bg-cinema-red-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
++              className="grid h-7 w-7 place-items-center rounded bg-brand text-white transition hover:bg-brand-hover shadow-brand-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+               aria-label="Gửi tin nhắn"
+             >
+               <Send size={13} />
+@@ -338,9 +338,9 @@ export function CineBotFloatingTrigger({ onClick }: { onClick: () => void }) {
+     <button
+       onClick={onClick}
+       aria-label="Mở Chatbot CineBot"
+-      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:border-cinema-red hover:bg-zinc-850 cursor-pointer"
++      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-md border border-surface-border bg-surface px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:border-brand hover:bg-surface-muted cursor-pointer"
+     >
+-      <span className="h-2 w-2 rounded-full bg-cinema-red" />
++      <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
+       <span>Hỏi CineBot</span>
+     </button>
+   );
+diff --git a/frontend/features/home/components/EditorialHero.tsx b/frontend/features/home/components/EditorialHero.tsx
+index dc47d36..f52b4e7 100644
+--- a/frontend/features/home/components/EditorialHero.tsx
++++ b/frontend/features/home/components/EditorialHero.tsx
+@@ -12,7 +12,7 @@ export function EditorialHero({ movie }: { movie: Movie }) {
+   const inWatchlist = isWatchlisted(movie.id);
+ 
+   return (
+-    <section className="relative min-h-[560px] sm:min-h-[640px] flex items-center overflow-hidden border-b border-zinc-800 bg-black">
++    <section className="relative min-h-[420px] sm:min-h-[500px] lg:min-h-[560px] flex items-center overflow-hidden border-b border-surface-border bg-background">
+       {/* 1. Backdrop Image Layer - z-0 with vivid visibility */}
+       <div className="absolute inset-0 z-0 h-full w-full">
+         <Image
+@@ -21,67 +21,62 @@ export function EditorialHero({ movie }: { movie: Movie }) {
+           alt={movie.title}
+           fill
+           sizes="100vw"
+-          className="object-cover object-center sm:object-right"
++          className="object-cover object-center sm:object-right opacity-70 sm:opacity-85"
+         />
+ 
+-        {/* 2. Directional gradient overlays for maximum text legibility & seamless fade to black */}
+-        {/* Left-to-right fade: Solid black on far left behind text -> semi-transparent -> reveals movie art on right */}
+-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/30 sm:via-black/75 sm:to-transparent" />
+-        
+-        {/* Top & Bottom edge soft fades */}
+-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
++        {/* 2. Directional gradient overlays for maximum text legibility & gentle fade */}
++        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/40 sm:via-background/80 sm:to-transparent" />
++        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/50" />
+       </div>
+ 
+       {/* 3. Foreground Text & Controls - z-10 */}
+-      <div className="page-shell relative z-10 py-16 sm:py-24">
++      <div className="page-shell relative z-10 py-10 sm:py-16 lg:py-20">
+         <div className="max-w-2xl">
+           {/* Metadata Line */}
+           <div className="flex items-center gap-3 text-xs font-semibold tracking-wider text-zinc-300">
+-            <span className="text-cinema-red font-bold uppercase">Phim tiêu điểm</span>
+-            <span className="text-zinc-500">/</span>
+-            <span className="text-zinc-300">4K Ultra HD</span>
+-            <span className="text-zinc-500">/</span>
++            <span className="text-brand font-bold uppercase tracking-wider">Hoạt hình tiêu điểm</span>
++            <span className="text-zinc-600">•</span>
+             <span className="flex items-center gap-1 font-bold text-amber-400">
+               <Star size={13} className="fill-amber-400" /> {movie.rating}
+             </span>
++            <span className="text-zinc-600">•</span>
++            <span className="text-zinc-400">{movie.year}</span>
+           </div>
+ 
+           {/* Main Title */}
+-          <h1 className="mt-4 text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl drop-shadow-md">
++          <h1 className="mt-2.5 text-3xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl drop-shadow-md">
+             {movie.title}
+           </h1>
+ 
+           {/* Quick Specs */}
+-          <div className="mt-3 flex items-center gap-3 text-sm text-zinc-300">
+-            <span className="font-semibold text-white">{movie.year}</span>
+-            <span className="text-zinc-600">•</span>
++          <div className="mt-2.5 flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
+             <span>{movie.runtime}</span>
+             <span className="text-zinc-600">•</span>
+             <span>{movie.genres.join(', ')}</span>
+           </div>
+ 
+           {/* Synopsis */}
+-          <p className="mt-4 max-w-xl text-sm sm:text-base leading-relaxed text-zinc-200 drop-shadow">
++          <p className="mt-3.5 max-w-xl text-xs sm:text-sm leading-relaxed text-zinc-200 line-clamp-3 sm:line-clamp-none drop-shadow">
+             {movie.description}
+           </p>
+ 
+           {/* Action CTAs */}
+-          <div className="mt-8 flex flex-wrap items-center gap-3">
++          <div className="mt-6 flex flex-wrap items-center gap-2.5 sm:gap-3">
+             <Link
+               href={`/movies/${movie.id}`}
+-              className="btn-primary px-6 py-3 text-sm font-bold shadow-red-sm"
++              className="btn-primary px-5 py-2.5 text-xs sm:text-sm font-bold shadow-brand-sm"
+             >
+-              <Play size={16} className="fill-current" /> Xem phim
++              Xem chi tiết
+             </Link>
+ 
+             <button
+               onClick={() => toggleWatchlist(movie.id, movie.title)}
+-              className="btn-secondary px-5 py-3 text-sm font-semibold"
++              className="btn-secondary px-4 py-2.5 text-xs sm:text-sm font-semibold"
+               aria-label={inWatchlist ? 'Xóa khỏi Watchlist' : 'Thêm vào Watchlist'}
+             >
+               {inWatchlist ? (
+                 <>
+-                  <Check size={16} className="text-cinema-red" /> Đã lưu Watchlist
++                  <Check size={15} className="text-brand" /> Đã lưu Watchlist
+                 </>
+               ) : (
+                 '+ Thêm vào Watchlist'
+@@ -90,9 +85,9 @@ export function EditorialHero({ movie }: { movie: Movie }) {
+ 
+             <button
+               onClick={openChat}
+-              className="rounded-md border border-zinc-700 bg-zinc-900/90 px-4 py-3 text-xs font-semibold text-zinc-200 transition hover:border-cinema-red hover:text-white cursor-pointer"
++              className="rounded-md border border-surface-border bg-surface-elevated/90 px-3.5 py-2.5 text-xs font-semibold text-zinc-200 transition hover:border-brand hover:text-white cursor-pointer"
+             >
+-              Hỏi CineBot về phim này
++              Hỏi CineBot
+             </button>
+           </div>
+         </div>
+diff --git a/frontend/features/movies/components/MovieCard.tsx b/frontend/features/movies/components/MovieCard.tsx
+index 8819885..bb2bd98 100644
+--- a/frontend/features/movies/components/MovieCard.tsx
++++ b/frontend/features/movies/components/MovieCard.tsx
+@@ -22,9 +22,9 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
+         fluid ? 'w-full' : 'w-[155px] shrink-0 sm:w-[185px] md:w-[205px]'
+       }`}
+     >
+-      <article className="overflow-hidden rounded-lg border border-zinc-850 bg-zinc-950 transition-all duration-200 group-hover:border-zinc-650 group-hover:shadow-card-hover">
++      <article className="overflow-hidden rounded-lg border border-surface-border bg-surface transition-all duration-200 group-hover:border-brand/40 group-hover:shadow-card-hover">
+         {/* Poster Media */}
+-        <div className="relative aspect-[2/3] w-full overflow-hidden bg-zinc-900">
++        <div className="relative aspect-[2/3] w-full overflow-hidden bg-surface-elevated">
+           <Image
+             src={movie.poster}
+             alt={movie.title}
+@@ -38,15 +38,26 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
+           />
+ 
+           {/* Overlay gradient */}
+-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 opacity-70" />
++          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/30 opacity-70" />
+ 
+           {/* Rating Badge */}
+-          <span className="absolute top-2 left-2 flex items-center gap-1 rounded bg-black/80 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-white/10 backdrop-blur-md">
++          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-surface-border backdrop-blur-md">
+             <Star size={11} className="fill-amber-400" />
+             {movie.rating}
+           </span>
+ 
+-          {/* Quick Watchlist Toggle */}
++          {/* Hover / Focus Overlay: Navigate to Details */}
++          <Link
++            href={`/movies/${movie.id}`}
++            aria-label={`Xem chi tiết ${movie.title}`}
++            className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
++          >
++            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/95 px-3.5 py-1.5 text-xs font-semibold text-white shadow-brand-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 hover:bg-brand-hover">
++              Xem chi tiết
++            </span>
++          </Link>
++
++          {/* Quick Watchlist Toggle - z-20 so it is NEVER blocked by the overlay link */}
+           <button
+             type="button"
+             aria-label={inWatchlist ? `Xóa ${movie.title} khỏi watchlist` : `Thêm ${movie.title} vào watchlist`}
+@@ -55,32 +66,21 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
+               e.stopPropagation();
+               toggleWatchlist(movie.id, movie.title);
+             }}
+-            className={`absolute top-2 right-2 rounded-full p-2 backdrop-blur-md transition-all duration-150 cursor-pointer ${
++            className={`absolute top-2 right-2 z-20 rounded-full p-2 backdrop-blur-md transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none ${
+               inWatchlist
+-                ? 'bg-cinema-red text-white'
+-                : 'bg-black/70 text-zinc-300 opacity-90 hover:bg-cinema-red hover:text-white'
++                ? 'bg-brand text-white shadow-brand-sm'
++                : 'bg-surface/85 text-zinc-300 border border-surface-border hover:bg-brand hover:text-white hover:border-brand'
+             }`}
+           >
+             {inWatchlist ? <Check size={13} /> : <Bookmark size={13} />}
+           </button>
+-
+-          {/* Hover Play Overlay */}
+-          <Link
+-            href={`/movies/${movie.id}`}
+-            aria-label={`Xem ${movie.title}`}
+-            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer"
+-          >
+-            <span className="grid h-11 w-11 place-items-center rounded-full bg-cinema-red text-white shadow-red-sm transition-transform duration-150 hover:scale-110">
+-              <Play size={16} className="fill-current ml-0.5" />
+-            </span>
+-          </Link>
+         </div>
+ 
+         {/* Content Info */}
+         <div className="p-3">
+           <Link
+             href={`/movies/${movie.id}`}
+-            className="block truncate text-sm font-semibold text-white transition-colors hover:text-cinema-red"
++            className="block truncate text-sm font-semibold text-white transition-colors hover:text-brand focus-visible:outline-none focus-visible:text-brand"
+           >
+             {movie.title}
+           </Link>
+diff --git a/frontend/features/movies/components/MovieDetail.tsx b/frontend/features/movies/components/MovieDetail.tsx
+index 3affee3..db903b3 100644
+--- a/frontend/features/movies/components/MovieDetail.tsx
++++ b/frontend/features/movies/components/MovieDetail.tsx
+@@ -47,17 +47,17 @@ export function MovieDetail({
+   const videoSource = movie.videoUrl || `/videos/${movie.id}.mp4`;
+ 
+   return (
+-    <main className="min-h-screen bg-black">
++    <main className="min-h-screen bg-background">
+       {/* Video Player Modal / Player Overlay */}
+       {isPlaying && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8 animate-fade-in">
+-          <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-zinc-800 bg-black shadow-2xl">
++          <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border border-surface-border bg-surface shadow-2xl">
+             {/* Player Header Bar */}
+-            <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-3">
++            <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
+               <div className="flex items-center gap-2">
+-                <span className="h-2 w-2 rounded-full bg-cinema-red" />
++                <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
+                 <h3 className="text-sm font-bold text-white truncate">{movie.title}</h3>
+-                <span className="text-xs text-zinc-400">• Đang phát 4K HD</span>
++                <span className="text-xs text-zinc-400">• Bản xem trước</span>
+               </div>
+               <button
+                 onClick={() => setIsPlaying(false)}
+@@ -85,7 +85,7 @@ export function MovieDetail({
+       )}
+ 
+       {/* Hero Backdrop */}
+-      <section className="relative overflow-hidden border-b border-zinc-800 bg-black">
++      <section className="relative overflow-hidden border-b border-surface-border bg-background">
+         {/* Backdrop Image Layer */}
+         <div className="absolute inset-0 z-0 h-full w-full">
+           <Image
+@@ -95,8 +95,8 @@ export function MovieDetail({
+             priority
+             className="object-cover opacity-75 sm:opacity-85"
+           />
+-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/30" />
+-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-transparent" />
++          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/30" />
++          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/75 to-transparent" />
+         </div>
+ 
+         {/* Content Layer */}
+@@ -111,7 +111,7 @@ export function MovieDetail({
+           <div className="flex flex-col gap-6 md:flex-row md:items-end">
+             {/* Poster */}
+             <div className="relative shrink-0">
+-              <div className="relative aspect-[2/3] w-44 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl sm:w-56">
++              <div className="relative aspect-[2/3] w-44 overflow-hidden rounded-lg border border-surface-border bg-surface shadow-2xl sm:w-56">
+                 <Image
+                   src={movie.poster}
+                   alt={movie.title}
+@@ -128,11 +128,11 @@ export function MovieDetail({
+             {/* Info */}
+             <div className="flex-1">
+               <div className="flex flex-wrap items-center gap-2 text-xs">
+-                <span className="rounded bg-cinema-red px-2 py-0.5 font-bold text-white uppercase text-[10px]">
+-                  Bản phát hành chính thức
++                <span className="rounded bg-brand px-2 py-0.5 font-bold text-white uppercase text-[10px] shadow-brand-sm">
++                  Tuyển chọn Dippie
+                 </span>
+-                <span className="rounded bg-zinc-800 border border-zinc-700 px-2 py-0.5 text-zinc-300">
+-                  4K UHD · HDR10+ · Dolby 5.1
++                <span className="rounded bg-surface-muted border border-surface-border px-2 py-0.5 text-zinc-300">
++                  HD · Phụ đề / Lồng tiếng
+                 </span>
+               </div>
+ 
+@@ -164,10 +164,10 @@ export function MovieDetail({
+               <div className="mt-6 flex flex-wrap items-center gap-3">
+                 <button
+                   onClick={() => setIsPlaying(true)}
+-                  className="btn-primary px-6 py-2.5 text-sm font-bold shadow-red-sm"
++                  className="btn-primary px-6 py-2.5 text-sm font-bold shadow-brand-sm"
+                 >
+                   <Play size={16} className="fill-current" />
+-                  Xem phim ngay
++                  Xem trailer / giới thiệu
+                 </button>
+ 
+                 <button
+@@ -177,7 +177,7 @@ export function MovieDetail({
+                 >
+                   {inWatchlist ? (
+                     <>
+-                      <Check size={15} className="text-cinema-red" /> Đã lưu Watchlist
++                      <Check size={15} className="text-brand" /> Đã lưu Watchlist
+                     </>
+                   ) : (
+                     '+ Thêm vào Watchlist'
+@@ -188,8 +188,8 @@ export function MovieDetail({
+                   onClick={() => toggleFavorite(movie.id, movie.title)}
+                   className={`rounded-md border p-2.5 transition-colors cursor-pointer ${
+                     favorite
+-                      ? 'border-cinema-red bg-cinema-red/15 text-cinema-red'
+-                      : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:text-white'
++                      ? 'border-brand bg-brand/15 text-brand'
++                      : 'border-zinc-700 bg-surface text-zinc-300 hover:border-zinc-500 hover:text-white'
+                   }`}
+                   aria-label={favorite ? 'Đã yêu thích' : 'Thêm vào Yêu thích'}
+                 >
+@@ -198,7 +198,7 @@ export function MovieDetail({
+ 
+                 <button
+                   onClick={openChat}
+-                  className="rounded-md border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-xs font-medium text-zinc-300 hover:border-cinema-red hover:text-white cursor-pointer"
++                  className="rounded-md border border-zinc-700 bg-surface px-3.5 py-2.5 text-xs font-medium text-zinc-300 hover:border-brand hover:text-white cursor-pointer"
+                 >
+                   Hỏi CineBot
+                 </button>
+@@ -214,7 +214,7 @@ export function MovieDetail({
+           {/* Left: Overview & Rating Selector */}
+           <div className="space-y-8">
+             {/* Interactive Rating Selector */}
+-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6">
++            <div className="rounded-xl border border-surface-border bg-surface p-5 sm:p-6">
+               <h2 className="text-base font-bold text-white">Đánh giá bộ phim này</h2>
+               <p className="mt-1 text-xs text-zinc-400">
+                 Chấm điểm giúp hệ thống hiểu rõ gu phim của bạn hơn.
+@@ -235,7 +235,7 @@ export function MovieDetail({
+                       className={`flex h-9 w-9 items-center justify-center rounded-md text-xs font-bold transition-all duration-150 cursor-pointer ${
+                         active
+                           ? 'bg-amber-400 text-black scale-105'
+-                          : 'border border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-white'
++                          : 'border border-surface-border bg-surface-muted text-zinc-400 hover:border-zinc-600 hover:text-white'
+                       }`}
+                       aria-label={`Chấm ${star} trên 10 sao`}
+                     >
+@@ -253,16 +253,16 @@ export function MovieDetail({
+             </div>
+ 
+             {/* Synopsis Section */}
+-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6">
++            <div className="rounded-xl border border-surface-border bg-surface p-5 sm:p-6">
+               <h2 className="text-base font-bold text-white mb-2">Tóm tắt nội dung</h2>
+               <p className="text-sm text-zinc-300 leading-relaxed">
+-                {movie.description} Tác phẩm được ghi hình ở độ phân giải gốc 4K với hệ thống âm thanh vòm không gian đa kênh sống động, mang lại trải nghiệm xem phim chất lượng cao tại nhà.
++                {movie.description}
+               </p>
+             </div>
+           </div>
+ 
+           {/* Right: Technical Attributes */}
+-          <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 sm:p-6 h-fit">
++          <div className="rounded-xl border border-surface-border bg-surface p-5 sm:p-6 h-fit">
+             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 mb-3">
+               Thông tin phát hành
+             </h3>
+@@ -275,7 +275,7 @@ export function MovieDetail({
+                     <Link
+                       key={genre}
+                       href={`/search?genre=${encodeURIComponent(genre)}`}
+-                      className="rounded bg-zinc-900 border border-zinc-800 px-2 py-0.5 text-zinc-300 hover:border-cinema-red hover:text-white transition-colors"
++                      className="rounded bg-surface-muted border border-surface-border px-2 py-0.5 text-zinc-300 hover:border-brand hover:text-white transition-colors"
+                     >
+                       {genre}
+                     </Link>
+@@ -283,31 +283,31 @@ export function MovieDetail({
+                 </dd>
+               </div>
+ 
+-              <div className="pt-2 border-t border-zinc-800">
++              <div className="pt-2 border-t border-surface-border">
+                 <dt className="text-zinc-500">Năm sản xuất</dt>
+                 <dd className="text-white font-medium mt-0.5">{movie.year}</dd>
+               </div>
+ 
+-              <div className="pt-2 border-t border-zinc-800">
++              <div className="pt-2 border-t border-surface-border">
+                 <dt className="text-zinc-500">Thời lượng</dt>
+                 <dd className="text-white font-medium mt-0.5">{movie.runtime}</dd>
+               </div>
+ 
+-              <div className="pt-2 border-t border-zinc-800">
++              <div className="pt-2 border-t border-surface-border">
+                 <dt className="text-zinc-500">Chất lượng hình ảnh</dt>
+-                <dd className="text-white font-medium mt-0.5">4K Ultra HD (HDR10+ / Dolby Vision)</dd>
++                <dd className="text-white font-medium mt-0.5">Độ nét cao (HD / Full HD)</dd>
+               </div>
+ 
+-              <div className="pt-2 border-t border-zinc-800">
++              <div className="pt-2 border-t border-surface-border">
+                 <dt className="text-zinc-500">Âm thanh</dt>
+-                <dd className="text-white font-medium mt-0.5">Dolby Atmos 5.1 / 7.1 Surround</dd>
++                <dd className="text-white font-medium mt-0.5">Stereo / Đa kênh nguyên bản</dd>
+               </div>
+             </dl>
+           </div>
+         </div>
+ 
+         {/* Similar Movies */}
+-        <div className="mt-12 pt-8 border-t border-zinc-800">
++        <div className="mt-12 pt-8 border-t border-surface-border">
+           <MovieSection
+             title="Phim tương tự"
+             subtitle="Các tác phẩm có phong cách và chủ đề tương tự"
+diff --git a/frontend/features/movies/components/MovieSection.tsx b/frontend/features/movies/components/MovieSection.tsx
+index b63f713..e6bb821 100644
+--- a/frontend/features/movies/components/MovieSection.tsx
++++ b/frontend/features/movies/components/MovieSection.tsx
+@@ -43,14 +43,14 @@ export function MovieSection({
+             <button
+               onClick={() => handleScroll('left')}
+               aria-label={`Cuộn ${title} sang trái`}
+-              className="rounded-md border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white cursor-pointer"
++              className="rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer"
+             >
+               <ArrowLeft size={14} />
+             </button>
+             <button
+               onClick={() => handleScroll('right')}
+               aria-label={`Cuộn ${title} sang phải`}
+-              className="rounded-md border border-zinc-800 bg-zinc-900 p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white cursor-pointer"
++              className="rounded-md border border-surface-border bg-surface p-1.5 text-zinc-400 transition hover:border-brand/40 hover:text-white cursor-pointer"
+             >
+               <ArrowRight size={14} />
+             </button>
+@@ -58,7 +58,7 @@ export function MovieSection({
+ 
+           <Link
+             href={exploreHref}
+-            className="flex items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-cinema-red ml-2"
++            className="flex items-center gap-1 text-xs font-medium text-zinc-400 transition hover:text-brand ml-2"
+           >
+             <span>Tất cả</span>
+             <ArrowUpRight size={13} />
+@@ -66,15 +66,21 @@ export function MovieSection({
+         </div>
+       </div>
+ 
+-      {/* Row */}
+-      <div
+-        ref={scrollRef}
+-        className="movie-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 sm:gap-4 scroll-smooth"
+-      >
+-        {movies.map((movie) => (
+-          <MovieCard key={movie.id} movie={movie} />
+-        ))}
+-      </div>
++      {/* Row or Empty State */}
++      {movies.length > 0 ? (
++        <div
++          ref={scrollRef}
++          className="movie-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 sm:gap-4 scroll-smooth"
++        >
++          {movies.map((movie) => (
++            <MovieCard key={movie.id} movie={movie} />
++          ))}
++        </div>
++      ) : (
++        <div className="rounded-lg border border-surface-border bg-surface p-6 text-center text-xs sm:text-sm text-zinc-400">
++          Hiện chưa có tác phẩm hoạt hình nào trong danh mục này.
++        </div>
++      )}
+     </section>
+   );
+ }
+diff --git a/frontend/features/profile/components/ProfileOverview.tsx b/frontend/features/profile/components/ProfileOverview.tsx
+index 12c8200..8c2b431 100644
+--- a/frontend/features/profile/components/ProfileOverview.tsx
++++ b/frontend/features/profile/components/ProfileOverview.tsx
+@@ -38,16 +38,16 @@ export function ProfileOverview() {
+   return (
+     <main className="page-shell min-h-[75vh] py-8 sm:py-12">
+       {/* Profile Header */}
+-      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6 sm:p-8">
++      <div className="rounded-xl border border-surface-border bg-surface p-6 sm:p-8">
+         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+           <div className="flex items-center gap-4">
+-            <div className="grid h-12 w-12 place-items-center rounded-md bg-cinema-red text-base font-bold text-white shadow-red-sm">
++            <div className="grid h-12 w-12 place-items-center rounded-md bg-brand text-base font-bold text-white shadow-brand-sm">
+               AM
+             </div>
+             <div>
+               <div className="flex items-center gap-2">
+-                <span className="text-xs font-bold text-cinema-red uppercase tracking-wider">
+-                  Thành viên Cinephile
++                <span className="text-xs font-bold text-brand uppercase tracking-wider">
++                  Thành viên Dippie
+                 </span>
+                 <span className="text-zinc-500">•</span>
+                 <span className="text-xs text-zinc-400">Level 3</span>
+@@ -56,22 +56,22 @@ export function ProfileOverview() {
+                 Alex Morgan
+               </h1>
+               <p className="text-xs text-zinc-400">
+-                Thành viên khám phá và lưu trữ phim điện ảnh
++                Thành viên khám phá hoạt hình & yêu điện ảnh
+               </p>
+             </div>
+           </div>
+ 
+           {/* Stats Bar */}
+           <div className="grid grid-cols-3 gap-2.5">
+-            <div className="rounded-md border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-center">
++            <div className="rounded-md border border-surface-border bg-surface-muted px-4 py-2.5 text-center">
+               <span className="text-lg font-bold text-white block">{watchlist.length}</span>
+               <span className="text-[10px] uppercase text-zinc-400">Watchlist</span>
+             </div>
+-            <div className="rounded-md border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-center">
+-              <span className="text-lg font-bold text-cinema-red block">{favorites.length}</span>
++            <div className="rounded-md border border-surface-border bg-surface-muted px-4 py-2.5 text-center">
++              <span className="text-lg font-bold text-brand block">{favorites.length}</span>
+               <span className="text-[10px] uppercase text-zinc-400">Yêu thích</span>
+             </div>
+-            <div className="rounded-md border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-center">
++            <div className="rounded-md border border-surface-border bg-surface-muted px-4 py-2.5 text-center">
+               <span className="text-lg font-bold text-amber-400 block">{Object.keys(ratings).length}</span>
+               <span className="text-[10px] uppercase text-zinc-400">Đã chấm</span>
+             </div>
+@@ -80,7 +80,7 @@ export function ProfileOverview() {
+ 
+         {/* Top Genre breakdown */}
+         {topGenres.length > 0 && (
+-          <div className="mt-6 pt-5 border-t border-zinc-800">
++          <div className="mt-6 pt-5 border-t border-surface-border">
+             <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2.5">
+               Phân tích gu thể loại:
+             </span>
+@@ -88,14 +88,14 @@ export function ProfileOverview() {
+               {topGenres.map(([genre, count]) => {
+                 const percentage = Math.min(100, count * 25);
+                 return (
+-                  <div key={genre} className="rounded-md border border-zinc-800 bg-zinc-900 p-2.5">
++                  <div key={genre} className="rounded-md border border-surface-border bg-surface-muted p-2.5">
+                     <div className="flex justify-between text-xs mb-1">
+                       <span className="text-white font-medium">{genre}</span>
+-                      <span className="text-cinema-red font-bold">{percentage}%</span>
++                      <span className="text-brand font-bold">{percentage}%</span>
+                     </div>
+                     <div className="h-1.5 w-full rounded bg-zinc-800 overflow-hidden">
+                       <div
+-                        className="h-full bg-cinema-red"
++                        className="h-full bg-brand"
+                         style={{ width: `${percentage}%` }}
+                       />
+                     </div>
+@@ -108,7 +108,7 @@ export function ProfileOverview() {
+       </div>
+ 
+       {/* Tabs */}
+-      <div className="mt-8 flex items-center gap-2 border-b border-zinc-800 pb-3">
++      <div className="mt-8 flex items-center gap-2 border-b border-surface-border pb-3">
+         {[
+           { id: 'watchlist', label: 'Danh sách xem', icon: Bookmark, count: watchlistMovies.length },
+           { id: 'favorites', label: 'Yêu thích', icon: Heart, count: favoriteMovies.length },
+@@ -126,7 +126,7 @@ export function ProfileOverview() {
+                   : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+               }`}
+             >
+-              <Icon size={14} className={active ? 'text-cinema-red' : ''} />
++              <Icon size={14} className={active ? 'text-brand' : ''} />
+               <span>{tab.label}</span>
+               <span className="text-[11px] text-zinc-400 font-normal">
+                 ({tab.count})
+@@ -145,8 +145,8 @@ export function ProfileOverview() {
+             ))}
+           </div>
+         ) : (
+-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950 px-6 py-14 text-center">
+-            <Film className="text-zinc-600 mb-2.5" size={28} />
++          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-surface-border bg-surface px-6 py-14 text-center">
++            <Film className="text-zinc-500 mb-2.5" size={28} />
+             <h3 className="text-base font-bold text-white">Chưa có bộ phim nào trong danh mục này</h3>
+             <p className="mt-1 text-xs text-zinc-400">
+               Hãy khám phá các tác phẩm trên trang chủ hoặc trò chuyện cùng CineBot để lưu thêm phim.
+diff --git a/frontend/features/search/components/SearchExperience.tsx b/frontend/features/search/components/SearchExperience.tsx
+index c05ebf5..bf0d45a 100644
+--- a/frontend/features/search/components/SearchExperience.tsx
++++ b/frontend/features/search/components/SearchExperience.tsx
+@@ -7,7 +7,7 @@ import { MovieCard } from '@/features/movies/components/MovieCard';
+ import { movies } from '@/lib/data/movies';
+ import { useWatchlist } from '@/lib/context/WatchlistContext';
+ 
+-const ALL_GENRES = ['Sci-Fi', 'Drama', 'Mystery', 'Thriller', 'Adventure', 'Romance', 'Crime'];
++const ALL_GENRES = ['Animation', 'Adventure', 'Family', 'Fantasy', 'Sci-Fi', 'Drama', 'Romance'];
+ 
+ type SortOption = 'rating' | 'year' | 'title';
+ 
+@@ -65,16 +65,16 @@ export function SearchExperience() {
+       {/* Title */}
+       <div>
+         <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+-          Kho phim điện ảnh
++          Kho phim hoạt hình & tuyển chọn
+         </h1>
+         <p className="mt-1.5 text-sm text-zinc-400">
+-          Tìm kiếm và lọc phim theo tên, cốt truyện hoặc thể loại yêu thích.
++          Tìm kiếm và lọc phim hoạt hình theo tên, cốt truyện hoặc thể loại yêu thích.
+         </p>
+       </div>
+ 
+       {/* Search Input Bar */}
+       <div className="mt-6">
+-        <div className="relative flex max-w-2xl items-center rounded-md border border-zinc-700 bg-zinc-900 px-3.5 py-3 shadow-lg focus-within:border-cinema-red">
++        <div className="relative flex max-w-2xl items-center rounded-md border border-surface-border bg-surface px-3.5 py-3 shadow-lg focus-within:border-brand">
+           <Search className="text-zinc-400 shrink-0" size={18} />
+           <input
+             autoFocus
+@@ -97,7 +97,7 @@ export function SearchExperience() {
+       </div>
+ 
+       {/* Filter Bar: Clean rectangular badges */}
+-      <div className="mt-5 flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
++      <div className="mt-5 flex flex-col gap-3 rounded-lg border border-surface-border bg-surface p-4">
+         {/* Genre Chips */}
+         <div>
+           <div className="flex items-center justify-between mb-2">
+@@ -107,7 +107,7 @@ export function SearchExperience() {
+             {(selectedGenres.length > 0 || query) && (
+               <button
+                 onClick={clearAllFilters}
+-                className="flex items-center gap-1 text-xs text-cinema-red hover:underline cursor-pointer"
++                className="flex items-center gap-1 text-xs text-brand hover:underline cursor-pointer"
+               >
+                 <RotateCcw size={12} /> Đặt lại bộ lọc
+               </button>
+@@ -123,8 +123,8 @@ export function SearchExperience() {
+                   onClick={() => toggleGenre(genre)}
+                   className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                     selected
+-                      ? 'bg-cinema-red text-white font-bold'
+-                      : 'border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-600 hover:text-white'
++                      ? 'bg-brand text-white font-bold shadow-brand-sm'
++                      : 'border border-surface-border bg-surface-muted text-zinc-300 hover:border-zinc-600 hover:text-white'
+                   }`}
+                 >
+                   {genre} {selected && '✓'}
+@@ -175,8 +175,8 @@ export function SearchExperience() {
+             ))}
+           </div>
+         ) : (
+-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-800 bg-zinc-950 px-6 py-16 text-center">
+-            <div className="grid h-12 w-12 place-items-center rounded bg-zinc-900 text-zinc-400 mb-3">
++          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-surface-border bg-surface px-6 py-16 text-center">
++            <div className="grid h-12 w-12 place-items-center rounded bg-surface-muted text-zinc-400 mb-3">
+               <Search size={20} />
+             </div>
+             <h3 className="text-base font-bold text-white">Không tìm thấy bộ phim nào</h3>
+diff --git a/frontend/lib/context/WatchlistContext.tsx b/frontend/lib/context/WatchlistContext.tsx
+index f01a365..af2944e 100644
+--- a/frontend/lib/context/WatchlistContext.tsx
++++ b/frontend/lib/context/WatchlistContext.tsx
+@@ -49,13 +49,13 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
+       const savedRatings = localStorage.getItem('dippie_ratings');
+ 
+       if (savedWatchlist) setWatchlist(JSON.parse(savedWatchlist));
+-      else setWatchlist(['afterlight', 'quiet-places']);
++      else setWatchlist(['spirited-away', 'your-name']);
+ 
+       if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
+-      else setFavorites(['the-last-orbit']);
++      else setFavorites(['spirited-away']);
+ 
+       if (savedRatings) setRatings(JSON.parse(savedRatings));
+-      else setRatings({ 'the-last-orbit': 9 });
++      else setRatings({ 'spirited-away': 10 });
+ 
+       // If token exists, sync with backend
+       const token = localStorage.getItem('dippie_auth_token');
+@@ -234,8 +234,8 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
+             key={toast.id}
+             className={`pointer-events-auto flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-xs sm:text-sm font-medium shadow-2xl backdrop-blur-xl animate-slide-up transition-all ${
+               toast.type === 'success'
+-                ? 'border-cinema-red/50 bg-zinc-950/95 text-white'
+-                : 'border-zinc-700 bg-zinc-950/95 text-zinc-300'
++                ? 'border-brand/50 bg-surface/95 text-white shadow-brand-sm'
++                : 'border-surface-border bg-surface/95 text-zinc-300'
+             }`}
+           >
+             <span>{toast.message}</span>
+diff --git a/frontend/lib/data/movies.ts b/frontend/lib/data/movies.ts
+index 4d09cce..30c9ebc 100644
+--- a/frontend/lib/data/movies.ts
++++ b/frontend/lib/data/movies.ts
+@@ -149,4 +149,5 @@ export const movies: Movie[] = [
+   },
+ ];
+ 
+-export const featuredMovie = movies[0];
++export const animationMovies = movies.filter((m) => m.genres.includes('Animation'));
++export const featuredMovie = animationMovies[0] || movies[0];
+diff --git a/frontend/tailwind.config.ts b/frontend/tailwind.config.ts
+index 3982189..a9500ca 100644
+--- a/frontend/tailwind.config.ts
++++ b/frontend/tailwind.config.ts
+@@ -11,27 +11,42 @@ const config: Config = {
+   theme: {
+     extend: {
+       colors: {
+-        background: '#000000',
+-        foreground: '#ffffff',
++        background: '#090d0b',
++        foreground: '#f3f4f6',
+         surface: {
+-          DEFAULT: '#0f0f10',
+-          elevated: '#161618',
+-          hover: '#1e1e22',
+-          border: '#27272a',
++          DEFAULT: '#111714',
++          elevated: '#16201b',
++          hover: '#1d2a23',
++          border: '#23332a',
++        },
++        brand: {
++          DEFAULT: '#10b981',
++          hover: '#059669',
++          dark: '#047857',
++          light: '#34d399',
++          muted: '#064e3b',
++          subtle: 'rgba(16, 185, 129, 0.12)',
++        },
++        danger: {
++          DEFAULT: '#ef4444',
++          hover: '#dc2626',
++          muted: '#7f1d1d',
+         },
+         cinema: {
+-          red: '#e50914',
+-          'red-hover': '#f40612',
+-          'red-muted': '#2d0a0c',
++          red: '#10b981',
++          'red-hover': '#059669',
++          'red-muted': '#064e3b',
+         },
+       },
+       fontFamily: {
+         sans: ['var(--font-inter)', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+       },
+       boxShadow: {
+-        'red-sm': '0 0 15px -3px rgba(229, 9, 20, 0.4)',
+-        'red-lg': '0 0 30px -5px rgba(229, 9, 20, 0.5)',
+-        'card-hover': '0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.15)',
++        'brand-sm': '0 0 15px -3px rgba(16, 185, 129, 0.35)',
++        'brand-lg': '0 0 30px -5px rgba(16, 185, 129, 0.4)',
++        'red-sm': '0 0 15px -3px rgba(16, 185, 129, 0.35)',
++        'red-lg': '0 0 30px -5px rgba(16, 185, 129, 0.4)',
++        'card-hover': '0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(16, 185, 129, 0.25)',
+       },
+       animation: {
+         'fade-in': 'fadeIn 0.2s ease-out forwards',

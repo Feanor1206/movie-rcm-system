@@ -1,0 +1,727 @@
+diff --git a/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md b/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md
+index 37a9c1a..63ead77 100644
+--- a/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md
++++ b/docs/contracts/M1_ACCOUNT_LIBRARY_CONTRACT.md
+@@ -307,3 +307,36 @@ CREATE TABLE IF NOT EXISTS favorite_items (
+   - Khóa đồng bộ mang thế hệ phiên: `${sessionGen}:${actorKey}:${action}:${movieId}`. Khối `finally` của một thao tác từ phiên cũ không bao giờ giải phóng khóa của phiên mới.
+   - Mọi mutation chỉ trả về `true` khi và chỉ khi phiên vẫn còn hiệu lực (`isStillCurrentSession()`) và server xác nhận thành công. Mọi phản hồi stale từ phiên trước tự động trả về `false` và không gây ra bất kỳ side effect nào.
+ 
++---
++
++## 7. Commit Watermarking, Read Acknowledgment & Uncertain Retry Lifecycle (M1-F04)
++
++### 7.1 Commit Watermarking & Strict Read Acknowledgment (H1)
++1. **Theo dõi thời điểm commit (`committedAtReadVersion`):**
++   - Bản ghi `OperationRecord` được bổ sung trường `committedAtReadVersion: number | null` (khởi tạo `null` khi bắt đầu mutation và được gán `readGenRef.current` ngay khi mutation commit thành công trên backend).
++2. **Quy tắc công nhận đọc (Read Acknowledgment):**
++   - Một yêu cầu đọc thư viện (refresh / refetch) phiên bản $R$ chỉ được phép công nhận (acknowledge) và ghi đè trạng thái của một mutation đã commit khi và chỉ khi yêu cầu đọc đó được khởi tạo **sau thời điểm mutation hoàn tất commit**:
++     $$R > \text{op.committedAtReadVersion}$$
++   - Nếu $R \le \text{op.committedAtReadVersion}$ (yêu cầu đọc được gửi đi trước hoặc trong lúc mutation đang ghi trên server, nhưng phản hồi của đọc lại về sau commit của mutation): client nhận diện phản hồi đọc này mang dữ liệu cũ từ server trước khi commit có hiệu lực. Do đó, client **bắt buộc áp dụng lớp phủ lạc quan** (`op.desiredValue`) đè lên dữ liệu cũ từ server, ngăn chặn tuyệt đối tình trạng refresh cũ xóa mất dữ liệu vừa ghi thành công.
++3. **Cơ chế Prune an toàn:**
++   - Việc xóa bản ghi khỏi sổ nhật ký (`operationsJournalRef.delete`) chỉ được thực hiện khi $R > \text{op.committedAtReadVersion}$. Nếu chưa có lượt đọc nào đủ mới hơn thời điểm commit, bản ghi được giữ lại để tiếp tục bảo vệ dữ liệu client trước bất kỳ phản hồi đọc trễ nào.
++
++### 7.2 Quản lý vòng đời Uncertain & Bảo toàn ý định thao tác khi Retry (H2)
++1. **Trạng thái thao tác bất định (`status: 'uncertain'`):**
++   - Khi một mutation ghi gặp sự cố mạng (`TypeError / Failed to fetch`) hoặc timeout (`AbortError`), yêu cầu có thể đã được commit vào DB backend nhưng phản hồi HTTP headers bị thất lạc trước khi tới client.
++   - Thao tác KHÔNG bị xóa khỏi `operationsJournalRef` và KHÔNG tự động đảo chiều rollback dữ liệu trên giao diện. Thay vào đó, bản ghi được chuyển sang trạng thái:
++     `status: 'uncertain'`
++   - Khóa đồng bộ (`syncPendingLocksRef`) được giải phóng trong `finally` để người dùng không bị kẹt spinner vô tận (`isActionPending` trả về `false`), đồng thời hàm `isActionUnconfirmed` phản ánh `true` để giao diện/bộ quản lý nhận biết trạng thái chưa xác nhận.
++2. **Bảo toàn ý định khi thử lại (Retry Intent Preservation):**
++   - Khi người dùng bấm thử lại thao tác (ví dụ: nhấn lại nút Watchlist / Yêu thích sau khi mạng chập chờn):
++     - Hàm thao tác kiểm tra sự tồn tại của bản ghi `existingOp` trong nhật ký.
++     - Nếu `existingOp.status === 'uncertain'`, hướng hành động `isAdding` (hoặc `targetRating`) **bảo lưu nguyên vẹn ý định ban đầu** (`existingOp.desiredValue`), **tuyệt đối không dựa trên trạng thái hiển thị lạc quan để tự động đảo chiều**:
++       - Thao tác thêm (Add) ban đầu gặp sự cố mất phản hồi $\rightarrow$ Khi retry, hệ thống tiếp tục gửi `POST` (idempotent), **không tự ý đổi thành `DELETE`** làm xóa mất dữ liệu trên backend.
++       - Thao tác xóa (Remove) ban đầu gặp sự cố mất phản hồi $\rightarrow$ Khi retry, hệ thống tiếp tục gửi `DELETE`, **không tự ý đổi thành `POST`** làm hồi sinh dữ liệu.
++3. **Quy tắc giải quyết trạng thái Uncertain khi Background Reconcile:**
++   - Khi hòa giải ngầm hoàn tất với thế hệ đọc $R > \text{op.readVersionAtStart}$:
++     - Nếu dữ liệu server xác nhận mục tồn tại phù hợp với `desiredValue === true`: bản ghi chuyển từ `uncertain` sang `committed` với `committedAtReadVersion = R`.
++     - Nếu dữ liệu server xác nhận mục không tồn tại sau khi đọc đủ mới: bản ghi `uncertain` được dọn dẹp và giao diện hòa giải về trạng thái thực tế của server.
++     - Nếu phản hồi đọc cũ ($R \le \text{op.readVersionAtStart}$) về trễ: phản hồi đó bị coi là quá cũ để kết luận và không được phép xóa bản ghi `uncertain`.
++
++
+diff --git a/frontend/lib/context/WatchlistContext.tsx b/frontend/lib/context/WatchlistContext.tsx
+index fc65cf8..ec73c45 100644
+--- a/frontend/lib/context/WatchlistContext.tsx
++++ b/frontend/lib/context/WatchlistContext.tsx
+@@ -31,6 +31,7 @@ type WatchlistContextType = {
+   isFavorite: (id: string) => boolean;
+   getRating: (id: string) => number | undefined;
+   isActionPending: (id: string, action?: 'watchlist' | 'favorite' | 'rating') => boolean;
++  isActionUnconfirmed: (id: string, action?: 'watchlist' | 'favorite' | 'rating') => boolean;
+   isLibraryLoading: boolean;
+   libraryError: string | null;
+   refetchLibrary: () => Promise<void>;
+@@ -68,7 +69,8 @@ type OperationRecord = {
+   action: 'watchlist' | 'favorite' | 'rating';
+   movieId: string;
+   readVersionAtStart: number;
+-  status: 'pending' | 'committed';
++  committedAtReadVersion: number | null;
++  status: 'pending' | 'committed' | 'uncertain';
+   desiredValue: any;
+ };
+ 
+@@ -162,7 +164,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+   const [toasts, setToasts] = useState<Toast[]>([]);
+   const [isChatOpen, setIsChatOpen] = useState(false);
+ 
+-  // G1/G2/G3: Session epoch, read versioning, operation ID, and mutation journal
++  // G1/G2/G3/H1/H2: Session epoch, read versioning, operation ID, and mutation journal
+   const sessionGenRef = useRef<number>(0);
+   const readGenRef = useRef<number>(0);
+   const lastKnownActorKeyRef = useRef<string>(currentActorKey);
+@@ -233,7 +235,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     setToasts((prev) => prev.filter((t) => t.id !== id));
+   }, []);
+ 
+-  // G1/G2/G3: Unified authoritative library fetch and reconciliation core
++  // G1/G2/G3/H1/H2: Unified authoritative library fetch and reconciliation core
+   const performFetchLibrary = useCallback(
+     async (options?: { isBackgroundReconcile?: boolean }) => {
+       const thisActorKey = currentActorKey;
+@@ -355,7 +357,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           }
+         });
+ 
+-        // G1 & G2 Reconciliation:
++        // G1, G2, H1 & H2 Reconciliation:
+         setSnapshot((prev) => {
+           if (sessionGenRef.current !== thisSessionGen || lastKnownActorKeyRef.current !== thisActorKey) {
+             return prev;
+@@ -365,58 +367,135 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           const resolvedFavorites = new Set<string>();
+           const resolvedRatings: Record<string, number> = { ...nextRatings };
+ 
+-          // 1. Process server watchlist with journal overlay
++          // 1. Process server watchlist
+           for (const id of nextWatchlist) {
+             const op = operationsJournalRef.current.get(`watchlist:${id}`);
+             if (!op) {
+               resolvedWatchlist.add(id);
+             } else {
+-              const isNewer = op.readVersionAtStart >= thisReadVersion;
+-              if (isNewer || op.status === 'pending') {
+-                if (op.desiredValue === true) resolvedWatchlist.add(id);
+-              } else {
++              // H1: Read R acknowledges commit ONLY IF R > committedAtReadVersion!
++              const isAcknowledged =
++                op.status === 'committed' &&
++                op.committedAtReadVersion !== null &&
++                thisReadVersion > op.committedAtReadVersion;
++
++              if (isAcknowledged) {
+                 resolvedWatchlist.add(id);
++              } else if (op.status === 'uncertain') {
++                if (op.desiredValue === true) {
++                  // Background reconcile confirmed item exists on server!
++                  op.status = 'committed';
++                  op.committedAtReadVersion = thisReadVersion;
++                  resolvedWatchlist.add(id);
++                } else {
++                  if (thisReadVersion > op.readVersionAtStart) {
++                    operationsJournalRef.current.delete(`watchlist:${id}`);
++                    resolvedWatchlist.add(id);
++                  }
++                }
++              } else {
++                if (op.desiredValue === true) resolvedWatchlist.add(id);
+               }
+             }
+           }
+-          for (const op of operationsJournalRef.current.values()) {
++          // Process operations that were not in server watchlist
++          for (const [key, op] of operationsJournalRef.current.entries()) {
+             if (op.action === 'watchlist') {
+-              const isNewer = op.readVersionAtStart >= thisReadVersion;
+-              if ((isNewer || op.status === 'pending') && op.desiredValue === true) {
+-                resolvedWatchlist.add(op.movieId);
++              const isAcknowledged =
++                op.status === 'committed' &&
++                op.committedAtReadVersion !== null &&
++                thisReadVersion > op.committedAtReadVersion;
++
++              if (!isAcknowledged) {
++                if (op.status === 'uncertain') {
++                  if (thisReadVersion > op.readVersionAtStart) {
++                    operationsJournalRef.current.delete(key);
++                  } else {
++                    if (op.desiredValue === true) resolvedWatchlist.add(op.movieId);
++                    else if (op.desiredValue === false) resolvedWatchlist.delete(op.movieId);
++                  }
++                } else if (op.desiredValue === true) {
++                  resolvedWatchlist.add(op.movieId);
++                } else if (op.desiredValue === false) {
++                  resolvedWatchlist.delete(op.movieId);
++                }
+               }
+             }
+           }
+ 
+-          // 2. Process server favorites with journal overlay
++          // 2. Process server favorites
+           for (const id of nextFavorites) {
+             const op = operationsJournalRef.current.get(`favorite:${id}`);
+             if (!op) {
+               resolvedFavorites.add(id);
+             } else {
+-              const isNewer = op.readVersionAtStart >= thisReadVersion;
+-              if (isNewer || op.status === 'pending') {
+-                if (op.desiredValue === true) resolvedFavorites.add(id);
+-              } else {
++              const isAcknowledged =
++                op.status === 'committed' &&
++                op.committedAtReadVersion !== null &&
++                thisReadVersion > op.committedAtReadVersion;
++
++              if (isAcknowledged) {
+                 resolvedFavorites.add(id);
++              } else if (op.status === 'uncertain') {
++                if (op.desiredValue === true) {
++                  op.status = 'committed';
++                  op.committedAtReadVersion = thisReadVersion;
++                  resolvedFavorites.add(id);
++                } else {
++                  if (thisReadVersion > op.readVersionAtStart) {
++                    operationsJournalRef.current.delete(`favorite:${id}`);
++                    resolvedFavorites.add(id);
++                  }
++                }
++              } else {
++                if (op.desiredValue === true) resolvedFavorites.add(id);
+               }
+             }
+           }
+-          for (const op of operationsJournalRef.current.values()) {
++          for (const [key, op] of operationsJournalRef.current.entries()) {
+             if (op.action === 'favorite') {
+-              const isNewer = op.readVersionAtStart >= thisReadVersion;
+-              if ((isNewer || op.status === 'pending') && op.desiredValue === true) {
+-                resolvedFavorites.add(op.movieId);
++              const isAcknowledged =
++                op.status === 'committed' &&
++                op.committedAtReadVersion !== null &&
++                thisReadVersion > op.committedAtReadVersion;
++
++              if (!isAcknowledged) {
++                if (op.status === 'uncertain') {
++                  if (thisReadVersion > op.readVersionAtStart) {
++                    operationsJournalRef.current.delete(key);
++                  } else {
++                    if (op.desiredValue === true) resolvedFavorites.add(op.movieId);
++                    else if (op.desiredValue === false) resolvedFavorites.delete(op.movieId);
++                  }
++                } else if (op.desiredValue === true) {
++                  resolvedFavorites.add(op.movieId);
++                } else if (op.desiredValue === false) {
++                  resolvedFavorites.delete(op.movieId);
++                }
+               }
+             }
+           }
+ 
+-          // 3. Process ratings with journal overlay
+-          for (const op of operationsJournalRef.current.values()) {
++          // 3. Process ratings
++          for (const [key, op] of operationsJournalRef.current.entries()) {
+             if (op.action === 'rating') {
+-              const isNewer = op.readVersionAtStart >= thisReadVersion;
+-              if (isNewer || op.status === 'pending') {
+-                if (typeof op.desiredValue === 'number') {
++              const isAcknowledged =
++                op.status === 'committed' &&
++                op.committedAtReadVersion !== null &&
++                thisReadVersion > op.committedAtReadVersion;
++
++              if (!isAcknowledged) {
++                if (op.status === 'uncertain') {
++                  if (thisReadVersion > op.readVersionAtStart) {
++                    operationsJournalRef.current.delete(key);
++                  } else {
++                    if (typeof op.desiredValue === 'number') {
++                      resolvedRatings[op.movieId] = op.desiredValue;
++                    } else if (op.desiredValue === undefined) {
++                      delete resolvedRatings[op.movieId];
++                    }
++                  }
++                } else if (typeof op.desiredValue === 'number') {
+                   resolvedRatings[op.movieId] = op.desiredValue;
+                 } else if (op.desiredValue === undefined) {
+                   delete resolvedRatings[op.movieId];
+@@ -425,9 +504,13 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+             }
+           }
+ 
+-          // Prune obsolete committed operations that started before this read version
++          // H1: Prune committed operations ONLY when thisReadVersion > op.committedAtReadVersion
+           for (const [key, op] of operationsJournalRef.current.entries()) {
+-            if (op.status === 'committed' && op.readVersionAtStart < thisReadVersion) {
++            if (
++              op.status === 'committed' &&
++              op.committedAtReadVersion !== null &&
++              thisReadVersion > op.committedAtReadVersion
++            ) {
+               operationsJournalRef.current.delete(key);
+             }
+           }
+@@ -451,10 +534,13 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           return;
+         }
+         setIsLibraryLoading(false);
+-        if (err instanceof DOMException && err.name === 'AbortError') {
++        if (
++          (err instanceof DOMException && err.name === 'AbortError') ||
++          (err as any)?.name === 'AbortError'
++        ) {
+           setLibraryError('Thời gian tải thư viện quá hạn (timeout).');
+         } else {
+-          setLibraryError('Không thể kết nối đến máy chủ thư viện.');
++          setLibraryError('Không thể tải toàn bộ thư viện cá nhân từ máy chủ.');
+         }
+       } finally {
+         if (timeoutId) {
+@@ -500,6 +586,15 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     [currentActorKey]
+   );
+ 
++  const isActionUnconfirmed = useCallback(
++    (id: string, action?: 'watchlist' | 'favorite' | 'rating') => {
++      const act = action || 'watchlist';
++      const op = operationsJournalRef.current.get(`${act}:${id}`);
++      return op?.status === 'uncertain';
++    },
++    []
++  );
++
+   // Watchlist Mutation
+   const toggleWatchlist = async (
+     id: string,
+@@ -515,8 +610,14 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     syncPendingLocksRef.current.add(lockKey);
+     setPendingUpdateTick((t) => t + 1);
+ 
+-    const alreadyInWatchlist = visibleWatchlist.includes(id);
+-    const isAdding = !alreadyInWatchlist;
++    const existingOp = operationsJournalRef.current.get(opKey);
++    // H2: If retrying an uncertain outcome, retain original desired intent; do not invert!
++    const isAdding =
++      existingOp && existingOp.status === 'uncertain'
++        ? existingOp.desiredValue
++        : !visibleWatchlist.includes(id);
++
++    const alreadyInWatchlist = !isAdding;
+     const displayTitle = title || id;
+ 
+     const isStillCurrentSession = () => {
+@@ -582,6 +683,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+       action: 'watchlist',
+       movieId: id,
+       readVersionAtStart: readGenRef.current,
++      committedAtReadVersion: null,
+       status: 'pending',
+       desiredValue: isAdding,
+     });
+@@ -643,6 +745,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           const op = operationsJournalRef.current.get(opKey);
+           if (op && op.id === opId) {
+             op.status = 'committed';
++            op.committedAtReadVersion = readGenRef.current;
+           }
+           showToast(`Đã xóa ${displayTitle} khỏi Danh sách xem`, 'info');
+           return true;
+@@ -688,6 +791,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           const op = operationsJournalRef.current.get(opKey);
+           if (op && op.id === opId) {
+             op.status = 'committed';
++            op.committedAtReadVersion = readGenRef.current;
+           }
+           showToast(`Đã lưu ${displayTitle} vào Danh sách xem`, 'success');
+           return true;
+@@ -700,20 +804,26 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         timeoutId = null;
+       }
+       if (isStillCurrentSession()) {
+-        const op = operationsJournalRef.current.get(opKey);
+-        if (op && op.id === opId) {
+-          operationsJournalRef.current.delete(opKey);
+-        }
+-
+         const isTimeout =
+-          (err instanceof DOMException && err.name === 'AbortError') || (err as any)?.name === 'AbortError';
++          (err instanceof DOMException && err.name === 'AbortError') ||
++          (err as any)?.name === 'AbortError';
+         const isNetworkError =
+           err instanceof TypeError || (err as any)?.name === 'TypeError';
+ 
+         if (isTimeout || isNetworkError) {
++          // H2: Unknown write outcome - mark as uncertain to retain intent and avoid inversion on retry
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            op.status = 'uncertain';
++          }
+           showToast('Thời gian gửi yêu cầu quá hạn hoặc mất kết nối. Đang kiểm tra lại trạng thái...', 'error');
+           performFetchLibrary({ isBackgroundReconcile: true });
+         } else {
++          // Definite failure: delete op and rollback
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            operationsJournalRef.current.delete(opKey);
++          }
+           setSnapshot((prev) => {
+             if (prev.ownerKey !== mutationActorKey) return prev;
+             return {
+@@ -752,8 +862,13 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+     syncPendingLocksRef.current.add(lockKey);
+     setPendingUpdateTick((t) => t + 1);
+ 
+-    const alreadyInFavorites = visibleFavorites.includes(id);
+-    const isAdding = !alreadyInFavorites;
++    const existingOp = operationsJournalRef.current.get(opKey);
++    const isAdding =
++      existingOp && existingOp.status === 'uncertain'
++        ? existingOp.desiredValue
++        : !visibleFavorites.includes(id);
++
++    const alreadyInFavorites = !isAdding;
+     const displayTitle = title || id;
+ 
+     const isStillCurrentSession = () => {
+@@ -819,6 +934,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+       action: 'favorite',
+       movieId: id,
+       readVersionAtStart: readGenRef.current,
++      committedAtReadVersion: null,
+       status: 'pending',
+       desiredValue: isAdding,
+     });
+@@ -882,6 +998,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           const op = operationsJournalRef.current.get(opKey);
+           if (op && op.id === opId) {
+             op.status = 'committed';
++            op.committedAtReadVersion = readGenRef.current;
+           }
+           showToast(`Đã xóa ${displayTitle} khỏi Yêu thích`, 'info');
+           return true;
+@@ -927,6 +1044,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+           const op = operationsJournalRef.current.get(opKey);
+           if (op && op.id === opId) {
+             op.status = 'committed';
++            op.committedAtReadVersion = readGenRef.current;
+           }
+           showToast(`Đã thêm ${displayTitle} vào Yêu thích`, 'success');
+           return true;
+@@ -939,20 +1057,24 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         timeoutId = null;
+       }
+       if (isStillCurrentSession()) {
+-        const op = operationsJournalRef.current.get(opKey);
+-        if (op && op.id === opId) {
+-          operationsJournalRef.current.delete(opKey);
+-        }
+-
+         const isTimeout =
+-          (err instanceof DOMException && err.name === 'AbortError') || (err as any)?.name === 'AbortError';
++          (err instanceof DOMException && err.name === 'AbortError') ||
++          (err as any)?.name === 'AbortError';
+         const isNetworkError =
+           err instanceof TypeError || (err as any)?.name === 'TypeError';
+ 
+         if (isTimeout || isNetworkError) {
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            op.status = 'uncertain';
++          }
+           showToast('Thời gian gửi yêu cầu quá hạn hoặc mất kết nối. Đang kiểm tra lại trạng thái...', 'error');
+           performFetchLibrary({ isBackgroundReconcile: true });
+         } else {
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            operationsJournalRef.current.delete(opKey);
++          }
+           setSnapshot((prev) => {
+             if (prev.ownerKey !== mutationActorKey) return prev;
+             return {
+@@ -1051,6 +1173,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+       action: 'rating',
+       movieId: id,
+       readVersionAtStart: readGenRef.current,
++      committedAtReadVersion: null,
+       status: 'pending',
+       desiredValue: validRating,
+     });
+@@ -1112,6 +1235,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         const op = operationsJournalRef.current.get(opKey);
+         if (op && op.id === opId) {
+           op.status = 'committed';
++          op.committedAtReadVersion = readGenRef.current;
+         }
+         showToast(`Đã chấm ${displayTitle} ${validRating}/10 điểm ★`, 'success');
+         return true;
+@@ -1123,20 +1247,24 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         timeoutId = null;
+       }
+       if (isStillCurrentSession()) {
+-        const op = operationsJournalRef.current.get(opKey);
+-        if (op && op.id === opId) {
+-          operationsJournalRef.current.delete(opKey);
+-        }
+-
+         const isTimeout =
+-          (err instanceof DOMException && err.name === 'AbortError') || (err as any)?.name === 'AbortError';
++          (err instanceof DOMException && err.name === 'AbortError') ||
++          (err as any)?.name === 'AbortError';
+         const isNetworkError =
+           err instanceof TypeError || (err as any)?.name === 'TypeError';
+ 
+         if (isTimeout || isNetworkError) {
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            op.status = 'uncertain';
++          }
+           showToast('Thời gian gửi yêu cầu quá hạn hoặc mất kết nối. Đang kiểm tra lại trạng thái...', 'error');
+           performFetchLibrary({ isBackgroundReconcile: true });
+         } else {
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            operationsJournalRef.current.delete(opKey);
++          }
+           setSnapshot((prev) => {
+             if (prev.ownerKey !== mutationActorKey) return prev;
+             const nextR = { ...prev.ratings };
+@@ -1232,6 +1360,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+       action: 'rating',
+       movieId: id,
+       readVersionAtStart: readGenRef.current,
++      committedAtReadVersion: null,
+       status: 'pending',
+       desiredValue: undefined,
+     });
+@@ -1289,6 +1418,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         const op = operationsJournalRef.current.get(opKey);
+         if (op && op.id === opId) {
+           op.status = 'committed';
++          op.committedAtReadVersion = readGenRef.current;
+         }
+         showToast(`Đã xóa đánh giá của ${displayTitle}`, 'info');
+         return true;
+@@ -1300,18 +1430,24 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         timeoutId = null;
+       }
+       if (isStillCurrentSession()) {
+-        const op = operationsJournalRef.current.get(opKey);
+-        if (op && op.id === opId) {
+-          operationsJournalRef.current.delete(opKey);
+-        }
+-
+-        const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+-        const isNetworkError = err instanceof TypeError;
++        const isTimeout =
++          (err instanceof DOMException && err.name === 'AbortError') ||
++          (err as any)?.name === 'AbortError';
++        const isNetworkError =
++          err instanceof TypeError || (err as any)?.name === 'TypeError';
+ 
+         if (isTimeout || isNetworkError) {
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            op.status = 'uncertain';
++          }
+           showToast('Thời gian gửi yêu cầu quá hạn hoặc mất kết nối. Đang kiểm tra lại trạng thái...', 'error');
+           performFetchLibrary({ isBackgroundReconcile: true });
+         } else {
++          const op = operationsJournalRef.current.get(opKey);
++          if (op && op.id === opId) {
++            operationsJournalRef.current.delete(opKey);
++          }
+           setSnapshot((prev) => {
+             if (prev.ownerKey !== mutationActorKey) return prev;
+             const nextR = { ...prev.ratings };
+@@ -1356,6 +1492,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
+         isFavorite,
+         getRating,
+         isActionPending,
++        isActionUnconfirmed,
+         isLibraryLoading,
+         libraryError,
+         refetchLibrary: () => performFetchLibrary(),
+diff --git a/frontend/tests/m1_behavior_suite.mjs b/frontend/tests/m1_behavior_suite.mjs
+index 5ba9469..c6ef970 100644
+--- a/frontend/tests/m1_behavior_suite.mjs
++++ b/frontend/tests/m1_behavior_suite.mjs
+@@ -806,3 +806,177 @@ test('17. G3 (P2): Unknown write outcome (network error) triggers background rec
+   assert.deepEqual([...h.value.watchlist], ['committed-item']);
+ });
+ 
++test('18. H1 (P2): Read initiated while write was pending cannot overwrite subsequent commit when read body arrives late', async () => {
++  const writeDeferred = deferred();
++  const readDeferred = deferred();
++  let refreshing = false;
++  const auth = {
++    current: {
++      ...makeActor(1),
++      handleSessionExpired: () => {},
++    },
++  };
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (opts?.method) return writeDeferred.promise;
++      if (refreshing && url.endsWith('watchlist')) {
++        return Promise.resolve({ ok: true, status: 200, json: () => readDeferred.promise });
++      }
++      return Promise.resolve(ok([]));
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++  assert.deepEqual([...h.value.watchlist], []);
++
++  // 1. User starts mutation to add X
++  const mutationPromise = h.value.toggleWatchlist('X');
++  await h.settle();
++
++  // 2. Refresh is initiated while write is pending
++  refreshing = true;
++  const readPromise = h.value.refetchLibrary();
++  await h.settle();
++
++  // 3. Backend completes write successfully
++  writeDeferred.resolve(ok({ movieId: 'X' }));
++  await mutationPromise;
++  await h.settle();
++  assert.deepEqual([...h.value.watchlist], ['X']);
++
++  // 4. Stale read arrives with empty list (from before commit)
++  readDeferred.resolve({ success: true, data: [] });
++  await readPromise;
++  await h.settle();
++
++  // H1: X MUST NOT be wiped out by stale read!
++  assert.deepEqual([...h.value.watchlist], ['X']);
++});
++
++test('19. H2 (P2): Unknown outcome on write network loss marks operation uncertain and retrying toggle maintains POST intent', async () => {
++  let backend = [];
++  let failReconcile = false;
++  const methods = [];
++  const auth = {
++    current: {
++      ...makeActor(1),
++      handleSessionExpired: () => {},
++    },
++  };
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (opts?.method === 'POST') {
++        methods.push('POST');
++        if (methods.length === 1) {
++          // First attempt: DB committed, but connection dropped before response headers
++          backend = ['X'];
++          failReconcile = true;
++          throw new TypeError('Connection reset after commit');
++        }
++        // Second attempt (retry): backend succeeds
++        backend = ['X'];
++        return Promise.resolve(ok({ movieId: 'X' }));
++      }
++      if (opts?.method === 'DELETE') {
++        methods.push('DELETE');
++        backend = [];
++        return Promise.resolve(ok(null));
++      }
++      if (failReconcile) return Promise.resolve({ ok: false, status: 500 });
++      return Promise.resolve(ok(backend.map((id) => ({ movieId: id }))));
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++
++  // First toggle: loses response after commit
++  const firstRes = await h.value.toggleWatchlist('X');
++  await h.settle();
++
++  assert.equal(firstRes, false);
++  assert.equal(h.value.isActionPending('X', 'watchlist'), false);
++  assert.equal(h.value.isActionUnconfirmed('X', 'watchlist'), true);
++  assert.deepEqual([...h.value.watchlist], ['X']);
++
++  // Second toggle: user retries. Must send POST, not DELETE!
++  const retryRes = await h.value.toggleWatchlist('X');
++  await h.settle();
++
++  assert.equal(retryRes, true);
++  assert.deepEqual(methods, ['POST', 'POST']);
++  assert.deepEqual(backend, ['X']);
++  assert.deepEqual([...h.value.watchlist], ['X']);
++  assert.equal(h.value.isActionUnconfirmed('X', 'watchlist'), false);
++});
++
++test('20. H2 (P2): Unknown outcome on DELETE maintains delete intent on retry without inverting to POST', async () => {
++  let backend = ['Y'];
++  let failReconcile = false;
++  const methods = [];
++  const auth = {
++    current: {
++      ...makeActor(1),
++      handleSessionExpired: () => {},
++    },
++  };
++
++  const h = makeHarness(
++    libFile,
++    'WatchlistProvider',
++    (url, opts) => {
++      if (opts?.method === 'POST') {
++        methods.push('POST');
++        backend = ['Y'];
++        return Promise.resolve(ok({ movieId: 'Y' }));
++      }
++      if (opts?.method === 'DELETE') {
++        methods.push('DELETE');
++        if (methods.length === 1) {
++          // First attempt: DB deleted Y, connection dropped before response
++          backend = [];
++          failReconcile = true;
++          throw new TypeError('Connection lost on delete');
++        }
++        backend = [];
++        return Promise.resolve(ok(null));
++      }
++      if (failReconcile) return Promise.resolve({ ok: false, status: 500 });
++      return Promise.resolve(ok(backend.map((id) => ({ movieId: id }))));
++    },
++    auth
++  );
++
++  h.render();
++  await h.settle();
++  assert.deepEqual([...h.value.watchlist], ['Y']);
++
++  // First delete attempt: fails with unknown outcome
++  const firstDel = await h.value.toggleWatchlist('Y');
++  await h.settle();
++
++  assert.equal(firstDel, false);
++  assert.equal(h.value.isActionPending('Y', 'watchlist'), false);
++  assert.equal(h.value.isActionUnconfirmed('Y', 'watchlist'), true);
++
++  // User retries delete: must send DELETE, never POST!
++  const retryDel = await h.value.toggleWatchlist('Y');
++  await h.settle();
++
++  assert.equal(retryDel, true);
++  assert.deepEqual(methods, ['DELETE', 'DELETE']);
++  assert.deepEqual(backend, []);
++  assert.deepEqual([...h.value.watchlist], []);
++  assert.equal(h.value.isActionUnconfirmed('Y', 'watchlist'), false);
++});
++
++

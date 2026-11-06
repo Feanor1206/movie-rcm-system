@@ -1,0 +1,28 @@
+{
+  "schema_version": "99.0",
+  "created_at": "not-a-timestamp",
+  "movies": [
+    {
+      "id": "INVALID ID WITH SPACES AND UPPERCASE",
+      "title": "",
+      "year": 1800,
+      "rating": 15.5,
+      "genres": [],
+      "synopsis": "Short",
+      "provenance": {
+        "verification_status": "unsupported_status"
+      },
+      "comparative_attributes": {
+        "darkness": 1.5,
+        "pacing": -0.5
+      },
+      "media_assets": [
+        {
+          "asset_id": "bad-asset",
+          "asset_type": "invalid_type",
+          "storage_backend": "invalid_backend"
+        }
+      ]
+    }
+  ]
+}

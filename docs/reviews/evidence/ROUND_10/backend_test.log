@@ -1,0 +1,135 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/C:/Users/Admin/.m2/wrapper/dists/apache-maven-3.9.6-bin/3311e1d4/apache-maven-3.9.6/lib/jansi-2.4.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper (file:/C:/Users/Admin/.m2/wrapper/dists/apache-maven-3.9.6-bin/3311e1d4/apache-maven-3.9.6/lib/guava-32.0.1-jre.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.dippie:moviercm-backend >---------------------
+[INFO] Building moviercm-backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ moviercm-backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ moviercm-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ moviercm-backend ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ moviercm-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ moviercm-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.dippie.moviercm.AuthAndLibraryIntegrationTest
+11:00:21.718 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.dippie.moviercm.AuthAndLibraryIntegrationTest]: AuthAndLibraryIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+11:00:21.922 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.AuthAndLibraryIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-14T11:00:22.598+07:00  INFO 7972 --- [moviercm-backend] [           main] c.d.m.AuthAndLibraryIntegrationTest      : Starting AuthAndLibraryIntegrationTest using Java 25.0.3 with PID 7972 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-14T11:00:22.601+07:00  INFO 7972 --- [moviercm-backend] [           main] c.d.m.AuthAndLibraryIntegrationTest      : The following 1 profile is active: "test"
+2026-10-14T11:00:24.251+07:00  INFO 7972 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-14T11:00:24.515+07:00  INFO 7972 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 223 ms. Found 5 JPA repository interfaces.
+2026-10-14T11:00:26.889+07:00  INFO 7972 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-14T11:00:27.161+07:00  INFO 7972 --- [moviercm-backend] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.2.Final
+2026-10-14T11:00:27.321+07:00  INFO 7972 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-14T11:00:28.862+07:00  INFO 7972 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-14T11:00:28.947+07:00  INFO 7972 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-14T11:00:29.499+07:00  INFO 7972 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:codex_round10_review user=SA
+2026-10-14T11:00:29.499+07:00  INFO 7972 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-14T11:00:32.832+07:00  INFO 7972 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-14T11:00:32.993+07:00  INFO 7972 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-14T11:00:36.158+07:00  INFO 7972 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-14T11:00:36.200+07:00  WARN 7972 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-14T11:00:37.237+07:00  INFO 7972 --- [moviercm-backend] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-10-14T11:00:40.123+07:00  WARN 7972 --- [moviercm-backend] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.apache.tomcat.jni.Library in an unnamed module (file:/C:/Users/Admin/.m2/repository/org/apache/tomcat/embed/tomcat-embed-core/10.1.28/tomcat-embed-core-10.1.28.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-10-14T11:00:43.671+07:00  INFO 7972 --- [moviercm-backend] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-14T11:00:43.671+07:00  INFO 7972 --- [moviercm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-14T11:00:43.671+07:00  INFO 7972 --- [moviercm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-14T11:00:43.789+07:00  INFO 7972 --- [moviercm-backend] [           main] c.d.m.AuthAndLibraryIntegrationTest      : Started AuthAndLibraryIntegrationTest in 21.621 seconds (process running for 23.515)
+WARNING: A Java agent has been loaded dynamically (C:\Users\Admin\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.19\byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-10-14T11:00:47.768+07:00 ERROR 7972 --- [moviercm-backend] [           main] c.d.moviercm.security.AuthEntryPointJwt  : Lỗi xác thực không hợp lệ: Bad credentials
+2026-10-14T11:00:48.533+07:00  WARN 7972 --- [moviercm-backend] [pool-2-thread-1] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 23505, SQLState: 23505
+2026-10-14T11:00:48.538+07:00 ERROR 7972 --- [moviercm-backend] [pool-2-thread-1] o.h.engine.jdbc.spi.SqlExceptionHelper   : Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_8 ON PUBLIC.WATCHLIST_ITEMS(USER_ID NULLS FIRST, MOVIE_ID NULLS FIRST) VALUES ( /* key:1 */ CAST(2 AS BIGINT), 'deep-blue')"; SQL statement:
+insert into watchlist_items (added_at,movie_id,movie_title,poster_url,user_id,id) values (?,?,?,?,?,default) [23505-224]
+2026-10-14T11:00:48.872+07:00  WARN 7972 --- [moviercm-backend] [pool-2-thread-4] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 23505, SQLState: 23505
+2026-10-14T11:00:48.872+07:00 ERROR 7972 --- [moviercm-backend] [pool-2-thread-4] o.h.engine.jdbc.spi.SqlExceptionHelper   : Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_5 ON PUBLIC.FAVORITE_ITEMS(USER_ID NULLS FIRST, MOVIE_ID NULLS FIRST) VALUES ( /* key:2 */ CAST(2 AS BIGINT), 'deep-blue')"; SQL statement:
+insert into favorite_items (added_at,movie_id,movie_title,poster_url,user_id,id) values (?,?,?,?,?,default) [23505-224]
+2026-10-14T11:00:49.200+07:00  WARN 7972 --- [moviercm-backend] [pool-2-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 23505, SQLState: 23505
+2026-10-14T11:00:49.205+07:00 ERROR 7972 --- [moviercm-backend] [pool-2-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : Unique index or primary key violation: "PUBLIC.CONSTRAINT_INDEX_B ON PUBLIC.MOVIE_RATINGS(USER_ID NULLS FIRST, MOVIE_ID NULLS FIRST) VALUES ( /* key:1 */ CAST(2 AS BIGINT), 'deep-blue')"; SQL statement:
+insert into movie_ratings (created_at,movie_id,rating,updated_at,user_id,id) values (?,?,?,?,?,default) [23505-224]
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 32.98 s -- in com.dippie.moviercm.AuthAndLibraryIntegrationTest
+[INFO] Running com.dippie.moviercm.CatalogIntegrationTest
+2026-10-14T11:00:54.503+07:00  INFO 7972 --- [moviercm-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.dippie.moviercm.CatalogIntegrationTest]: CatalogIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-14T11:00:54.514+07:00  INFO 7972 --- [moviercm-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.CatalogIntegrationTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.734 s -- in com.dippie.moviercm.CatalogIntegrationTest
+[INFO] Running com.dippie.moviercm.SeedAndConfigPolicyTest
+2026-10-14T11:00:56.254+07:00  INFO 7972 --- [moviercm-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.dippie.moviercm.SeedAndConfigPolicyTest]: SeedAndConfigPolicyTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-14T11:00:56.271+07:00  INFO 7972 --- [moviercm-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.SeedAndConfigPolicyTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-14T11:00:56.531+07:00  INFO 7972 --- [moviercm-backend] [           main] c.d.moviercm.SeedAndConfigPolicyTest     : Starting SeedAndConfigPolicyTest using Java 25.0.3 with PID 7972 (started by Admin in D:\Class\movie-rcm-system\backend\springboot)
+2026-10-14T11:00:56.531+07:00  INFO 7972 --- [moviercm-backend] [           main] c.d.moviercm.SeedAndConfigPolicyTest     : The following 1 profile is active: "test"
+2026-10-14T11:00:57.315+07:00  INFO 7972 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-14T11:00:57.365+07:00  INFO 7972 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 50 ms. Found 5 JPA repository interfaces.
+2026-10-14T11:00:57.713+07:00  INFO 7972 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-14T11:00:57.725+07:00  INFO 7972 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-14T11:00:57.766+07:00  INFO 7972 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-14T11:00:57.766+07:00  INFO 7972 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-10-14T11:00:57.766+07:00  INFO 7972 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection conn10: url=jdbc:h2:mem:codex_round10_review user=SA
+2026-10-14T11:00:57.766+07:00  INFO 7972 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-10-14T11:00:58.322+07:00  INFO 7972 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-14T11:00:58.345+07:00  INFO 7972 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-14T11:00:58.672+07:00  INFO 7972 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-14T11:00:58.672+07:00  WARN 7972 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-14T11:00:59.038+07:00  WARN 7972 --- [moviercm-backend] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-10-14T11:00:59.850+07:00  INFO 7972 --- [moviercm-backend] [           main] c.d.moviercm.SeedAndConfigPolicyTest     : Started SeedAndConfigPolicyTest in 3.538 seconds (process running for 39.577)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.800 s -- in com.dippie.moviercm.SeedAndConfigPolicyTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  46.427 s
+[INFO] Finished at: 2026-10-14T11:01:00+07:00
+[INFO] ------------------------------------------------------------------------

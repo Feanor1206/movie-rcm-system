@@ -1,0 +1,34 @@
+{
+  "milestone": "M4",
+  "taskId": "M4-F01",
+  "runId": "M4-F01-CHECKPOINT-01",
+  "promptVersion": 1,
+  "status": "ready_for_review",
+  "timestamp": "2026-10-14T15:28:00+07:00",
+  "reviewTarget": "Codex",
+  "sourceFrozen": true,
+  "summary": "Full follow-up resolution of all 6 findings from M4 Review. Server-side public media boundary enforced (404 Fail Closed, no-cache errors), Node 20 CI compatible component test suite, player lifecycle & route invalidation with stable focus and retry position recovery, real Spring Boot HTTP Range benchmark & CDP browser playback walkthrough, strict read-only storage root, and truthful runbook.",
+  "findingsResolved": [
+    "R1_PUBLIC_POLICY_SERVER_ENFORCED",
+    "R2_NODE20_CI_RUNTIME_COMPATIBILITY",
+    "R3_PLAYER_IDENTITY_FOCUS_LIFECYCLE",
+    "R4_ACTUAL_SPRING_BOOT_BENCHMARK_AND_BROWSER_EVIDENCE",
+    "R5_STORAGE_ROOT_PRECISION_AND_READONLY",
+    "R6_RUNBOOK_AND_REPORT_TRUTHFULNESS"
+  ],
+  "verificationResults": {
+    "backendMavenTest": "41/41 PASS",
+    "backendActiveProfileTest": "41/41 PASS",
+    "frontendNode26Test": "69/69 PASS",
+    "frontendNode20Test": "69/69 PASS",
+    "typeScriptCheck": "0 errors",
+    "productionBuild": "SUCCESS",
+    "dynamicBundleBudget": "139.98 KiB <= 140 KiB (PASS)",
+    "browserWalkthrough": "7/7 PASS (Code 0)",
+    "springBootHttpBenchmark": "5/5 PASS (Code 0)",
+    "screenshotsCaptured": 4
+  },
+  "blockedExternalInput": {
+    "googleDriveStreaming": "BLOCKED_EXTERNAL_INPUT / NOT_IMPLEMENTED (requires external user credentials / rclone mount)"
+  }
+}

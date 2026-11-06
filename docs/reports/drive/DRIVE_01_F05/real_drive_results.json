@@ -1,0 +1,103 @@
+{
+  "source": "Actual Google Drive read-only mount -> production Spring/H2 -> production Next player -> Chrome decoder",
+  "mount": "X:",
+  "startedAt": "2026-10-15T22:16:03.079Z",
+  "seeks": [
+    {
+      "fraction": 0.25,
+      "target": 111.45,
+      "latencyMs": 7780.852499999994,
+      "mediaTime": 111.6,
+      "presentedFrames": 37
+    },
+    {
+      "fraction": 0.6,
+      "target": 267.48,
+      "latencyMs": 12623.671799999996,
+      "mediaTime": 267.566667,
+      "presentedFrames": 39
+    },
+    {
+      "fraction": 0.94,
+      "target": 419.05199999999996,
+      "latencyMs": 10273.097699999998,
+      "mediaTime": 419.133333,
+      "presentedFrames": 41
+    }
+  ],
+  "bytes": 29209556,
+  "localOutput": "C:\\Users\\Admin\\AppData\\Local\\Temp\\codex-real-drive-3xkzkK",
+  "backendPort": 56692,
+  "head": {
+    "status": 200,
+    "acceptRanges": "bytes"
+  },
+  "ranges": [
+    {
+      "start": 0,
+      "bytes": 65536,
+      "latencyMs": 12685.353500000001
+    },
+    {
+      "start": 14604778,
+      "bytes": 65536,
+      "latencyMs": 13526.3747
+    },
+    {
+      "start": 29144020,
+      "bytes": 65536,
+      "latencyMs": 13750.071899999995
+    }
+  ],
+  "browserResponses": [
+    {
+      "url": "http://localhost:8080/api/media/stream/codex-real-drive-feature",
+      "status": 206
+    },
+    {
+      "url": "http://localhost:8080/api/media/stream/codex-real-drive-feature",
+      "status": 206
+    },
+    {
+      "url": "http://localhost:8080/api/media/stream/codex-real-drive-feature",
+      "status": 206
+    },
+    {
+      "url": "http://localhost:8080/api/media/stream/codex-real-drive-feature",
+      "status": 206
+    }
+  ],
+  "startupMs": 12736.862699999998,
+  "video": {
+    "duration": 445.8,
+    "width": 1920,
+    "height": 1080,
+    "currentTime": 1.065809,
+    "src": "http://localhost:8080/api/media/stream/codex-real-drive-feature"
+  },
+  "mobile": {
+    "width": 375,
+    "height": 667,
+    "videoWidth": 1920,
+    "currentTime": 419.734576,
+    "controls": [
+      {
+        "testId": "video-play-pause-btn",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "testId": "video-volume-btn",
+        "width": 44,
+        "height": 44
+      },
+      {
+        "testId": "video-fullscreen-btn",
+        "width": 44,
+        "height": 44
+      }
+    ]
+  },
+  "pass": true,
+  "finishedAt": "2026-10-15T22:17:45.485Z"
+}

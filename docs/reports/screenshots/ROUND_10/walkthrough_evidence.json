@@ -1,0 +1,170 @@
+[
+  {
+    "step": "01_home_guest_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "guest",
+    "expected": "Home loads in guest mode with \"Đăng nhập\" action and synthetic hero movie",
+    "actual": "Rendered guest navbar with \"Đăng nhập\" and hero \"The Quantum Garden\"",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 0,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "02_auth_modal_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "guest",
+    "expected": "Clicking \"Đăng nhập\" opens accessible AuthModal with role=\"dialog\", aria-modal=\"true\", and focused first input",
+    "actual": "Dialog verified with aria-modal=\"true\" and focused input field",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 0,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "03_login_user_a_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "user_a",
+    "expected": "AuthModal submits credentials, closes cleanly, and displays authenticated user \"user_a\" in navbar",
+    "actual": "Navbar displays \"user_a\", AuthModal dismissed, session established",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 0,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "04_detail_saved_rated_user_a",
+    "url": "http://127.0.0.1:3005/movies/m2-synthetic-anim-001",
+    "actor": "user_a",
+    "expected": "User A saves synthetic movie to Watchlist and submits rating score 9",
+    "actual": "Fixture User A recorded watchlist=m2-synthetic-anim-001 and rating=9",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "05_profile_user_a_desktop",
+    "url": "http://127.0.0.1:3005/profile",
+    "actor": "user_a",
+    "expected": "User A Profile verifies Watchlist card and Ratings tab with score 9/10",
+    "actual": "Watchlist and Ratings tabs confirmed with \"The Quantum Garden\" and score 9/10",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "06_hero_uncertain_retry_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "user_a",
+    "expected": "Hero uncertain state displays amber badge and \"Thử lưu lại\"; retry click confirms to \"Đã lưu Watchlist\"",
+    "actual": "Uncertain badge verified and retry confirmation succeeded",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "07_logout_switch_user_b",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "user_b",
+    "expected": "User A logs out cleanly; User B logs in with independent token",
+    "actual": "Navbar displays \"user_b\", clean session transition confirmed",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "08_user_b_isolation_profile",
+    "url": "http://127.0.0.1:3005/profile",
+    "actor": "user_b",
+    "expected": "User B profile renders completely empty library; zero data leaked from User A",
+    "actual": "Verified User B profile has 0 items and does not contain \"The Quantum Garden\"",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "09_search_deep_link_back_desktop",
+    "url": "http://127.0.0.1:3005/search?q=quantum",
+    "actor": "user_b",
+    "expected": "history.back() returns to search page with input draft and results intact",
+    "actual": "Verified URL /search?q=quantum, input draft \"quantum\", and search results",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "10_image_404_fallback_desktop",
+    "url": "http://127.0.0.1:3005/movies/m3-synthetic-broken-001",
+    "actor": "user_b",
+    "expected": "Movie with broken/404 image URL cleanly falls back to title placeholder without breaking layout",
+    "actual": "Rendered \"The Lost Lantern\" placeholder fallback upon 404 image error",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "11_detail_404_desktop",
+    "url": "http://127.0.0.1:3005/movies/nonexistent-movie-uuid-404",
+    "actor": "user_b",
+    "expected": "Non-existent movie ID triggers clean 404 error with home link",
+    "actual": "Rendered \"Không tìm thấy phim hoạt hình\" with home action",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "12_catalog_error_retry_desktop",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "user_b",
+    "expected": "Backend failure renders error banner with retry button",
+    "actual": "Rendered error state with \"Thử kết nối lại\" retry action",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "13_home_mobile",
+    "url": "http://127.0.0.1:3005/",
+    "actor": "user_b",
+    "expected": "Mobile responsive Home renders stacked hero with touch targets (375x667)",
+    "actual": "Verified viewport width 375 and mobile hero banner",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  },
+  {
+    "step": "14_detail_mobile",
+    "url": "http://127.0.0.1:3005/movies/m2-synthetic-anim-001",
+    "actor": "user_b",
+    "expected": "Mobile detail displays vertically stacked poster, trailer player action, and non-overlapping buttons",
+    "actual": "Verified mobile detail layout and non-overlapping controls on 375px viewport",
+    "pass": true,
+    "fixtureState": {
+      "userA_watchlist": 1,
+      "userB_watchlist": 0
+    }
+  }
+]

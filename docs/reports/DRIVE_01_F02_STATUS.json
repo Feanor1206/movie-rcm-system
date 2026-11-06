@@ -1,0 +1,122 @@
+{
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F02",
+  "runId": "DRIVE-01-F02-CHECKPOINT-01",
+  "promptVersion": 4,
+  "reviewedCheckpoint": "DRIVE-01-F01-CHECKPOINT-01",
+  "status": "ready_for_review",
+  "timestamp": "2026-10-15T03:05:00+07:00",
+  "reviewTarget": "Codex",
+  "sourceFrozen": true,
+  "baselineCommit": "5b5c501",
+  "currentHead": "dev",
+  "summary": "Full resolution of findings F1-F3 from DRIVE_01_F01_REVIEW.md across resource lifecycle ownership and non-blocking caller close (F1), mandatory 9-field identity schema and fail-closed stop/mount-cleanup verification (F2), and PowerShell 5.1 CJK / Unicode source encoding compatibility (F3). Verified by automated test suites (109 Maven, 72 PowerShell, 3 repro detectors) and fresh-root browser walkthrough exit 0.",
+  "gateResults": {
+    "G1_IMPLEMENTATION": "PASS",
+    "G2_MOUNTED_DRIVE": "BLOCKED_EXTERNAL_INPUT",
+    "G3_BROWSER_DRIVE": "BLOCKED_EXTERNAL_INPUT"
+  },
+  "findingResolutions": {
+    "F1_resourceLifecycleAndStalledClose": {
+      "finding": "IO deadlines do not own late resources or bound request cleanup. Late-completing channel opens leak file descriptors after caller timeout; channel close blocks request thread when native read is blocked in WinFsp kernel.",
+      "resolution": "Implemented explicit ownership handshake (PENDING, CALLER_ACQUIRED, TIMED_OUT) in DriveIoExecutor.executeOpen and automatic late AutoCloseable disposal in executeWithTimeout. Non-blocking DriveSeekableByteChannel.close marks closed immediately while actualOutstandingWorkers accounts for in-flight kernel operation until physical OS exit.",
+      "tests": "DriveLateOpenLifecycleTest (5/5 PASS), DriveCleanupDeadlineTest (3/3 PASS), reviewer repro DRIVE_F01_late_open.java (lateOpenChannelStillOpen=false actualWorkers=0), reviewer repro DRIVE_F01_channel_close.java (callerStillBlockedInClose=false ioWorkers=1)"
+    },
+    "F2_mandatoryProcessIdentity": {
+      "finding": "stop_drive.ps1 extracted sessionId, mountPoint, remoteTarget, arguments, and status but did not require them. Missing processName defaulted to rclone. Reviewer repro showed termination signaled with incomplete identity fields.",
+      "resolution": "Mandated all 9 state schema fields (pid, processName, executablePath, startTime, sessionId, mountPoint, remoteTarget, arguments, status). Missing any field fails closed (Status=VERIFICATION_FAILED), preserves state file on disk, and never signals process. Applied identical strict verification to mount launch-failure cleanup.",
+      "tests": "test_drive_security_seams.ps1 (30/30 PASS, including TC-F2-01 to TC-F2-10), reviewer repro DRIVE_F01_stop_missing_identity.ps1 (terminationRequestedWithMissingIdentityFields=False across PS 5.1 and PS 7)"
+    },
+    "F3_powerShell51Encoding": {
+      "finding": "PowerShell 5.1 failed to parse test_drive_toolkit_comprehensive.ps1 at line 144 before executing any tests due to ANSI code page decoding of raw UTF-8 CJK literals.",
+      "resolution": "Replaced embedded multibyte CJK and Vietnamese string literals with UTF-8 byte array construction ([System.Text.Encoding]::UTF8.GetString([byte[]]@(...))) and added UTF-8 BOM, ensuring clean -File execution on both Windows PowerShell 5.1 and PowerShell 7.",
+      "tests": "test_drive_toolkit_comprehensive.ps1 (28/28 PASS on powershell.exe 5.1 and pwsh 7)"
+    }
+  },
+  "multiAgentOwnership": {
+    "agentA_ioOwnershipImplementation": {
+      "role": "IO Ownership Implementation Engineer",
+      "filesOwned": [
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+        "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java"
+      ]
+    },
+    "agentB_windowsOwnershipImplementation": {
+      "role": "Windows Ownership Implementation Engineer",
+      "filesOwned": [
+        "scripts/drive/stop_drive.ps1",
+        "scripts/drive/status_drive.ps1",
+        "scripts/drive/mount_drive.ps1"
+      ]
+    },
+    "agentC_lateResourceRegressionTests": {
+      "role": "Late-Resource Regression Test Engineer",
+      "filesOwned": [
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveLateOpenLifecycleTest.java"
+      ]
+    },
+    "agentD_stalledCleanupRegressionTests": {
+      "role": "Stalled Cleanup Regression Test Engineer",
+      "filesOwned": [
+        "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupDeadlineTest.java",
+        "docs/reports/drive/DRIVE_01_F02/agent-d/test_results.log"
+      ]
+    },
+    "agentE_windowsRegressionsAndEncoding": {
+      "role": "Windows Regressions and Encoding Engineer",
+      "filesOwned": [
+        "scripts/drive-tests/test_drive_toolkit_comprehensive.ps1",
+        "scripts/drive-tests/test_drive_security_seams.ps1",
+        "scripts/drive/test_drive_tooling.ps1",
+        "docs/reports/drive/DRIVE_01_F02/agent-e/toolkit_test_evidence.json",
+        "docs/reports/drive/DRIVE_01_F02/agent-e/toolkit_test_evidence_pwsh.json",
+        "docs/reports/drive/DRIVE_01_F02/agent-e/TOOLKIT_VERIFICATION_REPORT.md"
+      ]
+    },
+    "agentF_integrationEvidenceAndDocs": {
+      "role": "Integration Evidence and Docs Engineer",
+      "filesOwned": [
+        "docs/contracts/DRIVE_STORAGE_CONTRACT.md",
+        "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+        "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md",
+        "docs/reports/drive/DRIVE_01_F02/README.md"
+      ]
+    },
+    "parent_integrationAndWalkthrough": {
+      "role": "Parent Orchestrator",
+      "filesOwned": [
+        "scripts/run_drive_media_walkthrough.cjs",
+        "docs/reports/DRIVE_01_F02_REPORT.md",
+        "docs/reports/DRIVE_01_F02_STATUS.json",
+        "docs/reports/DRIVE_01_F02.patch",
+        "docs/reports/DRIVE_01_F02_MANIFEST.json",
+        "docs/reports/drive/DRIVE_01_F02/walkthrough_results.json",
+        "docs/reports/drive/DRIVE_01_F02/screenshots/"
+      ]
+    }
+  },
+  "verificationResults": {
+    "backendMavenSuite": "109/109 PASS (Exit 0)",
+    "driveLateOpenLifecycleTest": "5/5 PASS (Exit 0)",
+    "driveCleanupDeadlineTest": "3/3 PASS (Exit 0)",
+    "driveToolingTests": "14/14 PASS (Exit 0 across PS 5.1 & PS 7)",
+    "driveToolkitComprehensive": "28/28 PASS (Exit 0 across PS 5.1 & PS 7)",
+    "driveToolkitSecuritySeams": "30/30 PASS (Exit 0 across PS 5.1 & PS 7)",
+    "reviewerReproLateOpen": "REPRO lateOpenChannelStillOpen=false actualWorkers=0 (Exit 0)",
+    "reviewerReproChannelClose": "REPRO readDeadlineFired=true callerStillBlockedInClose=false ioWorkers=1 (Exit 1 - stall resolved)",
+    "reviewerReproMissingIdentity": "REPRO terminationRequestedWithMissingIdentityFields=False (Exit 0 across PS 5.1 & PS 7)",
+    "browserWalkthrough": "PASS (Exit 0, 5 screenshots captured)",
+    "patchReverseCheck": "VERIFIED_CLEAN (Exit 0)"
+  },
+  "blockedExternalInput": {
+    "G2_MOUNTED_DRIVE": {
+      "reason": "Requires user interactive OAuth authentication via rclone config (drive.readonly), WinFsp driver installation, and selection of remote folder.",
+      "actionRequiredFromUser": "Follow setup guide in docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md and run scripts/drive/mount_drive.ps1 with -Execute."
+    },
+    "G3_BROWSER_DRIVE": {
+      "reason": "Requires an active live Google Drive mount (depends on G2).",
+      "actionRequiredFromUser": "Once G2 is established, execute walkthrough against live mount as documented in docs/runbooks/DRIVE_PERFORMANCE_PLAN.md."
+    }
+  }
+}

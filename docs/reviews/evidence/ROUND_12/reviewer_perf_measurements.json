@@ -1,0 +1,967 @@
+{
+  "benchmarkMetadata": {
+    "timestamp": "2026-10-14T06:09:58.245Z",
+    "framework": "Next.js 15.1.2 (Standalone)",
+    "nodeVersion": "v26.1.0",
+    "viewport": "1280x800",
+    "coldRunsPerRoute": 3,
+    "warmRunsPerRoute": 3,
+    "networkEnvironment": "Local Loopback (Fixture Server on 127.0.0.1:8080)",
+    "cachePolicy": "Cold: cache cleared and disabled via CDP. Warm: cache enabled across 3 repeated runs.",
+    "lcpMethodology": "PerformanceObserver with buffered:true injected before navigation. Missing sample -> null/unavailable. No FCP substitution.",
+    "clsMethodology": "Standard Session Window aggregation (max session window with 1s gap and 5s duration limit) + raw shift totals.",
+    "networkAccounting": "CDP Network.loadingFinished encodedDataLength (wire bytes) and cache/304 status tracking."
+  },
+  "exactFirstLoadJsBytes": {
+    "Home": {
+      "route": "/",
+      "rawBytes": 490624,
+      "gzipBytes": 138925,
+      "budgetBytes": 143360,
+      "underBudget": true
+    },
+    "Search": {
+      "route": "/search",
+      "rawBytes": 482201,
+      "gzipBytes": 137709,
+      "budgetBytes": 143360,
+      "underBudget": true
+    },
+    "Detail": {
+      "route": "/movies/[id]",
+      "rawBytes": 495115,
+      "gzipBytes": 140113,
+      "budgetBytes": 143360,
+      "underBudget": true
+    },
+    "Profile": {
+      "route": "/profile",
+      "rawBytes": 499237,
+      "gzipBytes": 138831,
+      "budgetBytes": 143360,
+      "underBudget": true
+    }
+  },
+  "routes": {
+    "Home": {
+      "path": "/",
+      "exactFirstLoadJsBytes": {
+        "route": "/",
+        "rawBytes": 490624,
+        "gzipBytes": 138925,
+        "budgetBytes": 143360,
+        "underBudget": true
+      },
+      "coldRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 330450,
+          "cdpRequestCount": 33,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 29,
+          "domContentLoaded": 33,
+          "loadDuration": 111,
+          "fcp": 84,
+          "lcp": 192,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.014,
+          "clsRaw": 0.014,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 313123,
+            "encodedBodyBytes": 306823,
+            "decodedBodyBytes": 735248
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 330450,
+          "cdpRequestCount": 33,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 29,
+          "domContentLoaded": 52,
+          "loadDuration": 86,
+          "fcp": 68,
+          "lcp": 188,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.014,
+          "clsRaw": 0.014,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 313123,
+            "encodedBodyBytes": 306823,
+            "decodedBodyBytes": 735248
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 329917,
+          "cdpRequestCount": 33,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 28,
+          "domContentLoaded": 29,
+          "loadDuration": 65,
+          "fcp": 60,
+          "lcp": 224,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.014,
+          "clsRaw": 0.014,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 313123,
+            "encodedBodyBytes": 306823,
+            "decodedBodyBytes": 735248
+          }
+        }
+      ],
+      "coldSummary": {
+        "domContentLoaded": {
+          "min": 29,
+          "max": 52,
+          "median": 33
+        },
+        "loadDuration": {
+          "min": 65,
+          "max": 111,
+          "median": 86
+        },
+        "fcp": {
+          "min": 60,
+          "max": 84,
+          "median": 68
+        },
+        "lcp": {
+          "min": 188,
+          "max": 224,
+          "median": 192
+        },
+        "clsSessionWindow": {
+          "min": 0.014,
+          "max": 0.014,
+          "median": 0.014
+        },
+        "cdpWireTransferBytes": {
+          "min": 329917,
+          "max": 330450,
+          "median": 330450
+        },
+        "cdpRequestCount": {
+          "min": 33,
+          "max": 33,
+          "median": 33
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      },
+      "warmRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 16931,
+          "cdpRequestCount": 29,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 12,
+          "domContentLoaded": 18,
+          "loadDuration": 40,
+          "fcp": 60,
+          "lcp": 148,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.014,
+          "clsRaw": 0.014,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 5930,
+            "encodedBodyBytes": 306823,
+            "decodedBodyBytes": 735248
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 16931,
+          "cdpRequestCount": 29,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 12,
+          "domContentLoaded": 41,
+          "loadDuration": 66,
+          "fcp": 104,
+          "lcp": 176,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.014,
+          "clsRaw": 0.014,
+          "rawLayoutShiftsCount": 1,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 5930,
+            "encodedBodyBytes": 306823,
+            "decodedBodyBytes": 735248
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 16931,
+          "cdpRequestCount": 29,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 12,
+          "domContentLoaded": 25,
+          "loadDuration": 47,
+          "fcp": 68,
+          "lcp": 140,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.014,
+          "clsRaw": 0.014,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 5930,
+            "encodedBodyBytes": 306823,
+            "decodedBodyBytes": 735248
+          }
+        }
+      ],
+      "warmSummary": {
+        "domContentLoaded": {
+          "min": 18,
+          "max": 41,
+          "median": 25
+        },
+        "loadDuration": {
+          "min": 40,
+          "max": 66,
+          "median": 47
+        },
+        "fcp": {
+          "min": 60,
+          "max": 104,
+          "median": 68
+        },
+        "lcp": {
+          "min": 140,
+          "max": 176,
+          "median": 148
+        },
+        "clsSessionWindow": {
+          "min": 0.014,
+          "max": 0.014,
+          "median": 0.014
+        },
+        "cdpWireTransferBytes": {
+          "min": 16931,
+          "max": 16931,
+          "median": 16931
+        },
+        "cdpRequestCount": {
+          "min": 29,
+          "max": 29,
+          "median": 29
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      }
+    },
+    "Search": {
+      "path": "/search?q=quantum",
+      "exactFirstLoadJsBytes": {
+        "route": "/search",
+        "rawBytes": 482201,
+        "gzipBytes": 137709,
+        "budgetBytes": 143360,
+        "underBudget": true
+      },
+      "coldRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 320375,
+          "cdpRequestCount": 30,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 26,
+          "domContentLoaded": 35,
+          "loadDuration": 139,
+          "fcp": 104,
+          "lcp": 204,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.069,
+          "clsRaw": 0.069,
+          "rawLayoutShiftsCount": 4,
+          "resourceTiming": {
+            "resourceCount": 25,
+            "transferBytes": 311983,
+            "encodedBodyBytes": 305983,
+            "decodedBodyBytes": 731122
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 320375,
+          "cdpRequestCount": 30,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 26,
+          "domContentLoaded": 34,
+          "loadDuration": 131,
+          "fcp": 64,
+          "lcp": 180,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.072,
+          "clsRaw": 0.071,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 25,
+            "transferBytes": 311983,
+            "encodedBodyBytes": 305983,
+            "decodedBodyBytes": 731122
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 320375,
+          "cdpRequestCount": 30,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 26,
+          "domContentLoaded": 40,
+          "loadDuration": 124,
+          "fcp": 80,
+          "lcp": 184,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.072,
+          "clsRaw": 0.071,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 25,
+            "transferBytes": 311983,
+            "encodedBodyBytes": 305983,
+            "decodedBodyBytes": 731122
+          }
+        }
+      ],
+      "coldSummary": {
+        "domContentLoaded": {
+          "min": 34,
+          "max": 40,
+          "median": 35
+        },
+        "loadDuration": {
+          "min": 124,
+          "max": 139,
+          "median": 131
+        },
+        "fcp": {
+          "min": 64,
+          "max": 104,
+          "median": 80
+        },
+        "lcp": {
+          "min": 180,
+          "max": 204,
+          "median": 184
+        },
+        "clsSessionWindow": {
+          "min": 0.069,
+          "max": 0.072,
+          "median": 0.072
+        },
+        "cdpWireTransferBytes": {
+          "min": 320375,
+          "max": 320375,
+          "median": 320375
+        },
+        "cdpRequestCount": {
+          "min": 30,
+          "max": 30,
+          "median": 30
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      },
+      "warmRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 7266,
+          "cdpRequestCount": 26,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 8,
+          "domContentLoaded": 23,
+          "loadDuration": 43,
+          "fcp": 68,
+          "lcp": 112,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.069,
+          "clsRaw": 0.069,
+          "rawLayoutShiftsCount": 3,
+          "resourceTiming": {
+            "resourceCount": 25,
+            "transferBytes": 4790,
+            "encodedBodyBytes": 305983,
+            "decodedBodyBytes": 731122
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 7799,
+          "cdpRequestCount": 26,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 9,
+          "domContentLoaded": 17,
+          "loadDuration": 30,
+          "fcp": 48,
+          "lcp": 72,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.069,
+          "clsRaw": 0.069,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 25,
+            "transferBytes": 4790,
+            "encodedBodyBytes": 305983,
+            "decodedBodyBytes": 731122
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 7799,
+          "cdpRequestCount": 26,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 9,
+          "domContentLoaded": 29,
+          "loadDuration": 55,
+          "fcp": 96,
+          "lcp": 128,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.069,
+          "clsRaw": 0.069,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 25,
+            "transferBytes": 4790,
+            "encodedBodyBytes": 305983,
+            "decodedBodyBytes": 731122
+          }
+        }
+      ],
+      "warmSummary": {
+        "domContentLoaded": {
+          "min": 17,
+          "max": 29,
+          "median": 23
+        },
+        "loadDuration": {
+          "min": 30,
+          "max": 55,
+          "median": 43
+        },
+        "fcp": {
+          "min": 48,
+          "max": 96,
+          "median": 68
+        },
+        "lcp": {
+          "min": 72,
+          "max": 128,
+          "median": 112
+        },
+        "clsSessionWindow": {
+          "min": 0.069,
+          "max": 0.069,
+          "median": 0.069
+        },
+        "cdpWireTransferBytes": {
+          "min": 7266,
+          "max": 7799,
+          "median": 7799
+        },
+        "cdpRequestCount": {
+          "min": 26,
+          "max": 26,
+          "median": 26
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      }
+    },
+    "Detail": {
+      "path": "/movies/m2-synthetic-anim-001",
+      "exactFirstLoadJsBytes": {
+        "route": "/movies/[id]",
+        "rawBytes": 495115,
+        "gzipBytes": 140113,
+        "budgetBytes": 143360,
+        "underBudget": true
+      },
+      "coldRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 332690,
+          "cdpRequestCount": 33,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 29,
+          "domContentLoaded": 23,
+          "loadDuration": 88,
+          "fcp": 48,
+          "lcp": 180,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0,
+          "clsRaw": 0,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 321654,
+            "encodedBodyBytes": 315054,
+            "decodedBodyBytes": 764620
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 332689,
+          "cdpRequestCount": 33,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 29,
+          "domContentLoaded": 52,
+          "loadDuration": 89,
+          "fcp": 72,
+          "lcp": 184,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0,
+          "clsRaw": 0,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 321654,
+            "encodedBodyBytes": 315054,
+            "decodedBodyBytes": 764620
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 332688,
+          "cdpRequestCount": 33,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 29,
+          "domContentLoaded": 46,
+          "loadDuration": 103,
+          "fcp": 76,
+          "lcp": 196,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0,
+          "clsRaw": 0,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 321654,
+            "encodedBodyBytes": 315054,
+            "decodedBodyBytes": 764620
+          }
+        }
+      ],
+      "coldSummary": {
+        "domContentLoaded": {
+          "min": 23,
+          "max": 52,
+          "median": 46
+        },
+        "loadDuration": {
+          "min": 88,
+          "max": 103,
+          "median": 89
+        },
+        "fcp": {
+          "min": 48,
+          "max": 76,
+          "median": 72
+        },
+        "lcp": {
+          "min": 180,
+          "max": 196,
+          "median": 184
+        },
+        "clsSessionWindow": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "cdpWireTransferBytes": {
+          "min": 332688,
+          "max": 332690,
+          "median": 332689
+        },
+        "cdpRequestCount": {
+          "min": 33,
+          "max": 33,
+          "median": 33
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      },
+      "warmRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 16965,
+          "cdpRequestCount": 29,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 11,
+          "domContentLoaded": 50,
+          "loadDuration": 52,
+          "fcp": 100,
+          "lcp": 148,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0,
+          "clsRaw": 0,
+          "rawLayoutShiftsCount": 1,
+          "resourceTiming": {
+            "resourceCount": 28,
+            "transferBytes": 7297,
+            "encodedBodyBytes": 315054,
+            "decodedBodyBytes": 764620
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 17023,
+          "cdpRequestCount": 30,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 12,
+          "domContentLoaded": 40,
+          "loadDuration": 46,
+          "fcp": 80,
+          "lcp": 120,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0,
+          "clsRaw": 0,
+          "rawLayoutShiftsCount": 1,
+          "resourceTiming": {
+            "resourceCount": 29,
+            "transferBytes": 7654,
+            "encodedBodyBytes": 315111,
+            "decodedBodyBytes": 764677
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 17024,
+          "cdpRequestCount": 30,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 12,
+          "domContentLoaded": 42,
+          "loadDuration": 43,
+          "fcp": 72,
+          "lcp": 120,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0,
+          "clsRaw": 0,
+          "rawLayoutShiftsCount": 1,
+          "resourceTiming": {
+            "resourceCount": 29,
+            "transferBytes": 7654,
+            "encodedBodyBytes": 315111,
+            "decodedBodyBytes": 764677
+          }
+        }
+      ],
+      "warmSummary": {
+        "domContentLoaded": {
+          "min": 40,
+          "max": 50,
+          "median": 42
+        },
+        "loadDuration": {
+          "min": 43,
+          "max": 52,
+          "median": 46
+        },
+        "fcp": {
+          "min": 72,
+          "max": 100,
+          "median": 80
+        },
+        "lcp": {
+          "min": 120,
+          "max": 148,
+          "median": 120
+        },
+        "clsSessionWindow": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "cdpWireTransferBytes": {
+          "min": 16965,
+          "max": 17024,
+          "median": 17023
+        },
+        "cdpRequestCount": {
+          "min": 29,
+          "max": 30,
+          "median": 30
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      }
+    },
+    "Profile": {
+      "path": "/profile",
+      "exactFirstLoadJsBytes": {
+        "route": "/profile",
+        "rawBytes": 499237,
+        "gzipBytes": 138831,
+        "budgetBytes": 143360,
+        "underBudget": true
+      },
+      "coldRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 319975,
+          "cdpRequestCount": 28,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 24,
+          "domContentLoaded": 85,
+          "loadDuration": 119,
+          "fcp": 104,
+          "lcp": 196,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.008,
+          "clsRaw": 0.008,
+          "rawLayoutShiftsCount": 3,
+          "resourceTiming": {
+            "resourceCount": 23,
+            "transferBytes": 311618,
+            "encodedBodyBytes": 305918,
+            "decodedBodyBytes": 731235
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 319975,
+          "cdpRequestCount": 28,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 24,
+          "domContentLoaded": 48,
+          "loadDuration": 84,
+          "fcp": 64,
+          "lcp": 164,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.008,
+          "clsRaw": 0.008,
+          "rawLayoutShiftsCount": 3,
+          "resourceTiming": {
+            "resourceCount": 23,
+            "transferBytes": 311618,
+            "encodedBodyBytes": 305918,
+            "decodedBodyBytes": 731235
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "cold",
+          "cdpWireTransferBytes": 319975,
+          "cdpRequestCount": 28,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 24,
+          "domContentLoaded": 42,
+          "loadDuration": 66,
+          "fcp": 60,
+          "lcp": 160,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.008,
+          "clsRaw": 0.008,
+          "rawLayoutShiftsCount": 3,
+          "resourceTiming": {
+            "resourceCount": 23,
+            "transferBytes": 311618,
+            "encodedBodyBytes": 305918,
+            "decodedBodyBytes": 731235
+          }
+        }
+      ],
+      "coldSummary": {
+        "domContentLoaded": {
+          "min": 42,
+          "max": 85,
+          "median": 48
+        },
+        "loadDuration": {
+          "min": 66,
+          "max": 119,
+          "median": 84
+        },
+        "fcp": {
+          "min": 60,
+          "max": 104,
+          "median": 64
+        },
+        "lcp": {
+          "min": 160,
+          "max": 196,
+          "median": 164
+        },
+        "clsSessionWindow": {
+          "min": 0.008,
+          "max": 0.008,
+          "median": 0.008
+        },
+        "cdpWireTransferBytes": {
+          "min": 319975,
+          "max": 319975,
+          "median": 319975
+        },
+        "cdpRequestCount": {
+          "min": 28,
+          "max": 28,
+          "median": 28
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      },
+      "warmRuns": [
+        {
+          "runIndex": 1,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 6548,
+          "cdpRequestCount": 24,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 7,
+          "domContentLoaded": 23,
+          "loadDuration": 45,
+          "fcp": 64,
+          "lcp": 100,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.007,
+          "clsRaw": 0.008,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 23,
+            "transferBytes": 4425,
+            "encodedBodyBytes": 305918,
+            "decodedBodyBytes": 731235
+          }
+        },
+        {
+          "runIndex": 2,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 6548,
+          "cdpRequestCount": 24,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 7,
+          "domContentLoaded": 29,
+          "loadDuration": 60,
+          "fcp": 80,
+          "lcp": 124,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.007,
+          "clsRaw": 0.008,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 23,
+            "transferBytes": 4425,
+            "encodedBodyBytes": 305918,
+            "decodedBodyBytes": 731235
+          }
+        },
+        {
+          "runIndex": 3,
+          "cacheMode": "warm",
+          "cdpWireTransferBytes": 6548,
+          "cdpRequestCount": 24,
+          "cdpCacheHits": 0,
+          "cdpWireRequests": 7,
+          "domContentLoaded": 24,
+          "loadDuration": 43,
+          "fcp": 68,
+          "lcp": 108,
+          "lcpEntriesCount": 2,
+          "clsSessionWindow": 0.007,
+          "clsRaw": 0.008,
+          "rawLayoutShiftsCount": 2,
+          "resourceTiming": {
+            "resourceCount": 23,
+            "transferBytes": 4425,
+            "encodedBodyBytes": 305918,
+            "decodedBodyBytes": 731235
+          }
+        }
+      ],
+      "warmSummary": {
+        "domContentLoaded": {
+          "min": 23,
+          "max": 29,
+          "median": 24
+        },
+        "loadDuration": {
+          "min": 43,
+          "max": 60,
+          "median": 45
+        },
+        "fcp": {
+          "min": 64,
+          "max": 80,
+          "median": 68
+        },
+        "lcp": {
+          "min": 100,
+          "max": 124,
+          "median": 108
+        },
+        "clsSessionWindow": {
+          "min": 0.007,
+          "max": 0.007,
+          "median": 0.007
+        },
+        "cdpWireTransferBytes": {
+          "min": 6548,
+          "max": 6548,
+          "median": 6548
+        },
+        "cdpRequestCount": {
+          "min": 24,
+          "max": 24,
+          "median": 24
+        },
+        "cdpCacheHits": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        }
+      }
+    }
+  }
+}

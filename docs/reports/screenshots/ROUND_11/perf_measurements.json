@@ -1,0 +1,296 @@
+{
+  "benchmarkMetadata": {
+    "timestamp": "2026-10-14T04:36:44.116Z",
+    "framework": "Next.js 15.1.2 (Standalone)",
+    "nodeVersion": "v26.1.0",
+    "viewport": "1280x800",
+    "runsPerRoute": 3,
+    "network": "Local Loopback (Fixture Server)"
+  },
+  "routes": {
+    "Home": {
+      "path": "/",
+      "runs": [
+        {
+          "type": "cold",
+          "domContentLoaded": 20,
+          "loadDuration": 44,
+          "fcp": 68,
+          "lcp": 68,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 29,
+          "totalTransferBytes": 6233
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 44,
+          "loadDuration": 76,
+          "fcp": 100,
+          "lcp": 100,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 29,
+          "totalTransferBytes": 6233
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 20,
+          "loadDuration": 34,
+          "fcp": 80,
+          "lcp": 80,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 29,
+          "totalTransferBytes": 6233
+        }
+      ],
+      "summary": {
+        "domContentLoaded": {
+          "min": 20,
+          "max": 44,
+          "median": 20
+        },
+        "loadDuration": {
+          "min": 34,
+          "max": 76,
+          "median": 44
+        },
+        "requestCount": {
+          "min": 29,
+          "max": 29,
+          "median": 29
+        },
+        "totalTransferBytes": {
+          "min": 6233,
+          "max": 6233,
+          "median": 6233
+        },
+        "lcp": {
+          "min": 68,
+          "max": 100,
+          "median": 80
+        },
+        "cls": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "inp": "unavailable"
+      }
+    },
+    "Search": {
+      "path": "/search?q=quantum",
+      "runs": [
+        {
+          "type": "cold",
+          "domContentLoaded": 31,
+          "loadDuration": 54,
+          "fcp": 96,
+          "lcp": 96,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 26,
+          "totalTransferBytes": 5091
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 32,
+          "loadDuration": 58,
+          "fcp": 112,
+          "lcp": 112,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 26,
+          "totalTransferBytes": 5091
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 29,
+          "loadDuration": 45,
+          "fcp": 96,
+          "lcp": 96,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 26,
+          "totalTransferBytes": 5091
+        }
+      ],
+      "summary": {
+        "domContentLoaded": {
+          "min": 29,
+          "max": 32,
+          "median": 31
+        },
+        "loadDuration": {
+          "min": 45,
+          "max": 58,
+          "median": 54
+        },
+        "requestCount": {
+          "min": 26,
+          "max": 26,
+          "median": 26
+        },
+        "totalTransferBytes": {
+          "min": 5091,
+          "max": 5091,
+          "median": 5091
+        },
+        "lcp": {
+          "min": 96,
+          "max": 112,
+          "median": 96
+        },
+        "cls": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "inp": "unavailable"
+      }
+    },
+    "Detail": {
+      "path": "/movies/m2-synthetic-anim-001",
+      "runs": [
+        {
+          "type": "cold",
+          "domContentLoaded": 30,
+          "loadDuration": 33,
+          "fcp": 72,
+          "lcp": 72,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 30,
+          "totalTransferBytes": 12498
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 51,
+          "loadDuration": 56,
+          "fcp": 120,
+          "lcp": 120,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 29,
+          "totalTransferBytes": 12138
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 44,
+          "loadDuration": 47,
+          "fcp": 84,
+          "lcp": 84,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 30,
+          "totalTransferBytes": 12496
+        }
+      ],
+      "summary": {
+        "domContentLoaded": {
+          "min": 30,
+          "max": 51,
+          "median": 44
+        },
+        "loadDuration": {
+          "min": 33,
+          "max": 56,
+          "median": 47
+        },
+        "requestCount": {
+          "min": 29,
+          "max": 30,
+          "median": 30
+        },
+        "totalTransferBytes": {
+          "min": 12138,
+          "max": 12498,
+          "median": 12496
+        },
+        "lcp": {
+          "min": 72,
+          "max": 120,
+          "median": 84
+        },
+        "cls": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "inp": "unavailable"
+      }
+    },
+    "Profile": {
+      "path": "/profile",
+      "runs": [
+        {
+          "type": "cold",
+          "domContentLoaded": 31,
+          "loadDuration": 56,
+          "fcp": 116,
+          "lcp": 116,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 24,
+          "totalTransferBytes": 4723
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 40,
+          "loadDuration": 61,
+          "fcp": 100,
+          "lcp": 100,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 24,
+          "totalTransferBytes": 4723
+        },
+        {
+          "type": "warm",
+          "domContentLoaded": 43,
+          "loadDuration": 62,
+          "fcp": 100,
+          "lcp": 100,
+          "cls": 0,
+          "inp": "unavailable",
+          "requestCount": 24,
+          "totalTransferBytes": 4723
+        }
+      ],
+      "summary": {
+        "domContentLoaded": {
+          "min": 31,
+          "max": 43,
+          "median": 40
+        },
+        "loadDuration": {
+          "min": 56,
+          "max": 62,
+          "median": 61
+        },
+        "requestCount": {
+          "min": 24,
+          "max": 24,
+          "median": 24
+        },
+        "totalTransferBytes": {
+          "min": 4723,
+          "max": 4723,
+          "median": 4723
+        },
+        "lcp": {
+          "min": 100,
+          "max": 116,
+          "median": 100
+        },
+        "cls": {
+          "min": 0,
+          "max": 0,
+          "median": 0
+        },
+        "inp": "unavailable"
+      }
+    }
+  }
+}

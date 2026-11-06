@@ -1,0 +1,167 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/C:/Users/Admin/.m2/wrapper/dists/apache-maven-3.9.6-bin/3311e1d4/apache-maven-3.9.6/lib/jansi-2.4.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper (file:/C:/Users/Admin/.m2/wrapper/dists/apache-maven-3.9.6-bin/3311e1d4/apache-maven-3.9.6/lib/guava-32.0.1-jre.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.dippie:moviercm-backend >---------------------
+[INFO] Building moviercm-backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ moviercm-backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ moviercm-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ moviercm-backend ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ moviercm-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ moviercm-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.dippie.moviercm.DriveCleanupAdmissionRaceTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.117 s -- in com.dippie.moviercm.DriveCleanupAdmissionRaceTest
+[INFO] Running com.dippie.moviercm.DriveCleanupDeadlineTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.161 s -- in com.dippie.moviercm.DriveCleanupDeadlineTest
+[INFO] Running com.dippie.moviercm.DriveCleanupQueueSaturationTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.239 s -- in com.dippie.moviercm.DriveCleanupQueueSaturationTest
+[INFO] Running com.dippie.moviercm.DriveCleanupShutdownOwnershipTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.160 s -- in com.dippie.moviercm.DriveCleanupShutdownOwnershipTest
+[INFO] Running com.dippie.moviercm.DriveFaultIsolationTest
+[INFO] Running com.dippie.moviercm.DriveFaultIsolationTest$CancellationRecoveryTests
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.191 s -- in com.dippie.moviercm.DriveFaultIsolationTest$CancellationRecoveryTests
+[INFO] Running com.dippie.moviercm.DriveFaultIsolationTest$ConcurrencyPermitTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.dippie.moviercm.DriveFaultIsolationTest$ConcurrencyPermitTests
+[INFO] Running com.dippie.moviercm.DriveFaultIsolationTest$FaultIsolationTests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in com.dippie.moviercm.DriveFaultIsolationTest$FaultIsolationTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.233 s -- in com.dippie.moviercm.DriveFaultIsolationTest
+[INFO] Running com.dippie.moviercm.DriveIoDeadlineTest
+[INFO] Running com.dippie.moviercm.DriveIoDeadlineTest$ControllerMetadataDeadlineTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.325 s -- in com.dippie.moviercm.DriveIoDeadlineTest$ControllerMetadataDeadlineTests
+[INFO] Running com.dippie.moviercm.DriveIoDeadlineTest$CircuitBreakerTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.036 s -- in com.dippie.moviercm.DriveIoDeadlineTest$CircuitBreakerTests
+[INFO] Running com.dippie.moviercm.DriveIoDeadlineTest$InterruptionIgnoringWorkerTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.449 s -- in com.dippie.moviercm.DriveIoDeadlineTest$InterruptionIgnoringWorkerTests
+[INFO] Running com.dippie.moviercm.DriveIoDeadlineTest$DeadlineEnforcementTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.524 s -- in com.dippie.moviercm.DriveIoDeadlineTest$DeadlineEnforcementTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.341 s -- in com.dippie.moviercm.DriveIoDeadlineTest
+[INFO] Running com.dippie.moviercm.DriveIoProviderIsolationTest
+[INFO] Running com.dippie.moviercm.DriveIoProviderIsolationTest$ErrorSanitizationTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.dippie.moviercm.DriveIoProviderIsolationTest$ErrorSanitizationTests
+[INFO] Running com.dippie.moviercm.DriveIoProviderIsolationTest$BulkheadIsolationTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.246 s -- in com.dippie.moviercm.DriveIoProviderIsolationTest$BulkheadIsolationTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.268 s -- in com.dippie.moviercm.DriveIoProviderIsolationTest
+[INFO] Running com.dippie.moviercm.DriveLateOpenLifecycleTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.880 s -- in com.dippie.moviercm.DriveLateOpenLifecycleTest
+[INFO] Running com.dippie.moviercm.DriveLifecycleStressAuditTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.132 s -- in com.dippie.moviercm.DriveLifecycleStressAuditTest
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$ReadOnlyInvariantTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.036 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$ReadOnlyInvariantTests
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$ValidFileOperationsTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$ValidFileOperationsTests
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$NotFoundTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$NotFoundTests
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$SymlinkBoundaryTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.080 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$SymlinkBoundaryTests
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$PathTraversalTests
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$PathTraversalTests
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$ValidMountPathTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$ValidMountPathTests
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$InvalidMountPathTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$InvalidMountPathTests
+[INFO] Running com.dippie.moviercm.DriveMediaStorageAdapterTest$UnconfiguredMountTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest$UnconfiguredMountTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.255 s -- in com.dippie.moviercm.DriveMediaStorageAdapterTest
+[INFO] Running com.dippie.moviercm.DriveMediaStreamingIntegrationTest
+04:40:53.716 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.dippie.moviercm.DriveMediaStreamingIntegrationTest]: DriveMediaStreamingIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+04:40:54.058 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.dippie.moviercm.MovieRcmApplication for test class com.dippie.moviercm.DriveMediaStreamingIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.3)
+
+2026-10-16T04:40:54.825+07:00  INFO 23008 --- [moviercm-backend] [           main] c.d.m.DriveMediaStreamingIntegrationTest : Starting DriveMediaStreamingIntegrationTest using Java 25.0.3 with PID 23008 (started by Admin in C:\Users\Admin\AppData\Local\Temp\drive_build_f05)
+2026-10-16T04:40:54.827+07:00  INFO 23008 --- [moviercm-backend] [           main] c.d.m.DriveMediaStreamingIntegrationTest : The following 1 profile is active: "test"
+2026-10-16T04:40:56.263+07:00  INFO 23008 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-16T04:40:56.417+07:00  INFO 23008 --- [moviercm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 139 ms. Found 6 JPA repository interfaces.
+2026-10-16T04:40:57.483+07:00  INFO 23008 --- [moviercm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-16T04:40:57.629+07:00  INFO 23008 --- [moviercm-backend] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.2.Final
+2026-10-16T04:40:57.695+07:00  INFO 23008 --- [moviercm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-16T04:40:58.299+07:00  INFO 23008 --- [moviercm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-16T04:40:58.343+07:00  INFO 23008 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-16T04:40:58.718+07:00  INFO 23008 --- [moviercm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:m1_test_db user=SA
+2026-10-16T04:40:58.722+07:00  INFO 23008 --- [moviercm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-16T04:41:00.423+07:00  INFO 23008 --- [moviercm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-16T04:41:00.537+07:00  INFO 23008 --- [moviercm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-16T04:41:01.224+07:00  INFO 23008 --- [moviercm-backend] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-10-16T04:41:02.320+07:00  INFO 23008 --- [moviercm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-16T04:41:02.323+07:00  WARN 23008 --- [moviercm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-16T04:41:02.707+07:00  WARN 23008 --- [moviercm-backend] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.apache.tomcat.jni.Library in an unnamed module (file:/C:/Users/Admin/.m2/repository/org/apache/tomcat/embed/tomcat-embed-core/10.1.28/tomcat-embed-core-10.1.28.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-10-16T04:41:04.047+07:00  INFO 23008 --- [moviercm-backend] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-16T04:41:04.048+07:00  INFO 23008 --- [moviercm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-16T04:41:04.049+07:00  INFO 23008 --- [moviercm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-16T04:41:04.092+07:00  INFO 23008 --- [moviercm-backend] [           main] c.d.m.DriveMediaStreamingIntegrationTest : Started DriveMediaStreamingIntegrationTest in 9.789 seconds (process running for 17.39)
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.05 s -- in com.dippie.moviercm.DriveMediaStreamingIntegrationTest
+[INFO] Running com.dippie.moviercm.DriveMetadataCleanupLifecycleTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.349 s -- in com.dippie.moviercm.DriveMetadataCleanupLifecycleTest
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$ReadOnlyAndMissingTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in com.dippie.moviercm.DrivePathSecurityTest$ReadOnlyAndMissingTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$ValidSubdirectoryTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in com.dippie.moviercm.DrivePathSecurityTest$ValidSubdirectoryTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$SymlinkEscapingTests
+Notice: File symlink creation restricted by Windows OS privileges: C:\Users\Admin\AppData\Local\Temp\junit6611026545696901835\symlink_escape.mp4: A required privilege is not held by the client
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.085 s -- in com.dippie.moviercm.DrivePathSecurityTest$SymlinkEscapingTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$WindowsNtDeviceNamespaceTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.dippie.moviercm.DrivePathSecurityTest$WindowsNtDeviceNamespaceTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$UncPathsTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.dippie.moviercm.DrivePathSecurityTest$UncPathsTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$AbsolutePathsTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in com.dippie.moviercm.DrivePathSecurityTest$AbsolutePathsTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$WindowsDriveLettersTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.dippie.moviercm.DrivePathSecurityTest$WindowsDriveLettersTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$PathTraversalTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.dippie.moviercm.DrivePathSecurityTest$PathTraversalTests
+[INFO] Running com.dippie.moviercm.DrivePathSecurityTest$NullByteInjectionTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.dippie.moviercm.DrivePathSecurityTest$NullByteInjectionTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.251 s -- in com.dippie.moviercm.DrivePathSecurityTest
+[INFO] Running com.dippie.moviercm.LunaDriveCleanupOpenLifecycleTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.500 s -- in com.dippie.moviercm.LunaDriveCleanupOpenLifecycleTest
+[INFO] Running com.dippie.moviercm.LunaDriveCleanupShutdownOwnershipTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.069 s -- in com.dippie.moviercm.LunaDriveCleanupShutdownOwnershipTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 111, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  27.724 s
+[INFO] Finished at: 2026-10-16T04:41:10+07:00
+[INFO] ------------------------------------------------------------------------

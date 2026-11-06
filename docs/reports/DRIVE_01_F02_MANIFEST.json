@@ -1,0 +1,153 @@
+{
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F02",
+  "generatedAt": "2026-10-14T20:07:06.7495387Z",
+  "totalFiles": 29,
+  "files": [
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+      "bytes": 9407,
+      "sha256": "75db348f6d00121afa687988a78caf863757c617a8dbb97dfaab221d2a46c522"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+      "bytes": 15351,
+      "sha256": "7427c904361d65a879bae5bb2a9e4857c264c23ee8fb8aa39673cda24b835936"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java",
+      "bytes": 7967,
+      "sha256": "df913b9913c93769de5976a5bbb2694820ff21afe4f61508d9c6b6765b73c67c"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveCleanupDeadlineTest.java",
+      "bytes": 12786,
+      "sha256": "67757d88774ff32c30fef339a186739c1da6f3c5d857cf8f42ba4271db3d50c2"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveLateOpenLifecycleTest.java",
+      "bytes": 21210,
+      "sha256": "34e83061cf756b7f112dd65c20e29807cb4b36068ea57f2cf21558d87241a3f8"
+    },
+    {
+      "path": "docs/contracts/DRIVE_STORAGE_CONTRACT.md",
+      "bytes": 14556,
+      "sha256": "100668463eb49dc45cbb0e49cceb547952b8cfeeb4dfb91ae63f12a0cc888e5d"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F02_REPORT.md",
+      "bytes": 15836,
+      "sha256": "33de7412f0089891e1cef000c8508f13a9d1ae57b717d1be35fd724843275af9"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F02_STATUS.json",
+      "bytes": 7567,
+      "sha256": "5b5a8a624c1d4bf9c515bc0e84e946a25433578f22c606ee1030873d7d08f7cf"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/README.md",
+      "bytes": 2905,
+      "sha256": "154be9c59d51f4d6171c79670b141331eb69babad8348c1867829ed71e11d134"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/agent-d/test_results.log",
+      "bytes": 3263,
+      "sha256": "4eb82bc9314af2d678545d5572f5395a76840157236c507d6fb74ade77990e72"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/agent-e/TOOLKIT_VERIFICATION_REPORT.md",
+      "bytes": 15418,
+      "sha256": "f8357cac36ed44f1a4a3b62b09c93df9181696d33440445fb2e15ff164de0e66"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/agent-e/toolkit_test_evidence.json",
+      "bytes": 68540,
+      "sha256": "01bcfe69eefb5281eec31c79d7c98822e7185f3c91017bad8819128baca886e4"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/agent-e/toolkit_test_evidence_pwsh.json",
+      "bytes": 32948,
+      "sha256": "dc3522598b70ff5c1c997b5ec28f8d703c3af35bfd7334a0c4dc9bb542edca2d"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/screenshots/00_desktop_drive_unmounted_alert.png",
+      "bytes": 173787,
+      "sha256": "27a5f391a75b5dfa45b62d32175e030923614a27fd656207dd03ed9989ef16e6"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/screenshots/01_desktop_drive_playback_playing.png",
+      "bytes": 69725,
+      "sha256": "5c72c3dc839e2102fd0fe78796eb423c5a3e65fa3409bec91b991cc38cbf7847"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/screenshots/02_desktop_drive_seek_near_end.png",
+      "bytes": 63543,
+      "sha256": "a683eb86ac6c1f54087d27820f1c1d5409c38883a9b32f90a903a9d12237bd1a"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/screenshots/03_desktop_drive_retry_recovery.png",
+      "bytes": 63809,
+      "sha256": "8f7ba0ab4fe0d9a5096ef5c813c8da84191a4ab742c9e17035407449fcdb12b6"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/screenshots/04_mobile_drive_playback_375px.png",
+      "bytes": 126837,
+      "sha256": "f8fbff4b365a5d859700fa20c74f69428720db34e55935cf455970a316b7c9e7"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F02/walkthrough_results.json",
+      "bytes": 9397,
+      "sha256": "70065583fbe7041becac72a35f0dce70f0be4488eb3023a69634b4ab752fae45"
+    },
+    {
+      "path": "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md",
+      "bytes": 28757,
+      "sha256": "4f14e567c0448f69028643bbdec42722381d6d5c3e9ecdfe1f552153f30e20e1"
+    },
+    {
+      "path": "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+      "bytes": 28388,
+      "sha256": "81370bfd695570a8ae69b1cdab38bc45df122841f412261fd9c96a41891a5797"
+    },
+    {
+      "path": "scripts/drive-tests/test_drive_security_seams.ps1",
+      "bytes": 76144,
+      "sha256": "60262a5a375c99aa5cefd1a3f8ff9a1c5b8e666fad4133949e86fc2410f9dabc"
+    },
+    {
+      "path": "scripts/drive-tests/test_drive_toolkit_comprehensive.ps1",
+      "bytes": 52731,
+      "sha256": "c03e3579b5e17f4eec826c81a49c79a0bf45fb24ca40cdfdd276b062958c2e37"
+    },
+    {
+      "path": "scripts/drive/mount_drive.ps1",
+      "bytes": 17083,
+      "sha256": "bb71e2a6aa1f9d4286dbabcf3e4e2e679b21c222642b751e6ec708e0fa9a5f17"
+    },
+    {
+      "path": "scripts/drive/status_drive.ps1",
+      "bytes": 18866,
+      "sha256": "ecf980a1e79547b9c1338e7f5b658a349c22533d3ffe43e2c8ce0400edd7491d"
+    },
+    {
+      "path": "scripts/drive/stop_drive.ps1",
+      "bytes": 27200,
+      "sha256": "ebbaf498c22ddfc1168605ffac64e340e36e7de245eaca07e67bd8d4c77b23b5"
+    },
+    {
+      "path": "scripts/drive/test_drive_tooling.ps1",
+      "bytes": 13658,
+      "sha256": "685a167fef7fe640c9122a190f5cb40f207813abf7853d450d19f0e5115d5051"
+    },
+    {
+      "path": "scripts/run_drive_media_walkthrough.cjs",
+      "bytes": 61049,
+      "sha256": "6c98aa82859dab37a0e1492b36c54be33e79873528820aec3279ef91b5d8185d"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F02.patch",
+      "bytes": 962969,
+      "sha256": "94240b2aebf8199f76457e028939c030a96036608997b7355f896a8539e22cfd"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "scenario": "boot checking to verified A, backend nonempty",
+    "watchlist": [],
+    "loading": false,
+    "error": null
+  },
+  {
+    "scenario": "A to B, backend B nonempty",
+    "watchlist": [],
+    "loading": false,
+    "error": null
+  },
+  {
+    "scenario": "older refresh body arrives after successful add",
+    "before": [
+      "X"
+    ],
+    "after": []
+  },
+  {
+    "scenario": "refresh during delete followed by delete success",
+    "watchlist": [
+      "X"
+    ]
+  }
+]

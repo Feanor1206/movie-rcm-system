@@ -1,0 +1,105 @@
+{
+  "taskId": "CATALOG-01",
+  "name": "Animation Catalog v1 Ingestion, Persistent Storage, Web Video Player & AI Search Pipeline",
+  "branch": "dev",
+  "status": "COMPLETED",
+  "timestamp": "2026-10-16T19:04:00+07:00",
+  "contract": {
+    "schema": "docs/contracts/animation-catalog-v1/dippie.catalog.v1.schema.json",
+    "version": "dippie.catalog.v1",
+    "tablesPersisted": 12,
+    "errorFormat": "JSON Pointer (RFC 6901)"
+  },
+  "components": {
+    "backendSpringboot": {
+      "status": "PASS",
+      "port": 8080,
+      "tables": [
+        "catalog_packages",
+        "catalog_genres",
+        "catalog_attribute_scales",
+        "catalog_sources",
+        "catalog_series",
+        "catalog_seasons",
+        "catalog_episodes",
+        "catalog_segments",
+        "catalog_characters",
+        "catalog_media_assets",
+        "catalog_text_tracks",
+        "catalog_scenes"
+      ],
+      "endpoints": [
+        "POST /api/admin/catalog/validate",
+        "POST /api/admin/catalog/import",
+        "GET /api/admin/catalog/history",
+        "GET /api/catalog/series",
+        "GET /api/catalog/series/{id}",
+        "GET /api/catalog/episodes/{id}",
+        "GET /api/catalog/search",
+        "GET /api/catalog/export"
+      ],
+      "features": {
+        "dryRunDiffPreview": true,
+        "transactionalAtomicCommit": true,
+        "revisionIdempotencyEnforced": true,
+        "mediaAssetAutoRegistration": true,
+        "driveByteRangeStreaming": true
+      },
+      "tests": {
+        "CatalogValidatorTest": "9/9 PASS",
+        "CatalogImportServiceTest": "6/6 PASS",
+        "total": "15/15 PASS",
+        "build": "BUILD SUCCESS"
+      }
+    },
+    "backendFastapi": {
+      "status": "PASS",
+      "port": 8000,
+      "model": "Qwen3-4B + Phase 23 LoRA (4bit-nf4 on CUDA)",
+      "embedding": "intfloat/multilingual-e5-small",
+      "bm25Algorithm": "Robertson-Sparck Jones BM25",
+      "endpoints": [
+        "POST /api/index/sync",
+        "POST /api/chat",
+        "POST /v1/discover",
+        "POST /api/recommend"
+      ],
+      "features": {
+        "multiLevelCatalogFlattening": true,
+        "itemTypeNormalizationVietnamese": true,
+        "queryFirstItemTypeInference": true,
+        "comparativeConstraintDiagnostics": true,
+        "groundedStage5Storytelling": true,
+        "static12MovieRestrictionRemoved": true
+      },
+      "tests": {
+        "test_catalog_retrieval.py": "12/12 PASS"
+      }
+    },
+    "frontendNextjs": {
+      "status": "PASS",
+      "port": 3000,
+      "routes": [
+        "/admin/import",
+        "/series/[id]",
+        "/search",
+        "/api/chat"
+      ],
+      "features": {
+        "catalogImportModal": true,
+        "diffPreviewUI": true,
+        "driveVideoStreaming": true,
+        "sceneSeekDirectTimestamp": true,
+        "multiLevelSearchResultBadges": true
+      },
+      "typeCheck": "tsc --noEmit: 0 errors"
+    }
+  },
+  "verification": {
+    "pipelineVerified": true,
+    "crossReviewCompleted": true,
+    "runbookDocumented": "docs/runbooks/CATALOG_IMPORT.md",
+    "reportDocumented": "docs/reports/CATALOG_01_REPORT.md",
+    "crossReviewDocumented": "docs/reports/CATALOG_01_CROSS_REVIEW.md"
+  }
+}

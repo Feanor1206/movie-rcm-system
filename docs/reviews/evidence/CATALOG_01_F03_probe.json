@@ -1,0 +1,29 @@
+{
+  "hash_contract": {
+    "java_worker_hash": "bbe8830198b044b23e9816461e88cbbad73799ea96280cdc1f070d3b931fdb35",
+    "python_receiver_hash": "840c5bd50b9d3fd542ad502ee8083425d36671b71cb166a8cb16c60b3cc59ca6",
+    "match": false
+  },
+  "baseline_status": "success",
+  "worker_request": {
+    "http_status": 400,
+    "detail": "Mã băm không khớp: khai báo bbe8830198b044b23e9816461e88cbbad73799ea96280cdc1f070d3b931fdb35 != tính toán 840c5bd50b9d3fd542ad502ee8083425d36671b71cb166a8cb16c60b3cc59ca6"
+  },
+  "after_rejected_request": {
+    "generation": 1,
+    "series_titles": [
+      "rejected-B"
+    ],
+    "expected": [
+      "accepted-A"
+    ]
+  },
+  "same_generation_conflict": {
+    "http_status": 409,
+    "detail": "Xung đột: Generation 1 đã tồn tại nhưng có nội dung khác (840c5bd50b9d3fd542ad502ee8083425d36671b71cb166a8cb16c60b3cc59ca6 != bf5bd3ece95f9e4a2eba9943384239f52102e7ceb9f1d196b10edd5e40de36f2)"
+  },
+  "after_conflict_series_titles": [
+    "rejected-B"
+  ],
+  "scope": "current production Java hash and unmodified Python sync AST; fake encoder/index/request; no HTTP/model/DB"
+}

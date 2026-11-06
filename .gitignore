@@ -1,0 +1,102 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+
+# IDEs & OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Frontend (Next.js / Node)
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+build/
+frontend/build/
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Java / Spring Boot
+target/
+backend/springboot/target/
+*.class
+*.war
+*.nar
+*.ear
+.gradle/
+backend/springboot/.gradle/
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# Python / FastAPI / AI
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# AI Model Checkpoints & Large Binary Weights (>50MB)
+*.bin
+*.onnx
+*.safetensors
+*.pt
+*.pth
+*.h5
+*.ckpt
+*.gguf
+ai/models/*
+!ai/models/.gitkeep
+!ai/models/README.md
+ai/models/checkpoints/
+ai/datasets/raw/*
+!ai/datasets/raw/.gitkeep
+ai/datasets/processed/*
+!ai/datasets/processed/.gitkeep
+distillation/checkpoints/
+data/raw/
+
+# Docker & Database
+pgdata/
+backend/springboot/data/
+*.mv.db
+*.trace.db
+
+# Large Media & Video Files (>100MB)
+*.mp4
+*.mkv
+*.mov
+*.avi
+storage/videos/
+frontend/public/videos/*
+!frontend/public/videos/.gitkeep
+
+# Local review baselines and generated model runtime artifacts
+/.f*_snapshot/
+/.round*_snapshot/
+/ai/phase23_package/best_adapter/

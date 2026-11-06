@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # 1. API GATEWAY (Nginx Reverse Proxy)
+  # =========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: movie_rcm_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - springboot
+      - fastapi
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 2. FRONTEND (Next.js 15 Web Application)
+  # =========================================================================
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: movie_rcm_frontend
+    restart: always
+    environment:
+      - NEXT_PUBLIC_SPRINGBOOT_API_URL=/api
+      - NEXT_PUBLIC_MODEL_API_URL=/api/chat
+    expose:
+      - "3000"
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 3. BACKEND SPRING BOOT (Auth, Users, Movie Catalog)
+  # =========================================================================
+  springboot:
+    build:
+      context: ../backend/springboot
+      dockerfile: Dockerfile
+    container_name: movie_rcm_springboot
+    restart: always
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/${POSTGRES_DB:-movie_rcm_db}}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-${POSTGRES_USER:-postgres}}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - APP_JWT_SECRET=${APP_JWT_SECRET}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 4. BACKEND FASTAPI (AI Recommendation & Qwen Phase 23 Serving Pipeline)
+  # =========================================================================
+  # Chế độ chính (Full Serving): Qwen3-4B + Phase 23 LoRA trên GPU (NF4 4-bit)
+  # Chế độ nhẹ (Light Serving): Đổi SERVING_MODE=light, USE_FULL_QWEN3_4B_LORA=false,
+  #                              DEVICE=cpu, và comment khối deploy GPU reservation.
+  # =========================================================================
+  fastapi:
+    build:
+      context: ../backend/fastapi
+      dockerfile: Dockerfile
+    container_name: movie_rcm_fastapi
+    restart: always
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - SERVING_MODE=full
+      - USE_FULL_QWEN3_4B_LORA=true
+      - DEVICE=cuda
+      - BASE_MODEL_NAME=Qwen/Qwen3-4B
+      - PHASE23_ADAPTER_DIR=/app/models/qwen3-4b-phase23-lora
+      - MODEL_NAME_OR_PATH=/app/models/qwen-0.6b/Qwen3-0.6B-Q8_0.gguf
+      - ENABLE_FALLBACK=false
+      - STRICT_READINESS=true
+      - MAX_CONCURRENT_INFERENCE=1
+      - MAX_NEW_TOKENS=256
+      - HF_HOME=/root/.cache/huggingface
+    volumes:
+      - ../ai/models:/app/models:ro
+      - hf_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    expose:
+      - "8000"
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 5. DATABASE (PostgreSQL 16)
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: movie_rcm_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-movie_rcm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../database/schema/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-movie_rcm_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - movie_network
+
+  # =========================================================================
+  # 6. CACHE (Redis 7)
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: movie_rcm_redis
+    restart: always
+    expose:
+      - "6379"
+    networks:
+      - movie_network
+
+networks:
+  movie_network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  hf_cache:

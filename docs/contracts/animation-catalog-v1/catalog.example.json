@@ -1,0 +1,674 @@
+{
+  "schema_version": "dippie.catalog.v1",
+  "package": {
+    "id": "pkg_demo",
+    "revision": 1,
+    "created_at": "2026-10-16T00:00:00Z",
+    "default_language": "vi",
+    "import_mode": "upsert",
+    "reference_scope": "self_contained",
+    "description": "Gói mẫu hư cấu, không nhập làm dữ liệu production."
+  },
+  "genres": [
+    {
+      "id": "animation",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hoạt hình"
+        },
+        {
+          "language": "en",
+          "text": "Animation"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "comedy",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hài"
+        },
+        {
+          "language": "en",
+          "text": "Comedy"
+        }
+      ],
+      "aliases": []
+    }
+  ],
+  "attribute_scales": [
+    {
+      "id": "darkness_v1",
+      "name": "Mức u tối",
+      "definition": "Thang biên tập mẫu cho nội dung từng tập; chưa phải số đo đã hiệu chuẩn.",
+      "minimum": 0,
+      "maximum": 4,
+      "levels": [
+        {
+          "value": 0,
+          "meaning": "Không có yếu tố u tối đáng kể"
+        },
+        {
+          "value": 1,
+          "meaning": "Nhẹ"
+        },
+        {
+          "value": 2,
+          "meaning": "Vừa"
+        },
+        {
+          "value": 3,
+          "meaning": "Nặng"
+        },
+        {
+          "value": 4,
+          "meaning": "Rất nặng"
+        }
+      ],
+      "version": "1.0",
+      "source_ids": [
+        "src_demo"
+      ]
+    },
+    {
+      "id": "pacing_v1",
+      "name": "Nhịp kể",
+      "definition": "Thang biên tập mẫu về nhịp kể, không phải FPS hay tốc độ phát video.",
+      "minimum": 0,
+      "maximum": 4,
+      "levels": [
+        {
+          "value": 0,
+          "meaning": "Rất chậm"
+        },
+        {
+          "value": 1,
+          "meaning": "Chậm"
+        },
+        {
+          "value": 2,
+          "meaning": "Vừa"
+        },
+        {
+          "value": 3,
+          "meaning": "Nhanh"
+        },
+        {
+          "value": 4,
+          "meaning": "Rất nhanh"
+        }
+      ],
+      "version": "1.0",
+      "source_ids": [
+        "src_demo"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "src_demo",
+      "kind": "manual",
+      "title": "Ví dụ cấu trúc hư cấu",
+      "url": null,
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": null,
+      "note": "Thay bằng nguồn và metadata thật của bạn."
+    }
+  ],
+  "series": [
+    {
+      "id": "ser_demo",
+      "title": "Bộ hoạt hình mẫu",
+      "original_title": null,
+      "primary_language": "vi",
+      "aliases": [],
+      "translations": [],
+      "synopsis": "Giới thiệu chung về bộ hoạt hình mẫu.",
+      "genre_ids": [
+        "animation",
+        "comedy"
+      ],
+      "keywords": [],
+      "themes": [],
+      "origin_countries": [],
+      "original_languages": [],
+      "release_year_start": null,
+      "release_year_end": null,
+      "release_status": "unknown",
+      "creators": [],
+      "studios": [],
+      "networks": [],
+      "character_ids": [
+        "char_a"
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": null,
+          "provenance": {
+            "source_ids": [
+              "src_demo"
+            ],
+            "origin": "manual",
+            "verification": "unverified",
+            "confidence": null,
+            "annotator": null,
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": null,
+            "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": null,
+          "provenance": {
+            "source_ids": [
+              "src_demo"
+            ],
+            "origin": "manual",
+            "verification": "unverified",
+            "confidence": null,
+            "annotator": null,
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": null,
+            "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+          }
+        }
+      ],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ],
+  "seasons": [
+    {
+      "id": "sea_demo_01",
+      "series_id": "ser_demo",
+      "number": 1,
+      "title": "Phần 1",
+      "kind": "regular",
+      "synopsis": null,
+      "translations": [],
+      "release_year_start": null,
+      "release_year_end": null,
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ],
+  "episodes": [
+    {
+      "id": "ep_demo_001",
+      "series_id": "ser_demo",
+      "season_id": "sea_demo_01",
+      "number": 1,
+      "production_code": null,
+      "title": "Ngày đầu ở lớp",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 120000,
+      "orders": [
+        {
+          "scheme": "broadcast",
+          "position": 1,
+          "display_label": "Tập 1"
+        }
+      ],
+      "synopsis": "Nhân vật A làm quen với lớp học mới trong ví dụ minh họa.",
+      "genre_ids": [
+        "animation",
+        "comedy"
+      ],
+      "keywords": [
+        "lớp học"
+      ],
+      "themes": [
+        "tình bạn"
+      ],
+      "character_ids": [
+        "char_a"
+      ],
+      "plot_facts": [],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": null,
+          "provenance": {
+            "source_ids": [
+              "src_demo"
+            ],
+            "origin": "manual",
+            "verification": "unverified",
+            "confidence": null,
+            "annotator": null,
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": null,
+            "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": null,
+          "provenance": {
+            "source_ids": [
+              "src_demo"
+            ],
+            "origin": "manual",
+            "verification": "unverified",
+            "confidence": null,
+            "annotator": null,
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": null,
+            "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+          }
+        }
+      ],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [],
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_demo_001a",
+      "episode_id": "ep_demo_001",
+      "position": 1,
+      "title": "Chiếc cặp thất lạc",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "synopsis": "A tìm chiếc cặp trong lớp học.",
+      "episode_start_ms": 10000,
+      "episode_end_ms": 90000,
+      "character_ids": [
+        "char_a"
+      ],
+      "keywords": [
+        "chiếc cặp",
+        "lớp học"
+      ],
+      "themes": [
+        "giúp đỡ"
+      ],
+      "plot_facts": [
+        {
+          "id": "fact_demo_001",
+          "text": "A tìm chiếc cặp bị thất lạc trong lớp.",
+          "language": "vi",
+          "character_ids": [
+            "char_a"
+          ],
+          "spoiler_level": "mild",
+          "provenance": {
+            "source_ids": [
+              "src_demo"
+            ],
+            "origin": "manual",
+            "verification": "unverified",
+            "confidence": null,
+            "annotator": null,
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": null,
+            "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+          }
+        }
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": null,
+          "provenance": {
+            "source_ids": [
+              "src_demo"
+            ],
+            "origin": "manual",
+            "verification": "unverified",
+            "confidence": null,
+            "annotator": null,
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": null,
+            "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+          }
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": null,
+          "provenance": {
+            "source_ids": [
+              "src_demo"
+            ],
+            "origin": "manual",
+            "verification": "unverified",
+            "confidence": null,
+            "annotator": null,
+            "tool_or_model": null,
+            "tool_revision": null,
+            "annotated_at": null,
+            "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+          }
+        }
+      ],
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ],
+  "characters": [
+    {
+      "id": "char_a",
+      "series_ids": [
+        "ser_demo"
+      ],
+      "name": "Nhân vật A",
+      "aliases": [],
+      "description": "Nhân vật hư cấu dùng làm ví dụ.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ],
+  "media_assets": [
+    {
+      "id": "asset_demo_001",
+      "content_type": "video",
+      "role": "feature",
+      "edition_label": null,
+      "spoken_languages": [],
+      "embedded_subtitle_languages": [],
+      "storage": {
+        "provider": "drive",
+        "storage_key": "animation_drive",
+        "relative_path": "bo-mau/phan-01/tap-001.mp4",
+        "drive_folder_id": null,
+        "drive_file_id": null
+      },
+      "size_bytes": null,
+      "sha256": null,
+      "duration_ms": 120000,
+      "technical": {
+        "container": null,
+        "video_codec": null,
+        "width": null,
+        "height": null,
+        "frame_rate": null,
+        "variable_frame_rate": null,
+        "bitrate_bps": null,
+        "has_audio": null,
+        "audio_streams": []
+      },
+      "coverage": [
+        {
+          "episode_id": "ep_demo_001",
+          "segment_id": null,
+          "sequence": 1,
+          "source_in_ms": 0,
+          "source_out_ms": 120000,
+          "episode_in_ms": 0,
+          "scope": "full_episode"
+        }
+      ],
+      "related_asset_id": null,
+      "access_policy": "private",
+      "enabled": true,
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ],
+  "text_tracks": [
+    {
+      "id": "track_demo_vi",
+      "media_asset_id": "asset_demo_001",
+      "kind": "subtitle",
+      "language": "vi",
+      "format": "inline",
+      "external_file": null,
+      "cues": [
+        {
+          "id": "cue_demo_001",
+          "start_ms": 11000,
+          "end_ms": 15000,
+          "text": "Chiếc cặp của mình đâu rồi?",
+          "speaker_character_ids": [
+            "char_a"
+          ],
+          "confidence": null
+        }
+      ],
+      "provenance": {
+        "source_ids": [
+          "src_demo"
+        ],
+        "origin": "manual",
+        "verification": "unverified",
+        "confidence": null,
+        "annotator": null,
+        "tool_or_model": null,
+        "tool_revision": null,
+        "annotated_at": null,
+        "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+      },
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ],
+  "scenes": [
+    {
+      "id": "scene_demo_001",
+      "episode_id": "ep_demo_001",
+      "segment_id": "seg_demo_001a",
+      "media_asset_id": "asset_demo_001",
+      "start_ms": 10000,
+      "end_ms": 18000,
+      "title": "Tìm cặp trong lớp",
+      "summary": "A nhìn quanh lớp để tìm cặp.",
+      "visual_description": "Nhân vật A tìm dưới bàn.",
+      "character_ids": [
+        "char_a"
+      ],
+      "keywords": [
+        "tìm đồ",
+        "chiếc cặp"
+      ],
+      "themes": [
+        "trường học"
+      ],
+      "visual_tags": [
+        "lớp học"
+      ],
+      "sound_events": [],
+      "transcript_cue_ids": [
+        "cue_demo_001"
+      ],
+      "spoiler_level": "mild",
+      "provenance": {
+        "source_ids": [
+          "src_demo"
+        ],
+        "origin": "manual",
+        "verification": "unverified",
+        "confidence": null,
+        "annotator": null,
+        "tool_or_model": null,
+        "tool_revision": null,
+        "annotated_at": null,
+        "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+      },
+      "record": {
+        "status": "draft",
+        "revision": 1,
+        "created_at": "2026-10-16T00:00:00Z",
+        "updated_at": "2026-10-16T00:00:00Z",
+        "provenance": {
+          "source_ids": [
+            "src_demo"
+          ],
+          "origin": "manual",
+          "verification": "unverified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": null,
+          "note": "Dữ liệu minh họa hư cấu, không phải metadata của video thật."
+        }
+      }
+    }
+  ]
+}

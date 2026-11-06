@@ -1,0 +1,120 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: moviercm-backend
+  profiles:
+    active: dev
+  sql:
+    init:
+      mode: never
+
+app:
+  seed:
+    enabled: false
+  jwt:
+    expiration-ms: 86400000 # 24 hours (1 day)
+  cors:
+    allowed-origins: "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
+  media:
+    root: ${APP_MEDIA_ROOT:./media}
+    drive-mount: ${APP_MEDIA_DRIVE_MOUNT:X:}
+    max-concurrent-streams: ${APP_MEDIA_MAX_CONCURRENT_STREAMS:10}
+    max-concurrent-drive-streams: ${APP_MEDIA_MAX_CONCURRENT_DRIVE_STREAMS:5}
+    drive-metadata-timeout-ms: ${APP_MEDIA_DRIVE_METADATA_TIMEOUT_MS:15000}
+    drive-read-timeout-ms: ${APP_MEDIA_DRIVE_READ_TIMEOUT_MS:15000}
+    drive-max-io-workers: ${APP_MEDIA_DRIVE_MAX_IO_WORKERS:10}
+    drive-circuit-failure-threshold: ${APP_MEDIA_DRIVE_CIRCUIT_FAILURE_THRESHOLD:5}
+    drive-circuit-cooldown-ms: ${APP_MEDIA_DRIVE_CIRCUIT_COOLDOWN_MS:10000}
+  catalog:
+    sync-url: ${APP_CATALOG_SYNC_URL:http://localhost:8000/api/index/sync}
+    sync-token: ${CATALOG_SYNC_TOKEN:${FASTAPI_SYNC_SECRET:}}
+    snapshot-path: ${APP_CATALOG_SNAPSHOT_PATH:./data/catalog/committed_catalog_snapshot.json}
+    sync-timeout-seconds: ${APP_CATALOG_SYNC_TIMEOUT_SECONDS:60}
+
+---
+# Development Profile (H2 Persistent File Database)
+spring:
+  config:
+    activate:
+      on-profile: dev
+  sql:
+    init:
+      mode: always
+  datasource:
+    url: jdbc:h2:file:./data/moviercm_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+app:
+  seed:
+    enabled: true
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+
+---
+# Production Profile (PostgreSQL Database)
+spring:
+  config:
+    activate:
+      on-profile: prod
+  sql:
+    init:
+      mode: never
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/movie_rcm_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+app:
+  seed:
+    enabled: false
+  jwt:
+    secret: ${APP_JWT_SECRET}
+
+---
+# Snapshot Profile (Dedicated H2 Persistent Database for Snapshot / Demo)
+spring:
+  config:
+    activate:
+      on-profile: snapshot
+  sql:
+    init:
+      mode: always
+  datasource:
+    url: jdbc:h2:file:./data/snapshot/moviercm_snapshot_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  h2:
+    console:
+      enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+app:
+  seed:
+    enabled: true
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+

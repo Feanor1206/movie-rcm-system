@@ -1,0 +1,198 @@
+{
+  "timestamp": "2026-10-18T10:43:23.268159+00:00",
+  "mission": "SNAPSHOT-02 — SỬA JS BUDGET VÀ DÙNG CATALOG/VIDEO THẬT TRÊN DRIVE",
+  "node_version": "v20.20.2",
+  "js_budget": {
+    "raw_output": "================================================================\n       NEXT.JS DYNAMIC ROUTE JS FIRST-LOAD BUDGET AUDIT         \n================================================================\nBuild ID:    Bs4JvcSKsjwhdSc7Np9NU\nTimestamp:   2026-10-18T10:43:23.466Z\nMethodology: unique app /layout + route manifest JavaScript; raw bytes and sum of individually gzipped files; excludes CSS/polyfills/RSC/API, not HTTP wire bytes\nBudget:      143360 bytes (140 KiB)\n----------------------------------------------------------------\n/                | Raw:  491552 B | Gzip: 139308 B (136.04 KiB) | Status: âœ” PASS (11 chunks)\n/search          | Raw:  488641 B | Gzip: 139682 B (136.41 KiB) | Status: âœ” PASS (11 chunks)\n/movies/[id]     | Raw:  494710 B | Gzip: 141307 B (138.00 KiB) | Status: âœ” PASS (11 chunks)\n/profile         | Raw:  502482 B | Gzip: 139808 B (136.53 KiB) | Status: âœ” PASS (11 chunks)\n================================================================\n",
+    "threshold_bytes": 143360,
+    "routes": {
+      "/": {
+        "raw_bytes": 491552,
+        "gzip_bytes": 139308,
+        "margin_bytes": 4052,
+        "status": "PASS"
+      },
+      "/search": {
+        "raw_bytes": 488641,
+        "gzip_bytes": 139682,
+        "margin_bytes": 3678,
+        "status": "PASS"
+      },
+      "/movies/[id]": {
+        "raw_bytes": 494710,
+        "gzip_bytes": 141307,
+        "margin_bytes": 2053,
+        "status": "PASS"
+      },
+      "/profile": {
+        "raw_bytes": 502482,
+        "gzip_bytes": 139808,
+        "margin_bytes": 3552,
+        "status": "PASS"
+      }
+    },
+    "movies_detail_margin_bytes": 2053,
+    "movies_detail_margin_kib": 2.0
+  },
+  "frontend_tests": {
+    "framework": "node:test",
+    "total_tests": 83,
+    "passed": 83,
+    "failed": 0,
+    "typescript_check": "tsc --noEmit: 0 errors (clean code 0)"
+  },
+  "catalog_discovery": {
+    "remote": "cinema-drive:",
+    "drive_root_folder_id": "1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ",
+    "file_name": "catalog.jadoo_all.json",
+    "package_id": "pkg_dippie_jadoo_all",
+    "revision": 2,
+    "schema_version": "dippie.catalog.v1",
+    "series_count": 1,
+    "season_count": 4,
+    "episode_count": 99,
+    "segment_count": 20,
+    "media_asset_count": 198,
+    "character_count": 9,
+    "sample_video_on_drive": {
+      "path": "X:\\jadooss1\\Anh sẽ mua cho em tất cả những gì em muốn ăn. ⧸ Xin Chào Jadoo [2ykw6ZxTb8o].mp4",
+      "exists_on_x": true,
+      "size_bytes": 339074277
+    }
+  },
+  "stack_readiness": {
+    "fastapi_8000": "HTTP 200 OK",
+    "springboot_8080": "HTTP 200 OK",
+    "nextjs_3000": "HTTP 200 OK",
+    "drive_x_mounted": true
+  },
+  "outbox_sync": {
+    "total_snapshots": 2,
+    "latest_snapshot_id": "snap_1792319788700_pkg_dippie_jadoo_all_g2",
+    "snapshot_version": 2,
+    "status": "READY",
+    "content_hash": "056a51d233cab913126dfd36a6d1460fa1cfa241b24146cc4272cf99efb05bab",
+    "total_items": 341,
+    "completed_at": "2026-10-18T17:37:19.199799"
+  },
+  "search_verification": {
+    "query": "Jadoo",
+    "total_results": 118,
+    "first_3_results": [
+      {
+        "id": "ser_jadoo",
+        "type": "series",
+        "title": "Xin Chào Jadoo"
+      },
+      {
+        "id": "ep_jadoo_s01_0001",
+        "type": "episode",
+        "title": "Anh sẽ mua cho em tất cả những gì em muốn ăn."
+      },
+      {
+        "id": "ep_jadoo_s01_0002",
+        "type": "episode",
+        "title": "Muốn ăn nhưng lại sợ tăng cân"
+      }
+    ]
+  },
+  "cinebot_verification": {
+    "query": "Tìm phim hoạt hình Xin Chào Jadoo",
+    "response_text": "Dựa trên sự tương đồng với **Xin Chào Jadoo**, tôi gợi ý đoạn trích **Nữ Hướng Đạo Sinh và màn giải cứu Eunhee trong rừng** (thời lượng **11:10–22:06**). Jadoo tham gia cắm trại Nữ Hướng Đạo Sinh, thể hiện kỹ năng sinh tồn tuyệt vời và vận dụng mẹo nhìn trong bóng tối của mẹ để tìm kiếm và giải cứu cô bạn kiêu kỳ Eunhee bị lạc. Tác phẩm có sự xuất hiện của nhân vật **Choi Jadoo, Jadoo**. Ngoài ra, bạn cũng có thể tham khảo thêm **Bài học con ve sầu và heo đất của Baby**, **Tuyển tập các tập phim ăn khách năm 2023**.",
+    "recommended_movies": [
+      "Nữ Hướng Đạo Sinh và màn giải cứu Eunhee trong rừng",
+      "Bài học con ve sầu và heo đất của Baby",
+      "Tuyển tập các tập phim ăn khách năm 2023"
+    ],
+    "intent_intent": null,
+    "intent_confidence": null
+  },
+  "media_stream_verification": {
+    "head": {
+      "status": 200,
+      "content_type": "video/mp4",
+      "content_length": 339074277,
+      "accept_ranges": "bytes"
+    },
+    "initial_range": {
+      "status": 206,
+      "content_range": "bytes 0-1023/339074277",
+      "bytes_received": 1024,
+      "magic_bytes": "ftyp"
+    },
+    "seek_range_10mb": {
+      "status": 206,
+      "content_range": "bytes 10485760-10486783/339074277",
+      "bytes_received": 1024
+    },
+    "ffprobe_initial_frames": [
+      {
+        "key_frame": 1,
+        "pkt_dts_time": "0.000000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "I"
+      },
+      {
+        "key_frame": 0,
+        "pkt_dts_time": "0.040000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "P"
+      },
+      {
+        "key_frame": 1,
+        "pkt_dts_time": "0.080000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "I"
+      }
+    ],
+    "ffprobe_seek_60s_frames": [
+      {
+        "key_frame": 1,
+        "pkt_dts_time": "58.800000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "I"
+      },
+      {
+        "key_frame": 0,
+        "pkt_dts_time": "58.840000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "P"
+      },
+      {
+        "key_frame": 0,
+        "pkt_dts_time": "58.880000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "P"
+      }
+    ],
+    "ffprobe_seek_120s_frames": [
+      {
+        "key_frame": 1,
+        "pkt_dts_time": "118.440000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "I"
+      },
+      {
+        "key_frame": 0,
+        "pkt_dts_time": "118.480000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "P"
+      },
+      {
+        "key_frame": 0,
+        "pkt_dts_time": "118.520000",
+        "width": 1920,
+        "height": 1080,
+        "pict_type": "P"
+      }
+    ]
+  }
+}

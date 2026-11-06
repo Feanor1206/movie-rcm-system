@@ -1,0 +1,183 @@
+﻿{
+  "milestone": "DRIVE-01",
+  "taskId": "DRIVE-01-F01",
+  "generatedAt": "2026-10-15T02:37:00.4842892+07:00",
+  "totalFiles": 35,
+  "files": [
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/controller/MediaStreamController.java",
+      "bytes": 7224,
+      "sha256": "fe1817cf441d2fb6a123a442a36c5fc4f9fbe26fe78351afe1281d7cd2d43714"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/DriveMediaStorageAdapter.java",
+      "bytes": 9513,
+      "sha256": "8c97ac71f7bc3ade2196c5273851730cb61d7a143a748be1370cfeb18a4a1eaa"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/LocalMediaStorageAdapter.java",
+      "bytes": 4720,
+      "sha256": "b98befab195682e3d5ea05b7e0e502ae28df4918e9cc8a82b34bf402157a5b96"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/MediaStreamService.java",
+      "bytes": 14852,
+      "sha256": "62b5e24aa673f2fde8f68cf9940c2d52f314a379a0df13c3599a1168def08ea1"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveCircuitBreaker.java",
+      "bytes": 2800,
+      "sha256": "b54173e7a509cd0267ba884d10563eb818b1382ac6849f8c18e5defd46a8d824"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveIoExecutor.java",
+      "bytes": 5807,
+      "sha256": "1cc8843ec52e215787e92db0b4f735e48091892c78ec0ccc6e6a28476a584a5a"
+    },
+    {
+      "path": "backend/springboot/src/main/java/com/dippie/moviercm/service/storage/DriveSeekableByteChannel.java",
+      "bytes": 2133,
+      "sha256": "5d4b19040d8046ab6df83764a30cae8774f142ad37703b08a92300a3354c569b"
+    },
+    {
+      "path": "backend/springboot/src/main/resources/application.yml",
+      "bytes": 2110,
+      "sha256": "af5cdd29bc30b132100e322c6f804a77cfd4e49093a3e0c5da74034af60e9bc8"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveIoDeadlineTest.java",
+      "bytes": 20239,
+      "sha256": "4e9f340af84fe0a549a66a8a006fa33ecd7532efc4c8629768c30204299b879e"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveIoProviderIsolationTest.java",
+      "bytes": 14434,
+      "sha256": "219a0b7a0b04592f4782f031ddb8bb1f062dbec8fa1e4de63e8d9d713e14d443"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveMediaStreamingIntegrationTest.java",
+      "bytes": 23516,
+      "sha256": "811eba919f03805534a30a4e5e6fe76cac6f600bee89329d3f2765c112550fe6"
+    },
+    {
+      "path": "backend/springboot/src/test/java/com/dippie/moviercm/DriveWalkthroughServer.java",
+      "bytes": 14082,
+      "sha256": "1a7abf73f6c43f904452b9595df268be01e5bb71a8148b64f541273d10765757"
+    },
+    {
+      "path": "docs/contracts/DRIVE_STORAGE_CONTRACT.md",
+      "bytes": 8140,
+      "sha256": "b6d828e4bf13b4b900cca1c7ad062a207e2f3473bfb12cfec7c84eee7fb2d66d"
+    },
+    {
+      "path": "docs/runbooks/DRIVE_PERFORMANCE_PLAN.md",
+      "bytes": 26683,
+      "sha256": "f40ce91e22a6d3ca1adb1c18e84bce2f63141d547eb44486740966889b63921c"
+    },
+    {
+      "path": "docs/runbooks/GOOGLE_DRIVE_WINDOWS_RUNBOOK.md",
+      "bytes": 20769,
+      "sha256": "5c8836c32a62a8078a2c7719a15599fee6384628ca78ec23ce5a06f34e83449e"
+    },
+    {
+      "path": "scripts/drive-tests/test_drive_security_seams.ps1",
+      "bytes": 48320,
+      "sha256": "92a0333eb8d8d2814923f3d50374cbb3e718078e0cdc914cbd49ba1b539618b9"
+    },
+    {
+      "path": "scripts/drive-tests/test_drive_toolkit_comprehensive.ps1",
+      "bytes": 51470,
+      "sha256": "43b4163aab6e8ba280c6ad3074f8c6971b754cc65bb106b32fb4cda8fed38a40"
+    },
+    {
+      "path": "scripts/drive/mount_drive.ps1",
+      "bytes": 15631,
+      "sha256": "e4c236aa50ba6c49e3fb5f24c35d4a729ca25c3cd7c0bf3e77e71dadb8aea44b"
+    },
+    {
+      "path": "scripts/drive/preflight_drive.ps1",
+      "bytes": 17771,
+      "sha256": "2539fb055447c5a1820f0dd97228ac3e97385feccf56571dc9d6c8c7c4e48cd7"
+    },
+    {
+      "path": "scripts/drive/status_drive.ps1",
+      "bytes": 14265,
+      "sha256": "b8e18849a94320a9b30aea392181647028e0c123035a99132d202d81acadf45c"
+    },
+    {
+      "path": "scripts/drive/stop_drive.ps1",
+      "bytes": 18763,
+      "sha256": "bccc41c61b7b464c9a2fbd716dc0b22c90dfe71a64c11935c2a40f88bd0d3caf"
+    },
+    {
+      "path": "scripts/drive_mapping_suite.cjs",
+      "bytes": 20834,
+      "sha256": "ac6cdc11d91cb3c92abac435f47ab42fa7d56e1f327c7bb22570487f6a8025d9"
+    },
+    {
+      "path": "scripts/preview_drive_media_mapping.cjs",
+      "bytes": 21637,
+      "sha256": "03321cac77c774a8bde9fd059db4f8d5432e4a810d70c83fbe3c806a9cb64df4"
+    },
+    {
+      "path": "scripts/run_drive_media_walkthrough.cjs",
+      "bytes": 61015,
+      "sha256": "a16756e0e83ba6c2b5f563ae70c631bec0f0ac3cae716892ff794e5caf228291"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F01_REPORT.md",
+      "bytes": 17420,
+      "sha256": "e069e8d6f91f3e34b8efdf7e58a078c97f91df3f5332d4dc7b28414241e5bb30"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F01_STATUS.json",
+      "bytes": 9193,
+      "sha256": "bb66d2efdc55dc8bb251e1aa321d098edd7fbbec2c2484d079367f3f83b315a3"
+    },
+    {
+      "path": "docs/reports/DRIVE_01_F01.patch",
+      "bytes": 953094,
+      "sha256": "4d11bb43b17296da5fd110fc3d8193e0cdcd8eb4dce26acbf54388d7b9825fa6"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/agent-d/test_results.log",
+      "bytes": 3566,
+      "sha256": "892dbe2a86f8e44b3bb9f14fd5f4e9c3949e4ed2347cfff839893ae07ac6d3e2"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/agent-e/toolkit_test_evidence.json",
+      "bytes": 56932,
+      "sha256": "c8e2c4bcb0079df2081f43e1d0171060a90b7e1c56fdcd0f5d45487d84beb4e5"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/walkthrough_results.json",
+      "bytes": 9383,
+      "sha256": "d46d8550296c6d5afb3a7ed9d85b61bfc79a55f713b143902c4b525415a95bf9"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/screenshots/00_desktop_drive_unmounted_alert.png",
+      "bytes": 173787,
+      "sha256": "27a5f391a75b5dfa45b62d32175e030923614a27fd656207dd03ed9989ef16e6"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/screenshots/01_desktop_drive_playback_playing.png",
+      "bytes": 69178,
+      "sha256": "eeae349f321f6f4b9694f286d416058a05cb24902cdcfbf6d150c762c1689e72"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/screenshots/02_desktop_drive_seek_near_end.png",
+      "bytes": 63431,
+      "sha256": "3b831bf27415c2ca3da06eb59d178e50c6df2ecafdff5a7b27f30a8b5bf16a3b"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/screenshots/03_desktop_drive_retry_recovery.png",
+      "bytes": 63928,
+      "sha256": "cd837d195cd239922011055f6d3157dc28e245b7c8aa00d2dbaedf1f3431b28e"
+    },
+    {
+      "path": "docs/reports/drive/DRIVE_01_F01/screenshots/04_mobile_drive_playback_375px.png",
+      "bytes": 127577,
+      "sha256": "134a2d70f22de09408e9d26cbe6f097a67648ac5af579dc74662885a0830c2c2"
+    }
+  ]
+}

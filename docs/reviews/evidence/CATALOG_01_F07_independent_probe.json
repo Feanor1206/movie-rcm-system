@@ -1,0 +1,38 @@
+{
+  "durable_failure_regression": {
+    "baseline_status": "success",
+    "rejected": {
+      "http_status": 500
+    },
+    "active_generation": 1,
+    "persisted_generation": 1,
+    "manager_titles": [
+      "accepted-A",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "index_titles": [
+      "accepted-A",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "persisted_titles": [
+      "accepted-A",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "scope": "production sync/save/load AST, real manager and HybridMovieIndex/BM25; fake encoder; temp state; no HTTP/browser/model",
+    "rejected_candidate_leaked_into_active_index": false
+  },
+  "concurrent_publication": {
+    "manager_titles": [
+      "next-B",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "index_titles": [
+      "accepted-A",
+      "Học Viện Thám Tử Nhí"
+    ],
+    "active_generation": 1,
+    "persisted_generation": 2,
+    "mixed_snapshot_seen_by_reader": true
+  },
+  "scope": "Thread scheduling barrier after production manager copy, before production index assignments; real state getters/index, fake encoder and temporary disk. No HTTP/browser/model/Drive."
+}

@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moviercm.dippie.com/schemas/canonical_movie_schema.v1.json",
+  "title": "CanonicalMovieBundle",
+  "description": "Canonical versioned schema for rich animation movie metadata, plot facts, comparative attributes, and decoupled media assets.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "created_at",
+    "movies"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1.0",
+        "1.0.0"
+      ],
+      "description": "Semantic schema version."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of creation."
+    },
+    "description": {
+      "type": "string"
+    },
+    "movies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "year",
+          "genres",
+          "synopsis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Stable canonical movie ID in kebab-case."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Primary display title."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Multilingual alternate titles, romanizations, and colloquial names."
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1888,
+            "maximum": 2100,
+            "description": "Original release year. Null if unknown."
+          },
+          "runtime_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "Total duration in minutes. Null if unknown."
+          },
+          "rating": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.0,
+            "maximum": 10.0,
+            "description": "Aggregate rating on a 0.0 - 10.0 scale. Null if unrated."
+          },
+          "genres": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Primary genre classifications."
+          },
+          "synopsis": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Detailed plot summary and premise."
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Primary original language code or name (e.g. 'ja', 'en', 'vi'). Null if unknown."
+          },
+          "poster_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri-reference",
+            "description": "Public URL or relative path to poster art. Null if unavailable."
+          },
+          "backdrop_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri-reference",
+            "description": "Public URL or relative path to wide backdrop art. Null if unavailable."
+          },
+          "provenance": {
+            "type": "object",
+            "required": [
+              "verification_status"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "verification_status": {
+                "type": "string",
+                "enum": [
+                  "human_verified",
+                  "inferred",
+                  "draft"
+                ],
+                "description": "Editorial certainty state of the metadata record."
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Origin of the metadata (e.g., official studio press kit, TMDB, editorial curator)."
+              },
+              "model_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "If inferred, the model identifier and prompt revision."
+              },
+              "verified_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Curator username or auditor identity."
+              },
+              "verified_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          },
+          "verified_facts": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "plot_facts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Concrete, verifiable storyline milestones and key events."
+              },
+              "characters": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Named characters and significant personas."
+              },
+              "themes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Philosophical or narrative motifs (e.g., environmentalism, coming-of-age, identity)."
+              },
+              "keywords": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Distinctive visual or thematic search anchors (e.g., bathhouse, spirits, parallel universe)."
+              }
+            }
+          },
+          "comparative_attributes": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "scale_version": {
+                "type": "string",
+                "description": "Semantic scale version, e.g. 'v1.0-normalized-0-1'."
+              },
+              "darkness": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Psychological/tonal darkness: 0.0 (whimsical/bright), 1.0 (grim/horror/existential dread). Null if unmeasured."
+              },
+              "pacing": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Narrative tempo: 0.0 (meditative/slow-burn), 1.0 (kinetic/action-packed). Null if unmeasured."
+              },
+              "provenance": {
+                "type": "string",
+                "enum": [
+                  "human_annotated",
+                  "model_inferred",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "media_assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "asset_id",
+                "asset_type",
+                "storage_backend"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "asset_id": {
+                  "type": "string",
+                  "description": "Unique asset identifier."
+                },
+                "asset_type": {
+                  "type": "string",
+                  "enum": [
+                    "feature_video",
+                    "trailer",
+                    "clip"
+                  ]
+                },
+                "storage_backend": {
+                  "type": "string",
+                  "enum": [
+                    "local",
+                    "google_drive",
+                    "remote_url"
+                  ]
+                },
+                "relative_path": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Relative path in media root (e.g. /videos/afterlight.mp4)."
+                },
+                "drive_file_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Remote Google Drive file ID if stored on Drive."
+                },
+                "container_format": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Container format, e.g. 'mp4', 'mkv', 'webm'."
+                },
+                "available": {
+                  "type": "boolean",
+                  "description": "Whether this asset is confirmed playable."
+                }
+              }
+            }
+          },
+          "scene_segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "start_seconds",
+                "end_seconds",
+                "description"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "start_seconds": {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                "end_seconds": {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 5
+                },
+                "transcript": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

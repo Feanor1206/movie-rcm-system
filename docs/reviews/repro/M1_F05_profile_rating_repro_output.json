@@ -1,0 +1,8 @@
+{
+  "label": "Chưa xác nhận điểm • Thử lưu lại điểm đánh giá",
+  "methods": [
+    "POST",
+    "DELETE"
+  ],
+  "finalBackendRating": null
+}
