@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Bookmark, Check, Loader2, Star, RefreshCw, Film } from 'lucide-react';
-import { buildMediaItemHref } from '@/lib/services/mediaRouting';
+import { Bookmark, Check, Loader2, Star, RefreshCw, Film, Play } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
@@ -48,13 +47,13 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
 
   return (
     <div
-      className={`group relative block outline-none transition-transform duration-200 hover:-translate-y-1 ${
-        fluid ? 'w-full' : 'w-[155px] shrink-0 sm:w-[185px] md:w-[205px]'
+      className={`group relative block outline-none transition-all duration-300 ease-out hover:-translate-y-2 ${
+        fluid ? 'w-full' : 'w-[160px] shrink-0 sm:w-[190px] md:w-[210px]'
       }`}
     >
-      <article className="comic-card overflow-hidden transition-all duration-200 group-hover:shadow-card-hover">
-        {/* Poster Media */}
-        <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-elevated">
+      <article className="relative overflow-hidden rounded-xl border border-surface-border/80 bg-gradient-to-b from-surface-elevated/90 to-surface transition-all duration-300 ease-out group-hover:border-brand/50 group-hover:shadow-[0_12px_32px_-4px_rgba(0,0,0,0.85),0_0_20px_-2px_rgba(16,185,129,0.28)]">
+        {/* Poster Media Container */}
+        <div className="relative aspect-[2/3] w-full overflow-hidden bg-surface-elevated">
           {hasPoster ? (
             <Image
               src={movie.poster}
@@ -64,46 +63,50 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
               sizes={
                 fluid
                   ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw'
-                  : '(max-width: 640px) 155px, (max-width: 1024px) 185px, 205px'
+                  : '(max-width: 640px) 160px, (max-width: 1024px) 190px, 210px'
               }
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="object-cover transition-transform duration-500 ease-out group-hover:scale-110"
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-mint text-muted">
-              <Film size={28} className="mb-2 text-muted" />
-              <span className="text-[11px] font-medium leading-tight line-clamp-2 text-muted">
+            <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-zinc-900 text-zinc-500">
+              <Film size={32} className="mb-2 text-zinc-600" />
+              <span className="text-xs font-semibold leading-tight line-clamp-2 text-zinc-300">
                 {movie.title}
               </span>
             </div>
           )}
 
-          {/* Overlay gradient */}
-          <div className="absolute inset-0 comic-halftone pointer-events-none opacity-20" />
+          {/* Cinematic Vignette Overlay: Top and bottom shadow for high contrast */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/95 via-transparent to-black/40 opacity-80 transition-opacity duration-300 group-hover:opacity-90" />
 
-          {/* Rating Badge */}
-          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-2 py-0.5 text-[11px] font-bold text-ink border border-surface-border backdrop-blur-md">
-            <Star size={11} className="fill-mint" />
-            {movie.rating}
+          {/* Rating Badge - Glassmorphism Pill */}
+          <span className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-0.5 text-[11px] font-black text-amber-400 border border-white/10 backdrop-blur-md shadow-sm">
+            <Star size={11} className="fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]" />
+            <span>{movie.rating}</span>
           </span>
 
           {/* Unconfirmed Status Badge */}
           {isUnconfirmed && (
             <span
               data-testid="unconfirmed-badge"
-              className="absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded bg-amber-500/95 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md border border-amber-300 backdrop-blur-md"
+              className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1 rounded-md bg-amber-500/95 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md border border-amber-300 backdrop-blur-md"
             >
               <RefreshCw size={10} className="stroke-[2.5]" />
               Chưa xác nhận
             </span>
           )}
 
-          {/* Hover / Focus Overlay: Navigate to Details */}
+          {/* Hover / Focus Overlay: Navigate to Details with Play Button */}
           <Link
-            href={buildMediaItemHref(movie)}
+            href={`/movies/${movie.id}`}
             aria-label={`Xem chi tiết ${movie.title}`}
-            className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/45 backdrop-blur-[2px] opacity-0 transition-all duration-300 ease-out group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
           >
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-xs font-bold text-zinc-950 shadow-brand-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 hover:bg-brand-hover">
+            {/* Play Button Icon */}
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand text-zinc-950 shadow-brand-lg transform scale-75 opacity-0 group-hover:scale-100 group-hover:opacity-100 transition-all duration-300 ease-out hover:scale-110 hover:bg-brand-hover">
+              <Play size={20} className="fill-zinc-950 ml-0.5" />
+            </span>
+            <span className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-surface-elevated/90 px-3 py-1 text-[11px] font-bold text-zinc-100 border border-white/15 backdrop-blur-md shadow-md transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out delay-75">
               Xem chi tiết
             </span>
           </Link>
@@ -119,12 +122,12 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
               e.stopPropagation();
               toggleWatchlist(movie.id, movie.title, movie.poster);
             }}
-            className={`absolute top-2 right-2 z-20 rounded-full p-2 backdrop-blur-md transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none disabled:opacity-60 ${
+            className={`absolute top-2.5 right-2.5 z-20 rounded-full p-2 backdrop-blur-md transition-all duration-200 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none disabled:opacity-60 hover:scale-110 active:scale-95 ${
               isUnconfirmed
                 ? 'bg-amber-400 text-zinc-950 shadow-md border border-amber-300 hover:bg-amber-300 ring-2 ring-amber-400/40'
                 : inWatchlist
                 ? 'bg-brand text-zinc-950 shadow-brand-sm'
-                : 'bg-surface/85 text-muted border border-surface-border hover:bg-brand hover:text-zinc-950 hover:border-brand'
+                : 'bg-black/60 text-zinc-200 border border-white/15 hover:bg-brand hover:text-zinc-950 hover:border-brand shadow-sm'
             }`}
           >
             {isPending ? (
@@ -140,20 +143,21 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
         </div>
 
         {/* Content Info */}
-        <div className="border-t-2 border-ink p-3">
+        <div className="p-3.5">
           <Link
-            href={buildMediaItemHref(movie)}
-            className="block truncate text-sm font-semibold text-ink transition-colors hover:text-brand focus-visible:outline-none focus-visible:text-brand"
+            href={`/movies/${movie.id}`}
+            className="block truncate text-sm font-bold text-white transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:text-brand"
           >
             {movie.title}
           </Link>
 
-          <div className="mt-1 flex items-center justify-between text-xs text-muted">
-            <span>{movie.year} · {movie.runtime}</span>
+          <div className="mt-1 flex items-center justify-between text-xs text-zinc-400">
+            <span className="font-medium text-zinc-300">{movie.year}</span>
+            <span className="text-[11px] text-zinc-500 font-mono">{movie.runtime}</span>
           </div>
 
-          <p className="mt-1 truncate text-xs text-muted">
-            {movie.genres.join(', ')}
+          <p className="mt-1.5 truncate text-[11px] font-medium text-zinc-400/80">
+            {movie.genres.join(' • ')}
           </p>
         </div>
       </article>
