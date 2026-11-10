@@ -1,13 +1,45 @@
 import type { Metadata, Viewport } from 'next';
+import { Be_Vietnam_Pro, Newsreader, JetBrains_Mono } from 'next/font/google';
 import { AuthProvider } from '@/lib/context/AuthContext';
 import { WatchlistProvider } from '@/lib/context/WatchlistContext';
 import './globals.css';
 
+const fontSans = Be_Vietnam_Pro({
+  subsets: ['vietnamese', 'latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const fontSerif = Newsreader({
+  subsets: ['vietnamese', 'latin'],
+  weight: ['600', '700', '800'],
+  style: ['normal', 'italic'],
+  variable: '--font-serif',
+  display: 'swap',
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ['vietnamese', 'latin'],
+  weight: ['500', '600'],
+  variable: '--font-mono',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Dippie — Tạp chí truyện phim hoạt hình',
+  title: {
+    default: 'Dippie — Tạp chí truyện phim hoạt hình',
+    template: '%s | Dippie',
+  },
   description: 'Mở từng trang truyện, khám phá những bộ phim hoạt hình đáng nhớ cùng Dippie.',
   keywords: ['hoạt hình', 'animation', 'anime', 'gợi ý hoạt hình', 'khám phá phim', 'CineBot'],
   authors: [{ name: 'Dippie Animation' }],
+  openGraph: {
+    title: 'Dippie — Tạp chí truyện phim hoạt hình',
+    description: 'Mở từng trang truyện, khám phá những bộ phim hoạt hình đáng nhớ cùng Dippie.',
+    type: 'website',
+    locale: 'vi_VN',
+  },
 };
 
 export const viewport: Viewport = {
@@ -23,8 +55,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-mint selection:text-ink">
+    <html
+      lang="vi"
+      className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable}`}
+    >
+      <body className="min-h-screen bg-[var(--paper)] font-sans text-[var(--ink)] antialiased selection:bg-mint selection:text-ink">
         <AuthProvider>
           <WatchlistProvider>{children}</WatchlistProvider>
         </AuthProvider>
