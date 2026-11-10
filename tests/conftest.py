@@ -1,17 +1,36 @@
-"""Keep rule, catalog and API regressions independent of downloaded model weights."""
+import json
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
+from fastapi.testclient import TestClient
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend" / "fastapi"))
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend/fastapi"))
+from main import create_app
 
 
-@pytest.fixture(scope="session", autouse=True)
-def lexical_retrieval_only():
-    # These suites verify deterministic catalog rules; live models have separate opt-in tests.
-    from services.hybrid_retrieval import DenseEncoder
+@pytest.fixture
+def catalog_payload():
+    return json.loads((ROOT / "docs/fixtures/rehearsal_catalog.json").read_text(encoding="utf-8"))
 
-    with patch.object(DenseEncoder, "load"):
-        yield
+
+@pytest.fixture
+def serving_app(tmp_path):
+    return create_app(sync_secret="snapshot-token", sync_path=tmp_path / "accepted.json",
+                      cache_dir=tmp_path / "vectors", load_default=False, model_mode="light")
+
+
+@pytest.fixture
+def client(serving_app):
+    with TestClient(serving_app) as client:
+        yield client
+
+
+@pytest.fixture
+def accept(client):
+    def accept(payload, generation=1, **extra):
+        return client.post("/api/index/sync", headers={"X-Service-Token": "snapshot-token"},
+                           json={"catalog": payload, "generation": generation, **extra})
+    return accept

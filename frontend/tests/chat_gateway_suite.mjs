@@ -10,7 +10,8 @@ const code = ts.transpileModule(fs.readFileSync(new URL('../app/api/chat/route.t
 
 function gateway(fetch) {
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, process: { env: {} }, AbortSignal,
+  vm.runInNewContext(code, { module, exports: module.exports, process: { env: {} }, AbortSignal, Response, ReadableStream,
+    AbortController, setTimeout, clearTimeout,
     fetch, require: () => ({ NextResponse: { json: (body, options = {}) => ({ body, status: options.status || 200 }) } }),
   });
   return module.exports.POST;
@@ -22,6 +23,31 @@ test('Chat validates JSON and empty questions before contacting the model', asyn
   for (const body of [null, [], { message: 42 }, { message: '  ' }]) {
     assert.equal((await post({ json: async () => body })).status, 400);
   }
+});
+
+test('Chat relays SSE immediately and cancels the upstream when the reader leaves', async () => {
+  const first = new TextEncoder().encode('event: token\ndata: {"text":"Chào"}\n\n');
+  let cancelled = false;
+  let upstreamSignal;
+  const upstream = new ReadableStream({
+    start(controller) { controller.enqueue(first); },
+    cancel() { cancelled = true; },
+  });
+  const post = gateway(async (_, init) => {
+    assert.match(init.headers.Accept, /text\/event-stream/);
+    upstreamSignal = init.signal;
+    return new Response(upstream, { headers: { 'Content-Type': 'text/event-stream' } });
+  });
+  const response = await post({ json: async () => ({ message: 'Jadoo' }) });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('Content-Type'), /text\/event-stream/);
+  assert.match(response.headers.get('Cache-Control'), /no-cache/);
+  assert.equal(response.headers.get('X-Accel-Buffering'), 'no');
+  const reader = response.body.getReader();
+  assert.equal(new TextDecoder().decode((await reader.read()).value), new TextDecoder().decode(first));
+  await reader.cancel();
+  assert.equal(cancelled, true);
+  assert.equal(upstreamSignal.aborted, true);
 });
 
 test('Chat forwards content history, preserves busy status, and does not leak backend errors', async () => {

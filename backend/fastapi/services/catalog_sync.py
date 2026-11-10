@@ -1,17 +1,3 @@
-"""
-Catalog Synchronization & Flattening Engine for Dippie Cinema (CATALOG-01-F01).
-
-Implements ingestion and multi-level flattening for payloads conforming to
-dippie.catalog.v1 (series, seasons, episodes, segments, scenes, characters,
-media assets, and text tracks).
-
-Transforms hierarchical catalog trees into unified searchable items:
-- Series items
-- Episode items
-- Segment items
-- Scene items
-"""
-
 import os
 import json
 import copy
@@ -40,12 +26,12 @@ DEMO_CATALOG_PATH = Path(__file__).resolve().parent.parent.parent.parent / "docs
 
 
 class CatalogSyncError(Exception):
-    """Raised when catalog parsing or synchronization fails."""
+
     pass
 
 
 def extract_alias_strings(raw_aliases: Optional[List[Any]]) -> List[str]:
-    """Extract plain text alias strings from alias list (handles dict or str items)."""
+
     if not raw_aliases or not isinstance(raw_aliases, list):
         return []
     res: List[str] = []
@@ -60,7 +46,7 @@ def extract_alias_strings(raw_aliases: Optional[List[Any]]) -> List[str]:
 
 
 def extract_plot_fact_strings(raw_facts: Optional[List[Any]]) -> List[str]:
-    """Extract plain text strings from plot_facts list (handles dict or str items)."""
+
     if not raw_facts or not isinstance(raw_facts, list):
         return []
     fact_texts: List[str] = []
@@ -75,10 +61,7 @@ def extract_plot_fact_strings(raw_facts: Optional[List[Any]]) -> List[str]:
 
 
 def extract_attributes_map(raw_attributes: Optional[List[Any]]) -> Dict[str, Any]:
-    """
-    Extract normalized scale_id -> value mapping from an attributes list.
-    Handles attribute dictionaries with 'scale_id' and 'value'.
-    """
+
     attr_map: Dict[str, Any] = {}
     if not raw_attributes or not isinstance(raw_attributes, list):
         return attr_map
@@ -98,7 +81,7 @@ def extract_attributes_map(raw_attributes: Optional[List[Any]]) -> Dict[str, Any
 
 
 def parse_year_from_date(date_str: Optional[str]) -> Optional[int]:
-    """Extract 4-digit year from ISO date strings (e.g. '2026-03-01')."""
+
     if not date_str or not isinstance(date_str, str):
         return None
     try:
@@ -111,10 +94,7 @@ def parse_year_from_date(date_str: Optional[str]) -> Optional[int]:
 
 
 class CatalogSyncManager:
-    """
-    Manages loading, flattening, and caching of dippie.catalog.v1 payloads.
-    Provides indexed searchable representation for hybrid search and AI chat.
-    """
+
 
     def __init__(self):
         self._raw_catalog: Optional[Dict[str, Any]] = None
@@ -137,14 +117,14 @@ class CatalogSyncManager:
         return dict(self._item_counts)
 
     def get_flattened_catalog(self) -> List[Dict[str, Any]]:
-        """Return all flattened searchable items (series, episodes, segments, scenes)."""
+
         return copy.deepcopy(self._flattened_items)
 
     def get_item_by_id(self, item_id: str) -> Dict[str, Any]:
         return copy.deepcopy(self._items_by_id.get(item_id, {}))
 
     def copy_from(self, other: "CatalogSyncManager") -> None:
-        """Atomically copy state from candidate manager (H2)."""
+
         self._raw_catalog = copy.deepcopy(other._raw_catalog)
         self._flattened_items = copy.deepcopy(other._flattened_items)
         self._items_by_id = copy.deepcopy(other._items_by_id)
@@ -153,14 +133,14 @@ class CatalogSyncManager:
         self._is_loaded = other._is_loaded
 
     def clone(self) -> "CatalogSyncManager":
-        """Return an isolated independent copy of this catalog manager (F09 R1)."""
+
         new_mgr = self.__class__()
         new_mgr.copy_from(self)
         return new_mgr
 
     @staticmethod
     def compute_hash(payload: Dict[str, Any]) -> str:
-        """Compute stable canonical SHA-256 hash of catalog payload (H1)."""
+
         serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
@@ -170,10 +150,7 @@ class CatalogSyncManager:
         include_draft: bool = False,
         include_private: bool = False,
     ) -> Dict[str, int]:
-        """
-        Parse and flatten a dippie.catalog.v1 payload into searchable units.
-        Enforces record status and access_policy rules (C9).
-        """
+
         if not isinstance(payload, dict):
             raise CatalogSyncError("Payload must be a dictionary.")
 
@@ -184,7 +161,7 @@ class CatalogSyncManager:
                 f"expected 'dippie.catalog.v1'. Parsing may be partial."
             )
 
-        # 1. Build lookup tables
+
         genre_map: Dict[str, List[str]] = {}
         for g in payload.get("genres", []):
             if isinstance(g, dict) and "id" in g:
@@ -210,32 +187,39 @@ class CatalogSyncManager:
                     "traits": c.get("traits", []),
                 }
 
-        # Media assets mapping: map episode_id -> primary_media_asset_id
+
         ep_to_asset: Dict[str, str] = {}
-        asset_policy_map: Dict[str, str] = {}
+        eligible_asset_ids = set()
         for asset in payload.get("media_assets", []):
             if isinstance(asset, dict) and "id" in asset:
                 aid = asset["id"]
                 policy = asset.get("access_policy", "public")
-                asset_policy_map[aid] = policy
+                if (asset.get("enabled", True) is not True
+                        or (not include_draft and (asset.get("record") or {}).get("status") in ("draft", "archived"))
+                        or (not include_private and policy != "public")):
+                    continue
+                eligible_asset_ids.add(aid)
                 for cov in asset.get("coverage", []):
                     if isinstance(cov, dict):
                         cov_ep = cov.get("episode_id")
                         if cov_ep and cov_ep not in ep_to_asset:
                             ep_to_asset[cov_ep] = aid
 
-        # Text tracks cues mapping: asset_id -> list of cues
+
         asset_cues: Dict[str, List[Dict[str, Any]]] = {}
         for track in payload.get("text_tracks", []):
             if isinstance(track, dict):
+                if (track.get("enabled", True) is not True
+                        or (not include_draft and (track.get("record") or {}).get("status") in ("draft", "archived"))):
+                    continue
                 mid = track.get("media_asset_id")
-                if mid:
+                if mid in eligible_asset_ids:
                     cues = track.get("cues", [])
                     if mid not in asset_cues:
                         asset_cues[mid] = []
                     asset_cues[mid].extend(cues)
 
-        # 2. Build parent hierarchical references
+
         series_dict: Dict[str, Dict[str, Any]] = {}
         for s in payload.get("series", []):
             if isinstance(s, dict) and "id" in s:
@@ -251,11 +235,11 @@ class CatalogSyncManager:
             if isinstance(sea, dict) and "id" in sea:
                 seasons_dict[sea["id"]] = sea
 
-        # 3. Flatten each entity level into searchable items
+
         flattened: List[Dict[str, Any]] = []
         eligible_series_ids: Set[str] = set()
 
-        # --- A. Series Items ---
+
         series_count = 0
         for s in payload.get("series", []):
             if not isinstance(s, dict) or "id" not in s:
@@ -300,7 +284,7 @@ class CatalogSyncManager:
                 "characters": char_names,
                 "release_year": rel_year,
                 "item_type": "series",
-                # Compatible fields
+
                 "year": rel_year,
                 "runtime": "Series",
                 "description": synopsis or f"Animation series: {title}",
@@ -310,7 +294,7 @@ class CatalogSyncManager:
             flattened.append(series_item)
             series_count += 1
 
-        # --- B. Episode Items ---
+
         episode_count = 0
         eligible_episode_ids: Set[str] = set()
         for ep in payload.get("episodes", []):
@@ -348,14 +332,14 @@ class CatalogSyncManager:
             synopsis = ep.get("synopsis", "")
             plot_facts = extract_plot_fact_strings(ep.get("plot_facts"))
 
-            # Genres
+
             ep_gids = ep.get("genre_ids") or parent_series.get("genre_ids", [])
             resolved_genres = []
             for gid in ep_gids:
                 resolved_genres.extend(genre_map.get(gid, [gid]))
             resolved_genres = list(dict.fromkeys(resolved_genres))
 
-            # Characters
+
             char_ids = ep.get("character_ids", [])
             char_names = []
             for cid in char_ids:
@@ -396,7 +380,7 @@ class CatalogSyncManager:
                 "genres": resolved_genres,
                 "release_year": year,
                 "item_type": "episode",
-                # Compatible fields
+
                 "year": year,
                 "runtime": runtime_str,
                 "description": synopsis or f"Episode {ep_num}: {title}",
@@ -406,7 +390,7 @@ class CatalogSyncManager:
             flattened.append(episode_item)
             episode_count += 1
 
-        # --- C. Segment Items ---
+
         segment_count = 0
         eligible_segment_ids: Set[str] = set()
         for seg in payload.get("segments", []):
@@ -449,7 +433,7 @@ class CatalogSyncManager:
             if end_ms is None:
                 end_ms = seg.get("end_ms")
 
-            # Inherit genres and year from parent episode/series
+
             ep_gids = parent_ep.get("genre_ids") or parent_series.get("genre_ids", [])
             resolved_genres = []
             for gid in ep_gids:
@@ -496,7 +480,7 @@ class CatalogSyncManager:
                 "genres": resolved_genres,
                 "release_year": year,
                 "item_type": "segment",
-                # Compatible fields
+
                 "year": year,
                 "runtime": runtime_str,
                 "description": synopsis or f"Segment: {title}",
@@ -506,7 +490,7 @@ class CatalogSyncManager:
             flattened.append(segment_item)
             segment_count += 1
 
-        # --- D. Scene Items ---
+
         scene_count = 0
         for sc in payload.get("scenes", []):
             if not isinstance(sc, dict) or "id" not in sc:
@@ -524,8 +508,8 @@ class CatalogSyncManager:
             sc_id = sc["id"]
             media_asset_id = sc.get("media_asset_id", "")
 
-            # Access policy check
-            if not include_private and asset_policy_map.get(media_asset_id) in ("private", "authenticated"):
+
+            if media_asset_id not in eligible_asset_ids:
                 continue
 
             start_ms = sc.get("start_ms")
@@ -533,7 +517,7 @@ class CatalogSyncManager:
 
             visual_summary = sc.get("visual_description") or sc.get("summary") or sc.get("visual_summary", "")
 
-            # Extract dialogue summary from cues falling into [start_ms, end_ms]
+
             cues = asset_cues.get(media_asset_id, [])
             dialogue_lines = []
             if start_ms is not None and end_ms is not None:
@@ -605,7 +589,7 @@ class CatalogSyncManager:
                 "genres": resolved_genres,
                 "release_year": year,
                 "item_type": "scene",
-                # Compatible fields
+
                 "year": year,
                 "runtime": runtime_str,
                 "description": desc or f"Scene: {title}",
@@ -615,7 +599,7 @@ class CatalogSyncManager:
             flattened.append(scene_item)
             scene_count += 1
 
-        # Store internal state
+
         self._raw_catalog = payload
         self._flattened_items = flattened
         self._items_by_id = {item["id"]: item for item in flattened}
@@ -637,7 +621,7 @@ class CatalogSyncManager:
         return dict(self._item_counts)
 
     def load_from_file(self, file_path: Union[str, Path]) -> Dict[str, int]:
-        """Load and parse catalog from a file path."""
+
         p = Path(file_path).resolve()
         if not p.exists():
             raise FileNotFoundError(f"Catalog file not found: {p}")
@@ -646,8 +630,7 @@ class CatalogSyncManager:
         return self.load_from_payload(data)
 
     def load_default_catalog(self) -> bool:
-        """Attempt to load from default committed catalog paths.
-        Demo mode is strictly opt-in via CATALOG_DEMO_MODE=true env var."""
+
         for path in DEFAULT_CATALOG_PATHS:
             if path.exists():
                 try:
@@ -657,7 +640,7 @@ class CatalogSyncManager:
                 except Exception as e:
                     logger.warning(f"[CatalogSyncManager] Failed loading snapshot {path}: {e}")
 
-        # Only load demo fixture if explicit demo mode is set
+
         if os.environ.get("CATALOG_DEMO_MODE", "").lower() in ("true", "1", "yes"):
             if DEMO_CATALOG_PATH.exists():
                 try:
@@ -671,15 +654,12 @@ class CatalogSyncManager:
         return False
 
 
-# Global singleton instance
 catalog_sync_manager = CatalogSyncManager()
 
 
 @dataclass(frozen=True)
 class AcceptedSnapshot:
-    """Immutable accepted catalog & retrieval snapshot (CATALOG-01-F08 R1, F09).
-    Guarantees readers capture a single atomic snapshot of catalog manager,
-    hybrid index, generation, and content hash across entire query execution."""
+
     generation: int
     content_hash: str
     catalog_manager: CatalogSyncManager
@@ -688,10 +668,8 @@ class AcceptedSnapshot:
     created_at: float = field(default_factory=time.time)
 
     def __post_init__(self):
-        # Guarantee manager ownership (F09 R1):
-        # Snapshot must own an isolated CatalogSyncManager instance and never share
-        # the mutable compatibility singleton catalog_sync_manager, preventing subsequent
-        # publications from mutating retained reader snapshots.
+
+
         mgr = getattr(self, "catalog_manager", None)
         if mgr is not None:
             isolated = mgr.clone() if hasattr(mgr, "clone") else mgr.__class__()
@@ -717,12 +695,12 @@ _snapshot_lock = threading.Lock()
 
 
 def get_accepted_snapshot() -> Optional[AcceptedSnapshot]:
-    """Capture a reference to the active accepted catalog snapshot."""
+
     return _current_snapshot
 
 
 def set_accepted_snapshot(snapshot: AcceptedSnapshot) -> None:
-    """Atomically update the active accepted snapshot reference under lock."""
+
     global _current_snapshot
     with _snapshot_lock:
         _current_snapshot = snapshot

@@ -27,11 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Background outbox worker responsible for generating full committed eligible catalog snapshots,
- * writing them atomically to configured disk paths, and synchronizing with FastAPI retrieval index.
- * Handles retries, server restart recovery, disk failure propagation, and stale generation protection (G1).
- */
 @Component
 public class CatalogSyncWorker {
 
@@ -65,7 +60,6 @@ public class CatalogSyncWorker {
     public void onStartup() {
         logger.info("[CatalogSyncWorker] Starting recovery check on application startup...");
         try {
-            // Recover any crashed SYNCING snapshots back to PENDING (G1)
             List<CatalogSnapshot> abandoned = snapshotRepository.findByStatusInOrderBySnapshotVersionAsc(List.of("SYNCING"));
             for (CatalogSnapshot s : abandoned) {
                 logger.info("[CatalogSyncWorker] Phục hồi snapshot bị gián đoạn sau restart: {} (gen {})", s.getId(), s.getSnapshotVersion());
@@ -96,7 +90,7 @@ public class CatalogSyncWorker {
 
             for (CatalogSnapshot snapshot : pendingSnapshots) {
                 if (snapshot.getRetryCount() != null && snapshot.getRetryCount() >= 5) {
-                    continue; // Skip exhausted retries until manual operator intervention (G1)
+                    continue;
                 }
                 processSingleSnapshot(snapshot);
             }
@@ -125,12 +119,10 @@ public class CatalogSyncWorker {
             snapshot.setUpdatedAt(LocalDateTime.now());
             snapshotRepository.save(snapshot);
 
-            // 1. Generate full committed eligible catalog JSON from database (self-contained)
             Map<String, Object> fullEligibleCatalog = queryService.exportEligibleSnapshot(false, false);
             String catalogJson = objectMapper.writeValueAsString(fullEligibleCatalog);
             String fullCatalogHash = CatalogImportService.computeSha256(catalogJson);
 
-            // 2. Write full committed catalog snapshot to configured disk path atomically (G1)
             try {
                 writeSnapshotToDisk(catalogJson);
             } catch (Exception diskEx) {
@@ -144,7 +136,6 @@ public class CatalogSyncWorker {
                 return;
             }
 
-            // 3. Dispatch to FastAPI if sync token is configured
             if (syncToken == null || syncToken.trim().isEmpty()) {
                 logger.warn("[CatalogSyncWorker] Không cấu hình syncToken ngoài Git; snapshot đã ghi ra đĩa tại {}. Đánh dấu BLOCKED (chưa có index ack).", snapshotPath);
                 snapshot.setStatus("BLOCKED");
@@ -195,12 +186,18 @@ public class CatalogSyncWorker {
                 snapshotRepository.save(snapshot);
                 logger.warn("[CatalogSyncWorker] Snapshot generation {} bị bỏ qua do stale: {}", snapshot.getSnapshotVersion(), responseBody);
             } else if (statusCode >= 200 && statusCode < 300) {
-                boolean statusOk = "success".equalsIgnoreCase(ackStatus) || "OK".equalsIgnoreCase(ackStatus)
-                        || "SYNCED".equalsIgnoreCase(ackStatus) || "UNCHANGED".equalsIgnoreCase(ackStatus);
-                boolean genMatches = ackGen != null && ackGen.longValue() == snapshot.getSnapshotVersion();
+                boolean statusOk = statusCode != 202 && ("success".equalsIgnoreCase(ackStatus) || "OK".equalsIgnoreCase(ackStatus)
+                        || "SYNCED".equalsIgnoreCase(ackStatus) || "UNCHANGED".equalsIgnoreCase(ackStatus));
+                boolean genMatches = ackGen != null && snapshot.getSnapshotVersion().toString().equals(ackGen.toString());
                 boolean hashMatches = ackHash != null && ackHash.equalsIgnoreCase(fullCatalogHash);
 
-                if (statusOk && genMatches && hashMatches) {
+                if (statusCode == 202 && "BUILDING".equalsIgnoreCase(ackStatus) && genMatches && hashMatches) {
+                    snapshot.setStatus("PENDING");
+                    snapshot.setErrorMessage(null);
+                    snapshot.setUpdatedAt(LocalDateTime.now());
+                    snapshotRepository.save(snapshot);
+                    logger.info("[CatalogSyncWorker] FastAPI đang chuẩn bị snapshot generation {}; tiếp tục chờ ACK hoàn tất.", snapshot.getSnapshotVersion());
+                } else if (statusOk && genMatches && hashMatches && Boolean.TRUE.equals(respMap.get("index_ready"))) {
                     snapshot.setStatus("READY");
                     snapshot.setContentHash(fullCatalogHash);
                     snapshot.setCompletedAt(LocalDateTime.now());

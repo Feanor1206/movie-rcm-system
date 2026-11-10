@@ -13,7 +13,7 @@ import {
   RotateCcw,
   Film,
 } from 'lucide-react';
-import { sendChatMessage, ChatMessage } from '@/lib/services/chatService';
+import { sendChatMessage, ChatMessage, ChatServiceResponse } from '@/lib/services/chatService';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
@@ -78,12 +78,8 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       scrollToBottom();
     }
   }, [messages, isOpen]);
-
-  // A11y: Escape key, body scroll lock, focus trap, and initial focus
   useEffect(() => {
     if (!isOpen) return;
-
-    // Save previous active element to restore focus upon closing (only if outside dialog)
     if (document.activeElement && (!cinebotRef.current || !cinebotRef.current.contains(document.activeElement))) {
       openerRef.current = document.activeElement as HTMLElement | null;
     }
@@ -166,13 +162,11 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setInputError('');
     setIsTyping(true);
 
-    try {
-      // Gửi câu hỏi đến /api/chat (nơi bạn có thể cắm model Python / FastAPI / LLM)
-      const result = await sendChatMessage(text, nextMessages, { sessionId: sessionIdRef.current, signal: controller.signal });
+    const botId = `bot-${userMessage.id}`;
+    const updateBot = (result: ChatServiceResponse) => {
       if (conversation !== conversationRef.current) return;
-
       const botMessage: ChatMessage = {
-        id: `bot-${Date.now()}`,
+        id: botId,
         sender: 'bot',
         text: result.text,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -181,8 +175,17 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         structuredIntent: result.structuredIntent,
         pipelineStages: result.pipelineStages,
       };
+      setMessages((prev) => prev.some((item) => item.id === botId)
+        ? prev.map((item) => item.id === botId ? botMessage : item)
+        : [...prev, botMessage]);
+    };
 
-      setMessages((prev) => [...prev, botMessage]);
+    try {
+      const result = await sendChatMessage(text, nextMessages, {
+        sessionId: sessionIdRef.current, signal: controller.signal, onUpdate: updateBot,
+      });
+      if (conversation !== conversationRef.current) return;
+      updateBot(result);
     } catch (err: any) {
       if (conversation !== conversationRef.current) return;
       console.error('Lỗi nhận phản hồi:', err);
@@ -192,7 +195,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         text: `⚠️ ${err?.message || 'Lỗi kết nối AI Gateway. Thử lại sau.'}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => [...prev.filter((item) => item.id !== botId), errorMsg]);
     } finally {
       if (conversation === conversationRef.current) {
         requestRef.current = null;
@@ -238,7 +241,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       className="fixed inset-0 z-50 flex items-end justify-end p-0 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in pointer-events-auto"
     >
       <div className="flex h-full w-full flex-col overflow-hidden bg-surface border-0 sm:border-2 sm:border-surface-border sm:rounded-none sm:h-[620px] sm:w-[440px] sm:shadow-2xl">
-        {/* Chatbot Header */}
+
         <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
           <div>
             <div className="flex items-center gap-2">
@@ -272,14 +275,14 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           </div>
         </div>
 
-        {/* Message Area */}
+
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((msg) => (
             <div
               key={msg.id}
               className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
             >
-              {/* Message Box */}
+
               <div
                 className={`max-w-[90%] rounded-[16px_16px_16px_2px] px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
                   msg.sender === 'user'
@@ -297,7 +300,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 </span>
               </div>
 
-              {/* Embedded Interactive Movie Cards */}
+
               {msg.movies && msg.movies.length > 0 && (
                 <div className="mt-2.5 w-full space-y-2">
                   {msg.movies.map((movie) => {
@@ -309,7 +312,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                         key={movie.id}
                         className="flex gap-3 rounded-lg border border-surface-border bg-surface-muted p-2.5 transition-colors hover:border-ink/30"
                       >
-                        {/* Poster */}
+
                         <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-surface-border bg-surface">
                           {hasPoster ? (
                             <Image
@@ -326,7 +329,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                           )}
                         </div>
 
-                        {/* Details */}
+
                         <div className="flex flex-col justify-between flex-1 min-w-0">
                           <div>
                             <div className="flex items-center justify-between gap-1">
@@ -346,7 +349,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                             </p>
                           </div>
 
-                          {/* Quick Actions */}
+
                           <div className="mt-2 flex items-center gap-2">
                             <Link
                               href={mediaHref}
@@ -376,7 +379,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 </div>
               )}
 
-              {/* Follow-up Suggestions (Clean rectangular buttons, No pills) */}
+
               {msg.followUps && msg.followUps.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {msg.followUps.map((prompt) => (
@@ -394,7 +397,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             </div>
           ))}
 
-          {/* Typing indicator */}
+
           {isTyping && (
             <div className="flex items-center gap-2 text-xs text-muted bg-surface-muted border border-brand/40 rounded-md px-3 py-1.5 w-fit">
               <span className="flex gap-1">
@@ -409,7 +412,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Bar */}
+
         <div className="border-t border-surface-border bg-surface-muted p-3">
           <div className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-2 focus-within:border-brand">
             <input

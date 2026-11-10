@@ -1,0 +1,449 @@
+{
+  "schema_version": "dippie.catalog.v1",
+  "package": {
+    "id": "pkg_test_01",
+    "revision": 1,
+    "created_at": "2026-10-16T00:00:00Z",
+    "default_language": "vi",
+    "import_mode": "upsert",
+    "reference_scope": "self_contained",
+    "description": "Test catalog fixture for CATALOG-01 retrieval."
+  },
+  "genres": [
+    {
+      "id": "animation",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hoạt hình"
+        },
+        {
+          "language": "en",
+          "text": "Animation"
+        }
+      ],
+      "aliases": [
+        "anime",
+        "cartoon"
+      ]
+    },
+    {
+      "id": "comedy",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hài"
+        },
+        {
+          "language": "en",
+          "text": "Comedy"
+        }
+      ],
+      "aliases": [
+        "hai huoc"
+      ]
+    },
+    {
+      "id": "sci-fi",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Khoa học viễn tưởng"
+        },
+        {
+          "language": "en",
+          "text": "Sci-Fi"
+        }
+      ],
+      "aliases": [
+        "vien tuong"
+      ]
+    },
+    {
+      "id": "horror",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Kinh dị"
+        },
+        {
+          "language": "en",
+          "text": "Horror"
+        }
+      ],
+      "aliases": [
+        "rung ron"
+      ]
+    }
+  ],
+  "attribute_scales": [
+    {
+      "id": "darkness_v1",
+      "name": "Mức u tối",
+      "definition": "Thang đo mức độ đen tối/u ám từ 0 đến 4.",
+      "minimum": 0,
+      "maximum": 4,
+      "levels": [
+        {
+          "value": 0,
+          "meaning": "Tươi sáng"
+        },
+        {
+          "value": 1,
+          "meaning": "Nhẹ"
+        },
+        {
+          "value": 2,
+          "meaning": "Vừa"
+        },
+        {
+          "value": 3,
+          "meaning": "Nặng"
+        },
+        {
+          "value": 4,
+          "meaning": "Rất u tối"
+        }
+      ]
+    },
+    {
+      "id": "pacing_v1",
+      "name": "Nhịp kể",
+      "definition": "Thang đo nhịp kể chuyện từ 0 đến 4.",
+      "minimum": 0,
+      "maximum": 4,
+      "levels": [
+        {
+          "value": 0,
+          "meaning": "Rất chậm"
+        },
+        {
+          "value": 1,
+          "meaning": "Chậm"
+        },
+        {
+          "value": 2,
+          "meaning": "Vừa"
+        },
+        {
+          "value": 3,
+          "meaning": "Nhanh"
+        },
+        {
+          "value": 4,
+          "meaning": "Rất dồn dập"
+        }
+      ]
+    }
+  ],
+  "sources": [],
+  "characters": [
+    {
+      "id": "char_bao",
+      "series_ids": [
+        "ser_chronicles"
+      ],
+      "name": "Bảo Thần Tốc",
+      "aliases": [
+        "Tiểu Bảo",
+        "Bao The Swift",
+        "Tia Chớp Nhỏ"
+      ],
+      "description": "Cậu bé giao hàng dũng cảm mang bảo vật xuyên không gian.",
+      "role": "main",
+      "traits": [
+        "brave",
+        "fast"
+      ]
+    },
+    {
+      "id": "char_chi",
+      "series_ids": [
+        "ser_chronicles"
+      ],
+      "name": "Chi Công Nghệ",
+      "aliases": [
+        "Hacker Chi",
+        "Chi Chi"
+      ],
+      "description": "Nhà khoa học trẻ giải mã tín hiệu vệ tinh cổ.",
+      "role": "main",
+      "traits": [
+        "smart"
+      ]
+    }
+  ],
+  "series": [
+    {
+      "id": "ser_chronicles",
+      "title": "Biên Niên Sử Dippie",
+      "aliases": [
+        "Dippie Chronicles",
+        "Biên Niên Sử Vũ Trụ"
+      ],
+      "synopsis": "Hành trình khám phá các hành tinh bí ẩn của nhóm bạn trẻ Dippie.",
+      "genre_ids": [
+        "animation",
+        "sci-fi"
+      ],
+      "keywords": [
+        "vũ trụ",
+        "phiêu lưu",
+        "khám phá"
+      ],
+      "themes": [
+        "tình bạn",
+        "trách nhiệm"
+      ],
+      "character_ids": [
+        "char_bao",
+        "char_chi"
+      ],
+      "release_year_start": 2026,
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": null
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "ser_spooky",
+      "title": "Ngôi Nhà Bí Ẩn",
+      "aliases": [
+        "Spooky Mansion"
+      ],
+      "synopsis": "Những câu chuyện rùng rợn kỳ quái trong ngôi nhà bỏ hoang.",
+      "genre_ids": [
+        "animation",
+        "horror"
+      ],
+      "keywords": [
+        "ma quái",
+        "bóng tối"
+      ],
+      "themes": [
+        "nỗi sợ"
+      ],
+      "character_ids": [],
+      "release_year_start": 2018,
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 4
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "seasons": [
+    {
+      "id": "sea_01",
+      "series_id": "ser_chronicles",
+      "number": 1,
+      "title": "Mùa 1: Tín Hiệu Đầu Tiên"
+    }
+  ],
+  "episodes": [
+    {
+      "id": "ep_chronicles_01",
+      "series_id": "ser_chronicles",
+      "season_id": "sea_01",
+      "number": 1,
+      "title": "Bình Minh Trên Sao Hỏa",
+      "aliases": [
+        "Mars Sunrise",
+        "Tập 1 Bình Minh"
+      ],
+      "release_date": "2026-03-01",
+      "duration_ms": 1320000,
+      "synopsis": "Bảo và Chi hạ cánh xuống căn cứ Sao Hỏa và phát hiện máy bay không người lái bị hỏng.",
+      "genre_ids": [
+        "animation",
+        "sci-fi"
+      ],
+      "keywords": [
+        "sao hỏa",
+        "hạ cánh"
+      ],
+      "themes": [
+        "khám phá"
+      ],
+      "character_ids": [
+        "char_bao",
+        "char_chi"
+      ],
+      "plot_facts": [
+        {
+          "id": "fact_ep01_01",
+          "text": "Bảo tìm thấy chiếc chìa khóa năng lượng nguyên thủy giấu dưới đáy hố thiên thạch."
+        }
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": null
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "ep_spooky_01",
+      "series_id": "ser_spooky",
+      "season_id": "sea_spooky_01",
+      "number": 1,
+      "title": "Đêm Trăng Máu",
+      "release_date": "2018-10-31",
+      "duration_ms": 1200000,
+      "synopsis": "Một đêm kinh hoàng khi bóng ma xuất hiện trong gương lúc nửa đêm.",
+      "genre_ids": [
+        "animation",
+        "horror"
+      ],
+      "keywords": [
+        "trăng máu",
+        "ma quái"
+      ],
+      "themes": [
+        "ác mộng"
+      ],
+      "character_ids": [],
+      "plot_facts": [
+        {
+          "id": "fact_spooky_01",
+          "text": "Chiếc gương cổ phản chiếu một hành lang không có lối ra."
+        }
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": 4
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 2
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_chronicles_01a",
+      "episode_id": "ep_chronicles_01",
+      "title": "Vượt Qua Bão Cát Sao Hỏa",
+      "aliases": [
+        "Mars Sandstorm Passage"
+      ],
+      "synopsis": "Bảo lái xe địa hình chở Chi vượt qua cơn bão cát khổng lồ đang quét qua hẻm núi.",
+      "episode_start_ms": 60000,
+      "episode_end_ms": 360000,
+      "character_ids": [
+        "char_bao"
+      ],
+      "keywords": [
+        "bão cát",
+        "hẻm núi"
+      ],
+      "themes": [
+        "nguy hiểm"
+      ],
+      "plot_facts": [
+        {
+          "id": "fact_seg01_01",
+          "text": "Cơn bão cát làm tê liệt hệ thống radar dẫn đường của xe địa hình."
+        }
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": null
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 4
+        }
+      ]
+    }
+  ],
+  "media_assets": [
+    {
+      "id": "asset_mars_ep01",
+      "content_type": "video",
+      "role": "feature",
+      "duration_ms": 1320000,
+      "coverage": [
+        {
+          "episode_id": "ep_chronicles_01",
+          "sequence": 1,
+          "source_in_ms": 0,
+          "source_out_ms": 1320000,
+          "episode_in_ms": 0,
+          "scope": "full_episode"
+        }
+      ]
+    }
+  ],
+  "text_tracks": [
+    {
+      "id": "track_ep01_vi",
+      "media_asset_id": "asset_mars_ep01",
+      "language": "vi",
+      "cues": [
+        {
+          "id": "cue_01",
+          "start_ms": 75000,
+          "end_ms": 82000,
+          "text": "Bão cát đang đến rất gần! Giữ chắc tay lái, Bảo!"
+        }
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "id": "scene_mars_canyon",
+      "episode_id": "ep_chronicles_01",
+      "segment_id": "seg_chronicles_01a",
+      "media_asset_id": "asset_mars_ep01",
+      "start_ms": 70000,
+      "end_ms": 95000,
+      "title": "Cú Nhảy Vực Thẳm",
+      "visual_description": "Chiếc xe địa hình phóng qua bờ vực sâu khi những tảng đá đỏ sạt lở dữ dội.",
+      "character_ids": [
+        "char_bao",
+        "char_chi"
+      ],
+      "keywords": [
+        "nhảy vực",
+        "đá đỏ",
+        "hẻm núi"
+      ],
+      "themes": [
+        "sinh tồn"
+      ],
+      "sound_events": [
+        "tiếng động cơ gầm",
+        "tiếng đá rơi"
+      ],
+      "attributes": [
+        {
+          "scale_id": "darkness_v1",
+          "value": null
+        },
+        {
+          "scale_id": "pacing_v1",
+          "value": 4
+        }
+      ]
+    }
+  ]
+}

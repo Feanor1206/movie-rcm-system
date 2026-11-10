@@ -39,14 +39,16 @@ export async function POST(req: Request) {
   if (typeof queryText !== 'string' || !queryText.trim() || queryText.length > MAX_MESSAGE_LENGTH) return invalid();
   if (body.sessionId !== undefined && (typeof body.sessionId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.sessionId))) return invalid();
 
-  const timeout = AbortSignal.timeout(180_000);
-  const signal = req.signal ? AbortSignal.any([req.signal, timeout]) : timeout;
+  const upstreamAbort = new AbortController();
+  const signal = req.signal ? AbortSignal.any([req.signal, upstreamAbort.signal]) : upstreamAbort.signal;
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; upstreamAbort.abort(); }, 15_000);
   try {
     signal.throwIfAborted();
     const modelApiUrl = process.env.MODEL_API_URL || process.env.NEXT_PUBLIC_MODEL_API_URL || 'http://localhost:8000/api/chat';
     const response = await fetch(modelApiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       signal,
       body: JSON.stringify({
         query: queryText.trim(),
@@ -54,8 +56,35 @@ export async function POST(req: Request) {
         sessionId: body.sessionId,
       }),
     });
+    clearTimeout(timer);
     if (!response.ok) {
       return unavailable([400, 429, 502, 503, 504].includes(response.status) ? response.status : 502);
+    }
+    if (response.headers?.get('Content-Type')?.toLowerCase().includes('text/event-stream')) {
+      if (!response.body) return unavailable(502);
+      const reader = response.body.getReader();
+      return new Response(new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          try {
+            const { done, value } = await reader.read();
+            if (done) {
+              controller.close();
+              reader.releaseLock();
+            } else controller.enqueue(value);
+          } catch {
+            upstreamAbort.abort();
+            controller.error(new Error('Luồng phản hồi CineBot bị gián đoạn.'));
+          }
+        },
+        async cancel(reason) {
+          upstreamAbort.abort();
+          await reader.cancel(reason);
+        },
+      }), { headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',
+      } });
     }
     let data;
     try {
@@ -78,6 +107,8 @@ export async function POST(req: Request) {
       pipelineStages: data.pipelineStages && typeof data.pipelineStages === 'object' && !Array.isArray(data.pipelineStages) ? data.pipelineStages : {},
     });
   } catch {
-    return unavailable(req.signal?.aborted ? 499 : timeout.aborted ? 504 : 503);
+    return unavailable(req.signal?.aborted ? 499 : timedOut ? 504 : 503);
+  } finally {
+    clearTimeout(timer);
   }
 }

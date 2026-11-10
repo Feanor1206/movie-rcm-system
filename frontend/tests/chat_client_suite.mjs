@@ -4,6 +4,59 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 
+function chatClient(fetch) {
+  const source = fs.readFileSync(new URL('../lib/services/chatService.ts', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const module = { exports: {} };
+  vm.runInNewContext(code, { module, exports: module.exports, fetch, TextDecoder, AbortSignal });
+  return module.exports.sendChatMessage;
+}
+
+test('Chat client yields metadata and split UTF-8 tokens before the terminal event', async () => {
+  let controller;
+  const bytes = new TextEncoder().encode(': heartbeat\r\n\r\nevent: metadata\r\ndata: {"recommendedMovies":[{"id":"ep2"}],"followUps":[],"pipelineStages":{"search":true}}\r\n\r\nevent: token\r\ndata: {"text":"Chào "}\r\n\r\nevent: token\r\ndata: {"text":"bạn"}\r\n\r\n');
+  const stream = new ReadableStream({ start(value) { controller = value; } });
+  const updates = [];
+  const request = chatClient(async (_, init) => {
+    assert.match(init.headers.Accept, /text\/event-stream/);
+    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream; charset=utf-8' } });
+  })('Jadoo', [], { onUpdate: (value) => updates.push(value) });
+  for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+  await new Promise(setImmediate);
+  assert.equal(updates.at(-1).text, 'Chào bạn');
+  assert.equal(updates[0].recommendedMovies[0].id, 'ep2');
+  controller.enqueue(new TextEncoder().encode('event: done\ndata: {"text":"Chào bạn","recommendedMovies":[{"id":"ep2"}],"followUps":[]}\n\n'));
+  controller.close();
+  const result = await request;
+  assert.equal(result.text, 'Chào bạn');
+  assert.equal(result.recommendedMovies[0].id, 'ep2');
+});
+
+test('Chat client rejects truncated, malformed and error streams instead of accepting a partial answer', async () => {
+  for (const body of [
+    'event: token\ndata: {"text":"partial"}\n\n',
+    'event: token\ndata: {"text":42}\n\n',
+    'event: done\ndata: {"text":"ok","recommendedMovies":{}}\n\n',
+    'event: token\ndata: broken JSON\n\n',
+    'event: error\ndata: {"text":"CineBot đang bận."}\n\n',
+  ]) {
+    await assert.rejects(chatClient(async () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }))('hi'));
+  }
+});
+
+test('Cancelling a chat stream closes its reader and rejects with the cancellation', async () => {
+  let cancelled = false;
+  const controller = new AbortController();
+  const stream = new ReadableStream({ cancel() { cancelled = true; } });
+  const request = chatClient(async () => new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } }))(
+    'hi', [], { signal: controller.signal },
+  );
+  await new Promise(setImmediate);
+  controller.abort();
+  await assert.rejects(request, { name: 'AbortError' });
+  assert.equal(cancelled, true);
+});
+
 test('Resetting a pending chat discards its reply and allows a new conversation', async () => {
   const source = fs.readFileSync(new URL('../features/chat/components/CineBot.tsx', import.meta.url), 'utf8');
   const componentCode = ts.transpileModule(source, { compilerOptions: {
@@ -40,17 +93,24 @@ test('Resetting a pending chat discards its reply and allows a new conversation'
   render();
   input().props.onChange({ target: { value: 'First question' } }); render();
   button('Gửi tin nhắn').props.onClick(); render();
+  requests[0].options.onUpdate({ text: 'First streamed fragment', recommendedMovies: [], followUps: [] }); render();
+  assert.match(JSON.stringify(tree), /First streamed fragment/);
   button('Làm mới cuộc trò chuyện').props.onClick(); render();
   assert.equal(requests[0].options.signal.aborted, true);
   assert.equal(input().props.disabled, false);
   input().props.onChange({ target: { value: 'Second question' } }); render();
   button('Gửi tin nhắn').props.onClick(); render();
   assert.notEqual(requests[0].options.sessionId, requests[1].options.sessionId);
+  requests[0].options.onUpdate({ text: 'Stale streamed fragment', recommendedMovies: [], followUps: [] }); render();
+  assert.doesNotMatch(JSON.stringify(tree), /Stale streamed fragment/);
+  requests[1].options.onUpdate({ text: 'New streamed fragment', recommendedMovies: [], followUps: [] }); render();
+  assert.match(JSON.stringify(tree), /New streamed fragment/);
   requests[0].resolve({ text: 'Old reply' }); await new Promise(setImmediate); render();
   assert.equal(input().props.disabled, true, 'old request must not unlock the new request');
   requests[1].resolve({ text: 'New reply' }); await new Promise(setImmediate); render();
   assert.doesNotMatch(JSON.stringify(tree), /Old reply/);
   assert.match(JSON.stringify(tree), /New reply/);
+  assert.doesNotMatch(JSON.stringify(tree), /New streamed fragment/);
   input().props.onChange({ target: { value: 'Follow-up' } }); render();
   button('Gửi tin nhắn').props.onClick(); render();
   assert.equal(requests[1].options.sessionId, requests[2].options.sessionId);
@@ -106,7 +166,6 @@ test('Chat changes actor without exposing old messages or reusing the session', 
 });
 
 test('Oversized messages show an error without entering history', async () => {
-  // Exercise the component's event handlers, including non-browser input events.
   const source = fs.readFileSync(new URL('../features/chat/components/CineBot.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true } }).outputText;
   let slots = [], index = 0, requests = [];

@@ -12,12 +12,15 @@ $launcherAst = [System.Management.Automation.Language.Parser]::ParseFile($launch
 if ($parseErrors.Count -gt 0) { throw "start_preview_stack.ps1 has PowerShell parse errors: $($parseErrors[0].Message)" }
 [System.Management.Automation.Language.Parser]::ParseFile($stopperPath, [ref]$tokens, [ref]$parseErrors) | Out-Null
 if ($parseErrors.Count -gt 0) { throw "stop_preview_stack.ps1 has PowerShell parse errors: $($parseErrors[0].Message)" }
+$modelModeParameter = $launcherAst.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq "ModelMode" }
+if ($modelModeParameter.DefaultValue.SafeGetValue() -ne "light") { throw "The launcher must default to ModelMode light." }
 
 $helperNames = @(
     "Format-NativeArgument",
     "Start-ChildServiceProcess",
     "Get-PreviewPaths",
     "Get-PreviewRuntimeContract",
+    "Get-FastApiArguments",
     "Get-SpringBootArguments",
     "Get-PreviewPortsToCheck",
     "Test-FrontendBuildStale",
@@ -117,6 +120,24 @@ try {
     $springArguments = Get-SpringBootArguments -SpringPort 18080 -DriveMountPoint "X:" -JarFile "backend.jar"
     Assert-True (-not (($springArguments -join " ").Contains("test-sync-secret"))) "The sync secret must stay out of Java command-line arguments."
     Assert-Equal "18000,18080,13000" (@((Get-PreviewPortsToCheck -ModelMode full -SpringPort 18080 -FastApiPort 18000 -FrontendPort 13000) | ForEach-Object { $_.Port }) -join ",") "Explicit model modes must preflight FastAPI."
+    foreach ($mode in @("light", "full", "cloud")) {
+        $modeContract = Get-PreviewRuntimeContract -ModelMode $mode -SpringPort 18080 -FastApiPort 18000 -FrontendPort 13000 -DataDirectory $dataDirectory -SyncSecret "test-sync-secret"
+        Assert-True $modeContract.StartFastApi "Every online model mode must start FastAPI."
+        Assert-Equal $mode $modeContract.FastApiEnvironment["MODEL_MODE"] "The registry mode must match ModelMode."
+        Assert-Equal $mode $modeContract.FastApiEnvironment["SERVING_MODE"] "Legacy serving mode must match ModelMode."
+        Assert-Equal "test-sync-secret" $modeContract.FastApiEnvironment["CATALOG_SYNC_TOKEN"] "FastAPI must receive its service token through the environment."
+        Assert-Equal ([System.IO.Path]::GetFullPath((Join-Path $dataDirectory "catalog_sync_state.json"))) $modeContract.FastApiEnvironment["SYNC_STATE_PATH"] "Accepted FastAPI state must stay under this preview data directory."
+        Assert-Equal $modeContract.SpringEnvironment["APP_CATALOG_SNAPSHOT_PATH"] $modeContract.FastApiEnvironment["CATALOG_SNAPSHOT_PATH"] "Spring and FastAPI must use the same committed catalog path."
+        Assert-Equal $modeContract.SpringEnvironment["APP_CATALOG_SNAPSHOT_PATH"] $modeContract.FastApiEnvironment["DEFAULT_CATALOG_PATH"] "A parent default catalog must not escape preview data isolation."
+        Assert-Equal ([System.IO.Path]::GetFullPath((Join-Path $dataDirectory "embedding_cache"))) $modeContract.FastApiEnvironment["EMBEDDING_CACHE_DIR"] "Embedding cache must belong to this preview."
+        Assert-True (-not $modeContract.FastApiEnvironment.ContainsKey("USE_FULL_QWEN3_4B_LORA")) "The obsolete model loader switch must not be set."
+        Assert-Equal "18000,18080,13000" (@((Get-PreviewPortsToCheck -ModelMode $mode -SpringPort 18080 -FastApiPort 18000 -FrontendPort 13000) | ForEach-Object { $_.Port }) -join ",") "Online model modes must preflight FastAPI."
+    }
+    $defaultContract = Get-PreviewRuntimeContract -SpringPort 18080 -FastApiPort 18000 -FrontendPort 13000 -DataDirectory $dataDirectory -SyncSecret "test-sync-secret"
+    Assert-Equal "light" $defaultContract.FastApiEnvironment["MODEL_MODE"] "Helper defaults must agree with the launcher default."
+    $fastApiArguments = Get-FastApiArguments -FastApiPort 18000
+    Assert-Equal "-m,uvicorn,main:app,--host,127.0.0.1,--port,18000,--workers,1,--log-level,warning" ($fastApiArguments -join ",") "FastAPI must use one worker and the selected loopback port."
+    Assert-True (-not ($fastApiArguments -contains "--reload")) "Model serving must never enable reload."
 
     $buildId = Join-Path $tempRoot ".next\BUILD_ID"
     $standaloneServer = Join-Path $tempRoot ".next\standalone\server.js"
@@ -174,8 +195,13 @@ try {
     Assert-True $refused "Unsafe stop must report failure, not a successful exit."
     Assert-True (Test-Path -LiteralPath $unownedDriveState) "Stop must preserve an incomplete Drive ownership record instead of using a shared default mount state."
 
-    Write-Host "PASS: launcher helpers enforce off/light/full branching, preview-only data paths, standalone build freshness, secret isolation, and process ownership."
+    Write-Host "PASS: launcher helpers enforce off/light/full/cloud branching, preview-only data paths, standalone build freshness, secret isolation, and process ownership."
 } finally {
     [System.Environment]::SetEnvironmentVariable($script:testVariable, $originalValue, "Process")
-    if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
+    $resolvedTempRoot = [System.IO.Path]::GetFullPath($tempRoot)
+    $tempPrefix = [System.IO.Path]::GetFullPath($env:TEMP).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedTempRoot.StartsWith($tempPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or [System.IO.Path]::GetFileName($resolvedTempRoot) -notlike "preview-launcher-tests-*") {
+        throw "Refusing cleanup outside the launcher test directory."
+    }
+    if (Test-Path -LiteralPath $resolvedTempRoot) { Remove-Item -LiteralPath $resolvedTempRoot -Recurse -Force }
 }

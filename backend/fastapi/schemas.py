@@ -1,5 +1,5 @@
-from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Any, Dict, Annotated
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ChatMessageItem(BaseModel):
@@ -20,7 +20,6 @@ class MovieItem(BaseModel):
     backdrop: Optional[str] = None
     videoUrl: Optional[str] = None
     matchPercentage: Optional[int] = None
-    # Multi-level catalog hierarchy fields (series, episode, segment, scene)
     item_type: Optional[str] = Field(default="movie", description="series, episode, segment, scene, movie")
     series_id: Optional[str] = None
     season_id: Optional[str] = None
@@ -45,12 +44,18 @@ class MovieItem(BaseModel):
     episode_title: Optional[str] = None
     comparative_attributes: Optional[Dict[str, Any]] = None
     diagnostics: Optional[Dict[str, Any]] = None
+    episodeId: Optional[str] = None
+    startMs: Optional[int] = None
+    score: Optional[float] = Field(default=None, allow_inf_nan=False)
+    calibratedScore: Optional[float] = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    evidence: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class IndexSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     catalog: Optional[Dict[str, Any]] = None
-    generation: Optional[int] = None
-    content_hash: Optional[str] = None
+    generation: Optional[int] = Field(default=None, ge=0, strict=True)
+    content_hash: Optional[str] = Field(default=None, max_length=128)
     reload_from_disk: Optional[bool] = False
     force_rebuild: Optional[bool] = False
 
@@ -67,9 +72,9 @@ class IndexSyncResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     query: Optional[str] = Field(default=None, max_length=4000)
     messages: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=40)
-    availableMovies: Optional[List[MovieItem]] = None
     sessionId: Optional[str] = Field(default="default", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
     @field_validator("messages")
@@ -80,7 +85,7 @@ class ChatRequest(BaseModel):
         normalized = []
         for message in messages:
             content = message.get("content") or message.get("text")
-            if message.get("role") not in ("user", "assistant") or not isinstance(content, str) or len(content) > 4000:
+            if message.get("role") not in ("user", "assistant") or not isinstance(content, str) or not content.strip() or len(content) > 4000:
                 raise ValueError("Each message must have a user or assistant role and text of at most 4000 characters")
             normalized.append({"role": message["role"], "content": content})
         return normalized
@@ -94,11 +99,23 @@ class ChatResponse(BaseModel):
     pipelineStages: Optional[Dict[str, Any]] = None
 
 
+class SearchConstraints(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    include_genres: List[Annotated[str, Field(min_length=1, max_length=80)]] = Field(default_factory=list, max_length=20)
+    exclude_genres: List[Annotated[str, Field(min_length=1, max_length=80)]] = Field(default_factory=list, max_length=20)
+    year_min: Optional[int] = Field(default=None, strict=True, ge=1800, le=2200)
+    year_max: Optional[int] = Field(default=None, strict=True, ge=1800, le=2200)
+    season_number: Optional[int] = Field(default=None, strict=True, ge=1, le=10000)
+    episode_number: Optional[int] = Field(default=None, strict=True, ge=1, le=100000)
+
+
 class DiscoverRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     query: str = Field(max_length=4000)
     sessionId: Optional[str] = Field(default="default", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     userId: Optional[str] = None
-    availableMovies: Optional[List[MovieItem]] = None
+    limit: int = Field(default=8, ge=1, le=100)
+    constraints: Optional[SearchConstraints] = None
 
 
 class DiscoverResponse(BaseModel):
@@ -161,4 +178,5 @@ class ReadinessResponse(BaseModel):
     degraded: bool
     loadError: Optional[str] = None
     message: str
+    features: Dict[str, Any] = Field(default_factory=dict)
 

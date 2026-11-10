@@ -1,9 +1,6 @@
 version: '3.8'
 
 services:
-  # =========================================================================
-  # 1. API GATEWAY (Nginx Reverse Proxy)
-  # =========================================================================
   nginx:
     image: nginx:alpine
     container_name: movie_rcm_nginx
@@ -19,9 +16,6 @@ services:
     networks:
       - movie_network
 
-  # =========================================================================
-  # 2. FRONTEND (Next.js 15 Web Application)
-  # =========================================================================
   frontend:
     build:
       context: ../frontend
@@ -38,9 +32,6 @@ services:
     networks:
       - movie_network
 
-  # =========================================================================
-  # 3. BACKEND SPRING BOOT (Auth, Users, Movie Catalog)
-  # =========================================================================
   springboot:
     build:
       context: ../backend/springboot
@@ -63,13 +54,6 @@ services:
     networks:
       - movie_network
 
-  # =========================================================================
-  # 4. BACKEND FASTAPI (AI Recommendation & Qwen Phase 23 Serving Pipeline)
-  # =========================================================================
-  # Chế độ chính (Full Serving): Qwen3-4B + Phase 23 LoRA trên GPU (NF4 4-bit)
-  # Chế độ nhẹ (Light Serving): Đổi SERVING_MODE=light, USE_FULL_QWEN3_4B_LORA=false,
-  #                              DEVICE=cpu, và comment khối deploy GPU reservation.
-  # =========================================================================
   fastapi:
     build:
       context: ../backend/fastapi
@@ -79,21 +63,20 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8000
-      - SERVING_MODE=full
-      - USE_FULL_QWEN3_4B_LORA=true
-      - DEVICE=cuda
-      - BASE_MODEL_NAME=Qwen/Qwen3-4B
-      - PHASE23_ADAPTER_DIR=/app/models/qwen3-4b-phase23-lora
-      - MODEL_NAME_OR_PATH=/app/models/qwen-0.6b/Qwen3-0.6B-Q8_0.gguf
-      - ENABLE_FALLBACK=false
-      - STRICT_READINESS=true
-      - MAX_CONCURRENT_INFERENCE=1
-      - MAX_NEW_TOKENS=256
-      - HF_HOME=/root/.cache/huggingface
+      - MODEL_MODE=${MODEL_MODE:-light}
+      - TEXT_ENCODER_PATH=${TEXT_ENCODER_PATH:-}
+      - RERANKER_MODEL_PATH=${RERANKER_MODEL_PATH:-}
+      - SCORE_CALIBRATION_PATH=${SCORE_CALIBRATION_PATH:-}
+      - LLAMA_SERVER_URL=${LLAMA_SERVER_URL:-http://host.docker.internal:8081/v1}
+      - LLM_MODEL=${LLM_MODEL:-Qwen3-4B-GGUF}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      - SYNC_STATE_PATH=/app/data/indices/catalog_sync_state.json
+      - EMBEDDING_CACHE_DIR=/app/data/indices/text
       - CATALOG_SYNC_TOKEN=${CATALOG_SYNC_TOKEN:-}
     volumes:
       - ../ai/models:/app/models:ro
-      - hf_cache:/root/.cache/huggingface
+      - ../data/indices:/app/data/indices
     deploy:
       resources:
         reservations:
@@ -106,9 +89,6 @@ services:
     networks:
       - movie_network
 
-  # =========================================================================
-  # 5. DATABASE (PostgreSQL 16)
-  # =========================================================================
   postgres:
     image: postgres:16-alpine
     container_name: movie_rcm_postgres
@@ -130,9 +110,6 @@ services:
     networks:
       - movie_network
 
-  # =========================================================================
-  # 6. CACHE (Redis 7)
-  # =========================================================================
   redis:
     image: redis:7-alpine
     container_name: movie_rcm_redis
@@ -148,4 +125,3 @@ networks:
 
 volumes:
   pgdata:
-  hf_cache:

@@ -9,7 +9,6 @@ export type Movie = {
   poster: string;
   backdrop: string;
   videoUrl?: string;
-  // Multi-level catalog hierarchy fields (dippie.catalog.v1 & search / chat)
   item_type?: 'series' | 'episode' | 'segment' | 'scene' | 'movie' | string;
   type?: 'series' | 'episode' | 'segment' | 'scene' | 'movie' | string;
   series_id?: string;
@@ -36,4 +35,7 @@ export type Movie = {
   mediaAssetId?: string;
   timeline?: string;
   timescale?: string;
+  matchPercentage?: number | null;
+  calibratedScore?: number | null;
+  evidence?: { documentId: string; text: string; startMs: number | null; endMs: number | null; itemType: string }[];
 };
