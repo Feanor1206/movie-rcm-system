@@ -21,10 +21,13 @@ download weights, train models, call paid APIs, or change the Spring database.
    one accepted snapshot. The old result fields remain, with `episodeId`,
    `startMs`, `score`, `calibratedScore` and catalog evidence added. Missing
    calibration is reported as null, never a fabricated probability.
-5. `light` uses deterministic chat; `full` calls external llama-server; `cloud`
-   calls an OpenAI-compatible DeepSeek endpoint. One GPU semaphore covers local
-   heavy inference. Readiness reports each feature independently; missing frame
-   or reranker artifacts cannot be reported as loaded.
+5. `cloud` calls an OpenAI-compatible DeepSeek endpoint using the model ID set
+   by `scripts/configure_llm.ps1`. `full` is an alias for `cloud` and `light`
+   uses deterministic chat. Cloud requests carry evidence from the local
+   pilot catalog, selected using up to three search results. The chat service
+   checks episode and time references before sending model text downstream.
+   One GPU semaphore covers local heavy inference. Readiness reports each
+   feature independently.
 6. Chat is async SSE: `metadata` carries result fields, `token` carries
    `{ "text": "delta" }`, `done` carries the full legacy ChatResponse, and
    `error` carries a safe `{ "text": "message" }`. Cancellation closes upstream

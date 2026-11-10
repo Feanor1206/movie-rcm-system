@@ -12,6 +12,17 @@ ARTIFACTS = ROOT / "ai/artifacts"
 CATALOG = ROOT / "data/catalog.jadoo_all.json"
 
 
+def load_deepseek_env():
+    path = ROOT / ".env.deepseek.local"
+    if not path.is_file():
+        return
+    keys = {"DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY"}
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        name, separator, value = line.partition("=")
+        if separator and name in keys:
+            os.environ[name] = value
+
+
 def read(path):
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 

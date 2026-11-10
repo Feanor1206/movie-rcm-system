@@ -59,12 +59,18 @@ explicit `--execute --max-requests N --run-id NAME`. The two stages share a
 persistent request cap when they use the same run ID and artifact directory.
 Summarization needs completed captions.
 
-The current authorization covers S01E22 and S04E21 with a combined cap of 40.
-After configuring the provider, keep the same run ID for both stages and retries.
+The DeepSeek pilot covers S01E22 and S04E21 with a shared cap of 40 requests,
+including the image probe. Start with `scripts/configure_llm.ps1` to enter the
+credentials locally. The default offline command plans without API calls.
+`--execute` sends one small pilot keyframe to the configured endpoint. An
+explicit image rejection selects local llama-server captions and DeepSeek text
+summaries. Set `LOCAL_VISION_BASE_URL` to the loopback server's `/v1` URL and
+`LOCAL_VISION_MODEL` to its model ID before continuing that branch. An
+inconclusive probe stops the run and keeps its status for investigation.
 
 ```powershell
-python -m ai.enrich.caption --episode ep_jadoo_s01_0022 --episode ep_jadoo_s04_0021 --execute --max-requests 40 --run-id pilot-two-episodes
-python -m ai.enrich.summarize --episode ep_jadoo_s01_0022 --episode ep_jadoo_s04_0021 --execute --max-requests 40 --run-id pilot-two-episodes
+python -m ai.enrich.deepseek_offline
+python -m ai.enrich.deepseek_offline --execute
 python -m ai.enrich.teacher_audit --episode ep_jadoo_s01_0022 --episode ep_jadoo_s04_0021 --run-id pilot-two-episodes --output ai/artifacts/pilot-teacher-audit.json
 ```
 
@@ -85,7 +91,9 @@ Review every listed record against its source. Enter the reviewer name and set
 generated. The publish command verifies exact review coverage, checks provenance
 and validates the resulting package. The package retains the model provenance
 and records the human review. Omit `--dialogue-only` in both commands to include
-captions, scenes and summaries when available.
+captions, scenes and summaries when available. Save the reviewed package as
+`ai/artifacts/pilot-published.json` to let cloud chat use its published pilot
+evidence independently of the Spring database.
 
 ```powershell
 python -m ai.enrich.publish_preview --dialogue-only --episode ep_jadoo_s01_0022 --episode ep_jadoo_s04_0021 --output ai/artifacts/dialogue-ready.json --review ai/artifacts/dialogue-review.json

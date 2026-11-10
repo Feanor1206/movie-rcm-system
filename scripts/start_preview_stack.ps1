@@ -24,6 +24,10 @@ $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location -Path $root
 
+if ($ModelMode -eq "full" -or (!$PSBoundParameters.ContainsKey("ModelMode") -and (Test-Path -LiteralPath (Join-Path $root ".env.deepseek.local") -PathType Leaf))) {
+    $ModelMode = "cloud"
+}
+
 $backendDir = Join-Path $root "backend\springboot"
 $fastapiDir = Join-Path $root "backend\fastapi"
 $frontendDir = Join-Path $root "frontend"
@@ -415,9 +419,8 @@ try {
         -SyncSecret $SyncSecret
 
     Write-Host "  -> Chế độ phục vụ AI (ModelMode): $ModelMode" -ForegroundColor Cyan
-    if ($ModelMode -eq "full") {
-        Write-Host "  -> CHÚ Ý: Chế độ 'full' sử dụng mô hình thật Qwen3-4B + Phase23 LoRA trên CUDA/GPU." -ForegroundColor Magenta
-        Write-Host "  -> Tuyệt đối không gọi fallback/template là mô hình thật." -ForegroundColor Magenta
+    if ($ModelMode -eq "cloud") {
+        Write-Host "  -> DeepSeek hội thoại qua API; mẫu dự phòng dùng khi API chưa sẵn sàng." -ForegroundColor Gray
     } elseif ($ModelMode -eq "light") {
         Write-Host "  -> Chế độ 'light' sử dụng semantic search và embedding gọn nhẹ, phù hợp CPU." -ForegroundColor Gray
     } else {

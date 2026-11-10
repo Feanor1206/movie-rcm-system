@@ -226,13 +226,16 @@ def reply(job, client, secret, budget):
             raise ValueError("Teacher request failed to reach its configured endpoint") from None
         if not response.is_success:
             raise ValueError(f"Teacher returned HTTP {response.status_code}")
+        provider = {}
         try:
             provider = response.json()
+            if not isinstance(provider, dict):
+                raise ValueError
             if hasattr(budget, "record_response"):
                 budget.record_response(provider)
             content = provider["choices"][0]["message"]["content"]
         except (ValueError, IndexError, KeyError, TypeError):
-            content = None
+            provider, content = {}, None
         cached = {"input_hash": job.input_hash, "content": content if isinstance(content, str) else None,
                   "model": job.model, "prompt_version": job.prompt_version, "created_at": now()}
         for field in ("usage", "cost"):

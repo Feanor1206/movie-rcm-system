@@ -18,8 +18,10 @@ class InferenceCapacityError(Exception):
 class ModelRegistry:
     def __init__(self, mode=None, gpu_timeout=30.0):
         self.mode = (mode or os.getenv("MODEL_MODE") or os.getenv("SERVING_MODE") or "light").lower()
-        if self.mode not in {"light", "full", "cloud"}:
-            raise ValueError("Model mode must be light, full or cloud")
+        if self.mode == "full":
+            self.mode = "cloud"
+        if self.mode not in {"light", "cloud"}:
+            raise ValueError("Model mode must be light or cloud")
         self.gpu_timeout = gpu_timeout
         self._gpu = threading.BoundedSemaphore(1)
         self._lock = threading.RLock()
@@ -105,18 +107,19 @@ class ModelRegistry:
         self.llm_error = error if not ready else None
 
     def health(self):
-        backend = {"light": "template", "full": "llama-server", "cloud": "deepseek"}[self.mode]
+        backend = "deepseek" if self.mode == "cloud" else "template"
+        model_name = (os.getenv("DEEPSEEK_MODEL") or "deepseek") if self.mode == "cloud" else "catalog-template"
         return {
             "status": "healthy" if self.mode == "light" or self.llm_ready else "degraded",
             "modelLoaded": self.llm_ready,
-            "modelNameOrPath": os.getenv("LLM_MODEL", "Qwen3-4B-GGUF") if self.mode == "full" else "deepseek-chat" if self.mode == "cloud" else "catalog-template",
-            "activeBaseModelName": os.getenv("LLM_MODEL", "Qwen3-4B-GGUF") if self.mode == "full" and self.llm_ready else None,
+            "modelNameOrPath": model_name,
+            "activeBaseModelName": model_name if self.llm_ready else None,
             "activeInferenceBackend": backend,
-            "device": "external" if self.mode == "full" else "cpu",
+            "device": "external" if self.mode == "cloud" else "cpu",
             "servingMode": self.mode,
-            "requestedDevice": "external" if self.mode == "full" else "cpu",
-            "actualDevice": "external" if self.mode == "full" and self.llm_ready else "cpu",
-            "quantization": "external" if self.mode == "full" else "none",
+            "requestedDevice": "external" if self.mode == "cloud" else "cpu",
+            "actualDevice": "external" if self.llm_ready else "cpu",
+            "quantization": "external" if self.mode == "cloud" else "none",
             "phase23AdapterLoaded": False,
             "degraded": self.mode != "light" and not self.llm_ready,
             "loadError": self.llm_error,
