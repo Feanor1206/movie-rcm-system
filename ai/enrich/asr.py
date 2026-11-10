@@ -104,8 +104,9 @@ def main():
             model = WhisperModel(str(model_path), device="cuda", device_index=0, compute_type="int8_float16",
                                  local_files_only=True)
             for row, path, signature in pending:
-                result = transcribe(model, row, words, args.language)
-                write(path, {**result, "input_hash": signature})
+                with GpuMonitor() as episode_monitor:
+                    result = transcribe(model, row, words, args.language)
+                write(path, {**result, "input_hash": signature, **episode_monitor.report()})
                 print(f"{row['episode_id']} {len(result['cues'])} cues, RTF={result['real_time_factor']:.4f}", flush=True)
             del model
         finally:

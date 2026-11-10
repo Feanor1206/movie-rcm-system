@@ -60,7 +60,7 @@ def test_teacher_cap_and_cache_avoid_duplicate_requests(tmp_path):
         assert request.headers["Authorization"] == "Bearer test-key"
         assert len([part for part in body["messages"][1]["content"] if part["type"] == "image_url"]) == 4
         payload = {"title": "Chào bạn", "summary": "Jadoo xuất hiện", "visual_description": "Jadoo đứng trước cửa",
-                   "character_ids": ["hallucinated"], "visual_tags": [], "sound_events": [], "keywords": [], "themes": []}
+                   "character_ids": ["hallucinated"], "reported_character_names": [], "visual_tags": [], "sound_events": [], "keywords": [], "themes": []}
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(payload)}}]})
 
     with pytest.raises(ValueError, match="exceed"):
@@ -109,3 +109,43 @@ def test_caption_cli_dry_run_never_initializes_network_client(tmp_path, monkeypa
     plan = (tmp_path / "ep-1/caption_plan.json").read_text(encoding="utf-8")
     assert "do-not-print" not in plan and "data:image" not in plan
     assert not (tmp_path / "ep-1/captions.json").exists()
+
+
+def test_shared_budget_survives_restart_and_stages(tmp_path):
+    from ai.enrich.caption import durable_budget
+    first = durable_budget(tmp_path, 'audit', 2)
+    first.consume()
+    second = durable_budget(tmp_path, 'audit', 2)
+    second.consume()
+    with pytest.raises(ValueError, match='max-requests'):
+        first.consume()
+    with pytest.raises(ValueError, match='budget'):
+        durable_budget(tmp_path, 'audit', 3)
+
+
+def test_cache_keeps_provider_usage_only_when_returned(tmp_path):
+    row = pilot_inputs(tmp_path, 4)
+    [(_, job)], _ = caption_jobs(tmp_path, row, {'jadoo': 'Jadoo'}, 'model', 'https://teacher.invalid/v1')
+    payload = {'title': 'T', 'summary': 'S', 'visual_description': 'V', 'character_ids': [],
+               'visual_tags': [], 'sound_events': [], 'keywords': [], 'themes': [], 'reported_character_names': []}
+    def endpoint(request):
+        return httpx.Response(200, json={'choices': [{'message': {'content': json.dumps(payload)}}],
+                                        'usage': {'prompt_tokens': 11, 'completion_tokens': 7}, 'cost': 0.01})
+    with httpx.Client(transport=httpx.MockTransport(endpoint)) as client:
+        reply(job, client, 'key', RequestBudget(1))
+    cached = json.loads(job.cache.read_text(encoding='utf-8'))
+    assert cached['usage'] == {'prompt_tokens': 11, 'completion_tokens': 7}
+    assert cached['cost'] == 0.01
+
+
+def test_audit_flags_known_alias_without_cue_and_samples_frames(tmp_path):
+    from ai.enrich.teacher_audit import scene_audit
+    row = pilot_inputs(tmp_path, 4)
+    scene = {'scene_id': 'scene-1', 'start_ms': 0, 'end_ms': 30000,
+             'title': 'Mimi nói', 'summary': 'Jadoo nghe', 'visual_description': '', 'character_ids': ['mimi']}
+    characters = [{'id': 'jadoo', 'name': 'Jadoo', 'aliases': [], 'series_ids': ['show']},
+                  {'id': 'mimi', 'name': 'Mimi', 'aliases': ['Mi Mi'], 'series_ids': ['show']}]
+    audit = scene_audit(tmp_path, row, scene, characters)
+    assert audit['absent_names'] == ['Mimi']
+    assert len(audit['keyframe_paths']) == 2
+    assert audit['cues'][0]['text'] == 'Jadoo ơi'

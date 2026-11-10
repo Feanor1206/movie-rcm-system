@@ -184,3 +184,30 @@ def test_comparison_cli_refuses_header_only_before_loading_artifacts(tmp_path):
                             capture_output=True, text=True)
     assert result.returncode == 2
     assert "no human labels" in result.stderr
+
+
+def test_comparison_reports_each_labeled_episode_for_every_configuration(tmp_path):
+    original = json.loads((ROOT / "docs" / "fixtures" / "retrieval_catalog.json").read_text(encoding="utf-8"))
+    episodes = original["episodes"][:2]
+    labels = [{"id": f"q{i}", "query": episode["title"], "episodeIds": [episode["id"]], "source": "human"}
+              for i, episode in enumerate(episodes)]
+    report = compare_catalogs(labels, original, original, FixtureEncoder(), tmp_path,
+                              [episode["id"] for episode in episodes])
+    for config in report["configurations"].values():
+        assert set(config["perEpisode"]) == {episode["id"] for episode in episodes}
+        assert all(row["queryCount"] == 1 for row in config["perEpisode"].values())
+        assert all("recallAt5" in row["metrics"] for row in config["perEpisode"].values())
+
+
+def test_per_episode_metrics_score_each_relevant_episode_and_its_own_moments():
+    from ai.evaluation.retrieval_gate import measure_per_episode
+
+    labels = [{"id": "q1", "episodeIds": ["ep1", "ep2"], "moments": [
+        {"episodeId": "ep1", "startMs": 100}, {"episodeId": "ep2", "startMs": 100_000}]}]
+    predictions = [{"id": "q1", "results": [{"episodeId": "ep1", "startMs": 100},
+                                              {"episodeId": "ep2", "startMs": 0}]}]
+    result = measure_per_episode(labels, predictions)
+    assert result["ep1"]["metrics"]["recallAt1"] == 1
+    assert result["ep1"]["metrics"]["momentRecallAt5"] == 1
+    assert result["ep2"]["metrics"]["recallAt1"] == 0
+    assert result["ep2"]["metrics"]["momentRecallAt5"] == 0

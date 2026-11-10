@@ -3,12 +3,17 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
+import tempfile
+import time
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
-from .common import ARTIFACTS, CATALOG, probe, read, run, write
+from .common import ARTIFACTS, CATALOG, probe, read, write
 
+
+RCLONE_CONFIG = ()
 
 RCLONE_LIMITS = ("--contimeout", "12s", "--timeout", "35s", "--tpslimit", "1", "--tpslimit-burst", "1",
                  "--retries", "1", "--low-level-retries", "1", "--transfers", "1", "--checkers", "1")
@@ -39,7 +44,7 @@ def discover(catalog, local_root=None, remote_files=None, pilot_ids=None):
     for episode in catalog["episodes"]:
         episode_id = episode["id"]
         duration = episode.get("duration_ms")
-        regular = episode.get("kind") == "regular" and isinstance(duration, int) and 600_000 <= duration <= 2_400_000
+        regular = episode.get("kind") == "regular" and isinstance(duration, int) and duration >= 600_000
         if not regular:
             anomalies.append({"episode_id": episode_id, "kind": episode.get("kind"), "duration_ms": duration})
         resolved = None
@@ -54,10 +59,10 @@ def discover(catalog, local_root=None, remote_files=None, pilot_ids=None):
                 if not path.is_file() and relative.parts[0] == "VideoDieppie":
                     path = (local_root / str(PurePosixPath(*relative.parts[1:]))).resolve()
                 if path.is_relative_to(local_root) and path.is_file() and path.stat().st_size == size:
-                    resolved = {"source": str(path), "size_bytes": size}
+                    resolved = {"local_path": str(path), "size_bytes": size}
             else:
                 row = by_id.get(storage.get("drive_file_id")) or by_path.get(relative.as_posix().removeprefix("VideoDieppie/"))
-                if row and row["Size"] == size and (not storage.get("drive_file_id") or row.get("ID") == storage["drive_file_id"]):
+                if row and not row.get("IsDir") and row["Size"] == size and (not storage.get("drive_file_id") or row.get("ID") == storage["drive_file_id"]):
                     resolved = {"remote_path": safe_relative(row["Path"]).as_posix(), "size_bytes": size,
                                 "remote_id": row.get("ID"), "remote_modified": row.get("ModTime")}
             if resolved:
@@ -69,9 +74,9 @@ def discover(catalog, local_root=None, remote_files=None, pilot_ids=None):
         if not resolved:
             missing.append(episode_id)
     ordered = lambda row: (row["size_bytes"], row["duration_ms"], row["episode_id"])
-    pilot = [min(group, key=ordered) for _, group in sorted(groups.items())][:5]
+    pilot = [min(short, key=ordered) for _, group in sorted(groups.items()) if (short := [row for row in group if row["duration_ms"] <= 2_400_000])][:5]
     selected = {row["episode_id"] for row in pilot}
-    remaining = [row for group in groups.values() for row in group if row["episode_id"] not in selected]
+    remaining = [row for group in groups.values() for row in group if row["episode_id"] not in selected and row["duration_ms"] <= 2_400_000]
     pilot.extend(sorted(remaining, key=ordered)[:5 - len(pilot)])
     if pilot_ids is not None:
         candidates = {row["episode_id"]: row for group in groups.values() for row in group}
@@ -83,17 +88,24 @@ def discover(catalog, local_root=None, remote_files=None, pilot_ids=None):
 
 
 def rclone_read(*arguments):
-    try:
-        result = subprocess.run(["rclone", *arguments, *RCLONE_LIMITS], capture_output=True, timeout=85)
-    except subprocess.TimeoutExpired:
-        raise ValueError("rclone timed out. Completed bytes remain available for a later resume.") from None
-    if result.returncode:
+    for attempt in range(3):
+        try:
+            result = subprocess.run(["rclone", *arguments, *RCLONE_CONFIG, *RCLONE_LIMITS], capture_output=True, timeout=85)
+        except subprocess.TimeoutExpired:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+                continue
+            raise ValueError("rclone timed out. Completed bytes remain available for a later resume.") from None
+        if result.returncode == 0:
+            return result.stdout
         message = result.stderr.decode("utf-8", errors="replace").strip()
         folded = message.casefold()
         if any(marker in folded for marker in ("rate limit", "ratelimit", "quota", "status 429", "error 429")):
-            raise ValueError("rclone reported a Drive quota or rate limit. Pause and resume later.")
+            raise ValueError(message or "rclone reported a Drive quota or rate limit")
+        if attempt < 2 and any(marker in folded for marker in ("timeout", "timed out", "connection reset", "status 500", "status 502", "status 503", "status 504")):
+            time.sleep(2 ** attempt)
+            continue
         raise ValueError(message or "rclone failed to read the media file")
-    return result.stdout
 
 
 def download(row, remote, destination, chunk_bytes):
@@ -129,28 +141,47 @@ def download(row, remote, destination, chunk_bytes):
 
 
 def stage(row, remote, artifacts, chunk_bytes=8 * 1024 * 1024):
-    if "source" in row:
-        path = Path(row["source"])
-    else:
-        root = artifacts.resolve()
-        folder = (root / row["episode_id"]).resolve()
-        if folder.parent != root:
-            raise ValueError("Episode staging folder must be directly inside the artifacts root")
-        destination = folder / "media.mp4"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists() and (not destination.is_file() or destination.stat().st_size != row["size_bytes"]):
-            raise ValueError(f"Existing staged media has an unexpected size for {row['episode_id']}")
-        try:
-            path = destination if destination.exists() else download(row, remote, destination, chunk_bytes)
-        except ValueError as error:
-            raise ValueError(f"Could not stage {row['episode_id']}: {error}") from None
-    duration = probe(path)
-    if abs(duration - row["duration_ms"]) > 2_000 or not 600_000 <= duration <= 2_400_000:
-        raise ValueError(f"Unexpected measured duration for {row['episode_id']}: {duration} ms")
-    if "source" not in row and path != destination:
-        os.replace(path, destination)
-        path = destination
-    return {**row, "source": str(path.resolve()), "probed_duration_ms": duration}
+    root = (artifacts / "media-mirror").resolve()
+    folder = (root / row["episode_id"]).resolve()
+    if folder.parent != root:
+        raise ValueError("Episode staging folder must be directly inside the mirror root")
+    destination = folder / "media.mp4"
+    folder.mkdir(parents=True, exist_ok=True)
+    old = Path(row.get("local_path") or row.get("source") or artifacts / row["episode_id"] / "media.mp4")
+    if destination.is_symlink() or (destination.exists() and
+            (not destination.is_file() or destination.stat().st_size != row["size_bytes"])):
+        raise ValueError(f"Existing staged media has an unexpected size for {row['episode_id']}")
+    try:
+        if destination.exists():
+            path = destination
+        elif old.is_file() and old.stat().st_size == row["size_bytes"]:
+            duration = probe(old)
+            if abs(duration - row["duration_ms"]) > 2_000 or duration < 600_000:
+                raise ValueError(f"Unexpected measured duration for {row['episode_id']}: {duration} ms")
+            try:
+                os.link(old, destination)
+                path = destination
+            except OSError:
+                with tempfile.NamedTemporaryFile(dir=folder, suffix=".mp4", delete=False) as stream:
+                    temporary = Path(stream.name)
+                try:
+                    shutil.copy2(old, temporary)
+                    if temporary.stat().st_size != row["size_bytes"] or probe(temporary) != duration:
+                        raise ValueError("Local source size or duration changed during mirror copy")
+                    os.replace(temporary, destination)
+                finally:
+                    temporary.unlink(missing_ok=True)
+                path = destination
+        else:
+            path = download(row, remote, destination, chunk_bytes)
+        duration = probe(path)
+        if abs(duration - row["duration_ms"]) > 2_000 or duration < 600_000:
+            raise ValueError(f"Unexpected measured duration for {row['episode_id']}: {duration} ms")
+        if path != destination:
+            os.replace(path, destination)
+        return {**row, "source": str(destination), "probed_duration_ms": duration}
+    except (ValueError, OSError) as error:
+        raise ValueError(f"Could not stage {row['episode_id']}: {error}") from None
 
 
 def main():
@@ -161,18 +192,20 @@ def main():
     source.add_argument("--media-root", type=Path)
     source.add_argument("--rclone-root")
     parser.add_argument("--remote-list", type=Path)
+    parser.add_argument("--rclone-config", type=Path)
     parser.add_argument("--rclone-chunk-mib", type=int, choices=range(1, 33), default=8)
     parser.add_argument("--pilot-episode", action="append")
     parser.add_argument("--stage", action="store_true")
     args = parser.parse_args()
+    global RCLONE_CONFIG
+    RCLONE_CONFIG = ("--config", str(args.rclone_config)) if args.rclone_config else ()
     if args.remote_list and not args.rclone_root:
         parser.error("--remote-list requires --rclone-root")
-    root = args.media_root.resolve(strict=True) if args.media_root else None
-    files = None if root else read(args.remote_list) if args.remote_list else json.loads(run(
-        "rclone", "lsjson", args.rclone_root, "--recursive", "--files-only", "--contimeout", "8s", "--timeout", "30s", "--retries", "1"))
     try:
+        root = args.media_root.resolve(strict=True) if args.media_root else None
+        files = None if root else read(args.remote_list) if args.remote_list else json.loads(rclone_read("lsjson", args.rclone_root, "--recursive", "--files-only"))
         result = discover(read(args.catalog), root, files, args.pilot_episode)
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         parser.error(str(error))
     report = args.artifacts / "inventory.json"
     write(report, result)
@@ -181,7 +214,7 @@ def main():
     if args.stage:
         def stage_order(pair):
             row = pair[1]
-            return (not ("source" in row or (args.artifacts / row["episode_id"] / "media.mp4").is_file()), row["size_bytes"])
+            return (not ("local_path" in row or (args.artifacts / row["episode_id"] / "media.mp4").is_file() or (args.artifacts / "media-mirror" / row["episode_id"] / "media.mp4").is_file()), row["size_bytes"])
 
         for index, row in sorted(enumerate(result["pilot"]), key=stage_order):
             try:
