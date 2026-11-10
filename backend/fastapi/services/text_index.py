@@ -15,13 +15,19 @@ import unicodedata
 import numpy as np
 
 
+NEGATION_CUE = re.compile(
+    r"\b(?:(?:(?:chứ|chu)\s+)?(?:không|khong)\s+(?:phải|phai|xem)|(?:bỏ|bo)\s+qua|trừ|"
+    r"tru(?=\s+(?:s\d+e\d+\b|(?:mùa|mua|season|phần|phan|tập|tap|ep|episode)\s*#?\s*\d)))\b"
+)
+
+
 def normalize(text: str) -> str:
     text = unicodedata.normalize("NFD", str(text).casefold().replace("đ", "d"))
     return "".join(char for char in text if unicodedata.category(char) != "Mn")
 
 
 def tokenize(text: str) -> list[str]:
-    return re.findall(r"\b\w+\b", normalize(text))
+    return re.findall(r"\b\w+\b", unicodedata.normalize("NFC", text.casefold()))
 
 
 def parse_season_episode_intent(query: str) -> tuple[int | None, int | None]:
@@ -254,15 +260,19 @@ class TextIndex:
         for index, text in enumerate(texts):
             tokens = tokenize(text)
             lengths[index] = len(tokens)
-            for word, count in Counter(tokens).items():
+            counts = Counter(tokens)
+            for word, count in tuple(counts.items()):
+                folded = normalize(word)
+                if folded != word:
+                    counts[folded] += count
+            for word, count in counts.items():
                 postings[word].append((index, count))
         lengths.flags.writeable = False
         return cls(tuple(documents), texts, dict(postings), lengths,
                    float(lengths.mean()) if len(lengths) else 0, embeddings, encoder,
                    model_id, missing_count, matrix_path)
 
-    def _allowed(self, query: str, constraints: dict) -> tuple[list[int], bool]:
-        scopes = re.split(r"\b(?:khong phai|chu khong phai|tru|bo qua|khong xem)\b", normalize(query), maxsplit=1)
+    def _allowed(self, scopes: list[str], constraints: dict) -> tuple[list[int], bool]:
         season, episode = parse_season_episode_intent(scopes[0])
         negative = parse_season_episode_intent(scopes[1]) if len(scopes) > 1 else (None, None)
         season = constraints.get("season_number", season)
@@ -294,12 +304,12 @@ class TextIndex:
         if calibration is not None and getattr(calibration, "score_type", "reranker") != ("reranker" if reranker is not None else "rrf"):
             raise ValueError("Calibration score stage does not match the active ranking model")
         constraints = constraints or {}
-        allowed, explicit_number = self._allowed(query, constraints)
+        scopes = NEGATION_CUE.split(unicodedata.normalize("NFC", query.casefold()), maxsplit=1)
+        allowed, explicit_number = self._allowed(scopes, constraints)
         if not allowed or not query.strip():
             return []
         scores = np.zeros(len(self._texts), dtype=np.float32)
-        positive = re.split(r"\b(?:khong phai|chu khong phai|tru|bo qua|khong xem)\b", normalize(query), maxsplit=1)[0]
-        for term in set(tokenize(positive)):
+        for term in set(tokenize(scopes[0])):
             posting = self._postings.get(term, [])
             inverse_frequency = math.log(1 + (len(self._texts) - len(posting) + 0.5) / (len(posting) + 0.5))
             for index, count in posting:

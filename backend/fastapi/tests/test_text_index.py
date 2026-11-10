@@ -96,6 +96,28 @@ def test_number_filters_are_hard_and_negations_do_not_become_positive(tmp_path, 
     assert index.search("bình hoa", constraints={"year_min": 2021}) == []
 
 
+def test_accented_queries_distinguish_minimal_pairs_and_folded_queries_find_both(tmp_path):
+    catalog = [{"id": "pillar", "title": "Trụ"}, {"id": "shelter", "title": "Trú"}]
+    index = TextIndex.build(catalog, cache_dir=tmp_path)
+
+    assert [item["id"] for item in index.search("trú")] == ["shelter"]
+    assert [item["id"] for item in index.search("TRU\u0323")] == ["pillar"]
+    assert {item["id"] for item in index.search("tru")} == {"pillar", "shelter"}
+
+
+@pytest.mark.parametrize("term", ["trú", "trụ", "tru\u0301"])
+def test_accented_tru_words_do_not_negate_following_episode_number(tmp_path, term):
+    catalog = [
+        {"id": "ep1", "title": "Trú và trụ", "item_type": "episode", "episode_number": 1},
+        {"id": "ep2", "title": "Trú và trụ", "item_type": "episode", "episode_number": 2},
+    ]
+    index = TextIndex.build(catalog, cache_dir=tmp_path)
+
+    assert [item["id"] for item in index.search(f"{term} tập 1")] == ["ep1"]
+    assert [item["id"] for item in index.search(f"{term} trừ tập 1")] == ["ep2"]
+    assert [item["id"] for item in index.search(f"{term} tru tap 1")] == ["ep2"]
+
+
 def test_dialogue_windows_only_from_eligible_episodes(tmp_path, catalog):
     catalog[0]["primary_media_asset_id"] = "asset1"
     payload = {"text_tracks": [

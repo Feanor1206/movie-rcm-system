@@ -111,16 +111,53 @@ def test_dense_delta_runs_outside_request_and_duplicate_jobs_are_coalesced(clien
     assert client.post("/api/index/sync", headers=headers, json=body).json()["status"] == "UNCHANGED"
 
 
-def test_large_dense_cache_miss_requires_offline_preparation(accept, serving_app, catalog_payload):
+def test_large_dense_cache_miss_requires_offline_preparation(accept, serving_app, catalog_payload, tmp_path, monkeypatch):
+    import numpy as np
+    from services.text_index import prepare_embeddings
+
     class Encoder:
         model_id = "not-prepared"
+
         def encode_documents(self, texts):
-            raise AssertionError("Sync must not run full catalog encoding")
+            assert preparing_offline
+            return np.ones((len(texts), 2))
+
+        def encode_queries(self, texts):
+            return np.ones((len(texts), 2))
+
     state = serving_app.state.runtime
-    state.registry.models["embedder"] = Encoder()
+    artifact = tmp_path / "model's directory"
+    monkeypatch.setenv("TEXT_ENCODER_PATH", str(artifact))
+    encoder = Encoder()
+    state.registry.models["embedder"] = encoder
     state.max_delta_documents = 0
-    assert accept(catalog_payload).status_code == 503
+    preparing_offline = False
+    response = accept(catalog_payload)
+    assert response.status_code == 503
+    blocked = response.json()
+    assert blocked["status"] == "CACHE_REQUIRED"
+    assert blocked["generation"] == 1 and not blocked["index_ready"]
+    assert blocked["missing_embeddings"] > 0
+    manager = CatalogSyncManager()
+    manager.load_from_payload(catalog_payload)
+    assert blocked["content_hash"] == manager.content_hash
+    candidate = state.cache_dir / "pending-catalogs" / f"{manager.content_hash}.json"
+    assert json.loads(candidate.read_text(encoding="utf-8")) == catalog_payload
+    command = blocked["cache_command"]
+    assert str(candidate) in command and str(state.cache_dir) in command
+    assert artifact.name.replace("'", "''") in command or "model'\"'\"'s directory" in command
+    assert "build_text_embeddings.py" in command and "--device cpu" in command
     assert state.snapshot is None and state.pending is None
+    assert not state.sync_path.exists()
+
+    preparing_offline = True
+    prepare_embeddings(manager.get_flattened_catalog(), cache_dir=state.cache_dir, encoder=encoder,
+                       model_id=encoder.model_id, payload=json.loads(candidate.read_text(encoding="utf-8")),
+                       content_hash=manager.content_hash)
+    preparing_offline = False
+    accepted = accept(catalog_payload)
+    assert accepted.status_code == 200 and accepted.json()["index_ready"]
+    assert state.snapshot.hybrid_index.dense_ready
 
 
 def test_failed_background_job_is_reported_on_retry(accept, serving_app, catalog_payload):

@@ -105,6 +105,7 @@ frontend/public/videos/*
 /graphify-out/
 /scratch/
 /artifacts/
+/ai/artifacts/
 
 # Rebuilt search indexes and fresh review/benchmark output
 /data/indices/

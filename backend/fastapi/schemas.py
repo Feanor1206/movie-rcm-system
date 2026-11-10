@@ -69,6 +69,10 @@ class IndexSyncResponse(BaseModel):
     index_ready: bool = True
 
 
+class CacheRequiredResponse(IndexSyncResponse):
+    missing_embeddings: int = Field(gt=0)
+    cache_command: str
+
 
 
 class ChatRequest(BaseModel):

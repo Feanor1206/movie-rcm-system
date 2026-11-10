@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shlex
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -43,15 +44,19 @@ class Runtime:
             content_hash=manager.content_hash or "", payload=payload)
 
     def save(self, snapshot):
-        self.sync_path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, temporary = tempfile.mkstemp(prefix="accepted-", suffix=".tmp", dir=self.sync_path.parent)
+        self._write_json(self.sync_path, {"generation": snapshot.generation, "content_hash": snapshot.content_hash,
+                                         "catalog": snapshot.payload})
+
+    @staticmethod
+    def _write_json(path, payload):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(prefix=f"{path.stem}-", suffix=".tmp", dir=path.parent)
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                json.dump({"generation": snapshot.generation, "content_hash": snapshot.content_hash,
-                           "catalog": snapshot.payload}, stream, ensure_ascii=False)
+                json.dump(payload, stream, ensure_ascii=False)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, self.sync_path)
+            os.replace(temporary, path)
         finally:
             Path(temporary).unlink(missing_ok=True)
 
@@ -128,7 +133,7 @@ class Runtime:
 
     def queue_delta(self, manager, index, generation, payload):
         if index.missing_embeddings > self.max_delta_documents:
-            raise HTTPException(503, "Cache embedding chưa đủ. Hãy dựng cache offline trước khi sync.")
+            return self.cache_required(manager, generation, payload, index.missing_embeddings)
         with self.publish_lock:
             existing = self.compare(generation, manager.content_hash)
             if existing:
@@ -149,6 +154,26 @@ class Runtime:
                 self.executor.submit(self.prepare_delta, manager, generation, payload)
             return dict(status="BUILDING", message="Đang chuẩn bị embedding mới trong nền.", generation=generation,
                         content_hash=manager.content_hash, item_counts=manager.item_counts, index_ready=False), 202
+
+    def cache_required(self, manager, generation, payload, missing_embeddings):
+        candidate = self.cache_dir.resolve() / "pending-catalogs" / f"{manager.content_hash}.json"
+        if not candidate.exists():
+            self._write_json(candidate, payload)
+        artifact = Path(os.getenv("TEXT_ENCODER_PATH") or os.getenv("EMBEDDER_PATH") or ROOT / "ai/models/text-onnx").resolve()
+
+        def quote(path):
+            value = str(path)
+            return "'" + value.replace("'", "''") + "'" if os.name == "nt" else shlex.quote(value)
+
+        command = (f"python {quote(ROOT / 'ai/build_text_embeddings.py')} --catalog {quote(candidate)} "
+                   f"--artifact {quote(artifact)} --cache-dir {quote(self.cache_dir.resolve())} --device cpu")
+        with self.publish_lock:
+            existing = self.compare(generation, manager.content_hash)
+            if existing:
+                return existing, 200
+        return dict(status="CACHE_REQUIRED", message="Dựng cache offline rồi thử đồng bộ lại.",
+                    generation=generation, content_hash=manager.content_hash, item_counts=manager.item_counts,
+                    index_ready=False, missing_embeddings=missing_embeddings, cache_command=command), 503
 
     def sync(self, request):
         with self.publish_lock:

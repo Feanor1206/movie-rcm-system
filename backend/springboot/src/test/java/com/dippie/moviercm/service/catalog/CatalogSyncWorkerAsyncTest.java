@@ -43,8 +43,9 @@ class CatalogSyncWorkerAsyncTest {
         snapshot = new CatalogSnapshot("snapshot-1", 7L, "initial", 0, "PENDING");
         snapshot.setRetryCount(2);
         when(repository.save(any(CatalogSnapshot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.findById(snapshot.getId())).thenReturn(java.util.Optional.of(snapshot));
         when(repository.findByStatusInOrderBySnapshotVersionAsc(anyList())).thenAnswer(invocation ->
-                List.of("PENDING", "SYNC_FAILED").contains(snapshot.getStatus()) ? List.of(snapshot) : List.of());
+                invocation.<List<String>>getArgument(0).contains(snapshot.getStatus()) ? List.of(snapshot) : List.of());
         when(query.exportEligibleSnapshot(false, false)).thenReturn(Map.of("series", List.of()));
         httpStatus = 202;
         acknowledgement = request -> Map.of("status", "BUILDING", "generation", request.get("generation"),
@@ -154,5 +155,45 @@ class CatalogSyncWorkerAsyncTest {
         assertEquals("SYNC_FAILED", snapshot.getStatus());
         assertEquals(3, snapshot.getRetryCount());
         assertNull(snapshot.getCompletedAt());
+    }
+
+    @Test
+    void missingEmbeddingCacheBlocksWithoutBurningRetriesAndCanBeRetried() {
+        String command = "python ai/build_text_embeddings.py --catalog catalog.json --artifact model --cache-dir vectors --device cpu";
+        httpStatus = 503;
+        acknowledgement = request -> Map.of("status", "CACHE_REQUIRED", "generation", request.get("generation"),
+                "content_hash", request.get("content_hash"), "index_ready", false,
+                "missing_embeddings", 65, "cache_command", command, "message", "Build the cache offline.");
+        worker.processPendingSnapshots();
+        assertEquals("BLOCKED", snapshot.getStatus());
+        assertEquals(2, snapshot.getRetryCount());
+        assertTrue(snapshot.getErrorMessage().contains("65"));
+        assertTrue(snapshot.getErrorMessage().contains(command));
+        assertNull(snapshot.getCompletedAt());
+        for (int poll = 0; poll < 6; poll++) {
+            worker.processPendingSnapshots();
+        }
+        assertEquals(1, requests.get());
+
+        httpStatus = 200;
+        acknowledgement = request -> Map.of("status", "success", "generation", request.get("generation"),
+                "content_hash", request.get("content_hash"), "index_ready", true);
+        worker.retrySnapshot(snapshot.getId());
+        assertEquals(2, requests.get());
+        assertEquals("READY", snapshot.getStatus());
+        assertEquals(0, snapshot.getRetryCount());
+        assertNull(snapshot.getErrorMessage());
+        assertNotNull(snapshot.getCompletedAt());
+    }
+
+    @Test
+    void mismatchedCacheRequiredAcknowledgementRemainsAFailedAttempt() {
+        httpStatus = 503;
+        acknowledgement = request -> Map.of("status", "CACHE_REQUIRED", "generation", 8,
+                "content_hash", request.get("content_hash"), "index_ready", false,
+                "missing_embeddings", 65, "cache_command", "python ai/build_text_embeddings.py");
+        worker.processPendingSnapshots();
+        assertEquals("SYNC_FAILED", snapshot.getStatus());
+        assertEquals(3, snapshot.getRetryCount());
     }
 }

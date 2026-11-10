@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from schemas import IndexSyncRequest, IndexSyncResponse
+from schemas import CacheRequiredResponse, IndexSyncRequest, IndexSyncResponse
 from services.catalog_sync import CatalogSyncError
 
 
@@ -12,7 +12,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/api/index/sync", response_model=IndexSyncResponse)
+@router.post("/api/index/sync", response_model=IndexSyncResponse, responses={503: {"model": CacheRequiredResponse}})
 def sync_index(http_request: Request, request: IndexSyncRequest):
     runtime = http_request.app.state.runtime
     if not runtime.sync_secret:

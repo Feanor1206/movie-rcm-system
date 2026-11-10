@@ -178,8 +178,22 @@ public class CatalogSyncWorker {
             String ackStatus = respMap != null ? (String) respMap.get("status") : null;
             Number ackGen = respMap != null ? (Number) respMap.get("generation") : null;
             String ackHash = respMap != null ? (String) respMap.get("content_hash") : null;
+            boolean genMatches = ackGen != null && snapshot.getSnapshotVersion().toString().equals(ackGen.toString());
+            boolean hashMatches = ackHash != null && ackHash.equalsIgnoreCase(fullCatalogHash);
 
-            if (statusCode == 409 || "SKIPPED".equalsIgnoreCase(ackStatus) || responseBody.contains("SKIPPED")) {
+            if (statusCode == 503 && "CACHE_REQUIRED".equals(ackStatus) && genMatches && hashMatches
+                    && Boolean.FALSE.equals(respMap.get("index_ready"))
+                    && respMap.get("missing_embeddings") instanceof Integer missing && missing > 0
+                    && respMap.get("cache_command") instanceof String command && !command.isBlank()
+                    && respMap.get("message") instanceof String message && !message.isBlank()) {
+                snapshot.setStatus("BLOCKED");
+                snapshot.setContentHash(fullCatalogHash);
+                snapshot.setErrorMessage("CACHE_REQUIRED · Thiếu " + missing + " embedding. " + message + "\n" + command);
+                snapshot.setUpdatedAt(LocalDateTime.now());
+                snapshotRepository.save(snapshot);
+                logger.info("[CatalogSyncWorker] Snapshot generation {} cần dựng cache offline cho {} tài liệu.",
+                        snapshot.getSnapshotVersion(), missing);
+            } else if (statusCode == 409 || "SKIPPED".equalsIgnoreCase(ackStatus)) {
                 snapshot.setStatus("STALE_SKIPPED");
                 snapshot.setCompletedAt(LocalDateTime.now());
                 snapshot.setErrorMessage("Generation cũ bị từ chối/bỏ qua bởi FastAPI: " + responseBody);
@@ -188,9 +202,6 @@ public class CatalogSyncWorker {
             } else if (statusCode >= 200 && statusCode < 300) {
                 boolean statusOk = statusCode != 202 && ("success".equalsIgnoreCase(ackStatus) || "OK".equalsIgnoreCase(ackStatus)
                         || "SYNCED".equalsIgnoreCase(ackStatus) || "UNCHANGED".equalsIgnoreCase(ackStatus));
-                boolean genMatches = ackGen != null && snapshot.getSnapshotVersion().toString().equals(ackGen.toString());
-                boolean hashMatches = ackHash != null && ackHash.equalsIgnoreCase(fullCatalogHash);
-
                 if (statusCode == 202 && "BUILDING".equalsIgnoreCase(ackStatus) && genMatches && hashMatches) {
                     snapshot.setStatus("PENDING");
                     snapshot.setErrorMessage(null);

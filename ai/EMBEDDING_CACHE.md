@@ -15,6 +15,34 @@ The cache identity fingerprints all artifact files, including tokenizer and
 manifest, so changing weights, tokenization or pooling invalidates the cache.
 Keep generated embeddings outside the artifact directory.
 
+## BGE-M3 dense export and agreement
+
+Use a separate Python environment with the serving requirements and the offline
+packages `transformers==4.57.1`, `accelerate==1.11.0` and `onnx==1.19.1`. The
+export and agreement check run on CPU. Keep the source checkpoint and both
+output variants outside tracked files. Allow disk space for the checkpoint,
+FP32 weights, INT8 weights and intermediate graphs.
+
+```powershell
+hf download BAAI/bge-m3 config.json pytorch_model.bin sentencepiece.bpe.model special_tokens_map.json tokenizer.json tokenizer_config.json --revision 5617a9f61b028005a4858fdac845db406aefb181 --local-dir ai/artifacts/models/bge-m3-source
+python ai/export_bge_m3.py export --source ai/artifacts/models/bge-m3-source --output ai/artifacts/models/bge-m3-onnx
+python ai/export_bge_m3.py compare --source ai/artifacts/models/bge-m3-source --artifact ai/artifacts/models/bge-m3-onnx/int8 --catalog ai/artifacts/pilot/catalog.json --report ai/artifacts/pilot/bge-m3-agreement.json
+```
+
+The exporter writes `fp32/` and `int8/` as separate serving artifacts with
+CLS pooling and a default input limit of 512 tokens. Point `TEXT_ENCODER_PATH`
+at `int8/` for CPU serving. ONNX Runtime quantizes the constant weights of
+matrix multiplications and calculates activation scales at runtime. [BAAI model
+card](https://huggingface.co/BAAI/bge-m3) · [ONNX Runtime quantization](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
+
+The agreement command samples 200 distinct document texts with seed 3050 and
+compares the normalized PyTorch FP32 and ONNX INT8 embeddings. It reports mean
+and minimum cosine similarity and mean top-10 neighbor overlap, excluding each
+document from its own neighbors. The catalog reader uses public serving
+eligibility. For a local preview corpus, supply a separate `--documents` JSONL
+file with one `{"text": "…"}` per line. A smaller corpus requires an explicit
+`--sample-size` for a smoke check and reports its actual sample count.
+
 For the first build, use a separate offline Python environment with the `ai/`
 requirements. The default path requires CUDA and local transformer weights:
 

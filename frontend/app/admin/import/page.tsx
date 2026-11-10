@@ -94,7 +94,6 @@ export default function AdminImportPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-surface-border pb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand">
@@ -128,11 +127,9 @@ export default function AdminImportPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left 2 Cols: Import Tool */}
         <div className="lg:col-span-2 space-y-8">
           <CatalogImportModal onImportSuccess={handleImportSuccess} />
 
-          {/* Currently Imported Series Section */}
           <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-sm">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
@@ -199,7 +196,6 @@ export default function AdminImportPage() {
             )}
           </div>
 
-          {/* Action Message Banner */}
           {actionMessage && (
             <div
               className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-xs ${
@@ -225,7 +221,6 @@ export default function AdminImportPage() {
             </div>
           )}
 
-          {/* Outbox Snapshots & AI Index Sync Section */}
           <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-sm">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
@@ -285,7 +280,8 @@ export default function AdminImportPage() {
                           )}
                           {snap.status === 'BLOCKED' && (
                             <span className="flex items-center gap-1 rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-bold text-orange-400 border border-orange-500/30">
-                              <AlertTriangle size={12} /> BLOCKED (Thiếu token)
+                              <AlertTriangle size={12} /> {snap.errorMessage?.startsWith('CACHE_REQUIRED')
+                                ? 'BLOCKED (Thiếu cache embedding)' : 'BLOCKED (Thiếu token)'}
                             </span>
                           )}
                           {snap.status === 'SYNC_FAILED' && (
@@ -309,7 +305,7 @@ export default function AdminImportPage() {
                       </div>
 
                       {snap.errorMessage && (
-                        <p className="rounded bg-red-500/10 p-2 font-mono text-[11px] text-red-400 border border-red-500/20">
+                        <p className="whitespace-pre-wrap break-words rounded bg-red-500/10 p-2 font-mono text-[11px] text-red-400 border border-red-500/20">
                           {snap.errorMessage}
                         </p>
                       )}
@@ -328,9 +324,7 @@ export default function AdminImportPage() {
           </div>
         </div>
 
-        {/* Right Col: Info & Import History */}
         <div className="space-y-6">
-          {/* Workflow Guide Card */}
           <div className="rounded-xl border border-surface-border bg-surface p-5">
             <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
               <Sparkles size={16} className="text-brand" />
@@ -373,7 +367,6 @@ export default function AdminImportPage() {
             </ol>
           </div>
 
-          {/* Import History */}
           <div className="rounded-xl border border-surface-border bg-surface p-5">
             <div className="flex items-center gap-2 border-b border-surface-border pb-3">
               <Clock size={16} className="text-brand" />
