@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,14 +16,25 @@ from services.chat import ChatService
 from services.llm_client import LLMClient
 from services.model_registry import InferenceCapacityError
 from services.rerank import ScoreCalibration
-from services.runtime import Runtime
+from services.runtime import ROOT, Runtime
 from services.search import SearchService
+
+
+def _load_deepseek_config():
+    path = ROOT / ".env.deepseek.local"
+    if path.is_file():
+        settings = dotenv_values(path, encoding="utf-8-sig", interpolate=False)
+        for name in ("DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY"):
+            if settings.get(name):
+                os.environ[name] = settings[name]
 
 
 def create_app(**options):
     @asynccontextmanager
     async def lifespan(application):
         runtime = application.state.runtime
+        if runtime.registry.mode == "cloud":
+            _load_deepseek_config()
         await runtime.registry.initialize()
         await run_in_threadpool(runtime.restore)
         reranker = runtime.registry.get("reranker")

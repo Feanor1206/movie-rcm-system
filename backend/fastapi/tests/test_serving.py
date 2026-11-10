@@ -13,9 +13,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from schemas import HealthResponse, ReadinessResponse
 from services.llm_client import LLMClient, LLMProtocolError, LLMUnavailableError
 from services.model_registry import ModelRegistry, TorchScriptReranker
+from services.pilot_catalog import evidence_for_results
 
 
-@pytest.mark.parametrize('mode,backend', [('light', 'template'), ('full', 'llama-server'), ('cloud', 'deepseek')])
+@pytest.mark.parametrize('mode,backend', [('light', 'template'), ('full', 'deepseek'), ('cloud', 'deepseek')])
 def test_model_modes_keep_external_llm_identity_truthful(mode, backend):
     registry = ModelRegistry(mode)
     health = HealthResponse(**registry.health()).model_dump()
@@ -120,9 +121,11 @@ def test_torchscript_reranker_rejects_model_outside_artifact(tmp_path):
         TorchScriptReranker(tmp_path)
 
 
-def test_full_provider_failure_clears_active_identity():
+def test_cloud_provider_failure_clears_active_identity(monkeypatch):
+    monkeypatch.setenv('DEEPSEEK_MODEL', 'pilot-model')
+    monkeypatch.setenv('DEEPSEEK_API_KEY', 'test-cloud-secret')
     async def run():
-        registry = ModelRegistry('full')
+        registry = ModelRegistry('cloud')
         registry.set_llm_status(True)
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(503, text='internal GPU path'))) as client:
             llm = LLMClient(registry, client)
@@ -136,16 +139,19 @@ def test_full_provider_failure_clears_active_identity():
     asyncio.run(run())
 
 
-def test_truncated_generation_is_rejected():
+def test_truncated_generation_is_rejected(monkeypatch):
+    monkeypatch.setenv('DEEPSEEK_MODEL', 'pilot-model')
+    monkeypatch.setenv('DEEPSEEK_API_KEY', 'test-cloud-secret')
     async def run():
-        payload = 'data: {"choices":[{"delta":{"content":"partial"},"finish_reason":"length"}]}\n\n'
+        payload = 'data: {"choices":[{"delta":{"content":"partial"},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n'
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(200, headers={'content-type': 'text/event-stream'}, text=payload))) as client:
             with pytest.raises(LLMProtocolError):
-                _ = [part async for part in LLMClient(ModelRegistry('full'), client).stream([])]
+                _ = [part async for part in LLMClient(ModelRegistry('cloud'), client).stream([])]
     asyncio.run(run())
 
 
 def test_cloud_intent_uses_json_mode_and_secret_only_in_header(monkeypatch):
+    monkeypatch.setenv('DEEPSEEK_MODEL', 'pilot-model')
     monkeypatch.setenv('DEEPSEEK_API_KEY', 'test-cloud-secret')
     requests = []
     async def run():
@@ -159,6 +165,7 @@ def test_cloud_intent_uses_json_mode_and_secret_only_in_header(monkeypatch):
     assert requests[0].headers['authorization'] == 'Bearer test-cloud-secret'
     body = json.loads(requests[0].content)
     assert body['response_format'] == {'type': 'json_object'}
+    assert body['model'] == 'pilot-model'
     assert 'test-cloud-secret' not in requests[0].content.decode()
 
 
@@ -168,3 +175,14 @@ def test_llm_client_does_not_close_shared_injected_transport():
             await LLMClient(ModelRegistry('full'), client).aclose()
             assert not client.is_closed
     asyncio.run(run())
+
+
+def test_cloud_evidence_uses_local_pilot_catalog_and_ignores_snapshot_text():
+    episode = 'ep_jadoo_s01_0022'
+    result = {'episodeId': episode, 'title': 'private title', 'startMs': None,
+              'evidence': [{'documentId': episode, 'text': 'private text'}]}
+    evidence = evidence_for_results([result])
+    assert len(evidence) == 1
+    assert 'private' not in json.dumps(evidence)
+    assert not evidence_for_results([{**result, 'startMs': 3600}])
+    assert not evidence_for_results([{**result, 'episodeId': 'ep_jadoo_s01_0001'}])

@@ -13,6 +13,21 @@ from ai.enrich import inventory as media_inventory
 from ai.enrich.inventory import discover
 
 
+def test_local_media_copy_fallback_publishes_only_the_mirror(tmp_path, monkeypatch):
+    source = tmp_path / "outside.mp4"
+    source.write_bytes(b"local video")
+    row = {"episode_id": "ep1", "duration_ms": 3_900_000, "size_bytes": source.stat().st_size,
+           "local_path": str(source)}
+    def cross_volume(*args):
+        raise OSError("cross-volume link unavailable")
+    monkeypatch.setattr(media_inventory.os, "link", cross_volume)
+    monkeypatch.setattr(media_inventory, "probe", lambda path: 3_900_000)
+    result = media_inventory.stage(row, None, tmp_path)
+    mirrored = tmp_path / "media-mirror" / "ep1" / "media.mp4"
+    assert Path(result["source"]) == mirrored
+    assert mirrored.read_bytes() == source.read_bytes()
+
+
 def test_inventory_requires_matching_drive_identity_and_spreads_across_seasons():
     catalog = read(CATALOG)
     remote = [{"ID": asset["storage"]["drive_file_id"],
@@ -100,3 +115,22 @@ def test_export_preserves_unselected_episodes_and_passes_schema(tmp_path, dialog
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
     assert not validator.validate(export)
+
+
+def test_mirror_adopts_existing_media_and_retains_identity(tmp_path, monkeypatch):
+    artifacts = tmp_path / "artifacts"
+    old = artifacts / "ep" / "media.mp4"
+    old.parent.mkdir(parents=True)
+    old.write_bytes(b"video")
+    monkeypatch.setattr(media_inventory, "probe", lambda path: 3900000)
+    row = {"episode_id": "ep", "size_bytes": 5, "duration_ms": 3900000, "remote_path": "x.mp4"}
+    result = media_inventory.stage(row, "remote:", artifacts)
+    assert Path(result["source"]).read_bytes() == b"video"
+    assert Path(result["source"]).is_relative_to(artifacts / "media-mirror")
+    assert old.samefile(result["source"])
+
+
+def test_rclone_quota_error_retains_original_message(monkeypatch):
+    monkeypatch.setattr(media_inventory.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=b"403 quotaExceeded: exact reason", stdout=b""))
+    with pytest.raises(ValueError, match="403 quotaExceeded: exact reason"):
+        media_inventory.rclone_read("lsjson", "remote:")

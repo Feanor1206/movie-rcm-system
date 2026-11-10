@@ -75,9 +75,9 @@ def detect_shots(source, duration_ms):
         manager.add_detector(ContentDetector(min_scene_len="0.5s"))
         manager.detect_scenes(video=video)
         shots = manager.get_scene_list(start_in_scene=True)
-        if not shots or abs(round(shots[-1][1].get_seconds() * 1000) - duration_ms) > 2_000:
+        if not shots or abs(round(shots[-1][1].seconds * 1000) - duration_ms) > 2_000:
             raise ValueError("Shot detector did not decode the full episode")
-        return [round(start.get_seconds() * 1000) for start, _ in shots[1:]]
+        return [round(start.seconds * 1000) for start, _ in shots[1:]]
     finally:
         capture.release()
 
@@ -97,7 +97,13 @@ def detect_episode(row, directory):
     manifest = directory / "scenes.json"
     if manifest.is_file():
         cached = read(manifest)
-        if cached.get("input_hash") == signature and cached.get("scenes"):
+        legacy = directory / "media.mp4"
+        matches = cached.get("input_hash") == signature
+        if not matches and legacy.is_file() and legacy.samefile(source):
+            legacy_signature = digest([VERSION, row["media_asset_id"], duration, str(legacy.resolve()), stat.st_size,
+                                       stat.st_mtime_ns, asr["cues"], samples])
+            matches = cached.get("input_hash") == legacy_signature
+        if matches and cached.get("scenes"):
             return cached, True
     started = time.perf_counter()
     cuts = detect_shots(source, duration)

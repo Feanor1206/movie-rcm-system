@@ -47,9 +47,13 @@ def extract_episode(row, directory):
     output = (directory / "frames" / signature[:16]).resolve()
     if manifest.is_file():
         cached = read(manifest)
-        if cached.get("input_hash") == signature and cached.get("frames") and cached.get("samples"):
+        legacy = directory / "media.mp4"
+        legacy_signature = digest([VERSION, row["media_asset_id"], duration, str(legacy.resolve()), stat.st_size, stat.st_mtime_ns])
+        same_media = legacy.is_file() and os.path.samefile(legacy, source)
+        if cached.get("frames") and cached.get("samples") and (cached.get("input_hash") == signature or (same_media and cached.get("input_hash") == legacy_signature)):
             paths = [Path(frame["path"]).resolve() for frame in cached["frames"]]
-            if all(path.is_relative_to(output) and path.is_file() and path.stat().st_size for path in paths):
+            cached_output = (directory / "frames" / cached["input_hash"][:16]).resolve()
+            if all(path.is_relative_to(cached_output) and path.is_file() and path.stat().st_size for path in paths):
                 return cached, True
     if not output.is_relative_to(directory.resolve()):
         raise ValueError("Frame output must remain inside the episode artifact directory")
