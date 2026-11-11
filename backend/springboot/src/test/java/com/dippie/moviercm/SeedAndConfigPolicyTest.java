@@ -136,7 +136,7 @@ public class SeedAndConfigPolicyTest {
     @DisplayName("Positive Control: Prod profile loads actual YAML, starts and validates when valid secrets and schema exist")
     void testProdProfileStartsSuccessfullyWithValidSecretsAndSchema() {
         String dbName = "prod_positive_" + UUID.randomUUID();
-        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
 
         executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
 
@@ -176,7 +176,7 @@ public class SeedAndConfigPolicyTest {
     @DisplayName("Negative Control: Prod profile fails with specific placeholder error when APP_JWT_SECRET is missing")
     void testProdProfileFailsWhenJwtSecretMissing() {
         String dbName = "prod_no_jwt_" + UUID.randomUUID();
-        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE";
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE";
 
         executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
 
@@ -203,7 +203,7 @@ public class SeedAndConfigPolicyTest {
     @DisplayName("Negative Control: Prod profile fails with specific placeholder error when SPRING_DATASOURCE_PASSWORD is missing")
     void testProdProfileFailsWhenDatasourcePasswordMissing() {
         String dbName = "prod_no_pw_" + UUID.randomUUID();
-        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE";
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE";
 
         executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
 
@@ -230,7 +230,7 @@ public class SeedAndConfigPolicyTest {
     @DisplayName("C1 Canonical Bootstrap: 01_init.sql initializes all 5 tables including favorite_items and passes Hibernate validate")
     void testCanonicalInitScriptPassesHibernateValidate() throws Exception {
         String dbName = "bootstrap_canon_" + UUID.randomUUID();
-        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
 
         executeSqlFile(jdbcUrl, "../../database/schema/01_init.sql");
 
@@ -291,7 +291,7 @@ public class SeedAndConfigPolicyTest {
     @DisplayName("C1 Additive Migration: 02_add_favorite_items.sql safely upgrades legacy 4-table schema preserving user data")
     void testAdditiveMigrationPreservesDataAndPassesValidate() throws Exception {
         String dbName = "migration_test_" + UUID.randomUUID();
-        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
+        String jdbcUrl = "jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
 
         // 1. Create legacy 4-table schema (without favorite_items) and insert sample data
         try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "valid_prod_fixture_password")) {

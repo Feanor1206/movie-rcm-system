@@ -713,7 +713,7 @@ class DatabaseManager:
             return
         url = self.database_url
         try:
-            connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+            connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {"connect_timeout": 3}
             self.engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
             Base.metadata.create_all(self.engine)
         except Exception:
