@@ -163,6 +163,14 @@ def test_python_main_catalog_import_search_and_watch_progress(tmp_path):
         assert search_res.status_code == 200
         assert len(search_res.json()["data"]) >= 1
 
+        ai_search = client.post("/v1/search", json={"query": "siêu thị", "limit": 5})
+        assert ai_search.status_code == 200
+        ai_hits = ai_search.json().get("results") or []
+        assert any(h.get("id") == "ep_shin_1" for h in ai_hits)
+
+        ai_rcm = client.post("/api/recommend", json={"movie_id": "ep_shin_1", "limit": 5})
+        assert ai_rcm.status_code == 200
+
         prog_create = client.put(
             "/api/users/watch-progress/ep_shin_1",
             json={"assetId": "ast_shin_1", "positionMs": 120000, "expectedVersion": -1},
@@ -180,3 +188,16 @@ def test_python_main_catalog_import_search_and_watch_progress(tmp_path):
         assert prog_update.status_code == 200
         assert prog_update.json()["data"]["completed"] is True
         assert prog_update.json()["data"]["version"] == 1
+
+    app2 = create_app(
+        sync_secret="test-secret",
+        sync_path=tmp_path / "nonexistent_sync.json",
+        cache_dir=tmp_path / "cache2",
+        model_mode="light",
+        load_default=False,
+        database_url=f"sqlite:///{db_file}",
+    )
+    with TestClient(app2) as client2:
+        ai_search2 = client2.post("/v1/search", json={"query": "siêu thị", "limit": 5})
+        assert ai_search2.status_code == 200
+        assert any(h.get("id") == "ep_shin_1" for h in (ai_search2.json().get("results") or []))

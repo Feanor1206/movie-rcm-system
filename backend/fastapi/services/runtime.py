@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from services.catalog_sync import AcceptedSnapshot, CatalogSyncManager
-from services.database import DatabaseManager
+from services.database import CatalogSnapshot, DatabaseManager, export_eligible_catalog
 from services.model_registry import ModelRegistry
 from services.text_index import TextIndex, prepare_embeddings
 
@@ -79,6 +79,19 @@ class Runtime:
                 logger.exception("Accepted snapshot recovery failed")
                 self.recovery_error = "Không thể phục hồi snapshot đã chấp nhận."
             return
+        try:
+            with self.db.session() as db:
+                eligible = export_eligible_catalog(db)
+                if eligible.get("episodes"):
+                    latest_snap = db.query(CatalogSnapshot).order_by(CatalogSnapshot.snapshot_version.desc()).first()
+                    gen = int(latest_snap.snapshot_version) if latest_snap else 1
+                    manager = CatalogSyncManager()
+                    if manager.load_from_payload(eligible, include_draft=False, include_private=False):
+                        self.snapshot = AcceptedSnapshot(gen, manager.content_hash, manager,
+                            self.build_index(manager, payload=eligible), eligible)
+                        return
+        except Exception:
+            logger.exception("Database catalog recovery skipped")
         if self.load_default:
             manager = CatalogSyncManager()
             if manager.load_default_catalog():

@@ -144,7 +144,20 @@ function Get-PreviewRuntimeContract {
     $modelUrl = if ($ModelMode -eq "off") { "http://127.0.0.1:1/api/chat" } else { "http://127.0.0.1:$FastApiPort/api/chat" }
     $syncToken = if ($ModelMode -eq "off") { "" } else { $SyncSecret }
     $springEnvironment = [System.Collections.Generic.Dictionary[string, string]]::new()
-    $springEnvironment["SPRING_DATASOURCE_URL"] = "jdbc:h2:file:$databasePath;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER"
+    if ($env:SPRING_DATASOURCE_URL) {
+        $springEnvironment["SPRING_DATASOURCE_URL"] = $env:SPRING_DATASOURCE_URL
+        if ($env:SPRING_DATASOURCE_DRIVER_CLASS_NAME) { $springEnvironment["SPRING_DATASOURCE_DRIVER_CLASS_NAME"] = $env:SPRING_DATASOURCE_DRIVER_CLASS_NAME }
+        if ($env:SPRING_DATASOURCE_USERNAME) { $springEnvironment["SPRING_DATASOURCE_USERNAME"] = $env:SPRING_DATASOURCE_USERNAME }
+        if ($null -ne $env:SPRING_DATASOURCE_PASSWORD) { $springEnvironment["SPRING_DATASOURCE_PASSWORD"] = $env:SPRING_DATASOURCE_PASSWORD }
+    } else {
+        $mysqlHost = if ($env:MYSQL_HOST) { $env:MYSQL_HOST } else { "localhost" }
+        $mysqlPort = if ($env:MYSQL_PORT) { $env:MYSQL_PORT } else { "3306" }
+        $mysqlDb = if ($env:MYSQL_DB) { $env:MYSQL_DB } else { "movie_rcm_db" }
+        $springEnvironment["SPRING_DATASOURCE_URL"] = "jdbc:mysql://${mysqlHost}:${mysqlPort}/${mysqlDb}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC"
+        $springEnvironment["SPRING_DATASOURCE_DRIVER_CLASS_NAME"] = "com.mysql.cj.jdbc.Driver"
+        $springEnvironment["SPRING_DATASOURCE_USERNAME"] = if ($env:MYSQL_USER) { $env:MYSQL_USER } else { "root" }
+        $springEnvironment["SPRING_DATASOURCE_PASSWORD"] = if ($env:MYSQL_PASSWORD) { $env:MYSQL_PASSWORD } else { "" }
+    }
     $springEnvironment["APP_CATALOG_SNAPSHOT_PATH"] = Join-Path $DataDirectory "committed_catalog_snapshot.json"
     $springEnvironment["APP_CATALOG_SYNC_URL"] = $syncUrl
     $springEnvironment["CATALOG_SYNC_TOKEN"] = $syncToken

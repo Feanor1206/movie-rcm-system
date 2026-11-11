@@ -1101,9 +1101,53 @@ def import_catalog_package(db, data: dict) -> dict:
         "importId": snap_id,
         "packageId": pkg_id,
         "revision": revision,
+        "snapshotVersion": next_gen,
         "contentHash": content_hash,
         "importedAt": now.isoformat(),
         "counts": counts,
         "indexStatus": "READY",
         "message": "Nhập dữ liệu package thành công và đồng bộ trực tiếp trong Python Main.",
     }
+
+
+def export_eligible_catalog(db, include_draft: bool = False, include_private: bool = False) -> dict:
+    def _filter_rows(rows, check_access: bool = False):
+        out = []
+        for row in rows:
+            if not row.raw_json:
+                continue
+            if not include_draft and not is_published(row.record_json):
+                continue
+            if check_access and not include_private and str(getattr(row, "access_policy", "public")).lower() != "public":
+                continue
+            try:
+                out.append(json.loads(row.raw_json))
+            except Exception:
+                pass
+        return out
+
+    latest_pkg = db.query(CatalogPackage).order_by(CatalogPackage.imported_at.desc()).first()
+    pkg_meta = {
+        "id": latest_pkg.id if latest_pkg else "dippie-exported-catalog",
+        "version": latest_pkg.version if latest_pkg else "1.0.0",
+        "revision": latest_pkg.revision if latest_pkg else 1,
+        "default_language": latest_pkg.default_language if latest_pkg else "vi",
+        "import_mode": latest_pkg.import_mode if latest_pkg else "upsert",
+        "reference_scope": latest_pkg.reference_scope if latest_pkg else "self_contained",
+    }
+    return {
+        "schema_version": "dippie.catalog.v1",
+        "package": pkg_meta,
+        "genres": _filter_rows(db.query(CatalogGenre).all()),
+        "attribute_scales": _filter_rows(db.query(CatalogAttributeScale).all()),
+        "sources": _filter_rows(db.query(CatalogSource).all()),
+        "series": _filter_rows(db.query(CatalogSeries).all()),
+        "seasons": _filter_rows(db.query(CatalogSeason).all()),
+        "episodes": _filter_rows(db.query(CatalogEpisode).all()),
+        "segments": _filter_rows(db.query(CatalogSegment).all()),
+        "characters": _filter_rows(db.query(CatalogCharacter).all()),
+        "media_assets": _filter_rows(db.query(CatalogMediaAsset).all(), check_access=True),
+        "text_tracks": _filter_rows(db.query(CatalogTextTrack).all()),
+        "scenes": _filter_rows(db.query(CatalogScene).all()),
+    }
+

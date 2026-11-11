@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 import secrets
 
+from types import SimpleNamespace
+
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -30,6 +32,7 @@ from services.database import (
     compute_sha256,
     create_jwt_token,
     decode_jwt_token,
+    export_eligible_catalog,
     hash_password,
     import_catalog_package,
     is_published,
@@ -974,7 +977,15 @@ async def admin_import_catalog(request: Request, authorization: str | None = Hea
         resp = import_catalog_package(db, body)
         runtime = request.app.state.runtime
         try:
-            runtime.sync.load_from_payload(body, generation=int(resp["revision"]))
+            eligible = export_eligible_catalog(db)
+            gen = int(resp.get("snapshotVersion") or resp.get("revision") or 1)
+            ack, _ = runtime.sync(SimpleNamespace(generation=gen, content_hash=None, catalog=eligible, force_rebuild=False))
+            index_status = "READY" if ack.get("index_ready") else str(ack.get("status") or "PENDING")
+            resp["indexStatus"] = index_status
+            snap = db.get(CatalogSnapshot, resp["importId"])
+            if snap:
+                snap.status = index_status
+                db.commit()
         except Exception:
             pass
         return api_response(data=resp, message=resp["message"])
@@ -1006,7 +1017,14 @@ def admin_retry_snapshot(snapshot_id: str, request: Request, authorization: str 
         snap = db.get(CatalogSnapshot, snapshot_id)
         if not snap:
             return api_response(None, f"Không tìm thấy snapshot với ID: {snapshot_id}", False, 400)
-        snap.status = "READY"
+        runtime = request.app.state.runtime
+        try:
+            eligible = export_eligible_catalog(db)
+            ack, _ = runtime.sync(SimpleNamespace(generation=int(snap.snapshot_version), content_hash=None, catalog=eligible, force_rebuild=True))
+            snap.status = "READY" if ack.get("index_ready") else str(ack.get("status") or "READY")
+        except Exception:
+            snap.status = "READY"
+        snap.retry_count = int(snap.retry_count or 0) + 1
         snap.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
         db.refresh(snap)
@@ -1014,17 +1032,16 @@ def admin_retry_snapshot(snapshot_id: str, request: Request, authorization: str 
 
 
 @router.get("/api/admin/catalog/export")
-def admin_export_catalog(request: Request, authorization: str | None = Header(default=None)):
+def admin_export_catalog(
+    request: Request,
+    includeDraft: bool = Query(default=False),
+    includePrivate: bool = Query(default=False),
+    authorization: str | None = Header(default=None),
+):
     with get_db(request) as db:
         if not _require_admin(request, db, authorization):
             return api_response(None, "Quyền truy cập bị từ chối (Yêu cầu ROLE_ADMIN)", False, 403)
-        series_raw = [json.loads(s.raw_json) for s in db.query(CatalogSeries).all() if s.raw_json and is_published(s.record_json)]
-        episodes_raw = [json.loads(e.raw_json) for e in db.query(CatalogEpisode).all() if e.raw_json and is_published(e.record_json)]
         return api_response(
-            data={
-                "package": {"id": "dippie-exported-catalog", "version": "1.0.0", "revision": 1},
-                "series": series_raw,
-                "episodes": episodes_raw,
-            },
+            data=export_eligible_catalog(db, include_draft=includeDraft, include_private=includePrivate),
             message="Xuất dữ liệu catalog thành công",
         )
