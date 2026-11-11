@@ -20,10 +20,10 @@ public class CatalogMediaAsset {
     @Column(name = "edition_label", length = 100)
     private String editionLabel;
 
-    @Column(name = "spoken_languages_json", columnDefinition = "TEXT")
+    @Column(name = "spoken_languages_json", columnDefinition = "LONGTEXT")
     private String spokenLanguagesJson;
 
-    @Column(name = "embedded_subtitle_languages_json", columnDefinition = "TEXT")
+    @Column(name = "embedded_subtitle_languages_json", columnDefinition = "LONGTEXT")
     private String embeddedSubtitleLanguagesJson;
 
     @Column(name = "storage_provider", nullable = false, length = 50)
@@ -50,10 +50,10 @@ public class CatalogMediaAsset {
     @Column(name = "duration_ms")
     private Long durationMs;
 
-    @Column(name = "technical_json", columnDefinition = "TEXT")
+    @Column(name = "technical_json", columnDefinition = "LONGTEXT")
     private String technicalJson;
 
-    @Column(name = "coverage_json", columnDefinition = "TEXT")
+    @Column(name = "coverage_json", columnDefinition = "LONGTEXT")
     private String coverageJson;
 
     @Column(name = "related_asset_id", length = 100)
@@ -65,10 +65,10 @@ public class CatalogMediaAsset {
     @Column(nullable = false)
     private Boolean enabled = true;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

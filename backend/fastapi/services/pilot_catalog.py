@@ -1,4 +1,5 @@
 import json
+import os
 from functools import lru_cache
 
 from services.catalog_sync import CatalogSyncError, CatalogSyncManager
@@ -10,15 +11,24 @@ PILOT_EPISODES = frozenset({"ep_jadoo_s01_0022", "ep_jadoo_s04_0021"})
 PILOT_SOURCES = (ROOT / "ai/artifacts/pilot-published.json", ROOT / "data/catalog.jadoo_all.json")
 
 
+def _allowed_episodes(package, is_published_package):
+    if os.getenv("ALLOW_FULL_CATALOG_GROUNDING", "").lower() in {"1", "true", "yes"} or is_published_package:
+        return {ep["id"] for ep in package.get("episodes", []) if isinstance(ep, dict) and ep.get("id")}
+    extra = {ep.strip() for ep in os.getenv("APPROVED_CLOUD_EPISODES", "").split(",") if ep.strip()}
+    return PILOT_EPISODES | extra
+
+
 @lru_cache(maxsize=4)
-def _read_documents(path, _version):
+def _read_documents(path, _version, full_grounding=False):
     with path.open(encoding="utf-8-sig") as stream:
         package = json.load(stream)
     manager = CatalogSyncManager()
     manager.load_from_payload(package, include_draft=False, include_private=False)
+    is_published = path == PILOT_SOURCES[0]
+    allowed = _allowed_episodes(package, is_published)
     items = [item for item in manager.get_flattened_catalog()
-             if item.get("episode_id") in PILOT_EPISODES or item["id"] in PILOT_EPISODES]
-    if path == PILOT_SOURCES[0]:
+             if item.get("episode_id") in allowed or item["id"] in allowed]
+    if is_published:
         package = {**package, "text_tracks": [track for track in package.get("text_tracks", [])
                    if (track.get("record") or {}).get("status") == "ready"]}
     index = TextIndex.build(items, payload=package, cache_dir=path.parent)
@@ -26,16 +36,26 @@ def _read_documents(path, _version):
 
 
 def evidence_for_results(results):
-    candidates = [result for result in results[:3] if result.get("episodeId") in PILOT_EPISODES]
-    if not candidates:
-        return []
+    full_grounding = os.getenv("ALLOW_FULL_CATALOG_GROUNDING", "").lower() in {"1", "true", "yes"}
+    extra = {ep.strip() for ep in os.getenv("APPROVED_CLOUD_EPISODES", "").split(",") if ep.strip()}
+    allowed_base = PILOT_EPISODES | extra
+    published_ids = set()
     sources = []
     for path in PILOT_SOURCES:
         try:
             stat = path.stat()
-            sources.append(_read_documents(path, (stat.st_mtime_ns, stat.st_size)))
+            docs = _read_documents(path, (stat.st_mtime_ns, stat.st_size), full_grounding)
+            sources.append(docs)
+            if path == PILOT_SOURCES[0]:
+                published_ids.update(doc["id"] for doc in docs.values() if doc.get("item_type") == "episode")
         except (CatalogSyncError, OSError, ValueError, TypeError, KeyError, AttributeError):
             continue
+    candidates = [
+        result for result in results[:3]
+        if full_grounding or result.get("episodeId") in (allowed_base | published_ids)
+    ]
+    if not candidates or not sources:
+        return []
     evidence = []
     for result in candidates:
         episode_id = result["episodeId"]

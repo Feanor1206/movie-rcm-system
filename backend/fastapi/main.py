@@ -11,7 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
 
-from routers import chat, frame, health, recommend, search, sync
+from routers import chat, core_api, frame, health, recommend, search, sync
 from services.chat import ChatService
 from services.llm_client import LLMClient
 from services.model_registry import InferenceCapacityError
@@ -24,7 +24,8 @@ def _load_deepseek_config():
     path = ROOT / ".env.deepseek.local"
     if path.is_file():
         settings = dotenv_values(path, encoding="utf-8-sig", interpolate=False)
-        for name in ("DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY"):
+        for name in ("DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY",
+                     "LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY"):
             if settings.get(name):
                 os.environ[name] = settings[name]
 
@@ -67,8 +68,8 @@ def create_app(**options):
                             headers={"Retry-After": "1"})
     origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
     application.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in origins],
-                               allow_credentials=True, allow_methods=["GET", "POST"], allow_headers=["*"])
-    for router in (health, sync, search, chat, frame, recommend):
+                               allow_credentials=True, allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], allow_headers=["*"])
+    for router in (health, sync, search, chat, frame, recommend, core_api):
         application.include_router(router.router)
     return application
 

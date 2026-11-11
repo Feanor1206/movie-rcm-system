@@ -26,10 +26,10 @@ public class Movie {
     @Column(length = 20)
     private String runtime;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String genres;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
 
     @Column(length = 500)

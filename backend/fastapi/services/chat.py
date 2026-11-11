@@ -112,13 +112,41 @@ def grounded_template(results):
     return f"Có vẻ bạn đang tìm {title}{time_text}." + (f" {evidence[0]}" if evidence else "")
 
 
+SAFE_CONNECTIVES = set(
+    "da dang se la mot nhung va cua trong o thi cung duoc khi nay do co ve ban dang tim "
+    "bo phim canh doan noi dung nhan vat tinh huong dien ra tai vi nen bi roi lai rat "
+    "thu vi hap dan xem ke ve xuat hien cung voi".split()
+)
+
+
 def _supported_paraphrase(text, evidence):
     folded = _fold(text)
     if not text.strip() or re.search(r"\d|[\"“”«»]|\b(?:tap|episode|phut|giay)\b", folded):
         return False
     words = set(re.findall(r"[^\W\d_]+", _fold(" ".join(evidence))))
-    words.update("da dang se la mot nhung va cua trong o thi cung duoc khi nay do co ve ban dang tim".split())
+    words.update(SAFE_CONNECTIVES)
     return all(word in words for word in re.findall(r"[^\W\d_]+", folded))
+
+
+def build_follow_ups(results, intent=None):
+    if not results:
+        return [
+            "Gợi ý các tập phim hoạt hình nổi bật",
+            "Tìm tập phim hài hước gia đình",
+        ]
+    top = results[0]
+    suggestions = []
+    characters = top.get("characters") or []
+    if isinstance(characters, list) and characters and isinstance(characters[0], str):
+        suggestions.append(f"Tìm thêm cảnh có {characters[0]}")
+    genres = top.get("genres") or []
+    if isinstance(genres, list) and genres and isinstance(genres[0], str):
+        suggestions.append(f"Gợi ý thêm phim thể loại {genres[0]}")
+    if len(results) > 1:
+        suggestions.append("không, tập khác")
+    if top.get("startMs") is not None or top.get("start_ms") is not None:
+        suggestions.append("cảnh sau đó thì sao")
+    return list(dict.fromkeys(suggestions))[:3]
 
 
 class ChatService:
@@ -161,7 +189,7 @@ class ChatService:
                     provider_error = "Dịch vụ hội thoại trả về nội dung không hợp lệ. "
         metadata = {
             "recommendedMovies": copy.deepcopy(results),
-            "followUps": [],
+            "followUps": build_follow_ups(results, intent),
             "structuredIntent": intent,
             "pipelineStages": {"retrieval": "accepted-snapshot", "conversation": "template", "grounded": True},
         }
@@ -193,7 +221,7 @@ class ChatService:
                             generated += delta
                             if len(generated) > 1200:
                                 raise LLMProtocolError("Output exceeded limit")
-                    secret = os.getenv("DEEPSEEK_API_KEY", "")
+                    secret = os.getenv("LLM_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
                     if (secret and secret in generated) or not _supported_paraphrase(generated, [quote for item in trusted for quote in item["evidence"]]):
                         raise LLMProtocolError("Output contains an unverified reference")
                     generated = generated.strip()

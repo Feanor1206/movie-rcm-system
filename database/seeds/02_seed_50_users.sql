@@ -5,7 +5,7 @@
 -- ==========================================================
 
 -- 1. INSERT 50 USERS
-INSERT INTO users (id, username, email, password, full_name, role) VALUES
+INSERT IGNORE INTO users (id, username, email, password, full_name, role) VALUES
 (1, 'alex', 'alex@dippie.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Alex Morgan', 'ROLE_ADMIN'),
 (2, 'linh_dan', 'linhdan@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Nguyễn Linh Đan', 'ROLE_USER'),
 (3, 'minh_tri', 'minhtri.tran@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Trần Minh Trí', 'ROLE_USER'),
@@ -55,11 +55,10 @@ INSERT INTO users (id, username, email, password, full_name, role) VALUES
 (47, 'hoang_nam', 'nam.hoang@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Phạm Hoàng Nam', 'ROLE_USER'),
 (48, 'kim_oanh', 'oanh.kim@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Lê Kim Oanh', 'ROLE_USER'),
 (49, 'the_vinh', 'vinh.the@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Hoàng Thế Vinh', 'ROLE_USER'),
-(50, 'lan_huong', 'huong.lan@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Trương Lan Hương', 'ROLE_USER')
-ON CONFLICT (id) DO NOTHING;
+(50, 'lan_huong', 'huong.lan@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Trương Lan Hương', 'ROLE_USER');
 
 -- 2. INSERT WATCHLIST ITEMS
-INSERT INTO watchlist_items (user_id, movie_id, movie_title, poster_url) VALUES
+INSERT IGNORE INTO watchlist_items (user_id, movie_id, movie_title, poster_url) VALUES
 (1, 'afterlight', 'Afterlight', 'https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85'),
 (1, 'quiet-places', 'Quiet Places', 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=85'),
 (2, 'the-last-orbit', 'The Last Orbit', 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85'),
@@ -72,11 +71,10 @@ INSERT INTO watchlist_items (user_id, movie_id, movie_title, poster_url) VALUES
 (7, 'nocturne', 'Nocturne', 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85'),
 (8, 'the-last-orbit', 'The Last Orbit', 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85'),
 (9, 'afterlight', 'Afterlight', 'https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85'),
-(10, 'deep-blue', 'Deep Blue', 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85')
-ON CONFLICT DO NOTHING;
+(10, 'deep-blue', 'Deep Blue', 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85');
 
 -- 3. INSERT MOVIE RATINGS (1-10 Stars)
-INSERT INTO movie_ratings (user_id, movie_id, rating) VALUES
+INSERT IGNORE INTO movie_ratings (user_id, movie_id, rating) VALUES
 (1, 'the-last-orbit', 9),
 (1, 'glass-horizon', 8),
 (2, 'the-last-orbit', 10),
@@ -106,5 +104,4 @@ INSERT INTO movie_ratings (user_id, movie_id, rating) VALUES
 (17, 'the-last-orbit', 9),
 (18, 'afterlight', 9),
 (19, 'glass-horizon', 8),
-(20, 'quiet-places', 9)
-ON CONFLICT DO NOTHING;
+(20, 'quiet-places', 9);

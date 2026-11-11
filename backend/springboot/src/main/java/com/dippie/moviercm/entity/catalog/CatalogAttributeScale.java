@@ -14,7 +14,7 @@ public class CatalogAttributeScale {
     @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String definition;
 
     @Column(nullable = false)
@@ -23,19 +23,19 @@ public class CatalogAttributeScale {
     @Column(nullable = false)
     private Double maximum;
 
-    @Column(name = "levels_json", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "levels_json", nullable = false, columnDefinition = "LONGTEXT")
     private String levelsJson;
 
     @Column(length = 50)
     private String version;
 
-    @Column(name = "source_ids_json", columnDefinition = "TEXT")
+    @Column(name = "source_ids_json", columnDefinition = "LONGTEXT")
     private String sourceIdsJson;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

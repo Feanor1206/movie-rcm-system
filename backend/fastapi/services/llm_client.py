@@ -44,8 +44,8 @@ class LLMClient:
         self.registry = registry
         self._client = client
         self._owns_client = client is None
-        self.base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
-        self.model = os.getenv("DEEPSEEK_MODEL", "").strip()
+        self.base_url = (os.getenv("LLM_BASE_URL") or os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com").rstrip("/")
+        self.model = (os.getenv("LLM_MODEL") or os.getenv("DEEPSEEK_MODEL") or "").strip()
         self.max_response_chars = 16000
 
     @property
@@ -56,15 +56,18 @@ class LLMClient:
 
     def _headers(self, stream=False):
         headers = {"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"}
-        secret = os.getenv("DEEPSEEK_API_KEY", "")
-        if not secret or not self.model:
-            raise LLMUnavailableError("CineBot chưa được cấu hình dịch vụ hội thoại.")
         try:
             endpoint = urlsplit(self.base_url)
-            if endpoint.scheme != "https" or not endpoint.hostname or endpoint.username is not None or endpoint.query or endpoint.fragment:
+            is_local_http = endpoint.scheme == "http" and endpoint.hostname in {"localhost", "127.0.0.1", "::1"}
+            if (not (endpoint.scheme == "https" or is_local_http)
+                    or not endpoint.hostname or endpoint.username is not None
+                    or endpoint.password is not None or endpoint.query or endpoint.fragment):
                 raise ValueError
         except ValueError:
             raise LLMUnavailableError("Địa chỉ dịch vụ hội thoại không hợp lệ.") from None
+        secret = os.getenv("LLM_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ("local" if is_local_http else "")
+        if not secret or not self.model:
+            raise LLMUnavailableError("CineBot chưa được cấu hình dịch vụ hội thoại.")
         headers["Authorization"] = f"Bearer {secret}"
         return headers
 

@@ -40,6 +40,10 @@ def parse_season_episode_intent(query: str) -> tuple[int | None, int | None]:
     return int(season[1]) if season else None, int(episode[1]) if episode else None
 
 
+HIGH_WEIGHT_FIELDS = ("title", "series_title", "episode_title", "aliases", "characters")
+MEDIUM_WEIGHT_FIELDS = ("keywords", "themes", "plot_facts", "sound_events")
+
+
 def document_text(item: dict) -> str:
     values = []
     for field in ("title", "series_title", "episode_title", "description", "synopsis",
@@ -51,6 +55,21 @@ def document_text(item: dict) -> str:
         elif isinstance(value, list):
             values.extend(text for text in value if isinstance(text, str))
     return "\n".join(dict.fromkeys(values))
+
+
+def _field_values(item: dict, fields: tuple[str, ...]) -> str:
+    values = []
+    for field in fields:
+        value = item.get(field)
+        if isinstance(value, str) and value:
+            values.append(value)
+        elif isinstance(value, list):
+            values.extend(text for text in value if isinstance(text, str))
+    return " ".join(values)
+
+
+def _bigrams(tokens: list[str]) -> list[str]:
+    return [f"{left}_{right}" for left, right in zip(tokens, tokens[1:])]
 
 
 def _coverage_mappings(episodes, payload):
@@ -257,12 +276,18 @@ class TextIndex:
                 _atomic_array(matrix_path, embeddings)
         postings = defaultdict(list)
         lengths = np.zeros(len(texts), dtype=np.float32)
-        for index, text in enumerate(texts):
+        for index, (item, text) in enumerate(zip(documents, texts)):
             tokens = tokenize(text)
             lengths[index] = len(tokens)
             counts = Counter(tokens)
+            for token in tokenize(_field_values(item, HIGH_WEIGHT_FIELDS)):
+                counts[token] += 2
+            for token in tokenize(_field_values(item, MEDIUM_WEIGHT_FIELDS)):
+                counts[token] += 1
+            for bigram in _bigrams(tokens):
+                counts[bigram] += 2
             for word, count in tuple(counts.items()):
-                folded = normalize(word)
+                folded = "_".join(normalize(part) for part in word.split("_")) if "_" in word else normalize(word)
                 if folded != word:
                     counts[folded] += count
             for word, count in counts.items():
@@ -309,12 +334,16 @@ class TextIndex:
         if not allowed or not query.strip():
             return []
         scores = np.zeros(len(self._texts), dtype=np.float32)
-        for term in set(tokenize(scopes[0])):
+        query_tokens = tokenize(scopes[0])
+        for term in set(query_tokens + _bigrams(query_tokens)):
             posting = self._postings.get(term, [])
+            if not posting:
+                continue
+            weight = 1.35 if "_" in term else 1.0
             inverse_frequency = math.log(1 + (len(self._texts) - len(posting) + 0.5) / (len(posting) + 0.5))
             for index, count in posting:
                 denominator = count + 1.5 * (0.25 + 0.75 * self._lengths[index] / (self._average_length or 1))
-                scores[index] += inverse_frequency * count * 2.5 / denominator
+                scores[index] += weight * inverse_frequency * count * 2.5 / denominator
         lexical = sorted((index for index in allowed if scores[index] > 0), key=lambda index: (-scores[index], index))[:30]
         rankings = [lexical]
         if self.dense_ready:

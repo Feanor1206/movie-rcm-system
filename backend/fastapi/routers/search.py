@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 
 from schemas import DiscoverRequest, DiscoverResponse
+from services.chat import build_follow_ups
 
 
 router = APIRouter()
@@ -17,6 +18,7 @@ def search(request: DiscoverRequest, http_request: Request):
     constraints = request.constraints.model_dump(exclude_none=True) if request.constraints else None
     results = http_request.app.state.runtime.search.search(snapshot, request.query, limit=request.limit, constraints=constraints)
     return DiscoverResponse(structuredIntent={"intent_type": "DISCOVERY", "semantic_query": request.query},
-        results=results, explanation="Đã tìm trong catalog hiện tại." if results else "Không tìm thấy nội dung phù hợp.",
+        results=results, followUps=build_follow_ups(results),
+        explanation="Đã tìm trong catalog hiện tại." if results else "Không tìm thấy nội dung phù hợp.",
         pipelineStages={"snapshotGeneration": snapshot.generation, "denseReady": snapshot.hybrid_index.dense_ready,
                         "missingEmbeddings": snapshot.hybrid_index.missing_embeddings})

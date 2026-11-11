@@ -34,7 +34,7 @@ app:
     sync-timeout-seconds: ${APP_CATALOG_SYNC_TIMEOUT_SECONDS:60}
 
 ---
-# Development Profile (H2 Persistent File Database)
+# Development Profile (MySQL Database)
 spring:
   config:
     activate:
@@ -43,14 +43,10 @@ spring:
     init:
       mode: always
   datasource:
-    url: jdbc:h2:file:./data/moviercm_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:movie_rcm_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD:}}
   jpa:
     open-in-view: false
     hibernate:
@@ -64,7 +60,7 @@ app:
     secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
 
 ---
-# Production Profile (PostgreSQL Database)
+# Production Profile (MySQL Database)
 spring:
   config:
     activate:
@@ -73,10 +69,10 @@ spring:
     init:
       mode: never
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/movie_rcm_db}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:movie_rcm_db}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD}}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
   jpa:
     open-in-view: false
     hibernate:
@@ -90,7 +86,7 @@ app:
     secret: ${APP_JWT_SECRET}
 
 ---
-# Snapshot Profile (Dedicated H2 Persistent Database for Snapshot / Demo)
+# Snapshot Profile (MySQL Snapshot / Demo Database)
 spring:
   config:
     activate:
@@ -99,13 +95,10 @@ spring:
     init:
       mode: always
   datasource:
-    url: jdbc:h2:file:./data/snapshot/moviercm_snapshot_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: 
-  h2:
-    console:
-      enabled: false
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_SNAPSHOT_DB:movie_rcm_snapshot_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD:}}
   jpa:
     open-in-view: false
     hibernate:
@@ -117,4 +110,3 @@ app:
     enabled: true
   jwt:
     secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-

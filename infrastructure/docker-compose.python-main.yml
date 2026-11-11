@@ -1,0 +1,20 @@
+# =========================================================================
+# Python Main Override (docker-compose.python-main.yml)
+# Runs FastAPI as the single unified main backend + AI engine with MySQL 8.0.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.python-main.yml up -d nginx frontend fastapi mysql redis
+# =========================================================================
+
+services:
+  frontend:
+    build:
+      args:
+        SPRINGBOOT_INTERNAL_URL: http://fastapi:8000
+    environment:
+      - BACKEND_INTERNAL_URL=http://fastapi:8000
+      - SPRINGBOOT_INTERNAL_URL=http://fastapi:8000
+      - MODEL_API_URL=http://fastapi:8000/api/chat
+
+  springboot:
+    profiles:
+      - java-only

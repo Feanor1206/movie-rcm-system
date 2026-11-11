@@ -36,6 +36,14 @@ class ModelRegistry:
         reranker_path = os.getenv("RERANKER_MODEL_PATH")
         if reranker_path:
             self.register("reranker", lambda: TorchScriptReranker(reranker_path), gpu=True)
+        frame_index_path = os.getenv("FRAME_INDEX_PATH")
+        if frame_index_path:
+            self.register("frame_search", lambda: self._load_frame_search(frame_index_path))
+
+    @staticmethod
+    def _load_frame_search(path):
+        from services.frame_search import FrameSearchIndex
+        return FrameSearchIndex.from_path(path)
 
     @staticmethod
     def _load_embedder(path):

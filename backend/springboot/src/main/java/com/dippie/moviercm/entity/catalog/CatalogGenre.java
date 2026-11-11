@@ -11,19 +11,19 @@ public class CatalogGenre {
     @Column(length = 100)
     private String id;
 
-    @Column(name = "labels_json", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "labels_json", nullable = false, columnDefinition = "LONGTEXT")
     private String labelsJson;
 
-    @Column(name = "aliases_json", columnDefinition = "TEXT")
+    @Column(name = "aliases_json", columnDefinition = "LONGTEXT")
     private String aliasesJson;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

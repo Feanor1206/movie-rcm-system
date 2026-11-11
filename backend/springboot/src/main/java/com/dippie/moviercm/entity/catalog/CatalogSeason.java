@@ -20,28 +20,28 @@ public class CatalogSeason {
     @Column(nullable = false, length = 255)
     private String title;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String synopsis;
 
     @Column(length = 50)
     private String kind;
 
-    @Column(name = "translations_json", columnDefinition = "TEXT")
+    @Column(name = "translations_json", columnDefinition = "LONGTEXT")
     private String translationsJson;
 
     @Column(name = "release_date", length = 50)
     private String releaseDate;
 
-    @Column(name = "artworks_json", columnDefinition = "TEXT")
+    @Column(name = "artworks_json", columnDefinition = "LONGTEXT")
     private String artworksJson;
 
-    @Column(name = "attributes_json", columnDefinition = "TEXT")
+    @Column(name = "attributes_json", columnDefinition = "LONGTEXT")
     private String attributesJson;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)
