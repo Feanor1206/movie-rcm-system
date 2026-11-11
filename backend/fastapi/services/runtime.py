@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from services.catalog_sync import AcceptedSnapshot, CatalogSyncManager
+from services.database import DatabaseManager
 from services.model_registry import ModelRegistry
 from services.text_index import TextIndex, prepare_embeddings
 
@@ -21,12 +22,13 @@ ROOT = next((parent for parent in Path(__file__).resolve().parents if (parent / 
 
 class Runtime:
     def __init__(self, *, sync_secret=None, sync_path=None, cache_dir=None,
-                 load_default=True, model_mode=None, max_delta_documents=64):
+                 load_default=True, model_mode=None, max_delta_documents=64, database_url=None):
         self.sync_secret = sync_secret if sync_secret is not None else os.getenv("CATALOG_SYNC_TOKEN", os.getenv("FASTAPI_SYNC_SECRET", "")).strip()
         self.sync_path = Path(sync_path or os.getenv("SYNC_STATE_PATH", ROOT / "data/indices/catalog_sync_state.json"))
         self.cache_dir = Path(cache_dir or os.getenv("EMBEDDING_CACHE_DIR", ROOT / "data/indices/text"))
         self.load_default = load_default
         self.registry = ModelRegistry(mode=model_mode)
+        self.db = DatabaseManager(database_url=database_url)
         self.snapshot = None
         self.publish_lock = threading.RLock()
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="index-delta")

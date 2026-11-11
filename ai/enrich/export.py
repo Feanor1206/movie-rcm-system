@@ -94,13 +94,11 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--dialogue-only", action="store_true")
     args = parser.parse_args()
-    if args.episode:
-        parser.error("Export requires all five pilot episodes")
     output = args.output or args.artifacts / ("pilot-dialogue.json" if args.dialogue_only else "pilot-enriched.json")
     if output.resolve() == args.catalog.resolve():
         parser.error("Output must differ from the original catalog")
     try:
-        result = enrich(read(args.catalog), episodes(args.inventory), args.artifacts, args.dialogue_only)
+        result = enrich(read(args.catalog), episodes(args.inventory, args.episode), args.artifacts, args.dialogue_only)
         spec = importlib.util.spec_from_file_location("catalog_validator", VALIDATOR)
         validator = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(validator)

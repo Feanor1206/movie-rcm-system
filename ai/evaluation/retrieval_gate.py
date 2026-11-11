@@ -94,6 +94,18 @@ def measure(labels, predictions):
             "timeHitRateAt5": accurate_episode_hits / episode_moment_hits if episode_moment_hits else None}
 
 
+
+def measure_per_episode(labels, predictions):
+    observed = _rows_by_id(predictions)
+    result = {}
+    for episode in sorted({episode for row in labels for episode in row["episodeIds"]}):
+        subset = [{**row, "episodeIds": [episode],
+                   "moments": [moment for moment in row.get("moments", []) if moment["episodeId"] == episode]}
+                  for row in labels if episode in row["episodeIds"]]
+        result[episode] = {"queryCount": len(subset),
+                           "metrics": measure(subset, [observed[row["id"]] for row in subset])}
+    return result
+
 def gate(labels, predictions, baseline, thresholds):
     if not labels or any(row.get("source") != "human" for row in labels):
         raise ValueError("Quality gate requires independently human-authored labels")
@@ -274,7 +286,8 @@ def compare_catalogs(labels, original, enriched, encoder, cache_dir, pilot_ids=N
         for mode, index in (("Bm25", lexical), ("Hybrid", hybrid)):
             predictions = run_cases(lambda query: index.search(query, limit=30), labels)
             configurations[catalog_name + mode] = {"denseReady": index.dense_ready,
-                                                    "metrics": measure(labels, predictions)}
+                                                    "metrics": measure(labels, predictions),
+                                                    "perEpisode": measure_per_episode(labels, predictions)}
     return {"queryCount": len(labels), "pilotEpisodeIds": sorted(selected), "modelId": encoder.model_id,
             "catalogHashes": hashes, "projectedDrafts": projected_counts, "configurations": configurations}
 

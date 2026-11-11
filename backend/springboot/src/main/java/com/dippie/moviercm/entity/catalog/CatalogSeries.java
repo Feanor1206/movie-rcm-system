@@ -17,28 +17,28 @@ public class CatalogSeries {
     @Column(name = "original_title", length = 255)
     private String originalTitle;
 
-    @Column(name = "aliases_json", columnDefinition = "TEXT")
+    @Column(name = "aliases_json", columnDefinition = "LONGTEXT")
     private String aliasesJson;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String synopsis;
 
-    @Column(name = "translations_json", columnDefinition = "TEXT")
+    @Column(name = "translations_json", columnDefinition = "LONGTEXT")
     private String translationsJson;
 
-    @Column(name = "genre_ids_json", columnDefinition = "TEXT")
+    @Column(name = "genre_ids_json", columnDefinition = "LONGTEXT")
     private String genreIdsJson;
 
-    @Column(name = "keywords_json", columnDefinition = "TEXT")
+    @Column(name = "keywords_json", columnDefinition = "LONGTEXT")
     private String keywordsJson;
 
-    @Column(name = "themes_json", columnDefinition = "TEXT")
+    @Column(name = "themes_json", columnDefinition = "LONGTEXT")
     private String themesJson;
 
-    @Column(name = "origin_countries_json", columnDefinition = "TEXT")
+    @Column(name = "origin_countries_json", columnDefinition = "LONGTEXT")
     private String originCountriesJson;
 
-    @Column(name = "original_languages_json", columnDefinition = "TEXT")
+    @Column(name = "original_languages_json", columnDefinition = "LONGTEXT")
     private String originalLanguagesJson;
 
     @Column(name = "release_year_start")
@@ -50,31 +50,31 @@ public class CatalogSeries {
     @Column(name = "release_status", length = 50)
     private String releaseStatus;
 
-    @Column(name = "character_ids_json", columnDefinition = "TEXT")
+    @Column(name = "character_ids_json", columnDefinition = "LONGTEXT")
     private String characterIdsJson;
 
-    @Column(name = "artworks_json", columnDefinition = "TEXT")
+    @Column(name = "artworks_json", columnDefinition = "LONGTEXT")
     private String artworksJson;
 
-    @Column(name = "attributes_json", columnDefinition = "TEXT")
+    @Column(name = "attributes_json", columnDefinition = "LONGTEXT")
     private String attributesJson;
 
-    @Column(name = "ratings_json", columnDefinition = "TEXT")
+    @Column(name = "ratings_json", columnDefinition = "LONGTEXT")
     private String ratingsJson;
 
-    @Column(name = "advisories_json", columnDefinition = "TEXT")
+    @Column(name = "advisories_json", columnDefinition = "LONGTEXT")
     private String advisoriesJson;
 
-    @Column(name = "credits_json", columnDefinition = "TEXT")
+    @Column(name = "credits_json", columnDefinition = "LONGTEXT")
     private String creditsJson;
 
-    @Column(name = "external_ids_json", columnDefinition = "TEXT")
+    @Column(name = "external_ids_json", columnDefinition = "LONGTEXT")
     private String externalIdsJson;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

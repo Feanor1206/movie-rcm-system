@@ -12,6 +12,17 @@ ARTIFACTS = ROOT / "ai/artifacts"
 CATALOG = ROOT / "data/catalog.jadoo_all.json"
 
 
+def load_deepseek_env():
+    path = ROOT / ".env.deepseek.local"
+    if not path.is_file():
+        return
+    keys = {"DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY"}
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        name, separator, value = line.partition("=")
+        if separator and name in keys:
+            os.environ[name] = value
+
+
 def read(path):
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
@@ -45,8 +56,8 @@ def now():
 def episodes(path, requested=None):
     rows = read(path)["pilot"]
     identifiers = [row["episode_id"] for row in rows]
-    if len(rows) != 5 or len(set(identifiers)) != 5 or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", key) for key in identifiers):
-        raise ValueError("Expected an inventory with exactly five distinct pilot episodes")
+    if not rows or len(set(identifiers)) != len(rows) or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", key) for key in identifiers):
+        raise ValueError("Expected an inventory with distinct valid pilot episodes")
     if requested:
         wanted = set(requested)
         if not wanted <= set(identifiers):

@@ -29,19 +29,19 @@ public class CatalogTextTrack {
     @Column(name = "is_default", nullable = false)
     private Boolean isDefault = false;
 
-    @Column(name = "external_file_json", columnDefinition = "TEXT")
+    @Column(name = "external_file_json", columnDefinition = "LONGTEXT")
     private String externalFileJson;
 
-    @Column(name = "cues_json", columnDefinition = "TEXT")
+    @Column(name = "cues_json", columnDefinition = "LONGTEXT")
     private String cuesJson;
 
-    @Column(name = "provenance_json", columnDefinition = "TEXT")
+    @Column(name = "provenance_json", columnDefinition = "LONGTEXT")
     private String provenanceJson;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

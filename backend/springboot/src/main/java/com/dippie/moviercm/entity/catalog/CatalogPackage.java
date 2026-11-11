@@ -26,7 +26,7 @@ public class CatalogPackage {
     @Column(name = "reference_scope", nullable = false, length = 50)
     private String referenceScope;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
 
     @Column(name = "content_hash", nullable = false, length = 100)
@@ -35,7 +35,7 @@ public class CatalogPackage {
     @Column(nullable = false, length = 50)
     private String status;
 
-    @Column(name = "error_message", columnDefinition = "TEXT")
+    @Column(name = "error_message", columnDefinition = "LONGTEXT")
     private String errorMessage;
 
     @Version

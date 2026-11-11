@@ -3,7 +3,7 @@ import json
 
 import httpx
 
-from .caption import RequestBudget, TeacherRequest, api_key, counts, enforce_budget, object_schema, options, reply, save_output, settings
+from .caption import durable_budget, TeacherRequest, api_key, counts, enforce_budget, object_schema, options, reply, save_output, settings
 from .common import episodes, pilot_options, read
 
 
@@ -50,7 +50,7 @@ def main():
                 raise ValueError("Missing caption outputs for: " + ", ".join(missing_captions))
             missing = enforce_budget(jobs, args.max_requests)
             key = api_key(missing)
-            budget = RequestBudget(args.max_requests)
+            budget = durable_budget(args.artifacts, args.run_id, args.max_requests)
             with httpx.Client(timeout=120, follow_redirects=False, trust_env=False) as client:
                 for job in jobs:
                     value, created_at = reply(job, client, key, budget)

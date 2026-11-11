@@ -23,7 +23,7 @@ public class CatalogSnapshot {
     @Column(nullable = false, length = 50)
     private String status; // PENDING, SYNCING, READY, FAILED
 
-    @Column(name = "error_message", columnDefinition = "TEXT")
+    @Column(name = "error_message", columnDefinition = "LONGTEXT")
     private String errorMessage;
 
     @Column(name = "retry_count")

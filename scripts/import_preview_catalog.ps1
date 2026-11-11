@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CatalogPath,
     [string]$ApiBaseUrl = "http://127.0.0.1:8080/api",
+    [string]$PreviewStateFile,
     [string]$Username,
     [System.Security.SecureString]$Password
 )
@@ -70,6 +71,30 @@ function Write-ValidationSummary {
     }
 }
 
+function Assert-OwnedPreview {
+    param([System.Uri]$ApiUri, [string]$StateFile)
+    if (-not $StateFile -or -not (Test-Path -LiteralPath $StateFile -PathType Leaf)) {
+        throw "Reviewed pilot import requires -PreviewStateFile from a running preview stack."
+    }
+    $state = Get-Content -LiteralPath $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($state.ReleaseLevel -ne 'usable_preview' -or $state.Status -ne 'READY' -or
+        $ApiUri.Host -ne '127.0.0.1' -or $ApiUri.Port -ne $state.SpringPort) {
+        throw "The import URL does not match the recorded ready preview stack."
+    }
+    $spring = @($state.Processes | Where-Object { $_.Name -eq 'SpringBoot' -and $_.Port -eq $ApiUri.Port })
+    if ($spring.Count -ne 1) { throw "The preview state must identify exactly one Spring process." }
+    $record = $spring[0]
+    $running = Get-Process -Id $record.PID -ErrorAction Stop
+    $recordedStart = [DateTime]$record.StartTime
+    if (-not $running.Path -or $running.Path -ne $record.ExecutablePath -or
+        [Math]::Abs(($running.StartTime.ToUniversalTime() - $recordedStart.ToUniversalTime()).TotalSeconds) -gt 3) {
+        throw "The recorded preview Spring process identity has changed."
+    }
+    $listener = Get-NetTCPConnection -LocalPort $ApiUri.Port -State Listen -ErrorAction SilentlyContinue |
+        Where-Object { $_.OwningProcess -eq $running.Id -and $_.LocalAddress -eq '127.0.0.1' }
+    if (-not $listener) { throw "The recorded preview Spring process does not own the requested loopback listener." }
+}
+
 if (-not (Test-Path -LiteralPath $CatalogPath -PathType Leaf)) {
     throw "Catalog file not found: $CatalogPath"
 }
@@ -84,6 +109,14 @@ if (-not [System.Uri]::TryCreate($ApiBaseUrl, [System.UriKind]::Absolute, [ref]$
     throw "ApiBaseUrl must be an HTTP(S) loopback URL ending in /api."
 }
 $apiBase = $ApiBaseUrl.TrimEnd("/")
+$reviewedPilot = $false
+try {
+    $catalogDocument = ConvertFrom-Json -InputObject $catalogJson
+    $reviewedPilot = $catalogDocument.package.description -eq 'Reviewed pilot catalog for isolated preview import'
+} catch {
+    $reviewedPilot = $false
+}
+if ($reviewedPilot -or $PreviewStateFile) { Assert-OwnedPreview -ApiUri $apiUri -StateFile $PreviewStateFile }
 
 if (-not $Username) { $Username = [System.Environment]::GetEnvironmentVariable("PREVIEW_ADMIN_USERNAME", "Process") }
 if (-not $Username) { $Username = Read-Host "Admin username or email" }
@@ -129,6 +162,7 @@ if (-not $validation.Body.valid -or [int]$validation.Body.conflicts -gt 0) {
     throw "Catalog validation failed or reported conflicts; no catalog was imported."
 }
 
+if ($reviewedPilot -or $PreviewStateFile) { Assert-OwnedPreview -ApiUri $apiUri -StateFile $PreviewStateFile }
 $import = Invoke-PreviewApi -Uri "$apiBase/admin/catalog/import" -Method "Post" `
     -Body $catalogJson -Headers $headers -Label "Catalog import"
 if ($import.StatusCode -ne 200 -or -not $import.Body -or -not $import.Body.success) {

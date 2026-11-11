@@ -75,7 +75,9 @@ class EventStream(httpx.AsyncByteStream):
 
 
 def test_llm_stream_uses_external_server_and_closes_response(monkeypatch):
-    monkeypatch.setenv("LLAMA_SERVER_URL", "http://local.invalid:8081/v1")
+    monkeypatch.setenv("DEEPSEEK_BASE_URL", "https://local.invalid:8081/v1")
+    monkeypatch.setenv("DEEPSEEK_MODEL", "test-model")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     stream = EventStream([
         b'data: {"choices":[{"delta":{"content":"Xin "}}]}\n\n',
         'data: {"choices":[{"delta":{"content":"chào"}}]}\n\n'.encode(),
@@ -94,11 +96,14 @@ def test_llm_stream_uses_external_server_and_closes_response(monkeypatch):
             assert registry.llm_ready
         assert stream.closed
     asyncio.run(run())
-    assert str(requests[0].url) == "http://local.invalid:8081/v1/chat/completions"
+    assert str(requests[0].url) == "https://local.invalid:8081/v1/chat/completions"
     assert json.loads(requests[0].content)["stream"] is True
+    assert json.loads(requests[0].content)["model"] == "test-model"
+    assert requests[0].headers["authorization"] == "Bearer test-key"
 
 
 def test_llm_cloud_secret_never_leaks_and_readiness_recovers(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_MODEL", "test-model")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "private-api-key")
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(401, text="private-api-key"))) as client:
@@ -112,7 +117,9 @@ def test_llm_cloud_secret_never_leaks_and_readiness_recovers(monkeypatch):
     asyncio.run(run())
 
 
-def test_cancelled_provider_stream_closes_connection_and_releases_gpu():
+def test_cancelled_provider_stream_closes_connection(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_MODEL", "test-model")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     class WaitingStream(EventStream):
         async def __aiter__(self):
             yield b'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n'
@@ -129,13 +136,13 @@ def test_cancelled_provider_stream_closes_connection_and_releases_gpu():
             with pytest.raises(asyncio.CancelledError):
                 await task
             assert provider.closed
-            with registry.gpu_slot():
-                pass
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("payload", [b'data: nope\n\n', b'data: {"choices": []}\n\n', b'data: {"choices":[{"delta":{"content":12}}]}\n\n'])
-def test_llm_rejects_invalid_provider_stream(payload):
+def test_llm_rejects_invalid_provider_stream(payload, monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_MODEL", "test-model")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(200, headers={"content-type": "text/event-stream"}, content=payload))) as client:
             with pytest.raises(LLMProtocolError):
@@ -143,7 +150,9 @@ def test_llm_rejects_invalid_provider_stream(payload):
     asyncio.run(run())
 
 
-def test_intent_grammar_and_enum_are_validated():
+def test_intent_grammar_and_enum_are_validated(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_MODEL", "test-model")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     requests = []
     async def run():
         def handler(request):
@@ -153,8 +162,8 @@ def test_intent_grammar_and_enum_are_validated():
             with pytest.raises(LLMProtocolError):
                 await LLMClient(ModelRegistry("full"), client=client).parse_intent([])
     asyncio.run(run())
-    schema = requests[0]["response_format"]["json_schema"]["schema"]
-    assert schema["properties"]["intent_type"]["enum"] == ["DISCOVERY", "CONVERSATIONAL_PATCH", "CLARIFICATION", "NO_OP"]
+    assert requests[0]["response_format"] == {"type": "json_object"}
+    assert "CONVERSATIONAL_PATCH" in requests[0]["messages"][0]["content"]
 
 
 MOVIE = {"id": "episode-12", "episodeId": "episode-12", "title": "Tập 12: Bình hoa", "startMs": 520000,
@@ -180,7 +189,9 @@ def test_light_chat_streams_same_grounded_contract_without_llm():
     assert calls[0][1] == "captured"
 
 
-def test_llm_hallucinated_episode_and_timestamp_are_not_exposed():
+def test_llm_hallucinated_episode_and_timestamp_are_not_exposed(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": MOVIE["title"], "startMs": MOVIE["startMs"], "evidence": ["Chi làm vỡ bình hoa."]}])
     class FakeLLM:
         async def stream(self, messages):
             for text in ["Tập 999 ", "ở 55:55 có trận đánh."]:
@@ -203,7 +214,9 @@ def test_chat_patch_uses_request_history_without_global_sessions():
     assert intent["requested_k"] == 2
 
 
-def test_chat_provider_error_falls_back_without_exposing_details():
+def test_chat_provider_error_falls_back_without_exposing_details(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": MOVIE["title"], "startMs": MOVIE["startMs"], "evidence": ["Chi làm vỡ bình hoa."]}])
     class FakeLLM:
         async def stream(self, messages):
             raise LLMUnavailableError("private server detail")
@@ -216,7 +229,9 @@ def test_chat_provider_error_falls_back_without_exposing_details():
     asyncio.run(run())
 
 
-def test_chat_delivers_text_before_provider_finishes():
+def test_chat_delivers_text_before_provider_finishes(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": MOVIE["title"], "startMs": MOVIE["startMs"], "evidence": ["Chi làm vỡ bình hoa."]}])
     async def run():
         waiting = asyncio.Event()
         finish = asyncio.Event()
@@ -230,19 +245,15 @@ def test_chat_delivers_text_before_provider_finishes():
         event, data = await asyncio.wait_for(anext(stream), 0.2)
         assert event == "token"
         assert data["text"]
-        tokens = [data["text"]]
-        while "Chi làm vỡ bình hoa." not in "".join(tokens):
-            event, data = await asyncio.wait_for(anext(stream), 0.2)
-            if event == "token":
-                tokens.append(data["text"])
         finish.set()
         events = [item async for item in stream]
         assert events[-1][0] == "done"
-        assert events[-1][1]["text"].startswith("".join(tokens))
+        assert events[-1][1]["text"].startswith(data["text"])
+        assert "Chi làm vỡ bình hoa." in events[-1][1]["text"]
     asyncio.run(run())
 
 
-def test_full_chat_uses_intent_client_for_complex_queries_and_preserves_explicit_constraints():
+def test_cloud_chat_keeps_query_local_and_preserves_explicit_constraints():
     parsed = []
     searched = []
     class FakeLLM:
@@ -257,5 +268,156 @@ def test_full_chat_uses_intent_client_for_complex_queries_and_preserves_explicit
     async def run():
         _ = [event async for event in ChatService(ModelRegistry("full"), search, FakeLLM()).stream("bình hoa trước năm 2010")]
     asyncio.run(run())
-    assert parsed
-    assert searched[0] == ("bình hoa", {"year_max": 2009})
+    assert not parsed
+    assert searched[0] == ("bình hoa trước năm 2010", {"year_max": 2009})
+
+
+def test_cloud_only_sends_trusted_pilot_evidence_and_rejects_invented_reference(monkeypatch):
+    import services.chat as chat_module
+    sent = []
+    trusted = [{"title": "Tập 12: Bình hoa", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}]
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: trusted)
+    class FakeLLM:
+        async def stream(self, messages):
+            sent.extend(messages)
+            yield "Tập 999 ở 55:55."
+    private = {**MOVIE, "evidence": [{"text": "DATABASE SECRET"}]}
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [private], FakeLLM()).stream("PRIVATE QUERY", history=[{"role": "user", "content": "PRIVATE HISTORY"}])]
+        assert "999" not in events[-1][1]["text"]
+        assert "55:55" not in events[-1][1]["text"]
+        assert "Bình hoa" in events[-1][1]["text"]
+    asyncio.run(run())
+    serialized = json.dumps(sent, ensure_ascii=False)
+    assert "PRIVATE QUERY" not in serialized
+    assert "PRIVATE HISTORY" not in serialized
+    assert "DATABASE SECRET" not in serialized
+    assert "Chi làm vỡ bình hoa" in serialized
+
+
+def test_cloud_does_not_call_provider_without_trusted_evidence(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [])
+    class FakeLLM:
+        async def stream(self, messages):
+            pytest.fail("untrusted data reached provider")
+            yield
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("bình hoa")]
+        assert "Chi làm vỡ bình hoa" in events[-1][1]["text"]
+    asyncio.run(run())
+
+
+def test_followups_reuse_previous_search_locally():
+    history = [{"role": "user", "content": "Chi làm vỡ bình hoa"}]
+    for query in ["không, tập khác", "cảnh sau đó thì sao"]:
+        intent = deterministic_intent(query, history)
+        assert intent["intent_type"] == "CONVERSATIONAL_PATCH"
+        assert "Chi làm vỡ bình hoa" in intent["semantic_query"]
+
+
+def test_cloud_accepts_bounded_paraphrase_and_falls_back_on_new_facts(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12: Bình hoa", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
+    class FakeLLM:
+        def __init__(self, response):
+            self.response = response
+        async def stream(self, messages):
+            yield self.response
+    async def run():
+        async def answer(response):
+            events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM(response)).stream("bình hoa")]
+            return events[-1][1]["text"]
+        assert "Chi đã làm vỡ bình hoa." in await answer("Chi đã làm vỡ bình hoa.")
+        result = await answer("Chi giết người.")
+        assert "giết người" not in result
+        assert "Chi làm vỡ bình hoa." in result
+    asyncio.run(run())
+
+
+def test_official_deepseek_disables_thinking_for_bounded_response(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+    assert LLMClient(ModelRegistry("cloud"))._payload([])["thinking"] == {"type": "disabled"}
+    monkeypatch.setenv("DEEPSEEK_BASE_URL", "https://gateway.example/v1")
+    assert "thinking" not in LLMClient(ModelRegistry("cloud"))._payload([])
+
+
+def test_provider_echo_of_api_key_is_not_emitted(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "Chi")
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
+    class FakeLLM:
+        async def stream(self, messages):
+            yield "Chi"
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("bình hoa")]
+        assert events[-1][1]["text"].endswith("Chi làm vỡ bình hoa.")
+        assert events[-1][1]["pipelineStages"]["conversation"] == "template"
+    asyncio.run(run())
+
+
+def test_cloud_requires_explicit_model_before_request(monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_MODEL", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    def handler(request):
+        pytest.fail("request sent without configured model")
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(LLMUnavailableError):
+                _ = [part async for part in LLMClient(ModelRegistry("cloud"), client).stream([])]
+    asyncio.run(run())
+
+
+def test_pilot_intent_receives_only_enums_and_catalog_and_rejects_mismatch(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
+    requests = []
+    class FakeLLM:
+        async def parse_intent(self, messages):
+            requests.extend(messages)
+            return {"intent_type": "NO_OP", "mode": "chitchat", "scope": "series", "semantic_query": "invented"}
+        async def stream(self, messages):
+            yield "Chi làm vỡ bình hoa."
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("PRIVATE QUERY", history=[{"role": "user", "content": "PRIVATE HISTORY"}])]
+        intent = events[-1][1]["structuredIntent"]
+        assert intent["intent_type"] == "DISCOVERY"
+        assert intent["semantic_query"] == "PRIVATE QUERY"
+    asyncio.run(run())
+    assert requests
+    assert "PRIVATE" not in json.dumps(requests)
+    assert "Chi làm vỡ bình hoa" in json.dumps(requests, ensure_ascii=False)
+
+
+def test_intent_provider_outage_uses_template_without_second_call(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
+    class FakeLLM:
+        async def parse_intent(self, messages):
+            raise LLMUnavailableError("private detail")
+        async def stream(self, messages):
+            pytest.fail("should not retry after outage")
+            yield
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("bình hoa")]
+        assert "chưa sẵn sàng" in events[-1][1]["text"]
+        assert "private detail" not in events[-1][1]["text"]
+    asyncio.run(run())
+
+
+def test_valid_pilot_intent_refines_scope_but_keeps_local_followup(monkeypatch):
+    import services.chat as chat_module
+    monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
+    class FakeLLM:
+        async def parse_intent(self, messages):
+            return {"intent_type": "CONVERSATIONAL_PATCH", "mode": "find_moment", "scope": "scene", "semantic_query": "wrong", "requested_k": 100}
+        async def stream(self, messages):
+            yield "Chi làm vỡ bình hoa."
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("không, tập khác", history=[{"role": "user", "content": "bình hoa"}])]
+        intent = events[-1][1]["structuredIntent"]
+        assert intent["intent_type"] == "CONVERSATIONAL_PATCH"
+        assert intent["scope"] == "scene"
+        assert intent["semantic_query"] == "bình hoa không, tập khác"
+        assert intent["requested_k"] == 8
+    asyncio.run(run())
