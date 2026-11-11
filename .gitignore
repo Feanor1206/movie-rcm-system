@@ -83,9 +83,17 @@ data/raw/
 
 # Docker & Database
 pgdata/
+mysql_data/
 backend/springboot/data/
+data/python_main.db
+*.db
+*.sqlite
+*.sqlite3
 *.mv.db
 *.trace.db
+
+# Local analysis and disposable experiments
+.pytest_tmp/
 
 # Large Media & Video Files (>100MB)
 *.mp4

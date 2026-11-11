@@ -1,118 +1,98 @@
 -- =========================================================================
 -- Dippie Animation Movie Recommendation System
 -- Schema Migration: Version 1.0 (Production Reviewable DDL)
--- Target: PostgreSQL 14+ / H2 PostgreSQL Mode
+-- Target: MySQL 8.0+ / H2 MySQL Mode
 -- Policy: Prod uses ddl-auto: validate; this script defines initial schema
 -- =========================================================================
 
--- 1. Users Table
 CREATE TABLE IF NOT EXISTS users (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(100),
     role VARCHAR(20) NOT NULL DEFAULT 'ROLE_USER',
-    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT uq_users_username UNIQUE (username),
-    CONSTRAINT uq_users_email UNIQUE (email)
+    CONSTRAINT uq_users_email UNIQUE (email),
+    INDEX idx_users_username (username),
+    INDEX idx_users_email (email)
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
-
--- 2. Movies Catalog Table
 CREATE TABLE IF NOT EXISTS movies (
     id VARCHAR(100) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     release_year INTEGER NOT NULL,
-    rating DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    rating DOUBLE NOT NULL DEFAULT 0.0,
     runtime VARCHAR(20),
-    genres TEXT,
-    description TEXT,
+    genres LONGTEXT,
+    description LONGTEXT,
     poster VARCHAR(500),
     backdrop VARCHAR(500),
     video_url VARCHAR(500),
-    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_movies_year (release_year),
+    INDEX idx_movies_rating (rating)
 );
 
-CREATE INDEX IF NOT EXISTS idx_movies_year ON movies (release_year);
-CREATE INDEX IF NOT EXISTS idx_movies_rating ON movies (rating);
-
--- 3. Watchlist Items Table
 CREATE TABLE IF NOT EXISTS watchlist_items (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     movie_id VARCHAR(100) NOT NULL,
     movie_title VARCHAR(255) NOT NULL,
     poster_url VARCHAR(500),
-    added_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_watchlist_user_movie UNIQUE (user_id, movie_id),
-    CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_watchlist_user (user_id),
+    INDEX idx_watchlist_movie (movie_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist_items (user_id);
-CREATE INDEX IF NOT EXISTS idx_watchlist_movie ON watchlist_items (movie_id);
-
--- 4. Favorite Items Table
 CREATE TABLE IF NOT EXISTS favorite_items (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     movie_id VARCHAR(100) NOT NULL,
     movie_title VARCHAR(255) NOT NULL,
     poster_url VARCHAR(500),
-    added_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_user_movie_favorite UNIQUE (user_id, movie_id),
-    CONSTRAINT fk_favorite_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    CONSTRAINT fk_favorite_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_favorite_user (user_id),
+    INDEX idx_favorite_movie (movie_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_favorite_user ON favorite_items (user_id);
-CREATE INDEX IF NOT EXISTS idx_favorite_movie ON favorite_items (movie_id);
-
--- 5. Movie Ratings Table
 CREATE TABLE IF NOT EXISTS movie_ratings (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     movie_id VARCHAR(100) NOT NULL,
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 10),
-    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT uq_rating_user_movie UNIQUE (user_id, movie_id),
-    CONSTRAINT fk_rating_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    CONSTRAINT fk_rating_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_ratings_user (user_id),
+    INDEX idx_ratings_movie (movie_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_ratings_user ON movie_ratings (user_id);
-CREATE INDEX IF NOT EXISTS idx_ratings_movie ON movie_ratings (movie_id);
-
--- 6. Media Assets Table (Milestone M4)
 CREATE TABLE IF NOT EXISTS media_assets (
     id VARCHAR(64) PRIMARY KEY,
     movie_id VARCHAR(100) NOT NULL,
     kind VARCHAR(20) NOT NULL,
     storage_provider VARCHAR(30) NOT NULL DEFAULT 'local',
+    storage_key VARCHAR(100) DEFAULT 'local_main',
     relative_path VARCHAR(500) NOT NULL,
     version VARCHAR(50) NOT NULL DEFAULT 'v1',
     mime_type VARCHAR(100) NOT NULL DEFAULT 'video/mp4',
     byte_length BIGINT NOT NULL,
-    duration_seconds DOUBLE PRECISION,
+    duration_seconds DOUBLE,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies (id) ON DELETE CASCADE,
-    CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version)
+    CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version),
+    INDEX idx_media_movie_id (movie_id),
+    INDEX idx_media_movie_kind (movie_id, kind)
 );
-
-CREATE INDEX IF NOT EXISTS idx_media_movie_id ON media_assets (movie_id);
-CREATE INDEX IF NOT EXISTS idx_media_movie_kind ON media_assets (movie_id, kind);
-
--- =========================================================================
--- Rollback & Data Preservation Policy
--- =========================================================================
--- DO NOT execute DROP TABLE or destructive DDL during rollbacks.
--- Rollbacks must be performed via application code/configuration rollback.
--- All tables, schema definitions, and user interaction data (movie_ratings,
--- favorite_items, watchlist_items, users, movies, media_assets) must be preserved intact.
-

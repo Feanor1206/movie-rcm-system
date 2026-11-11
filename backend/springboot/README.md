@@ -30,12 +30,12 @@ mvn spring-boot:run
 
 ---
 
-### 2. Chạy với profile `prod` (PostgreSQL Database)
+### 2. Chạy với profile `prod` (MySQL 8.0 Database)
 
-Chạy container PostgreSQL từ thư mục `infrastructure/`:
+Chạy container MySQL 8.0 từ thư mục `infrastructure/`:
 ```bash
 cd ../../infrastructure
-docker compose up -d postgres
+docker compose up -d mysql
 ```
 
 Khởi chạy Spring Boot với profile `prod`:

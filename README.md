@@ -1,15 +1,23 @@
-# Dippie
+# Dippie (`movie-rcm-system`)
 
-Animation discovery, catalog management, personal library and video playback.
+Nền tảng khám phá phim hoạt hình, quản lý danh mục (`dippie.catalog.v1`), thư viện cá nhân, phát video trực tuyến (HTTP Range / Google Drive) và trợ lý AI **CineBot v4**.
 
-- **Next.js:** browsing, search, account/library, episode player and CineBot interface.
-- **Spring Boot:** authentication, catalog source of truth, library, progress and HTTP Range streaming.
-- **FastAPI:** intent parsing and catalog-grounded discovery; model optimization remains separate.
+Dự án hỗ trợ **2 kiến trúc Backend song song** dùng chung cơ sở dữ liệu **MySQL 8.0** và **AI Engine v4**:
+- **`java-main` (`Spring Boot Main` + `FastAPI AI` + `MySQL 8.0`)**: Spring Boot (`:8080`) đảm nhiệm Auth, Catalog, Library, Watch Progress & Streaming; FastAPI (`:8000`) đảm nhiệm AI Search, CineBot RAG, Frame Search & Recommendation.
+- **`python-main` (`FastAPI Unified Main & AI` + `MySQL 8.0`)**: Một dịch vụ FastAPI duy nhất (`:8000`) đảm nhiệm toàn bộ REST API nghiệp vụ (`/api/*`) lẫn AI Engine (`/v1/*`, `/api/chat`, `/api/recommend`), kết nối trực tiếp vào MySQL 8.0.
 
-## Run locally on Windows
+---
 
-Requires Node.js 20+, Java 17+ and Python 3.11+. Install the serving and frontend dependencies:
+## 🌿 Cấu trúc Nhánh GitHub
+- `main` / `dev`: Nhánh hợp nhất chứa đầy đủ cả 2 chế độ (`Java Main` và `Python Main`).
+- `java-main`: Bản chạy **Spring Boot** làm Backend chính + **FastAPI** làm AI Gateway + **MySQL 8.0**.
+- `python-main`: Bản chạy **FastAPI** làm Unified Backend + AI + **MySQL 8.0** (đã lược bỏ thư mục `backend/springboot`).
 
+---
+
+## 🚀 Khởi chạy nhanh trên Windows
+
+### 1. Cài đặt môi trường
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -17,32 +25,53 @@ python -m pip install -r backend/fastapi/requirements.txt
 cd frontend
 npm ci
 cd ..
-.\start-all.ps1 -Background
 ```
 
-The launcher builds the application, checks service readiness and keeps isolated preview state. It selects `cloud` when the local DeepSeek configuration exists and `light` otherwise. Pass `-ModelMode light` for template-based CineBot or `-ModelMode off` to start only Spring and Next.js. Open http://localhost:3000. Stop owned services with `.\scripts\stop_preview_stack.ps1`.
+### 2. Khởi chạy MySQL 8.0 (Docker)
+```powershell
+cd infrastructure
+docker compose up -d mysql
+cd ..
+```
+*(Nếu máy chưa bật MySQL, bản `Python Main` tự động fallback sang SQLite nội bộ tại `data/python_main.db`, còn bản `Java Main` có thể chạy profile `test`/`H2 MySQL Mode`).*
 
-The preview profile includes local demo accounts. Import a catalog through the admin screen or `scripts/import_preview_catalog.ps1`; catalog payloads are in `data/` and schema fixtures in `docs/`. Local video files or a configured Drive mount must exist for playback.
+### 3. Chạy ứng dụng
+- **Chạy bản Java Main (`Spring Boot :8080` + `FastAPI AI :8000` + `Next.js :3000`):**
+  ```powershell
+  .\start-java-main.ps1 -Background
+  ```
+- **Chạy bản Python Main (`FastAPI Full Main + AI :8000` + `Next.js :3000`):**
+  ```powershell
+  .\start-python-main.ps1 -Background
+  ```
+- Dừng toàn bộ dịch vụ:
+  ```powershell
+  .\scripts\stop_preview_stack.ps1
+  ```
 
-Run `.\scripts\configure_llm.ps1` to enter the base URL, model ID and API key in PowerShell. For DeepSeek V4.1 Flash on the official endpoint, enter `deepseek-flash` as the model ID. The script saves the ignored `.env.deepseek.local` file and sends one test request. Run it again to update the settings or pass `-Clear` to remove the file. Restart FastAPI after either change. `full` is a legacy alias for `cloud`.
+---
 
-Cloud chat sends evidence selected from local pilot catalog files. User messages, history and the Spring snapshot contents stay local. Chat uses the deterministic template when the provider or matching pilot evidence is unavailable. `/ready` reports search, frames, recommendations, chat, LLM and reranker separately. Frame search requires a registered frame model and index.
+## 🧠 Kiến trúc AI Engine v4 (`backend/fastapi` & `ai/`)
+1. **Field-Weighted BM25 + Vietnamese Bi-gram + Dense RRF (`text_index.py`, `search.py`)**: Tìm kiếm phân cấp theo trọng số trường (`title`, `characters`, `dialogue`, `visual_summary`, `synopsis`), hỗ trợ tiếng Việt có dấu/không dấu và hiệu chuẩn điểm số.
+2. **Grounded RAG CineBot (`chat.py`, `llm_client.py`)**: Trích xuất bằng chứng từ tập phim, phân cảnh, lời thoại kèm mốc thời gian (`timestamp`); hỗ trợ mọi OpenAI-compatible LLM (DeepSeek, OpenAI, hoặc Local Ollama/vLLM/llama.cpp) và tự động fallback về câu trả lời xác định khi offline.
+3. **Visual Frame Search (`frame_search.py`)**: Tìm tập phim và mốc thời gian từ ảnh chụp màn hình qua 64-bit DCT Perceptual Hash (`pHash`) kết hợp Color Layout + Edge Grid.
+4. **Hybrid Content-Affinity Recommender (`recommend.py`)**: Gợi ý phim dựa trên vector tương đồng nội dung (Genre, Themes, Characters, Mood, Rating) từ hồ sơ người dùng (`likedMovieIds`, `favorites`, `ratings`).
 
-Local encoder and reranker artifacts use `TEXT_ENCODER_PATH` and `RERANKER_MODEL_PATH`. Initial document embeddings must be prepared offline; sync reads cached vectors and queues only bounded missing deltas. `202 BUILDING` is pending, not an accepted snapshot. Spring waits without consuming its failure retry budget. Large missing caches return 503 until offline preparation finishes. Accepted generations survive restarts and switch atomically. Requests cannot supply a separate `availableMovies` catalog.
+---
 
-See [embedding preparation](ai/EMBEDDING_CACHE.md), [retrieval evaluation](ai/evaluation/README.md), and the [serving contract](docs/fastapi-v2-serving.md). Chat now uses SSE throughout FastAPI, Next.js and the browser. Results retain legacy fields and add episode/time, scores and evidence. Missing trained artifacts or calibration are reported explicitly. No credentials or model weights belong in Git. Example environment files live under `backend/fastapi/` and `frontend/`.
-
-## Verify
+## 🧪 Kiểm thử (Verification)
 
 ```powershell
-cd frontend
+# 1. Kiểm thử Python Main + AI v4 (Offline)
+.\.venv\Scripts\python.exe -m pytest tests backend/fastapi/tests -q
+
+# 2. Kiểm thử Spring Boot (MySQL compatibility mode)
+cd backend/springboot
+.\mvnw.cmd test "-Dspring.profiles.active=test"
+
+# 3. Kiểm thử & Build Frontend Next.js
+cd ../../frontend
 npm test
 npm run typecheck
 npm run build
 ```
-
-Spring tests run with `.\mvnw.cmd test '-Dspring.profiles.active=test'` from `backend/springboot`. For Python, install `backend/fastapi/requirements-test.txt` and run `python -m pytest -q tests backend/fastapi/tests` from the root. Offline tests cover API and snapshot boundaries, a tiny ONNX graph and mocked providers. Live, billed DeepSeek tests are opt-in through `RUN_DEEPSEEK_INTEGRATION=1`. Training dependencies are separate in `ai/requirements-training.txt`.
-
-CI checks the frontend, Spring and offline Python suites. Docker configuration is in `infrastructure/`; supply real environment values before deployment. Live Docker/PostgreSQL deployment has not been verified on the development host.
-
-Generated indexes, analysis graphs, temporary experiments and captured reports are ignored. Product documentation will be written after implementation.

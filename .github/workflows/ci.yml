@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "master", "develop", "dev", "chore/taicautruc" ]
+    branches: [ "main", "dev", "java-main", "python-main" ]
   pull_request:
-    branches: [ "main", "master", "develop", "dev", "chore/taicautruc" ]
+    branches: [ "main", "dev", "java-main", "python-main" ]
 
 jobs:
   frontend-check:
@@ -36,6 +36,7 @@ jobs:
 
   backend-check:
     name: Spring Boot Tests & Policy
+    if: github.ref_name != 'python-main'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,7 +55,7 @@ jobs:
         run: ./mvnw test -Dspring.profiles.active=test
 
   fastapi-check:
-    name: FastAPI Offline Tests
+    name: FastAPI & AI v4 Offline Tests
     runs-on: ubuntu-latest
     defaults:
       run:
