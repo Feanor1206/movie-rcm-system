@@ -10,38 +10,31 @@ Dịch vụ Backend chính phụ trách quản lý tài khoản người dùng, 
 - **Java 17** hoặc **Java 21**
 - **Maven** (hoặc dùng Maven Wrapper)
 
-### 1. Chạy với profile `dev` (Sử dụng H2 In-Memory Database - Chạy ngay không cần cài DB)
+### 1. Chạy với profile `dev` / `prod` (MySQL 8.0 Database)
 
-```bash
-cd backend/springboot
-
-# Build dự án
-mvn clean package -DskipTests
-
-# Khởi chạy ứng dụng
-mvn spring-boot:run
-```
-
-- Server chạy tại: [http://localhost:8080](http://localhost:8080)
-- H2 Database Console: [http://localhost:8080/h2-console](http://localhost:8080/h2-console)
-  - JDBC URL: `jdbc:h2:mem:moviercm_db`
-  - Username: `sa`
-  - Password: *(để trống)*
-
----
-
-### 2. Chạy với profile `prod` (MySQL 8.0 Database)
-
-Chạy container MySQL 8.0 từ thư mục `infrastructure/`:
+Khởi chạy container MySQL 8.0 từ thư mục `infrastructure/`:
 ```bash
 cd ../../infrastructure
 docker compose up -d mysql
 ```
 
-Khởi chạy Spring Boot với profile `prod`:
+Build và khởi chạy ứng dụng Spring Boot:
 ```bash
 cd ../backend/springboot
-mvn spring-boot:run -Dspring-boot.run.profiles=prod
+./mvnw clean package -DskipTests
+./mvnw spring-boot:run
+```
+
+- Server chạy tại: [http://localhost:8080](http://localhost:8080)
+- Cơ sở dữ liệu mặc định: `jdbc:mysql://localhost:3306/movie_rcm_db`
+
+---
+
+### 2. Chạy kiểm thử tự động với profile `test` (H2 In-Memory ở chế độ tương thích MySQL)
+
+```bash
+cd backend/springboot
+./mvnw test -Dspring.profiles.active=test
 ```
 
 ---
