@@ -12,7 +12,12 @@ if str(ROOT / "backend" / "fastapi") not in sys.path:
 from main import create_app
 
 
-def test_python_main_auth_movies_and_user_library(tmp_path):
+def test_python_main_auth_movies_and_user_library(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    synthetic_dir = media_root / "synthetic"
+    synthetic_dir.mkdir(parents=True, exist_ok=True)
+    (synthetic_dir / "feature_test.mp4").write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 1024)
+    monkeypatch.setenv("APP_MEDIA_ROOT", str(media_root))
     db_file = tmp_path / "test_mysql_compat.db"
     app = create_app(
         sync_secret="test-secret",
@@ -33,16 +38,41 @@ def test_python_main_auth_movies_and_user_library(tmp_path):
         assert len(movies) >= 13
         assert movies[0]["id"] == "drive-videoplayback"
 
-        browse_res = client.get("/api/movies/browse?q=Orbit&genre=Sci-Fi&page=0&size=5")
+        browse_default = client.get("/api/movies/browse")
+        assert browse_default.status_code == 200
+        assert browse_default.json()["data"]["size"] == 12
+
+        browse_res = client.get("/api/movies/browse?query=Orbit&genre=Sci-Fi&page=0&size=5")
         assert browse_res.status_code == 200
         browse_data = browse_res.json()["data"]
         assert browse_data["totalElements"] == 1
         assert browse_data["items"][0]["id"] == "the-last-orbit"
 
+        browse_search = client.get("/api/movies/browse?search=Orbit&page=0&size=5")
+        assert browse_search.status_code == 200
+        assert browse_search.json()["data"]["totalElements"] == 1
+
+        not_found_movie = client.get("/api/movies/nonexistent-movie-id")
+        assert not_found_movie.status_code == 404
+        assert not_found_movie.json()["success"] is False
+
         desc_res = client.get("/api/movies/the-last-orbit/media-descriptor")
         assert desc_res.status_code == 200
         assert desc_res.json()["data"]["hasFeature"] is True
         assert desc_res.json()["data"]["hasTrailer"] is True
+
+        grant_res = client.post("/api/media/grant/ast-orbit-feat")
+        assert grant_res.status_code == 200
+        grant_body = grant_res.json()
+        assert grant_body["assetId"] == "ast-orbit-feat"
+        assert grant_body["grant"]
+        assert grant_body["streamUrl"].startswith("/api/media/stream/ast-orbit-feat?grant=")
+        assert grant_body["expiresIn"] == 300
+
+        head_res = client.head(grant_body["streamUrl"])
+        assert head_res.status_code == 200
+        assert head_res.headers.get("accept-ranges") == "bytes"
+        assert int(head_res.headers.get("content-length", "0")) > 0
 
         reg_res = client.post(
             "/api/auth/register",
@@ -56,6 +86,20 @@ def test_python_main_auth_movies_and_user_library(tmp_path):
         assert reg_res.status_code == 201
         token = reg_res.json()["data"]["token"]
         headers = {"Authorization": f"Bearer {token}"}
+
+        login_by_email = client.post(
+            "/api/auth/login",
+            json={"usernameOrEmail": "tester@dippie.com", "password": "password123"},
+        )
+        assert login_by_email.status_code == 200
+        assert login_by_email.json()["data"]["username"] == "new_tester"
+
+        login_by_username = client.post(
+            "/api/auth/login",
+            json={"usernameOrEmail": "new_tester", "password": "password123"},
+        )
+        assert login_by_username.status_code == 200
+        assert login_by_username.json()["data"]["email"] == "tester@dippie.com"
 
         me_res = client.get("/api/auth/me", headers=headers)
         assert me_res.status_code == 200
@@ -142,26 +186,62 @@ def test_python_main_catalog_import_search_and_watch_progress(tmp_path):
     }
 
     with TestClient(app) as client:
-        admin_login = client.post("/api/auth/login", json={"username": "admin", "password": "password123"})
+        admin_login = client.post("/api/auth/login", json={"usernameOrEmail": "admin", "password": "password123"})
         assert admin_login.status_code == 200
         admin_token = admin_login.json()["data"]["token"]
         admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
+        invalid_val = client.post("/api/admin/catalog/validate", json={"series": []}, headers=admin_headers)
+        assert invalid_val.status_code == 400
+        assert invalid_val.json()["valid"] is False
+        assert isinstance(invalid_val.json()["errors"], list)
+        assert invalid_val.json()["toCreate"] == 0
+
+        valid_val = client.post("/api/admin/catalog/validate", json=sample_package, headers=admin_headers)
+        assert valid_val.status_code == 200
+        assert valid_val.json()["valid"] is True
+        assert valid_val.json()["packageId"] == "pkg_mysql_test"
+
         imp_res = client.post("/api/admin/catalog/import", json=sample_package, headers=admin_headers)
         assert imp_res.status_code == 200
-        assert imp_res.json()["data"]["success"] is True
+        assert imp_res.json()["success"] is True
+
+        hist_res = client.get("/api/admin/catalog/history", headers=admin_headers)
+        assert hist_res.status_code == 200
+        assert isinstance(hist_res.json(), list)
+        assert len(hist_res.json()) == 1
+
+        snaps_res = client.get("/api/admin/catalog/snapshots", headers=admin_headers)
+        assert snaps_res.status_code == 200
+        assert isinstance(snaps_res.json(), list)
+        assert len(snaps_res.json()) == 1
+        snap_id = snaps_res.json()[0]["id"]
+
+        retry_res = client.post(f"/api/admin/catalog/snapshots/{snap_id}/retry", headers=admin_headers)
+        assert retry_res.status_code == 200
+        assert retry_res.json()["id"] == snap_id
+        assert retry_res.json()["retryCount"] == 1
+
+        export_res = client.get("/api/admin/catalog/export", headers=admin_headers)
+        assert export_res.status_code == 200
+        assert export_res.json()["schema_version"] == "dippie.catalog.v1"
+
+        all_series_res = client.get("/api/catalog/series")
+        assert all_series_res.status_code == 200
+        assert isinstance(all_series_res.json(), list)
+        assert len(all_series_res.json()) == 1
 
         series_res = client.get("/api/catalog/series/ser_shin")
         assert series_res.status_code == 200
-        assert len(series_res.json()["data"]["episodes"]) == 1
+        assert len(series_res.json()["episodes"]) == 1
 
         ep_res = client.get("/api/catalog/episodes/ep_shin_1")
         assert ep_res.status_code == 200
-        assert ep_res.json()["data"]["episode"]["title"] == "Tập 1: Đi siêu thị"
+        assert ep_res.json()["episode"]["title"] == "Tập 1: Đi siêu thị"
 
         search_res = client.get("/api/catalog/search?q=siêu thị")
         assert search_res.status_code == 200
-        assert len(search_res.json()["data"]) >= 1
+        assert len(search_res.json()) >= 1
 
         ai_search = client.post("/v1/search", json={"query": "siêu thị", "limit": 5})
         assert ai_search.status_code == 200

@@ -130,6 +130,7 @@ def test_cross_jwt_token_interoperability():
     grant_claims = jwt.decode(grant_token, decoded_key, algorithms=["HS256"])
     assert grant_claims["assetId"] == "ast-drive-videoplayback"
     assert grant_claims["type"] == "playback_grant"
+    assert decode_jwt_token(grant_token) is None, "Playback grant must be rejected as general auth token"
 
 
 def test_cross_database_schema_and_types():

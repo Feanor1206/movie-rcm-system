@@ -720,6 +720,8 @@ def create_jwt_token(username: str) -> str:
 def decode_jwt_token(token: str) -> str | None:
     try:
         payload = jwt.decode(token, _jwt_key(), algorithms=["HS256"])
+        if payload.get("type") == "playback_grant" or payload.get("purpose") == "playback":
+            return None
         return payload.get("sub")
     except Exception:
         return None
@@ -1237,18 +1239,6 @@ def import_catalog_package(db, data: dict) -> dict:
     )
     db.add(snap)
     db.commit()
-    return {
-        "success": True,
-        "importId": snap_id,
-        "packageId": pkg_id,
-        "revision": revision,
-        "snapshotVersion": next_gen,
-        "contentHash": content_hash,
-        "importedAt": now.isoformat(),
-        "counts": counts,
-        "indexStatus": "READY",
-        "message": "Nhập dữ liệu package thành công và đồng bộ trực tiếp trong Python Main.",
-    }
     return {
         "success": True,
         "importId": snap_id,

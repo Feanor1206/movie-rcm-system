@@ -74,6 +74,7 @@ def require_user(request: Request, db, authorization: str | None) -> User | None
 
 
 class LoginPayload(BaseModel):
+    usernameOrEmail: str = ""
     username: str = ""
     password: str = ""
 
@@ -104,12 +105,12 @@ def api_health():
 
 @router.post("/api/auth/login")
 def login(payload: LoginPayload, request: Request):
-    username = (payload.username or "").strip()
+    ident = (payload.usernameOrEmail or payload.username or "").strip()
     password = payload.password or ""
-    if not username or not password:
+    if not ident or not password:
         return api_response(None, "Tên đăng nhập và mật khẩu không được để trống", False, 400)
     with get_db(request) as db:
-        user = db.query(User).filter(User.username == username).first()
+        user = db.query(User).filter((User.username == ident) | (User.email == ident)).first()
         if not user or not verify_password(password, user.password):
             return api_response(None, "Sai tên đăng nhập hoặc mật khẩu", False, 401)
         token = create_jwt_token(user.username)
@@ -209,13 +210,16 @@ def _matches_search(movie: Movie, raw_query: str | None) -> bool:
 def get_all_movies(
     request: Request,
     search: str | None = Query(default=None),
+    query: str | None = Query(default=None),
+    q: str | None = Query(default=None),
     genre: str | None = Query(default=None),
 ):
+    effective_search = next((v.strip() for v in (search, query, q) if v and v.strip()), None)
     with get_db(request) as db:
         all_movies = db.query(Movie).all()
         filtered = [
             m for m in all_movies
-            if _matches_search(m, search) and _matches_genre_token(m.genres, genre)
+            if _matches_search(m, effective_search) and _matches_genre_token(m.genres, genre)
         ]
         filtered.sort(key=lambda m: (-(m.rating or 0.0), m.id))
         return api_response(data=[m.to_response() for m in filtered])
@@ -224,6 +228,8 @@ def get_all_movies(
 @router.get("/api/movies/browse")
 def browse_movies(
     request: Request,
+    query: str | None = Query(default=None),
+    search: str | None = Query(default=None),
     q: str | None = Query(default=None),
     genre: str | None = Query(default=None),
     genres: str | None = Query(default=None),
@@ -233,7 +239,7 @@ def browse_movies(
     sort: str = Query(default="rating"),
     direction: str = Query(default="desc"),
     page: int = Query(default=0),
-    size: int = Query(default=20),
+    size: int = Query(default=12),
 ):
     if page < 0:
         return api_response(None, f"Chỉ số trang (page) không được âm: {page}", False, 400)
@@ -248,17 +254,19 @@ def browse_movies(
     if sort_dir not in {"asc", "desc"}:
         return api_response(None, f"Chiều sắp xếp không hợp lệ: '{direction}'", False, 400)
 
+    effective_q = next((v.strip() for v in (query, search, q) if v and v.strip()), None)
+
     with get_db(request) as db:
-        query = db.query(Movie)
+        db_query = db.query(Movie)
         if yearMin is not None:
-            query = query.filter(Movie.release_year >= yearMin)
+            db_query = db_query.filter(Movie.release_year >= yearMin)
         if yearMax is not None:
-            query = query.filter(Movie.release_year <= yearMax)
-        items = query.all()
+            db_query = db_query.filter(Movie.release_year <= yearMax)
+        items = db_query.all()
         result = []
         genre_tokens = [t.strip() for t in (genres or "").split(",") if t.strip()]
         for m in items:
-            if not _matches_search(m, q):
+            if not _matches_search(m, effective_q):
                 continue
             if not _matches_genre_token(m.genres, genre):
                 continue
@@ -301,7 +309,7 @@ def get_movie_by_id(movie_id: str, request: Request):
     with get_db(request) as db:
         movie = db.get(Movie, movie_id)
         if not movie:
-            return api_response(None, f"Movie not found with id: {movie_id}", False, 400)
+            return api_response(None, f"Movie not found with id: {movie_id}", False, 404)
         return api_response(data=movie.to_response())
 
 
@@ -341,17 +349,25 @@ def get_media_descriptor(movie_id: str, request: Request):
 
 
 @router.get("/api/catalog/series")
-def get_catalog_series(request: Request):
+def get_catalog_series(request: Request, authorization: str | None = Header(default=None)):
     with get_db(request) as db:
-        series_list = [s.to_dict() for s in db.query(CatalogSeries).all() if is_published(s.record_json)]
-        return api_response(data=series_list)
+        user = get_optional_user(request, db, authorization)
+        is_admin = bool(user and user.role == "ROLE_ADMIN")
+        series_list = [
+            s.to_dict()
+            for s in db.query(CatalogSeries).all()
+            if is_admin or is_published(s.record_json)
+        ]
+        return JSONResponse(series_list)
 
 
 @router.get("/api/catalog/series/{series_id}")
-def get_catalog_series_detail(series_id: str, request: Request):
+def get_catalog_series_detail(series_id: str, request: Request, authorization: str | None = Header(default=None)):
     with get_db(request) as db:
+        user = get_optional_user(request, db, authorization)
+        is_admin = bool(user and user.role == "ROLE_ADMIN")
         series = db.get(CatalogSeries, series_id)
-        if not series or not is_published(series.record_json):
+        if not series or (not is_admin and not is_published(series.record_json)):
             return api_response(None, f"Không tìm thấy bộ phim (series) với mã: {series_id}", False, 404)
         seasons = (
             db.query(CatalogSeason)
@@ -359,7 +375,7 @@ def get_catalog_series_detail(series_id: str, request: Request):
             .order_by(CatalogSeason.number.asc())
             .all()
         )
-        pub_seasons = [s.to_dict() for s in seasons if is_published(s.record_json)]
+        pub_seasons = [s.to_dict() for s in seasons if is_admin or is_published(s.record_json)]
         pub_season_ids = {s["id"] for s in pub_seasons}
         episodes = (
             db.query(CatalogEpisode)
@@ -370,9 +386,10 @@ def get_catalog_series_detail(series_id: str, request: Request):
         pub_episodes = [
             e.to_dict()
             for e in episodes
-            if is_published(e.record_json) and (not e.season_id or e.season_id in pub_season_ids)
+            if (is_admin or is_published(e.record_json))
+            and (is_admin or not e.season_id or e.season_id in pub_season_ids)
         ]
-        return api_response(data={"series": series.to_dict(), "seasons": pub_seasons, "episodes": pub_episodes})
+        return JSONResponse({"series": series.to_dict(), "seasons": pub_seasons, "episodes": pub_episodes})
 
 
 def _asset_covers_episode(asset: CatalogMediaAsset, episode_id: str) -> bool:
@@ -388,7 +405,10 @@ def _asset_covers_episode(asset: CatalogMediaAsset, episode_id: str) -> bool:
 
 
 def _asset_allowed(asset: CatalogMediaAsset, user: User | None) -> bool:
-    if not asset.enabled or not is_published(asset.record_json):
+    if not asset.enabled:
+        return False
+    is_admin = bool(user and user.role == "ROLE_ADMIN")
+    if not is_admin and not is_published(asset.record_json):
         return False
     policy = (asset.access_policy or "public").lower()
     if policy == "public":
@@ -398,28 +418,29 @@ def _asset_allowed(asset: CatalogMediaAsset, user: User | None) -> bool:
     if policy == "authenticated":
         return True
     if policy == "private":
-        return user.role == "ROLE_ADMIN"
+        return is_admin
     return False
 
 
 @router.get("/api/catalog/episodes/{episode_id}")
 def get_catalog_episode_detail(episode_id: str, request: Request, authorization: str | None = Header(default=None)):
     with get_db(request) as db:
+        user = get_optional_user(request, db, authorization)
+        is_admin = bool(user and user.role == "ROLE_ADMIN")
         ep = db.get(CatalogEpisode, episode_id)
-        if not ep or not is_published(ep.record_json):
+        if not ep or (not is_admin and not is_published(ep.record_json)):
             return api_response(None, f"Không tìm thấy tập phim với mã: {episode_id}", False, 404)
         series = db.get(CatalogSeries, ep.series_id)
-        if not series or not is_published(series.record_json):
+        if not is_admin and (not series or not is_published(series.record_json)):
             return api_response(None, f"Không tìm thấy tập phim với mã: {episode_id}", False, 404)
         if ep.season_id:
             sea = db.get(CatalogSeason, ep.season_id)
-            if not sea or not is_published(sea.record_json):
+            if not is_admin and (not sea or not is_published(sea.record_json)):
                 return api_response(None, f"Không tìm thấy tập phim với mã: {episode_id}", False, 404)
-        user = get_optional_user(request, db, authorization)
         segments = [
             s.to_dict()
             for s in db.query(CatalogSegment).filter(CatalogSegment.episode_id == episode_id).order_by(CatalogSegment.position.asc()).all()
-            if is_published(s.record_json)
+            if is_admin or is_published(s.record_json)
         ]
         all_assets = db.query(CatalogMediaAsset).filter(CatalogMediaAsset.coverage_json.like(f"%{episode_id}%")).all()
         assets = [a.to_dict() for a in all_assets if _asset_covers_episode(a, episode_id) and _asset_allowed(a, user)]
@@ -427,25 +448,29 @@ def get_catalog_episode_detail(episode_id: str, request: Request, authorization:
         scenes = [
             sc.to_dict()
             for sc in db.query(CatalogScene).filter(CatalogScene.episode_id == episode_id).order_by(CatalogScene.start_ms.asc()).all()
-            if is_published(sc.record_json) and (not sc.media_asset_id or sc.media_asset_id in allowed_asset_ids)
+            if (is_admin or is_published(sc.record_json))
+            and (is_admin or not sc.media_asset_id or sc.media_asset_id in allowed_asset_ids)
         ]
-        return api_response(data={"episode": ep.to_dict(), "segments": segments, "mediaAssets": assets, "scenes": scenes})
+        return JSONResponse({"episode": ep.to_dict(), "segments": segments, "mediaAssets": assets, "scenes": scenes})
 
 
 @router.get("/api/catalog/search")
 def search_catalog(request: Request, q: str = Query(default=""), authorization: str | None = Header(default=None)):
     term = (q or "").strip().lower()
     if not term:
-        return api_response(data=[])
+        return JSONResponse([])
     with get_db(request) as db:
         user = get_optional_user(request, db, authorization)
+        is_admin = bool(user and user.role == "ROLE_ADMIN")
         results = []
-        pub_series = {s.id: s for s in db.query(CatalogSeries).all() if is_published(s.record_json)}
-        pub_seasons = {s.id: s for s in db.query(CatalogSeason).all() if is_published(s.record_json)}
+        pub_series = {s.id: s for s in db.query(CatalogSeries).all() if is_admin or is_published(s.record_json)}
+        pub_seasons = {s.id: s for s in db.query(CatalogSeason).all() if is_admin or is_published(s.record_json)}
         pub_episodes = {
             e.id: e
             for e in db.query(CatalogEpisode).all()
-            if is_published(e.record_json) and e.series_id in pub_series and (not e.season_id or e.season_id in pub_seasons)
+            if (is_admin or is_published(e.record_json))
+            and e.series_id in pub_series
+            and (is_admin or not e.season_id or e.season_id in pub_seasons)
         }
         allowed_assets = {a.id: a for a in db.query(CatalogMediaAsset).all() if _asset_allowed(a, user)}
 
@@ -468,7 +493,7 @@ def search_catalog(request: Request, q: str = Query(default=""), authorization: 
                 })
 
         for seg in db.query(CatalogSegment).all():
-            if not is_published(seg.record_json) or seg.episode_id not in pub_episodes:
+            if (not is_admin and not is_published(seg.record_json)) or seg.episode_id not in pub_episodes:
                 continue
             if any(term in (field or "").lower() for field in (seg.title, seg.synopsis, seg.plot_facts_json, seg.keywords_json)):
                 ep = pub_episodes[seg.episode_id]
@@ -480,9 +505,9 @@ def search_catalog(request: Request, q: str = Query(default=""), authorization: 
                 })
 
         for sc in db.query(CatalogScene).all():
-            if not is_published(sc.record_json) or sc.episode_id not in pub_episodes:
+            if (not is_admin and not is_published(sc.record_json)) or sc.episode_id not in pub_episodes:
                 continue
-            if sc.media_asset_id and sc.media_asset_id not in allowed_assets:
+            if not is_admin and sc.media_asset_id and sc.media_asset_id not in allowed_assets:
                 continue
             if any(term in (field or "").lower() for field in (sc.title, sc.summary, sc.visual_description, sc.visual_tags_json)):
                 ep = pub_episodes[sc.episode_id]
@@ -492,7 +517,7 @@ def search_catalog(request: Request, q: str = Query(default=""), authorization: 
                     "mediaAssetId": sc.media_asset_id, "startMs": sc.start_ms, "endMs": sc.end_ms,
                     "snippet": sc.summary or sc.visual_description,
                 })
-        return api_response(data=results)
+        return JSONResponse(results)
 
 
 @router.get("/api/users/watchlist")
@@ -829,7 +854,16 @@ def grant_media_token(asset_id: str, request: Request, authorization: str | None
             user.role if user else "ROLE_ANONYMOUS",
             now_ts + 300,
         )
-        return api_response(data={"token": token, "expiresInSeconds": 300}, message="Granted playback token")
+        return JSONResponse(
+            {
+                "assetId": asset_id,
+                "grant": token,
+                "token": token,
+                "streamUrl": f"/api/media/stream/{asset_id}?grant={token}",
+                "expiresIn": 300,
+                "expiresInSeconds": 300,
+            }
+        )
 
 
 def _resolve_media_file(asset: MediaAsset) -> Path | None:
@@ -842,7 +876,9 @@ def _resolve_media_file(asset: MediaAsset) -> Path | None:
     for root_candidate in [
         Path(os.getenv("APP_MEDIA_ROOT", "./media")),
         Path(__file__).resolve().parents[2] / "springboot" / "media",
+        Path(__file__).resolve().parents[2] / "springboot" / "target" / "test-media",
         Path(__file__).resolve().parents[3] / "media",
+        Path(__file__).resolve().parents[3] / "ai" / "artifacts",
     ]:
         target = (root_candidate / rel).resolve()
         if target.is_file():
@@ -850,14 +886,16 @@ def _resolve_media_file(asset: MediaAsset) -> Path | None:
     return None
 
 
-@router.get("/api/media/stream/{asset_id}")
+@router.api_route("/api/media/stream/{asset_id}", methods=["GET", "HEAD"])
 def stream_media(
     asset_id: str,
     request: Request,
     range: str | None = Header(default=None),
+    grant: str | None = Query(default=None),
     token: str | None = Query(default=None),
     authorization: str | None = Header(default=None),
 ):
+    effective_token = (grant or token or "").strip() or None
     with get_db(request) as db:
         asset = db.get(MediaAsset, asset_id)
         if not asset or not asset.is_available:
@@ -865,8 +903,8 @@ def stream_media(
         user = get_optional_user(request, db, authorization)
         if not asset.is_public:
             allowed = False
-            if token and token in MEDIA_TOKENS:
-                t_asset, _, t_role, exp = MEDIA_TOKENS[token]
+            if effective_token and effective_token in MEDIA_TOKENS:
+                t_asset, _, t_role, exp = MEDIA_TOKENS[effective_token]
                 if t_asset == asset_id and exp >= datetime.now(timezone.utc).timestamp():
                     c_asset = db.get(CatalogMediaAsset, asset_id)
                     if not c_asset or (c_asset.access_policy or "").lower() != "private" or t_role == "ROLE_ADMIN":
@@ -883,6 +921,13 @@ def stream_media(
             return api_response(None, f"Không tìm thấy tệp media: {asset.relative_path}", False, 404)
         total_length = file_path.stat().st_size
         mime = asset.mime_type or "video/mp4"
+
+        if request.method == "HEAD":
+            return Response(
+                status_code=200,
+                media_type=mime,
+                headers={"Accept-Ranges": "bytes", "Content-Length": str(total_length)},
+            )
 
         if not range or not range.strip():
             data = file_path.read_bytes()
@@ -947,16 +992,23 @@ async def admin_validate_catalog(request: Request, authorization: str | None = H
         body = await request.json()
         pkg = body.get("package") if isinstance(body, dict) else None
         if not isinstance(pkg, dict) or not pkg.get("id"):
-            return api_response(
-                data={
+            return JSONResponse(
+                {
                     "valid": False,
+                    "packageId": None,
+                    "revision": None,
+                    "contentHash": None,
+                    "toCreate": 0,
+                    "toUpdate": 0,
+                    "unchanged": 0,
+                    "conflicts": 0,
                     "errors": [{"path": "package.id", "code": "MISSING_FIELD", "message": "Thiếu package.id"}],
                 },
-                message="Phát hiện lỗi cấu trúc hoặc tham chiếu trong package",
+                status_code=400,
             )
         content_hash = compute_sha256(body)
-        return api_response(
-            data={
+        return JSONResponse(
+            {
                 "valid": True,
                 "packageId": pkg.get("id"),
                 "revision": int(pkg.get("revision") or 1),
@@ -966,8 +1018,7 @@ async def admin_validate_catalog(request: Request, authorization: str | None = H
                 "unchanged": 0,
                 "conflicts": 0,
                 "errors": [],
-            },
-            message="Package hợp lệ và sẵn sàng import",
+            }
         )
 
 
@@ -993,7 +1044,7 @@ async def admin_import_catalog(request: Request, authorization: str | None = Hea
                 db.commit()
         except Exception:
             pass
-        return api_response(data=resp, message=resp["message"])
+        return JSONResponse(resp)
 
 
 @router.get("/api/admin/catalog/history")
@@ -1002,7 +1053,7 @@ def admin_catalog_history(request: Request, authorization: str | None = Header(d
         if not _require_admin(request, db, authorization):
             return api_response(None, "Quyền truy cập bị từ chối (Yêu cầu ROLE_ADMIN)", False, 403)
         pkgs = db.query(CatalogPackage).order_by(CatalogPackage.imported_at.desc()).all()
-        return api_response(data=[p.to_dict() for p in pkgs])
+        return JSONResponse([p.to_dict() for p in pkgs])
 
 
 @router.get("/api/admin/catalog/snapshots")
@@ -1011,7 +1062,7 @@ def admin_catalog_snapshots(request: Request, authorization: str | None = Header
         if not _require_admin(request, db, authorization):
             return api_response(None, "Quyền truy cập bị từ chối (Yêu cầu ROLE_ADMIN)", False, 403)
         snaps = db.query(CatalogSnapshot).order_by(CatalogSnapshot.snapshot_version.desc()).all()
-        return api_response(data=[s.to_dict() for s in snaps])
+        return JSONResponse([s.to_dict() for s in snaps])
 
 
 @router.post("/api/admin/catalog/snapshots/{snapshot_id}/retry")
@@ -1033,7 +1084,7 @@ def admin_retry_snapshot(snapshot_id: str, request: Request, authorization: str 
         snap.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
         db.refresh(snap)
-        return api_response(data=snap.to_dict(), message="Đã kích hoạt đồng bộ lại cho snapshot: " + snapshot_id)
+        return JSONResponse(snap.to_dict())
 
 
 @router.get("/api/admin/catalog/export")
@@ -1046,7 +1097,6 @@ def admin_export_catalog(
     with get_db(request) as db:
         if not _require_admin(request, db, authorization):
             return api_response(None, "Quyền truy cập bị từ chối (Yêu cầu ROLE_ADMIN)", False, 403)
-        return api_response(
-            data=export_eligible_catalog(db, include_draft=includeDraft, include_private=includePrivate),
-            message="Xuất dữ liệu catalog thành công",
+        return JSONResponse(
+            export_eligible_catalog(db, include_draft=includeDraft, include_private=includePrivate)
         )

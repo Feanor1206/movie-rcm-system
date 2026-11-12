@@ -6,6 +6,10 @@
 # =========================================================================
 
 services:
+  nginx:
+    volumes:
+      - ./nginx/python-main.conf:/etc/nginx/conf.d/default.conf:ro
+
   frontend:
     build:
       args:
@@ -14,6 +18,12 @@ services:
       - BACKEND_INTERNAL_URL=http://fastapi:8000
       - SPRINGBOOT_INTERNAL_URL=http://fastapi:8000
       - MODEL_API_URL=http://fastapi:8000/api/chat
+
+  fastapi:
+    networks:
+      movie_network:
+        aliases:
+          - springboot
 
   springboot:
     profiles:
