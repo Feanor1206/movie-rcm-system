@@ -36,8 +36,10 @@ from services.database import (
     WatchlistItem,
     WatchProgress,
     create_jwt_token,
+    create_playback_grant_token,
     decode_jwt_token,
     export_eligible_catalog,
+    validate_playback_grant_token,
 )
 
 
@@ -131,6 +133,12 @@ def test_cross_jwt_token_interoperability():
     assert grant_claims["assetId"] == "ast-drive-videoplayback"
     assert grant_claims["type"] == "playback_grant"
     assert decode_jwt_token(grant_token) is None, "Playback grant must be rejected as general auth token"
+    assert validate_playback_grant_token(grant_token, "ast-drive-videoplayback") == "ROLE_USER"
+
+    py_grant = create_playback_grant_token("ast-drive-videoplayback", "streamer_01", "ROLE_ADMIN", 300)
+    assert decode_jwt_token(py_grant) is None
+    assert validate_playback_grant_token(py_grant, "ast-drive-videoplayback") == "ROLE_ADMIN"
+    assert validate_playback_grant_token(py_grant, "other-asset") is None
 
 
 def test_cross_database_schema_and_types():

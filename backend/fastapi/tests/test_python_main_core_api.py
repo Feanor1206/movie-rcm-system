@@ -69,10 +69,16 @@ def test_python_main_auth_movies_and_user_library(tmp_path, monkeypatch):
         assert grant_body["streamUrl"].startswith("/api/media/stream/ast-orbit-feat?grant=")
         assert grant_body["expiresIn"] == 300
 
+        grant_as_auth = client.get("/api/auth/me", headers={"Authorization": f"Bearer {grant_body['grant']}"})
+        assert grant_as_auth.status_code == 401
+
         head_res = client.head(grant_body["streamUrl"])
         assert head_res.status_code == 200
         assert head_res.headers.get("accept-ranges") == "bytes"
         assert int(head_res.headers.get("content-length", "0")) > 0
+
+        token_stream_res = client.get(f"/api/media/stream/ast-orbit-feat?token={grant_body['token']}")
+        assert token_stream_res.status_code == 200
 
         reg_res = client.post(
             "/api/auth/register",
@@ -201,10 +207,49 @@ def test_python_main_catalog_import_search_and_watch_progress(tmp_path):
         assert valid_val.status_code == 200
         assert valid_val.json()["valid"] is True
         assert valid_val.json()["packageId"] == "pkg_mysql_test"
+        assert valid_val.json()["toCreate"] == 5
+        assert valid_val.json()["toUpdate"] == 0
+        assert valid_val.json()["unchanged"] == 0
+        assert valid_val.json()["conflicts"] == 0
 
         imp_res = client.post("/api/admin/catalog/import", json=sample_package, headers=admin_headers)
         assert imp_res.status_code == 200
         assert imp_res.json()["success"] is True
+
+        unchanged_val = client.post("/api/admin/catalog/validate", json=sample_package, headers=admin_headers)
+        assert unchanged_val.status_code == 200
+        assert unchanged_val.json()["unchanged"] == 5
+        assert unchanged_val.json()["toCreate"] == 0
+
+        updated_pkg = {
+            **sample_package,
+            "package": {"id": "pkg_mysql_test", "version": "1.0.1", "revision": 2},
+            "series": [
+                {
+                    **sample_package["series"][0],
+                    "synopsis": "Phim hoạt hình gia đình vui nhộn bản cập nhật",
+                    "record": {"status": "ready", "revision": 2},
+                }
+            ],
+        }
+        update_val = client.post("/api/admin/catalog/validate", json=updated_pkg, headers=admin_headers)
+        assert update_val.status_code == 200
+        assert update_val.json()["toUpdate"] == 2
+        assert update_val.json()["unchanged"] == 3
+        assert update_val.json()["conflicts"] == 0
+
+        conflict_pkg = {
+            **sample_package,
+            "series": [
+                {
+                    **sample_package["series"][0],
+                    "synopsis": "Thay đổi nội dung nhưng không tăng revision",
+                }
+            ],
+        }
+        conflict_val = client.post("/api/admin/catalog/validate", json=conflict_pkg, headers=admin_headers)
+        assert conflict_val.status_code == 200
+        assert conflict_val.json()["conflicts"] == 2
 
         hist_res = client.get("/api/admin/catalog/history", headers=admin_headers)
         assert hist_res.status_code == 200
@@ -225,6 +270,9 @@ def test_python_main_catalog_import_search_and_watch_progress(tmp_path):
         export_res = client.get("/api/admin/catalog/export", headers=admin_headers)
         assert export_res.status_code == 200
         assert export_res.json()["schema_version"] == "dippie.catalog.v1"
+        assert {"id", "revision", "created_at", "default_language", "import_mode", "reference_scope", "description"}.issubset(
+            set(export_res.json()["package"].keys())
+        )
 
         all_series_res = client.get("/api/catalog/series")
         assert all_series_res.status_code == 200

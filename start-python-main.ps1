@@ -60,7 +60,7 @@ $nextBin = Join-Path $frontendDir "node_modules\next\dist\bin\next"
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if ($nodeCmd -and (Test-Path $nextBin)) {
     $feExe = $nodeCmd.Source
-    $feProc = Start-Process -FilePath $feExe -ArgumentList @($nextBin, "dev", "-p", "$FrontendPort") -WorkingDirectory $frontendDir -PassThru -WindowStyle Hidden
+    $feProc = Start-Process -FilePath $feExe -ArgumentList @("node_modules\next\dist\bin\next", "dev", "-p", "$FrontendPort") -WorkingDirectory $frontendDir -PassThru -WindowStyle Hidden
 } else {
     $feExe = (Get-Command npm.cmd -ErrorAction Stop).Source
     $feProc = Start-Process -FilePath $feExe -ArgumentList @("run", "dev", "--", "-p", "$FrontendPort") -WorkingDirectory $frontendDir -PassThru -WindowStyle Hidden
