@@ -34,8 +34,11 @@ Write-Host "`n[3/4] Đồng bộ nhánh 'python-main' từ 'dev' (non-destructiv
 git checkout python-main
 
 # Thực hiện merge với --no-commit để xử lý dọn dẹp backend/springboot an toàn
-$mergeResult = git merge dev --no-commit 2>&1
-Write-Host $mergeResult
+# Tạm thời hạ ErrorActionPreference để tránh NativeCommandError từ thông báo stderr của Git
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+git merge dev --no-commit
+$ErrorActionPreference = $prevEAP
 
 # Lược bỏ các file backend/springboot nếu bị kéo vào hoặc gặp xung đột modify/delete
 if (Test-Path "backend\springboot") {
@@ -47,10 +50,12 @@ if (Test-Path "backend\springboot") {
 
 # Dọn dẹp các trạng thái modify/delete conflict (UD) đối với backend/springboot
 $conflicts = git status --porcelain
-foreach ($line in ($conflicts -split "`n")) {
-    if ($line -match "^\s*UD\s+(backend/springboot/.*)") {
-        $conflictFile = $matches[1].Trim()
-        git rm -f $conflictFile 2>$null | Out-Null
+if ($conflicts) {
+    foreach ($line in ($conflicts -split "`n")) {
+        if ($line -match "^\s*UD\s+(backend/springboot/.*)") {
+            $conflictFile = $matches[1].Trim()
+            git rm -f $conflictFile 2>$null | Out-Null
+        }
     }
 }
 
