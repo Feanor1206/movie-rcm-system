@@ -13,7 +13,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from services.database import (
+    CatalogAttributeScale,
+    CatalogCharacter,
     CatalogEpisode,
+    CatalogGenre,
     CatalogMediaAsset,
     CatalogPackage,
     CatalogScene,
@@ -21,6 +24,8 @@ from services.database import (
     CatalogSegment,
     CatalogSeries,
     CatalogSnapshot,
+    CatalogSource,
+    CatalogTextTrack,
     FavoriteItem,
     MediaAsset,
     Movie,
@@ -30,11 +35,13 @@ from services.database import (
     WatchlistItem,
     compute_sha256,
     create_jwt_token,
+    create_playback_grant_token,
     decode_jwt_token,
     export_eligible_catalog,
     hash_password,
     import_catalog_package,
     is_published,
+    validate_playback_grant_token,
     verify_password,
 )
 
@@ -847,7 +854,12 @@ def grant_media_token(asset_id: str, request: Request, authorization: str | None
             expired = [k for k, v in MEDIA_TOKENS.items() if v[3] < now_ts]
             for k in expired:
                 del MEDIA_TOKENS[k]
-        token = secrets.token_urlsafe(24)
+        token = create_playback_grant_token(
+            asset_id,
+            user.username if user else "anonymous",
+            user.role if user else "ROLE_ANONYMOUS",
+            300,
+        )
         MEDIA_TOKENS[token] = (
             asset_id,
             user.id if user else None,
@@ -903,12 +915,18 @@ def stream_media(
         user = get_optional_user(request, db, authorization)
         if not asset.is_public:
             allowed = False
-            if effective_token and effective_token in MEDIA_TOKENS:
-                t_asset, _, t_role, exp = MEDIA_TOKENS[effective_token]
-                if t_asset == asset_id and exp >= datetime.now(timezone.utc).timestamp():
-                    c_asset = db.get(CatalogMediaAsset, asset_id)
-                    if not c_asset or (c_asset.access_policy or "").lower() != "private" or t_role == "ROLE_ADMIN":
-                        allowed = True
+            grant_role = None
+            if effective_token:
+                if effective_token in MEDIA_TOKENS:
+                    t_asset, _, t_role, exp = MEDIA_TOKENS[effective_token]
+                    if t_asset == asset_id and exp >= datetime.now(timezone.utc).timestamp():
+                        grant_role = t_role
+                if not grant_role:
+                    grant_role = validate_playback_grant_token(effective_token, asset_id)
+            if grant_role:
+                c_asset = db.get(CatalogMediaAsset, asset_id)
+                if not c_asset or (c_asset.access_policy or "").lower() != "private" or grant_role == "ROLE_ADMIN":
+                    allowed = True
             elif user:
                 c_asset = db.get(CatalogMediaAsset, asset_id)
                 if not c_asset or (c_asset.access_policy or "").lower() != "private" or user.role == "ROLE_ADMIN":
@@ -1006,17 +1024,75 @@ async def admin_validate_catalog(request: Request, authorization: str | None = H
                 },
                 status_code=400,
             )
+        pkg_id = str(pkg.get("id"))
+        revision = int(pkg.get("revision") or 1)
         content_hash = compute_sha256(body)
+        to_create = 0
+        to_update = 0
+        unchanged = 0
+        conflicts = 0
+        existing_pkg = db.get(CatalogPackage, pkg_id)
+        if existing_pkg is None:
+            to_create += 1
+        elif revision < int(existing_pkg.revision or 1):
+            conflicts += 1
+        elif revision == int(existing_pkg.revision or 1):
+            if content_hash == existing_pkg.content_hash:
+                unchanged += 1
+            else:
+                conflicts += 1
+        else:
+            to_update += 1
+
+        collections = (
+            ("genres", CatalogGenre),
+            ("attribute_scales", CatalogAttributeScale),
+            ("sources", CatalogSource),
+            ("series", CatalogSeries),
+            ("seasons", CatalogSeason),
+            ("episodes", CatalogEpisode),
+            ("segments", CatalogSegment),
+            ("characters", CatalogCharacter),
+            ("media_assets", CatalogMediaAsset),
+            ("text_tracks", CatalogTextTrack),
+            ("scenes", CatalogScene),
+        )
+        for col_key, model_cls in collections:
+            for item in body.get(col_key) or []:
+                if not isinstance(item, dict) or not item.get("id"):
+                    continue
+                existing = db.get(model_cls, str(item["id"]))
+                if existing is None:
+                    to_create += 1
+                    continue
+                inc_rev = int((item.get("record") or {}).get("revision") or revision)
+                ex_rev = int(existing.revision or 1)
+                if inc_rev < ex_rev:
+                    conflicts += 1
+                elif inc_rev == ex_rev:
+                    ex_hash = ""
+                    if existing.raw_json:
+                        try:
+                            ex_hash = compute_sha256(json.loads(existing.raw_json))
+                        except Exception:
+                            ex_hash = compute_sha256(existing.raw_json)
+                    if compute_sha256(item) == ex_hash:
+                        unchanged += 1
+                    else:
+                        conflicts += 1
+                else:
+                    to_update += 1
+
         return JSONResponse(
             {
                 "valid": True,
-                "packageId": pkg.get("id"),
-                "revision": int(pkg.get("revision") or 1),
+                "packageId": pkg_id,
+                "revision": revision,
                 "contentHash": content_hash,
-                "toCreate": len(body.get("episodes") or []) + len(body.get("series") or []),
-                "toUpdate": 0,
-                "unchanged": 0,
-                "conflicts": 0,
+                "toCreate": to_create,
+                "toUpdate": to_update,
+                "unchanged": unchanged,
+                "conflicts": conflicts,
                 "errors": [],
             }
         )
@@ -1090,8 +1166,8 @@ def admin_retry_snapshot(snapshot_id: str, request: Request, authorization: str 
 @router.get("/api/admin/catalog/export")
 def admin_export_catalog(
     request: Request,
-    includeDraft: bool = Query(default=False),
-    includePrivate: bool = Query(default=False),
+    includeDraft: bool = Query(default=True),
+    includePrivate: bool = Query(default=True),
     authorization: str | None = Header(default=None),
 ):
     with get_db(request) as db:

@@ -727,6 +727,32 @@ def decode_jwt_token(token: str) -> str | None:
         return None
 
 
+def create_playback_grant_token(asset_id: str, username: str, role: str, validity_seconds: int = 300) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": username or "anonymous",
+        "assetId": asset_id,
+        "role": role or "ROLE_ANONYMOUS",
+        "type": "playback_grant",
+        "purpose": "playback",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(seconds=validity_seconds)).timestamp()),
+    }
+    return jwt.encode(payload, _jwt_key(), algorithm="HS256")
+
+
+def validate_playback_grant_token(token: str, asset_id: str) -> str | None:
+    try:
+        payload = jwt.decode(token, _jwt_key(), algorithms=["HS256"])
+        if payload.get("type") != "playback_grant":
+            return None
+        if not asset_id or payload.get("assetId") != asset_id:
+            return None
+        return str(payload.get("role") or "ROLE_ANONYMOUS")
+    except Exception:
+        return None
+
+
 def resolve_database_url(explicit_url: str | None = None) -> str:
     if explicit_url:
         return explicit_url
@@ -1270,10 +1296,17 @@ def export_eligible_catalog(db, include_draft: bool = False, include_private: bo
         return out
 
     latest_pkg = db.query(CatalogPackage).order_by(CatalogPackage.imported_at.desc()).first()
+    created_at_iso = (
+        latest_pkg.created_at.isoformat() + "Z"
+        if (latest_pkg and latest_pkg.created_at)
+        else datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+    )
     pkg_meta = {
         "id": latest_pkg.id if latest_pkg else "dippie-exported-catalog",
         "version": latest_pkg.version if latest_pkg else "1.0.0",
         "revision": latest_pkg.revision if latest_pkg else 1,
+        "description": (latest_pkg.description if (latest_pkg and latest_pkg.description) else "Canonical catalog export"),
+        "created_at": created_at_iso,
         "default_language": latest_pkg.default_language if latest_pkg else "vi",
         "import_mode": latest_pkg.import_mode if latest_pkg else "upsert",
         "reference_scope": latest_pkg.reference_scope if latest_pkg else "self_contained",
