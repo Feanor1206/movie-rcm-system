@@ -19,20 +19,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class CatalogImportService {
@@ -321,6 +315,20 @@ public class CatalogImportService {
         }
     }
 
+    private List<String> extractIds(JsonNode arrayNode) {
+        if (arrayNode == null || !arrayNode.isArray() || arrayNode.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<String> ids = new ArrayList<>(arrayNode.size());
+        for (JsonNode item : arrayNode) {
+            String id = item.path("id").asText(null);
+            if (id != null && !id.isBlank()) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
     public CatalogValidationResult validateAndPreview(JsonNode data) {
         List<CatalogValidationError> errors = validator.validate(data);
         if (!errors.isEmpty()) {
@@ -364,11 +372,14 @@ public class CatalogImportService {
 
         // 2. Genres
         if (data.has("genres") && data.get("genres").isArray()) {
+            List<String> ids = extractIds(data.get("genres"));
+            Map<String, CatalogGenre> existingMap = genreRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogGenre::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("genres")) {
                 String id = item.path("id").asText();
-                Optional<CatalogGenre> existing = genreRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogGenre::getRawJson).orElse(null),
-                        existing.map(CatalogGenre::getRecordJson).orElse(null), null, revision);
+                CatalogGenre existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -378,11 +389,14 @@ public class CatalogImportService {
 
         // 3. Attribute Scales
         if (data.has("attribute_scales") && data.get("attribute_scales").isArray()) {
+            List<String> ids = extractIds(data.get("attribute_scales"));
+            Map<String, CatalogAttributeScale> existingMap = scaleRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogAttributeScale::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("attribute_scales")) {
                 String id = item.path("id").asText();
-                Optional<CatalogAttributeScale> existing = scaleRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogAttributeScale::getRawJson).orElse(null),
-                        existing.map(CatalogAttributeScale::getRecordJson).orElse(null), null, revision);
+                CatalogAttributeScale existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -392,11 +406,14 @@ public class CatalogImportService {
 
         // 4. Sources
         if (data.has("sources") && data.get("sources").isArray()) {
+            List<String> ids = extractIds(data.get("sources"));
+            Map<String, CatalogSource> existingMap = sourceRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSource::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("sources")) {
                 String id = item.path("id").asText();
-                Optional<CatalogSource> existing = sourceRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogSource::getRawJson).orElse(null),
-                        existing.map(CatalogSource::getRecordJson).orElse(null), null, revision);
+                CatalogSource existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -406,11 +423,14 @@ public class CatalogImportService {
 
         // 5. Series
         if (data.has("series") && data.get("series").isArray()) {
+            List<String> ids = extractIds(data.get("series"));
+            Map<String, CatalogSeries> existingMap = seriesRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSeries::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("series")) {
                 String id = item.path("id").asText();
-                Optional<CatalogSeries> existing = seriesRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogSeries::getRawJson).orElse(null),
-                        existing.map(CatalogSeries::getRecordJson).orElse(null), existing.map(CatalogSeries::getRevision).orElse(null), revision);
+                CatalogSeries existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -420,11 +440,14 @@ public class CatalogImportService {
 
         // 6. Seasons
         if (data.has("seasons") && data.get("seasons").isArray()) {
+            List<String> ids = extractIds(data.get("seasons"));
+            Map<String, CatalogSeason> existingMap = seasonRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSeason::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("seasons")) {
                 String id = item.path("id").asText();
-                Optional<CatalogSeason> existing = seasonRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogSeason::getRawJson).orElse(null),
-                        existing.map(CatalogSeason::getRecordJson).orElse(null), existing.map(CatalogSeason::getRevision).orElse(null), revision);
+                CatalogSeason existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -434,11 +457,14 @@ public class CatalogImportService {
 
         // 7. Episodes
         if (data.has("episodes") && data.get("episodes").isArray()) {
+            List<String> ids = extractIds(data.get("episodes"));
+            Map<String, CatalogEpisode> existingMap = episodeRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogEpisode::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("episodes")) {
                 String id = item.path("id").asText();
-                Optional<CatalogEpisode> existing = episodeRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogEpisode::getRawJson).orElse(null),
-                        existing.map(CatalogEpisode::getRecordJson).orElse(null), existing.map(CatalogEpisode::getRevision).orElse(null), revision);
+                CatalogEpisode existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -448,11 +474,14 @@ public class CatalogImportService {
 
         // 8. Segments
         if (data.has("segments") && data.get("segments").isArray()) {
+            List<String> ids = extractIds(data.get("segments"));
+            Map<String, CatalogSegment> existingMap = segmentRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSegment::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("segments")) {
                 String id = item.path("id").asText();
-                Optional<CatalogSegment> existing = segmentRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogSegment::getRawJson).orElse(null),
-                        existing.map(CatalogSegment::getRecordJson).orElse(null), existing.map(CatalogSegment::getRevision).orElse(null), revision);
+                CatalogSegment existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -462,11 +491,14 @@ public class CatalogImportService {
 
         // 9. Characters
         if (data.has("characters") && data.get("characters").isArray()) {
+            List<String> ids = extractIds(data.get("characters"));
+            Map<String, CatalogCharacter> existingMap = characterRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogCharacter::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("characters")) {
                 String id = item.path("id").asText();
-                Optional<CatalogCharacter> existing = characterRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogCharacter::getRawJson).orElse(null),
-                        existing.map(CatalogCharacter::getRecordJson).orElse(null), existing.map(CatalogCharacter::getRevision).orElse(null), revision);
+                CatalogCharacter existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -476,11 +508,14 @@ public class CatalogImportService {
 
         // 10. Media Assets
         if (data.has("media_assets") && data.get("media_assets").isArray()) {
+            List<String> ids = extractIds(data.get("media_assets"));
+            Map<String, CatalogMediaAsset> existingMap = mediaAssetRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogMediaAsset::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("media_assets")) {
                 String id = item.path("id").asText();
-                Optional<CatalogMediaAsset> existing = mediaAssetRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogMediaAsset::getRawJson).orElse(null),
-                        existing.map(CatalogMediaAsset::getRecordJson).orElse(null), existing.map(CatalogMediaAsset::getRevision).orElse(null), revision);
+                CatalogMediaAsset existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -490,11 +525,14 @@ public class CatalogImportService {
 
         // 11. Text Tracks
         if (data.has("text_tracks") && data.get("text_tracks").isArray()) {
+            List<String> ids = extractIds(data.get("text_tracks"));
+            Map<String, CatalogTextTrack> existingMap = textTrackRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogTextTrack::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("text_tracks")) {
                 String id = item.path("id").asText();
-                Optional<CatalogTextTrack> existing = textTrackRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogTextTrack::getRawJson).orElse(null),
-                        existing.map(CatalogTextTrack::getRecordJson).orElse(null), existing.map(CatalogTextTrack::getRevision).orElse(null), revision);
+                CatalogTextTrack existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -504,11 +542,14 @@ public class CatalogImportService {
 
         // 12. Scenes
         if (data.has("scenes") && data.get("scenes").isArray()) {
+            List<String> ids = extractIds(data.get("scenes"));
+            Map<String, CatalogScene> existingMap = sceneRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogScene::getId, Function.identity(), (a, b) -> a));
             for (JsonNode item : data.get("scenes")) {
                 String id = item.path("id").asText();
-                Optional<CatalogScene> existing = sceneRepository.findById(id);
-                DiffStatus status = evaluateDiff(item, existing.map(CatalogScene::getRawJson).orElse(null),
-                        existing.map(CatalogScene::getRecordJson).orElse(null), existing.map(CatalogScene::getRevision).orElse(null), revision);
+                CatalogScene existing = existingMap.get(id);
+                DiffStatus status = evaluateDiff(item, existing != null ? existing.getRawJson() : null,
+                        existing != null ? existing.getRecordJson() : null, existing != null ? existing.getRevision() : null, revision);
                 if (status == DiffStatus.CREATE) toCreate++;
                 else if (status == DiffStatus.UPDATE) toUpdate++;
                 else if (status == DiffStatus.UNCHANGED) unchanged++;
@@ -597,16 +638,20 @@ public class CatalogImportService {
         // 4. Upsert Genres
         int genreCount = 0;
         if (data.has("genres") && data.get("genres").isArray()) {
+            List<String> ids = extractIds(data.get("genres"));
+            Map<String, CatalogGenre> existingMap = genreRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogGenre::getId, Function.identity(), (a, b) -> a));
+            List<CatalogGenre> toSave = new ArrayList<>(ids.size());
             for (JsonNode g : data.get("genres")) {
                 String gid = g.path("id").asText();
-                Optional<CatalogGenre> existingOptGen = genreRepository.findById(gid);
-                DiffStatus diff = evaluateDiff(g, existingOptGen.map(CatalogGenre::getRawJson).orElse(null),
-                        existingOptGen.map(CatalogGenre::getRecordJson).orElse(null), null, revision);
+                CatalogGenre existingOptGen = existingMap.get(gid);
+                DiffStatus diff = evaluateDiff(g, existingOptGen != null ? existingOptGen.getRawJson() : null,
+                        existingOptGen != null ? existingOptGen.getRecordJson() : null, null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại thể loại [" + gid + "]");
                 }
 
-                CatalogGenre genre = existingOptGen.orElse(new CatalogGenre());
+                CatalogGenre genre = existingOptGen != null ? existingOptGen : new CatalogGenre();
                 genre.setId(gid);
                 genre.setLabelsJson(g.hasNonNull("labels") ? g.get("labels").toString() : (g.hasNonNull("name") ? objectMapper.createObjectNode().put("vi", g.get("name").asText()).toString() : "{}"));
                 genre.setDescription(g.hasNonNull("description") ? g.get("description").asText() : null);
@@ -614,25 +659,30 @@ public class CatalogImportService {
                 genre.setRecordJson(g.hasNonNull("record") ? g.get("record").toString() : null);
                 genre.setRawJson(g.toString());
                 genre.setUpdatedAt(LocalDateTime.now());
-                genreRepository.save(genre);
+                toSave.add(genre);
                 genreCount++;
             }
+            genreRepository.saveAll(toSave);
         }
         counts.put("genres", genreCount);
 
         // 5. Upsert Attribute Scales
         int scaleCount = 0;
         if (data.has("attribute_scales") && data.get("attribute_scales").isArray()) {
+            List<String> ids = extractIds(data.get("attribute_scales"));
+            Map<String, CatalogAttributeScale> existingMap = scaleRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogAttributeScale::getId, Function.identity(), (a, b) -> a));
+            List<CatalogAttributeScale> toSave = new ArrayList<>(ids.size());
             for (JsonNode sc : data.get("attribute_scales")) {
                 String sid = sc.path("id").asText();
-                Optional<CatalogAttributeScale> existingOptScale = scaleRepository.findById(sid);
-                DiffStatus diff = evaluateDiff(sc, existingOptScale.map(CatalogAttributeScale::getRawJson).orElse(null),
-                        existingOptScale.map(CatalogAttributeScale::getRecordJson).orElse(null), null, revision);
+                CatalogAttributeScale existingOptScale = existingMap.get(sid);
+                DiffStatus diff = evaluateDiff(sc, existingOptScale != null ? existingOptScale.getRawJson() : null,
+                        existingOptScale != null ? existingOptScale.getRecordJson() : null, null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại thang đo [" + sid + "]");
                 }
 
-                CatalogAttributeScale scale = existingOptScale.orElse(new CatalogAttributeScale());
+                CatalogAttributeScale scale = existingOptScale != null ? existingOptScale : new CatalogAttributeScale();
                 scale.setId(sid);
                 scale.setName(sc.path("name").asText());
                 scale.setDefinition(sc.hasNonNull("definition") ? sc.get("definition").asText() : null);
@@ -644,25 +694,30 @@ public class CatalogImportService {
                 scale.setRecordJson(sc.hasNonNull("record") ? sc.get("record").toString() : null);
                 scale.setRawJson(sc.toString());
                 scale.setUpdatedAt(LocalDateTime.now());
-                scaleRepository.save(scale);
+                toSave.add(scale);
                 scaleCount++;
             }
+            scaleRepository.saveAll(toSave);
         }
         counts.put("attributeScales", scaleCount);
 
         // 6. Upsert Sources
         int sourceCount = 0;
         if (data.has("sources") && data.get("sources").isArray()) {
+            List<String> ids = extractIds(data.get("sources"));
+            Map<String, CatalogSource> existingMap = sourceRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSource::getId, Function.identity(), (a, b) -> a));
+            List<CatalogSource> toSave = new ArrayList<>(ids.size());
             for (JsonNode src : data.get("sources")) {
                 String srcId = src.path("id").asText();
-                Optional<CatalogSource> existingOptSrc = sourceRepository.findById(srcId);
-                DiffStatus diff = evaluateDiff(src, existingOptSrc.map(CatalogSource::getRawJson).orElse(null),
-                        existingOptSrc.map(CatalogSource::getRecordJson).orElse(null), null, revision);
+                CatalogSource existingOptSrc = existingMap.get(srcId);
+                DiffStatus diff = evaluateDiff(src, existingOptSrc != null ? existingOptSrc.getRawJson() : null,
+                        existingOptSrc != null ? existingOptSrc.getRecordJson() : null, null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại nguồn [" + srcId + "]");
                 }
 
-                CatalogSource source = existingOptSrc.orElse(new CatalogSource());
+                CatalogSource source = existingOptSrc != null ? existingOptSrc : new CatalogSource();
                 source.setId(srcId);
                 source.setKind(src.path("kind").asText(src.path("source_type").asText("web")));
                 source.setTitle(src.path("title").asText(src.path("name").asText(null)));
@@ -672,25 +727,30 @@ public class CatalogImportService {
                 source.setRecordJson(src.hasNonNull("record") ? src.get("record").toString() : null);
                 source.setRawJson(src.toString());
                 source.setUpdatedAt(LocalDateTime.now());
-                sourceRepository.save(source);
+                toSave.add(source);
                 sourceCount++;
             }
+            sourceRepository.saveAll(toSave);
         }
         counts.put("sources", sourceCount);
 
         // 7. Upsert Series
         int seriesCount = 0;
         if (data.has("series") && data.get("series").isArray()) {
+            List<String> ids = extractIds(data.get("series"));
+            Map<String, CatalogSeries> existingMap = seriesRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSeries::getId, Function.identity(), (a, b) -> a));
+            List<CatalogSeries> toSave = new ArrayList<>(ids.size());
             for (JsonNode s : data.get("series")) {
                 String sid = s.path("id").asText();
-                Optional<CatalogSeries> existingOptSer = seriesRepository.findById(sid);
-                DiffStatus diff = evaluateDiff(s, existingOptSer.map(CatalogSeries::getRawJson).orElse(null),
-                        existingOptSer.map(CatalogSeries::getRecordJson).orElse(null), existingOptSer.map(CatalogSeries::getRevision).orElse(null), revision);
+                CatalogSeries existingOptSer = existingMap.get(sid);
+                DiffStatus diff = evaluateDiff(s, existingOptSer != null ? existingOptSer.getRawJson() : null,
+                        existingOptSer != null ? existingOptSer.getRecordJson() : null, existingOptSer != null ? existingOptSer.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại bộ phim [" + sid + "]");
                 }
 
-                CatalogSeries series = existingOptSer.orElse(new CatalogSeries());
+                CatalogSeries series = existingOptSer != null ? existingOptSer : new CatalogSeries();
                 series.setId(sid);
                 series.setTitle(s.path("title").asText());
                 series.setOriginalTitle(s.path("original_title").asText(null));
@@ -717,27 +777,32 @@ public class CatalogImportService {
                 series.setRevision(extractRevision(s, revision));
                 series.setRawJson(s.toString());
                 series.setUpdatedAt(LocalDateTime.now());
-                seriesRepository.save(series);
+                toSave.add(series);
 
                 syncSeriesToLegacyMovie(series);
                 seriesCount++;
             }
+            seriesRepository.saveAll(toSave);
         }
         counts.put("series", seriesCount);
 
         // 8. Upsert Seasons
         int seasonCount = 0;
         if (data.has("seasons") && data.get("seasons").isArray()) {
+            List<String> ids = extractIds(data.get("seasons"));
+            Map<String, CatalogSeason> existingMap = seasonRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSeason::getId, Function.identity(), (a, b) -> a));
+            List<CatalogSeason> toSave = new ArrayList<>(ids.size());
             for (JsonNode sea : data.get("seasons")) {
                 String seaId = sea.path("id").asText();
-                Optional<CatalogSeason> existingOptSea = seasonRepository.findById(seaId);
-                DiffStatus diff = evaluateDiff(sea, existingOptSea.map(CatalogSeason::getRawJson).orElse(null),
-                        existingOptSea.map(CatalogSeason::getRecordJson).orElse(null), existingOptSea.map(CatalogSeason::getRevision).orElse(null), revision);
+                CatalogSeason existingOptSea = existingMap.get(seaId);
+                DiffStatus diff = evaluateDiff(sea, existingOptSea != null ? existingOptSea.getRawJson() : null,
+                        existingOptSea != null ? existingOptSea.getRecordJson() : null, existingOptSea != null ? existingOptSea.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại mùa phim [" + seaId + "]");
                 }
 
-                CatalogSeason season = existingOptSea.orElse(new CatalogSeason());
+                CatalogSeason season = existingOptSea != null ? existingOptSea : new CatalogSeason();
                 season.setId(seaId);
                 season.setSeriesId(sea.path("series_id").asText());
                 Integer seasonNum = getIntOrNull(sea, "number");
@@ -752,25 +817,30 @@ public class CatalogImportService {
                 season.setRevision(extractRevision(sea, revision));
                 season.setRawJson(sea.toString());
                 season.setUpdatedAt(LocalDateTime.now());
-                seasonRepository.save(season);
+                toSave.add(season);
                 seasonCount++;
             }
+            seasonRepository.saveAll(toSave);
         }
         counts.put("seasons", seasonCount);
 
         // 9. Upsert Episodes
         int episodeCount = 0;
         if (data.has("episodes") && data.get("episodes").isArray()) {
+            List<String> ids = extractIds(data.get("episodes"));
+            Map<String, CatalogEpisode> existingMap = episodeRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogEpisode::getId, Function.identity(), (a, b) -> a));
+            List<CatalogEpisode> toSave = new ArrayList<>(ids.size());
             for (JsonNode ep : data.get("episodes")) {
                 String epId = ep.path("id").asText();
-                Optional<CatalogEpisode> existingOptEp = episodeRepository.findById(epId);
-                DiffStatus diff = evaluateDiff(ep, existingOptEp.map(CatalogEpisode::getRawJson).orElse(null),
-                        existingOptEp.map(CatalogEpisode::getRecordJson).orElse(null), existingOptEp.map(CatalogEpisode::getRevision).orElse(null), revision);
+                CatalogEpisode existingOptEp = existingMap.get(epId);
+                DiffStatus diff = evaluateDiff(ep, existingOptEp != null ? existingOptEp.getRawJson() : null,
+                        existingOptEp != null ? existingOptEp.getRecordJson() : null, existingOptEp != null ? existingOptEp.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại tập phim [" + epId + "]");
                 }
 
-                CatalogEpisode episode = existingOptEp.orElse(new CatalogEpisode());
+                CatalogEpisode episode = existingOptEp != null ? existingOptEp : new CatalogEpisode();
                 episode.setId(epId);
                 episode.setSeriesId(ep.path("series_id").asText());
                 episode.setSeasonId(ep.hasNonNull("season_id") ? ep.get("season_id").asText() : null);
@@ -795,27 +865,32 @@ public class CatalogImportService {
                 episode.setRevision(extractRevision(ep, revision));
                 episode.setRawJson(ep.toString());
                 episode.setUpdatedAt(LocalDateTime.now());
-                episodeRepository.save(episode);
+                toSave.add(episode);
 
                 syncEpisodeToLegacyMovie(episode);
                 episodeCount++;
             }
+            episodeRepository.saveAll(toSave);
         }
         counts.put("episodes", episodeCount);
 
         // 10. Upsert Segments
         int segmentCount = 0;
         if (data.has("segments") && data.get("segments").isArray()) {
+            List<String> ids = extractIds(data.get("segments"));
+            Map<String, CatalogSegment> existingMap = segmentRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogSegment::getId, Function.identity(), (a, b) -> a));
+            List<CatalogSegment> toSave = new ArrayList<>(ids.size());
             for (JsonNode seg : data.get("segments")) {
                 String segId = seg.path("id").asText();
-                Optional<CatalogSegment> existingOptSeg = segmentRepository.findById(segId);
-                DiffStatus diff = evaluateDiff(seg, existingOptSeg.map(CatalogSegment::getRawJson).orElse(null),
-                        existingOptSeg.map(CatalogSegment::getRecordJson).orElse(null), existingOptSeg.map(CatalogSegment::getRevision).orElse(null), revision);
+                CatalogSegment existingOptSeg = existingMap.get(segId);
+                DiffStatus diff = evaluateDiff(seg, existingOptSeg != null ? existingOptSeg.getRawJson() : null,
+                        existingOptSeg != null ? existingOptSeg.getRecordJson() : null, existingOptSeg != null ? existingOptSeg.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại phân đoạn [" + segId + "]");
                 }
 
-                CatalogSegment segment = existingOptSeg.orElse(new CatalogSegment());
+                CatalogSegment segment = existingOptSeg != null ? existingOptSeg : new CatalogSegment();
                 segment.setId(segId);
                 segment.setEpisodeId(seg.path("episode_id").asText());
                 segment.setPosition(seg.path("position").asInt(1));
@@ -831,25 +906,30 @@ public class CatalogImportService {
                 segment.setRevision(extractRevision(seg, revision));
                 segment.setRawJson(seg.toString());
                 segment.setUpdatedAt(LocalDateTime.now());
-                segmentRepository.save(segment);
+                toSave.add(segment);
                 segmentCount++;
             }
+            segmentRepository.saveAll(toSave);
         }
         counts.put("segments", segmentCount);
 
         // 11. Upsert Characters
         int characterCount = 0;
         if (data.has("characters") && data.get("characters").isArray()) {
+            List<String> ids = extractIds(data.get("characters"));
+            Map<String, CatalogCharacter> existingMap = characterRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogCharacter::getId, Function.identity(), (a, b) -> a));
+            List<CatalogCharacter> toSave = new ArrayList<>(ids.size());
             for (JsonNode c : data.get("characters")) {
                 String cid = c.path("id").asText();
-                Optional<CatalogCharacter> existingOptChar = characterRepository.findById(cid);
-                DiffStatus diff = evaluateDiff(c, existingOptChar.map(CatalogCharacter::getRawJson).orElse(null),
-                        existingOptChar.map(CatalogCharacter::getRecordJson).orElse(null), existingOptChar.map(CatalogCharacter::getRevision).orElse(null), revision);
+                CatalogCharacter existingOptChar = existingMap.get(cid);
+                DiffStatus diff = evaluateDiff(c, existingOptChar != null ? existingOptChar.getRawJson() : null,
+                        existingOptChar != null ? existingOptChar.getRecordJson() : null, existingOptChar != null ? existingOptChar.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại nhân vật [" + cid + "]");
                 }
 
-                CatalogCharacter character = existingOptChar.orElse(new CatalogCharacter());
+                CatalogCharacter character = existingOptChar != null ? existingOptChar : new CatalogCharacter();
                 character.setId(cid);
                 character.setName(c.path("name").asText());
                 character.setDescription(c.path("description").asText(null));
@@ -864,25 +944,30 @@ public class CatalogImportService {
                 character.setRevision(extractRevision(c, revision));
                 character.setRawJson(c.toString());
                 character.setUpdatedAt(LocalDateTime.now());
-                characterRepository.save(character);
+                toSave.add(character);
                 characterCount++;
             }
+            characterRepository.saveAll(toSave);
         }
         counts.put("characters", characterCount);
 
         // 12. Upsert Media Assets & Sync to Streaming Registry
         int mediaCount = 0;
         if (data.has("media_assets") && data.get("media_assets").isArray()) {
+            List<String> ids = extractIds(data.get("media_assets"));
+            Map<String, CatalogMediaAsset> existingMap = mediaAssetRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogMediaAsset::getId, Function.identity(), (a, b) -> a));
+            List<CatalogMediaAsset> toSave = new ArrayList<>(ids.size());
             for (JsonNode ma : data.get("media_assets")) {
                 String mid = ma.path("id").asText();
-                Optional<CatalogMediaAsset> existingOptAsset = mediaAssetRepository.findById(mid);
-                DiffStatus diff = evaluateDiff(ma, existingOptAsset.map(CatalogMediaAsset::getRawJson).orElse(null),
-                        existingOptAsset.map(CatalogMediaAsset::getRecordJson).orElse(null), existingOptAsset.map(CatalogMediaAsset::getRevision).orElse(null), revision);
+                CatalogMediaAsset existingOptAsset = existingMap.get(mid);
+                DiffStatus diff = evaluateDiff(ma, existingOptAsset != null ? existingOptAsset.getRawJson() : null,
+                        existingOptAsset != null ? existingOptAsset.getRecordJson() : null, existingOptAsset != null ? existingOptAsset.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại media asset [" + mid + "]");
                 }
 
-                CatalogMediaAsset asset = existingOptAsset.orElse(new CatalogMediaAsset());
+                CatalogMediaAsset asset = existingOptAsset != null ? existingOptAsset : new CatalogMediaAsset();
                 asset.setId(mid);
 
                 JsonNode storage = ma.get("storage");
@@ -923,28 +1008,33 @@ public class CatalogImportService {
                 asset.setRevision(extractRevision(ma, revision));
                 asset.setRawJson(ma.toString());
                 asset.setUpdatedAt(LocalDateTime.now());
-                mediaAssetRepository.save(asset);
+                toSave.add(asset);
 
                 // Sync to legacy media_assets for direct HTTP 206 streaming via /api/media/stream/{mid}
                 syncToLegacyMediaAsset(asset);
                 mediaCount++;
             }
+            mediaAssetRepository.saveAll(toSave);
         }
         counts.put("mediaAssets", mediaCount);
 
         // 13. Upsert Text Tracks
         int trackCount = 0;
         if (data.has("text_tracks") && data.get("text_tracks").isArray()) {
+            List<String> ids = extractIds(data.get("text_tracks"));
+            Map<String, CatalogTextTrack> existingMap = textTrackRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogTextTrack::getId, Function.identity(), (a, b) -> a));
+            List<CatalogTextTrack> toSave = new ArrayList<>(ids.size());
             for (JsonNode tt : data.get("text_tracks")) {
                 String tid = tt.path("id").asText();
-                Optional<CatalogTextTrack> existingOptTrack = textTrackRepository.findById(tid);
-                DiffStatus diff = evaluateDiff(tt, existingOptTrack.map(CatalogTextTrack::getRawJson).orElse(null),
-                        existingOptTrack.map(CatalogTextTrack::getRecordJson).orElse(null), existingOptTrack.map(CatalogTextTrack::getRevision).orElse(null), revision);
+                CatalogTextTrack existingOptTrack = existingMap.get(tid);
+                DiffStatus diff = evaluateDiff(tt, existingOptTrack != null ? existingOptTrack.getRawJson() : null,
+                        existingOptTrack != null ? existingOptTrack.getRecordJson() : null, existingOptTrack != null ? existingOptTrack.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại phụ đề / text track [" + tid + "]");
                 }
 
-                CatalogTextTrack track = existingOptTrack.orElse(new CatalogTextTrack());
+                CatalogTextTrack track = existingOptTrack != null ? existingOptTrack : new CatalogTextTrack();
                 track.setId(tid);
                 track.setMediaAssetId(tt.path("media_asset_id").asText());
                 track.setKind(tt.path("kind").asText("subtitles"));
@@ -957,25 +1047,30 @@ public class CatalogImportService {
                 track.setRevision(extractRevision(tt, revision));
                 track.setRawJson(tt.toString());
                 track.setUpdatedAt(LocalDateTime.now());
-                textTrackRepository.save(track);
+                toSave.add(track);
                 trackCount++;
             }
+            textTrackRepository.saveAll(toSave);
         }
         counts.put("textTracks", trackCount);
 
         // 14. Upsert Scenes
         int sceneCount = 0;
         if (data.has("scenes") && data.get("scenes").isArray()) {
+            List<String> ids = extractIds(data.get("scenes"));
+            Map<String, CatalogScene> existingMap = sceneRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(CatalogScene::getId, Function.identity(), (a, b) -> a));
+            List<CatalogScene> toSave = new ArrayList<>(ids.size());
             for (JsonNode sc : data.get("scenes")) {
                 String scId = sc.path("id").asText();
-                Optional<CatalogScene> existingOptScene = sceneRepository.findById(scId);
-                DiffStatus diff = evaluateDiff(sc, existingOptScene.map(CatalogScene::getRawJson).orElse(null),
-                        existingOptScene.map(CatalogScene::getRecordJson).orElse(null), existingOptScene.map(CatalogScene::getRevision).orElse(null), revision);
+                CatalogScene existingOptScene = existingMap.get(scId);
+                DiffStatus diff = evaluateDiff(sc, existingOptScene != null ? existingOptScene.getRawJson() : null,
+                        existingOptScene != null ? existingOptScene.getRecordJson() : null, existingOptScene != null ? existingOptScene.getRevision() : null, revision);
                 if (diff == DiffStatus.CONFLICT) {
                     throw new CatalogConflictException("Xung đột revision tại cảnh phim [" + scId + "]");
                 }
 
-                CatalogScene scene = existingOptScene.orElse(new CatalogScene());
+                CatalogScene scene = existingOptScene != null ? existingOptScene : new CatalogScene();
                 scene.setId(scId);
                 scene.setMediaAssetId(sc.path("media_asset_id").asText());
                 scene.setEpisodeId(sc.path("episode_id").asText());
@@ -993,9 +1088,10 @@ public class CatalogImportService {
                 scene.setRevision(extractRevision(sc, revision));
                 scene.setRawJson(sc.toString());
                 scene.setUpdatedAt(LocalDateTime.now());
-                sceneRepository.save(scene);
+                toSave.add(scene);
                 sceneCount++;
             }
+            sceneRepository.saveAll(toSave);
         }
         counts.put("scenes", sceneCount);
 

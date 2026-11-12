@@ -4,7 +4,12 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "catalog_media_assets")
+@Table(
+    name = "catalog_media_assets",
+    indexes = {
+        @Index(name = "idx_cat_asset_provider_key", columnList = "storage_provider, storage_key")
+    }
+)
 public class CatalogMediaAsset {
 
     @Id

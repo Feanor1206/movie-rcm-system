@@ -55,6 +55,12 @@ public class CatalogValidator {
     private static final int MAX_PAYLOAD_DEPTH = 30;
     private static final int MAX_TOTAL_NODES = 250_000;
 
+    private static final Map<String, Pattern> PATTERN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final DateTimeFormatter STRICT_DATE_FORMATTER = new DateTimeFormatterBuilder()
+            .appendPattern("uuuu-MM-dd")
+            .toFormatter(Locale.ROOT)
+            .withResolverStyle(ResolverStyle.STRICT);
+
     private JsonNode rootSchema;
     private final Map<String, JsonNode> schemaDefs = new HashMap<>();
 
@@ -287,7 +293,8 @@ public class CatalogValidator {
             }
             if (schema.has("pattern")) {
                 String pattern = schema.get("pattern").asText();
-                if (!Pattern.compile(pattern).matcher(text).find()) {
+                Pattern compiledPattern = PATTERN_CACHE.computeIfAbsent(pattern, Pattern::compile);
+                if (!compiledPattern.matcher(text).find()) {
                     errors.add(new CatalogValidationError(path.isEmpty() ? "/" : path, "PATTERN_MISMATCH",
                             "String does not match pattern: " + pattern));
                 }
@@ -303,11 +310,7 @@ public class CatalogValidator {
                     }
                 } else if ("date".equals(fmt)) {
                     try {
-                        DateTimeFormatter formatter = new DateTimeFormatterBuilder()
-                                .appendPattern("uuuu-MM-dd")
-                                .toFormatter(Locale.ROOT)
-                                .withResolverStyle(ResolverStyle.STRICT);
-                        LocalDate.parse(text, formatter);
+                        LocalDate.parse(text, STRICT_DATE_FORMATTER);
                     } catch (Exception e) {
                         errors.add(new CatalogValidationError(path.isEmpty() ? "/" : path, "INVALID_DATE",
                                 "Invalid date format: " + text));

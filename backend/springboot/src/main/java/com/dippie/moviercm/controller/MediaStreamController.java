@@ -124,12 +124,12 @@ public class MediaStreamController {
                     response.setHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(totalLength));
 
                     try (OutputStream out = response.getOutputStream()) {
-                        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+                        byte[] rawBuffer = new byte[BUFFER_SIZE];
+                        ByteBuffer buffer = ByteBuffer.wrap(rawBuffer);
                         long totalWritten = 0;
                         int bytesRead;
                         while ((bytesRead = channel.read(buffer)) != -1) {
-                            buffer.flip();
-                            out.write(buffer.array(), buffer.arrayOffset(), buffer.limit());
+                            out.write(rawBuffer, 0, bytesRead);
                             totalWritten += bytesRead;
                             buffer.clear();
                         }
@@ -150,17 +150,18 @@ public class MediaStreamController {
                     channel.position(start);
 
                     try (OutputStream out = response.getOutputStream()) {
-                        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+                        byte[] rawBuffer = new byte[BUFFER_SIZE];
+                        ByteBuffer buffer = ByteBuffer.wrap(rawBuffer);
                         long remaining = contentLength;
                         while (remaining > 0) {
                             buffer.clear();
-                            int toRead = (int) Math.min(buffer.capacity(), remaining);
+                            int toRead = (int) Math.min(BUFFER_SIZE, remaining);
                             buffer.limit(toRead);
                             int bytesRead = channel.read(buffer);
                             if (bytesRead == -1) {
                                 throw new IOException("Stream read truncated: expected " + contentLength + " bytes but reached EOF with " + remaining + " bytes remaining");
                             }
-                            out.write(buffer.array(), buffer.arrayOffset(), bytesRead);
+                            out.write(rawBuffer, 0, bytesRead);
                             remaining -= bytesRead;
                         }
                         out.flush();

@@ -149,6 +149,7 @@ public class WatchProgressService {
 
     private boolean coversFullEpisode(String coverageJson, String episodeId) {
         if (coverageJson == null || coverageJson.isBlank()) return false;
+        if (!coverageJson.contains("full_episode") || !coverageJson.contains(episodeId)) return false;
         try {
             JsonNode coverage = objectMapper.readTree(coverageJson);
             if (!coverage.isArray()) return false;
@@ -184,6 +185,7 @@ public class WatchProgressService {
 
     private boolean isPublished(String recordJson) {
         if (recordJson == null || recordJson.isBlank()) return false;
+        if (!recordJson.contains("ready") && !recordJson.contains("READY")) return false;
         try {
             JsonNode record = objectMapper.readTree(recordJson);
             return "ready".equalsIgnoreCase(record.path("status").asText());

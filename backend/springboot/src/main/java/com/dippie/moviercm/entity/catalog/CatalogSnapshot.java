@@ -4,7 +4,15 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "catalog_snapshots")
+@Table(
+    name = "catalog_snapshots",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_cat_snap_version", columnNames = {"snapshot_version"})
+    },
+    indexes = {
+        @Index(name = "idx_cat_snap_status", columnList = "status")
+    }
+)
 public class CatalogSnapshot {
 
     @Id

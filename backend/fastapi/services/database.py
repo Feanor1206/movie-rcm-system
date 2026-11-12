@@ -1,5 +1,6 @@
 import base64
 from datetime import datetime, timedelta, timezone
+import functools
 import hashlib
 import json
 import os
@@ -8,7 +9,21 @@ import time
 
 import bcrypt
 import jwt
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+    event,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
@@ -30,6 +45,11 @@ class User(Base):
 
 class Movie(Base):
     __tablename__ = "movies"
+    __table_args__ = (
+        Index("idx_movies_title", "title"),
+        Index("idx_movies_year", "release_year"),
+        Index("idx_movies_rating", "rating"),
+    )
     id = Column(String(100), primary_key=True)
     title = Column(String(255), nullable=False)
     release_year = Column(Integer, nullable=False)
@@ -61,7 +81,11 @@ class Movie(Base):
 
 class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
-    __table_args__ = (UniqueConstraint("user_id", "movie_id", name="uq_user_movie_watchlist"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="uq_user_movie_watchlist"),
+        Index("idx_watchlist_user", "user_id"),
+        Index("idx_watchlist_movie", "movie_id"),
+    )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     movie_id = Column(String(100), nullable=False)
@@ -82,7 +106,11 @@ class WatchlistItem(Base):
 
 class MovieRating(Base):
     __tablename__ = "movie_ratings"
-    __table_args__ = (UniqueConstraint("user_id", "movie_id", name="uq_user_movie_rating"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="uq_user_movie_rating"),
+        Index("idx_ratings_user", "user_id"),
+        Index("idx_ratings_movie", "movie_id"),
+    )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     movie_id = Column(String(100), nullable=False)
@@ -103,7 +131,11 @@ class MovieRating(Base):
 
 class FavoriteItem(Base):
     __tablename__ = "favorite_items"
-    __table_args__ = (UniqueConstraint("user_id", "movie_id", name="uq_user_movie_favorite"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="uq_user_movie_favorite"),
+        Index("idx_favorite_user", "user_id"),
+        Index("idx_favorite_movie", "movie_id"),
+    )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     movie_id = Column(String(100), nullable=False)
@@ -124,7 +156,11 @@ class FavoriteItem(Base):
 
 class MediaAsset(Base):
     __tablename__ = "media_assets"
-    __table_args__ = (UniqueConstraint("movie_id", "kind", "version", name="uq_movie_kind_version"),)
+    __table_args__ = (
+        UniqueConstraint("movie_id", "kind", "version", name="uq_movie_kind_version"),
+        Index("idx_media_movie_id", "movie_id"),
+        Index("idx_media_movie_kind", "movie_id", "kind"),
+    )
     id = Column(String(64), primary_key=True)
     movie_id = Column(String(100), ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
     kind = Column(String(20), nullable=False)
@@ -235,6 +271,7 @@ class CatalogSource(Base):
 
 class CatalogSeries(Base):
     __tablename__ = "catalog_series"
+    __table_args__ = (Index("idx_cat_series_title", "title"),)
     id = Column(String(100), primary_key=True)
     title = Column(String(255), nullable=False)
     original_title = Column(String(255))
@@ -297,6 +334,7 @@ class CatalogSeries(Base):
 
 class CatalogSeason(Base):
     __tablename__ = "catalog_seasons"
+    __table_args__ = (Index("idx_cat_season_series", "series_id"),)
     id = Column(String(100), primary_key=True)
     series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE"), nullable=False)
     number = Column(Integer)
@@ -335,6 +373,10 @@ class CatalogSeason(Base):
 
 class CatalogEpisode(Base):
     __tablename__ = "catalog_episodes"
+    __table_args__ = (
+        Index("idx_cat_ep_series", "series_id"),
+        Index("idx_cat_ep_season", "season_id"),
+    )
     id = Column(String(100), primary_key=True)
     series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE"), nullable=False)
     season_id = Column(String(100))
@@ -399,6 +441,7 @@ class CatalogEpisode(Base):
 
 class CatalogSegment(Base):
     __tablename__ = "catalog_segments"
+    __table_args__ = (Index("idx_cat_seg_ep", "episode_id"),)
     id = Column(String(100), primary_key=True)
     episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), nullable=False)
     position = Column(Integer, nullable=False)
@@ -522,6 +565,7 @@ class CatalogMediaAsset(Base):
 
 class CatalogTextTrack(Base):
     __tablename__ = "catalog_text_tracks"
+    __table_args__ = (Index("idx_cat_track_asset", "media_asset_id"),)
     id = Column(String(100), primary_key=True)
     media_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", ondelete="CASCADE"), nullable=False)
     language = Column(String(50), nullable=False)
@@ -541,6 +585,10 @@ class CatalogTextTrack(Base):
 
 class CatalogScene(Base):
     __tablename__ = "catalog_scenes"
+    __table_args__ = (
+        Index("idx_cat_scene_ep", "episode_id"),
+        Index("idx_cat_scene_asset", "media_asset_id"),
+    )
     id = Column(String(100), primary_key=True)
     media_asset_id = Column(String(100))
     episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), nullable=False)
@@ -593,6 +641,7 @@ class CatalogScene(Base):
 
 class CatalogSnapshot(Base):
     __tablename__ = "catalog_snapshots"
+    __table_args__ = (Index("idx_cat_snap_status", "status"),)
     id = Column(String(100), primary_key=True)
     snapshot_version = Column(BigInteger, nullable=False, unique=True)
     content_hash = Column(String(100), nullable=False)
@@ -621,7 +670,10 @@ class CatalogSnapshot(Base):
 
 class WatchProgress(Base):
     __tablename__ = "watch_progress"
-    __table_args__ = (UniqueConstraint("user_id", "episode_id", name="uq_watch_progress_user_episode"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "episode_id", name="uq_watch_progress_user_episode"),
+        Index("idx_watch_progress_user_updated", "user_id", "updated_at"),
+    )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), nullable=False)
@@ -643,7 +695,11 @@ def verify_password(raw_password: str, hashed: str) -> bool:
 
 
 def _jwt_key() -> bytes:
-    secret = os.getenv("APP_JWT_SECRET", DEFAULT_JWT_SECRET)
+    return _jwt_key_cached(os.getenv("APP_JWT_SECRET", DEFAULT_JWT_SECRET))
+
+
+@functools.lru_cache(maxsize=4)
+def _jwt_key_cached(secret: str) -> bytes:
     try:
         return base64.b64decode(secret)
     except Exception:
@@ -713,8 +769,24 @@ class DatabaseManager:
             return
         url = self.database_url
         try:
-            connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {"connect_timeout": 3}
-            self.engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
+            if url.startswith("sqlite"):
+                connect_args = {"check_same_thread": False}
+                self.engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
+                @event.listens_for(self.engine, "connect")
+                def _set_sqlite_pragma(dbapi_connection, connection_record):
+                    cursor = dbapi_connection.cursor()
+                    cursor.execute("PRAGMA synchronous=NORMAL")
+                    cursor.close()
+            else:
+                connect_args = {"connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "3"))}
+                self.engine = create_engine(
+                    url,
+                    pool_pre_ping=True,
+                    pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
+                    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+                    pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
+                    connect_args=connect_args,
+                )
             Base.metadata.create_all(self.engine)
         except Exception:
             fallback_path = Path(os.getenv("PYTHON_MAIN_SQLITE_FALLBACK", "data/python_main.db"))
@@ -771,7 +843,7 @@ class DatabaseManager:
 
 
 def is_published(record_json: str | None) -> bool:
-    if not record_json:
+    if not record_json or "ready" not in record_json.lower():
         return False
     try:
         return str(json.loads(record_json).get("status", "")).lower() == "ready"
@@ -818,272 +890,341 @@ def import_catalog_package(db, data: dict) -> dict:
     counts = {}
 
     genres = data.get("genres") or []
-    for g in genres:
-        gid = g["id"]
-        entity = db.get(CatalogGenre, gid) or CatalogGenre(id=gid)
-        entity.labels_json = json.dumps(g.get("labels") or {"vi": g.get("name", gid)}, ensure_ascii=False)
-        entity.aliases_json = json.dumps(g.get("aliases"), ensure_ascii=False) if g.get("aliases") is not None else None
-        entity.description = g.get("description")
-        entity.record_json = json.dumps(g.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(g, ensure_ascii=False)
-        entity.revision = int((g.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if genres:
+        ids = [g["id"] for g in genres if "id" in g]
+        existing = {row.id: row for row in db.query(CatalogGenre).filter(CatalogGenre.id.in_(ids)).all()} if ids else {}
+        for g in genres:
+            gid = g["id"]
+            entity = existing.get(gid)
+            if not entity:
+                entity = CatalogGenre(id=gid)
+                db.add(entity)
+            entity.labels_json = json.dumps(g.get("labels") or {"vi": g.get("name", gid)}, ensure_ascii=False)
+            entity.aliases_json = json.dumps(g.get("aliases"), ensure_ascii=False) if g.get("aliases") is not None else None
+            entity.description = g.get("description")
+            entity.record_json = json.dumps(g.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(g, ensure_ascii=False)
+            entity.revision = int((g.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["genres"] = len(genres)
 
     scales = data.get("attribute_scales") or []
-    for sc in scales:
-        sid = sc["id"]
-        entity = db.get(CatalogAttributeScale, sid) or CatalogAttributeScale(id=sid)
-        entity.name = sc.get("name", sid)
-        entity.definition = sc.get("definition")
-        entity.minimum = float(sc.get("minimum", 0.0))
-        entity.maximum = float(sc.get("maximum", 1.0))
-        entity.levels_json = json.dumps(sc.get("levels") or [], ensure_ascii=False)
-        entity.version = sc.get("version", "1.0.0")
-        entity.source_ids_json = json.dumps(sc.get("source_ids"), ensure_ascii=False) if sc.get("source_ids") is not None else None
-        entity.record_json = json.dumps(sc.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(sc, ensure_ascii=False)
-        entity.revision = int((sc.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if scales:
+        ids = [sc["id"] for sc in scales if "id" in sc]
+        existing = {row.id: row for row in db.query(CatalogAttributeScale).filter(CatalogAttributeScale.id.in_(ids)).all()} if ids else {}
+        for sc in scales:
+            sid = sc["id"]
+            entity = existing.get(sid)
+            if not entity:
+                entity = CatalogAttributeScale(id=sid)
+                db.add(entity)
+            entity.name = sc.get("name", sid)
+            entity.definition = sc.get("definition")
+            entity.minimum = float(sc.get("minimum", 0.0))
+            entity.maximum = float(sc.get("maximum", 1.0))
+            entity.levels_json = json.dumps(sc.get("levels") or [], ensure_ascii=False)
+            entity.version = sc.get("version", "1.0.0")
+            entity.source_ids_json = json.dumps(sc.get("source_ids"), ensure_ascii=False) if sc.get("source_ids") is not None else None
+            entity.record_json = json.dumps(sc.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(sc, ensure_ascii=False)
+            entity.revision = int((sc.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["attributeScales"] = len(scales)
 
     sources = data.get("sources") or []
-    for src in sources:
-        sid = src["id"]
-        entity = db.get(CatalogSource, sid) or CatalogSource(id=sid)
-        entity.kind = src.get("kind") or src.get("source_type") or "web"
-        entity.title = src.get("title") or src.get("name") or sid
-        entity.uri = src.get("url") or src.get("uri")
-        entity.note = src.get("note") or src.get("notes")
-        entity.retrieved_at = src.get("retrieved_at")
-        entity.record_json = json.dumps(src.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(src, ensure_ascii=False)
-        entity.revision = int((src.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if sources:
+        ids = [src["id"] for src in sources if "id" in src]
+        existing = {row.id: row for row in db.query(CatalogSource).filter(CatalogSource.id.in_(ids)).all()} if ids else {}
+        for src in sources:
+            sid = src["id"]
+            entity = existing.get(sid)
+            if not entity:
+                entity = CatalogSource(id=sid)
+                db.add(entity)
+            entity.kind = src.get("kind") or src.get("source_type") or "web"
+            entity.title = src.get("title") or src.get("name") or sid
+            entity.uri = src.get("url") or src.get("uri")
+            entity.note = src.get("note") or src.get("notes")
+            entity.retrieved_at = src.get("retrieved_at")
+            entity.record_json = json.dumps(src.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(src, ensure_ascii=False)
+            entity.revision = int((src.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["sources"] = len(sources)
 
     series_list = data.get("series") or []
-    for s in series_list:
-        sid = s["id"]
-        entity = db.get(CatalogSeries, sid) or CatalogSeries(id=sid)
-        entity.title = s.get("title", sid)
-        entity.original_title = s.get("original_title")
-        entity.aliases_json = json.dumps(s.get("aliases"), ensure_ascii=False) if s.get("aliases") is not None else None
-        entity.synopsis = s.get("synopsis")
-        entity.translations_json = json.dumps(s.get("translations"), ensure_ascii=False) if s.get("translations") is not None else None
-        entity.genre_ids_json = json.dumps(s.get("genre_ids"), ensure_ascii=False) if s.get("genre_ids") is not None else None
-        entity.keywords_json = json.dumps(s.get("keywords") or s.get("tags"), ensure_ascii=False) if (s.get("keywords") or s.get("tags")) is not None else None
-        entity.themes_json = json.dumps(s.get("themes"), ensure_ascii=False) if s.get("themes") is not None else None
-        entity.origin_countries_json = json.dumps(s.get("origin_countries"), ensure_ascii=False) if s.get("origin_countries") is not None else None
-        entity.original_languages_json = json.dumps(s.get("original_languages"), ensure_ascii=False) if s.get("original_languages") is not None else None
-        entity.release_year_start = s.get("release_year_start") or s.get("release_year")
-        entity.release_year_end = s.get("release_year_end")
-        entity.release_status = s.get("release_status") or s.get("status")
-        entity.character_ids_json = json.dumps(s.get("character_ids"), ensure_ascii=False) if s.get("character_ids") is not None else None
-        entity.artworks_json = json.dumps(s.get("artwork") or s.get("artworks"), ensure_ascii=False) if (s.get("artwork") or s.get("artworks")) is not None else None
-        entity.attributes_json = json.dumps(s.get("attributes"), ensure_ascii=False) if s.get("attributes") is not None else None
-        entity.ratings_json = json.dumps(s.get("ratings"), ensure_ascii=False) if s.get("ratings") is not None else None
-        entity.advisories_json = json.dumps(s.get("content_advisory"), ensure_ascii=False) if s.get("content_advisory") is not None else None
-        entity.external_ids_json = json.dumps(s.get("external_ids"), ensure_ascii=False) if s.get("external_ids") is not None else None
-        entity.record_json = json.dumps(s.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(s, ensure_ascii=False)
-        entity.revision = int((s.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
-        if not db.get(Movie, sid):
-            db.add(Movie(
-                id=sid, title=entity.title, release_year=entity.release_year_start or 2026,
-                rating=0.0, runtime="Series", genres="Animation", description=entity.synopsis or "",
-            ))
-            db.flush()
+    seasons = data.get("seasons") or []
+    episodes = data.get("episodes") or []
+    media_assets = data.get("media_assets") or []
+
+    needed_movie_ids = {s["id"] for s in series_list if "id" in s} | {ep["id"] for ep in episodes if "id" in ep}
+    for ma in media_assets:
+        cov = ma.get("coverage") or []
+        m_id = cov[0].get("episode_id", ma["id"]) if isinstance(cov, list) and cov else ma["id"]
+        needed_movie_ids.add(m_id)
+    existing_movies = {row.id: row for row in db.query(Movie).filter(Movie.id.in_(needed_movie_ids)).all()} if needed_movie_ids else {}
+
+    if series_list:
+        ids = [s["id"] for s in series_list if "id" in s]
+        existing = {row.id: row for row in db.query(CatalogSeries).filter(CatalogSeries.id.in_(ids)).all()} if ids else {}
+        for s in series_list:
+            sid = s["id"]
+            entity = existing.get(sid)
+            if not entity:
+                entity = CatalogSeries(id=sid)
+                db.add(entity)
+            entity.title = s.get("title", sid)
+            entity.original_title = s.get("original_title")
+            entity.aliases_json = json.dumps(s.get("aliases"), ensure_ascii=False) if s.get("aliases") is not None else None
+            entity.synopsis = s.get("synopsis")
+            entity.translations_json = json.dumps(s.get("translations"), ensure_ascii=False) if s.get("translations") is not None else None
+            entity.genre_ids_json = json.dumps(s.get("genre_ids"), ensure_ascii=False) if s.get("genre_ids") is not None else None
+            entity.keywords_json = json.dumps(s.get("keywords") or s.get("tags"), ensure_ascii=False) if (s.get("keywords") or s.get("tags")) is not None else None
+            entity.themes_json = json.dumps(s.get("themes"), ensure_ascii=False) if s.get("themes") is not None else None
+            entity.origin_countries_json = json.dumps(s.get("origin_countries"), ensure_ascii=False) if s.get("origin_countries") is not None else None
+            entity.original_languages_json = json.dumps(s.get("original_languages"), ensure_ascii=False) if s.get("original_languages") is not None else None
+            entity.release_year_start = s.get("release_year_start") or s.get("release_year")
+            entity.release_year_end = s.get("release_year_end")
+            entity.release_status = s.get("release_status") or s.get("status")
+            entity.character_ids_json = json.dumps(s.get("character_ids"), ensure_ascii=False) if s.get("character_ids") is not None else None
+            entity.artworks_json = json.dumps(s.get("artwork") or s.get("artworks"), ensure_ascii=False) if (s.get("artwork") or s.get("artworks")) is not None else None
+            entity.attributes_json = json.dumps(s.get("attributes"), ensure_ascii=False) if s.get("attributes") is not None else None
+            entity.ratings_json = json.dumps(s.get("ratings"), ensure_ascii=False) if s.get("ratings") is not None else None
+            entity.advisories_json = json.dumps(s.get("content_advisory"), ensure_ascii=False) if s.get("content_advisory") is not None else None
+            entity.external_ids_json = json.dumps(s.get("external_ids"), ensure_ascii=False) if s.get("external_ids") is not None else None
+            entity.record_json = json.dumps(s.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(s, ensure_ascii=False)
+            entity.revision = int((s.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
+            if sid not in existing_movies:
+                m = Movie(
+                    id=sid, title=entity.title, release_year=entity.release_year_start or 2026,
+                    rating=0.0, runtime="Series", genres="Animation", description=entity.synopsis or "",
+                )
+                db.add(m)
+                existing_movies[sid] = m
     counts["series"] = len(series_list)
 
-    seasons = data.get("seasons") or []
-    for sea in seasons:
-        sea_id = sea["id"]
-        entity = db.get(CatalogSeason, sea_id) or CatalogSeason(id=sea_id)
-        entity.series_id = sea["series_id"]
-        entity.number = sea.get("number") if sea.get("number") is not None else sea.get("season_number")
-        entity.title = sea.get("title", sea_id)
-        entity.synopsis = sea.get("synopsis") or sea.get("description")
-        entity.kind = sea.get("kind", "standard")
-        entity.release_date = str(sea.get("release_date") or sea.get("release_year") or "") or None
-        entity.artworks_json = json.dumps(sea.get("artwork") or sea.get("artworks"), ensure_ascii=False) if (sea.get("artwork") or sea.get("artworks")) is not None else None
-        entity.record_json = json.dumps(sea.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(sea, ensure_ascii=False)
-        entity.revision = int((sea.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if seasons:
+        ids = [sea["id"] for sea in seasons if "id" in sea]
+        existing = {row.id: row for row in db.query(CatalogSeason).filter(CatalogSeason.id.in_(ids)).all()} if ids else {}
+        for sea in seasons:
+            sea_id = sea["id"]
+            entity = existing.get(sea_id)
+            if not entity:
+                entity = CatalogSeason(id=sea_id)
+                db.add(entity)
+            entity.series_id = sea["series_id"]
+            entity.number = sea.get("number") if sea.get("number") is not None else sea.get("season_number")
+            entity.title = sea.get("title", sea_id)
+            entity.synopsis = sea.get("synopsis") or sea.get("description")
+            entity.kind = sea.get("kind", "standard")
+            entity.release_date = str(sea.get("release_date") or sea.get("release_year") or "") or None
+            entity.artworks_json = json.dumps(sea.get("artwork") or sea.get("artworks"), ensure_ascii=False) if (sea.get("artwork") or sea.get("artworks")) is not None else None
+            entity.record_json = json.dumps(sea.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(sea, ensure_ascii=False)
+            entity.revision = int((sea.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["seasons"] = len(seasons)
 
-    episodes = data.get("episodes") or []
-    for ep in episodes:
-        ep_id = ep["id"]
-        entity = db.get(CatalogEpisode, ep_id) or CatalogEpisode(id=ep_id)
-        entity.series_id = ep["series_id"]
-        entity.season_id = ep.get("season_id")
-        entity.number = ep.get("number") if ep.get("number") is not None else ep.get("episode_number")
-        entity.title = ep.get("title", ep_id)
-        entity.aliases_json = json.dumps(ep.get("aliases"), ensure_ascii=False) if ep.get("aliases") is not None else None
-        entity.synopsis = ep.get("synopsis")
-        entity.translations_json = json.dumps(ep.get("translations"), ensure_ascii=False) if ep.get("translations") is not None else None
-        entity.kind = ep.get("kind") or ep.get("episode_type") or "standard"
-        entity.release_date = ep.get("release_date") or ep.get("air_date")
-        entity.duration_ms = ep.get("duration_ms")
-        entity.genre_ids_json = json.dumps(ep.get("genre_ids"), ensure_ascii=False) if ep.get("genre_ids") is not None else None
-        entity.primary_language = ep.get("primary_language")
-        entity.character_ids_json = json.dumps(ep.get("character_ids"), ensure_ascii=False) if ep.get("character_ids") is not None else None
-        entity.plot_facts_json = json.dumps(ep.get("plot_facts"), ensure_ascii=False) if ep.get("plot_facts") is not None else None
-        entity.keywords_json = json.dumps(ep.get("keywords") or ep.get("tags"), ensure_ascii=False) if (ep.get("keywords") or ep.get("tags")) is not None else None
-        entity.themes_json = json.dumps(ep.get("themes"), ensure_ascii=False) if ep.get("themes") is not None else None
-        entity.attributes_json = json.dumps(ep.get("attributes"), ensure_ascii=False) if ep.get("attributes") is not None else None
-        entity.artworks_json = json.dumps(ep.get("artwork") or ep.get("artworks"), ensure_ascii=False) if (ep.get("artwork") or ep.get("artworks")) is not None else None
-        entity.record_json = json.dumps(ep.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(ep, ensure_ascii=False)
-        entity.revision = int((ep.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
-        if not db.get(Movie, ep_id):
-            mins = int((entity.duration_ms or 1200000) / 60000)
-            db.add(Movie(
-                id=ep_id, title=entity.title, release_year=2026,
-                rating=0.0, runtime=f"{mins}m", genres="Animation", description=entity.synopsis or "",
-            ))
-            db.flush()
+    if episodes:
+        ids = [ep["id"] for ep in episodes if "id" in ep]
+        existing = {row.id: row for row in db.query(CatalogEpisode).filter(CatalogEpisode.id.in_(ids)).all()} if ids else {}
+        for ep in episodes:
+            ep_id = ep["id"]
+            entity = existing.get(ep_id)
+            if not entity:
+                entity = CatalogEpisode(id=ep_id)
+                db.add(entity)
+            entity.series_id = ep["series_id"]
+            entity.season_id = ep.get("season_id")
+            entity.number = ep.get("number") if ep.get("number") is not None else ep.get("episode_number")
+            entity.title = ep.get("title", ep_id)
+            entity.aliases_json = json.dumps(ep.get("aliases"), ensure_ascii=False) if ep.get("aliases") is not None else None
+            entity.synopsis = ep.get("synopsis")
+            entity.translations_json = json.dumps(ep.get("translations"), ensure_ascii=False) if ep.get("translations") is not None else None
+            entity.kind = ep.get("kind") or ep.get("episode_type") or "standard"
+            entity.release_date = ep.get("release_date") or ep.get("air_date")
+            entity.duration_ms = ep.get("duration_ms")
+            entity.genre_ids_json = json.dumps(ep.get("genre_ids"), ensure_ascii=False) if ep.get("genre_ids") is not None else None
+            entity.primary_language = ep.get("primary_language")
+            entity.character_ids_json = json.dumps(ep.get("character_ids"), ensure_ascii=False) if ep.get("character_ids") is not None else None
+            entity.plot_facts_json = json.dumps(ep.get("plot_facts"), ensure_ascii=False) if ep.get("plot_facts") is not None else None
+            entity.keywords_json = json.dumps(ep.get("keywords") or ep.get("tags"), ensure_ascii=False) if (ep.get("keywords") or ep.get("tags")) is not None else None
+            entity.themes_json = json.dumps(ep.get("themes"), ensure_ascii=False) if ep.get("themes") is not None else None
+            entity.attributes_json = json.dumps(ep.get("attributes"), ensure_ascii=False) if ep.get("attributes") is not None else None
+            entity.artworks_json = json.dumps(ep.get("artwork") or ep.get("artworks"), ensure_ascii=False) if (ep.get("artwork") or ep.get("artworks")) is not None else None
+            entity.record_json = json.dumps(ep.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(ep, ensure_ascii=False)
+            entity.revision = int((ep.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
+            if ep_id not in existing_movies:
+                mins = int((entity.duration_ms or 1200000) / 60000)
+                m = Movie(
+                    id=ep_id, title=entity.title, release_year=2026,
+                    rating=0.0, runtime=f"{mins}m", genres="Animation", description=entity.synopsis or "",
+                )
+                db.add(m)
+                existing_movies[ep_id] = m
     counts["episodes"] = len(episodes)
 
     segments = data.get("segments") or []
-    for seg in segments:
-        seg_id = seg["id"]
-        entity = db.get(CatalogSegment, seg_id) or CatalogSegment(id=seg_id)
-        entity.episode_id = seg["episode_id"]
-        entity.position = int(seg.get("position") or 1)
-        entity.title = seg.get("title", seg_id)
-        entity.synopsis = seg.get("synopsis")
-        entity.episode_start_ms = seg.get("episode_start_ms")
-        entity.episode_end_ms = seg.get("episode_end_ms")
-        entity.character_ids_json = json.dumps(seg.get("character_ids"), ensure_ascii=False) if seg.get("character_ids") is not None else None
-        entity.keywords_json = json.dumps(seg.get("keywords") or seg.get("tags"), ensure_ascii=False) if (seg.get("keywords") or seg.get("tags")) is not None else None
-        entity.attributes_json = json.dumps(seg.get("attributes"), ensure_ascii=False) if seg.get("attributes") is not None else None
-        entity.plot_facts_json = json.dumps(seg.get("plot_facts"), ensure_ascii=False) if seg.get("plot_facts") is not None else None
-        entity.record_json = json.dumps(seg.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(seg, ensure_ascii=False)
-        entity.revision = int((seg.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if segments:
+        ids = [seg["id"] for seg in segments if "id" in seg]
+        existing = {row.id: row for row in db.query(CatalogSegment).filter(CatalogSegment.id.in_(ids)).all()} if ids else {}
+        for seg in segments:
+            seg_id = seg["id"]
+            entity = existing.get(seg_id)
+            if not entity:
+                entity = CatalogSegment(id=seg_id)
+                db.add(entity)
+            entity.episode_id = seg["episode_id"]
+            entity.position = int(seg.get("position") or 1)
+            entity.title = seg.get("title", seg_id)
+            entity.synopsis = seg.get("synopsis")
+            entity.episode_start_ms = seg.get("episode_start_ms")
+            entity.episode_end_ms = seg.get("episode_end_ms")
+            entity.character_ids_json = json.dumps(seg.get("character_ids"), ensure_ascii=False) if seg.get("character_ids") is not None else None
+            entity.keywords_json = json.dumps(seg.get("keywords") or seg.get("tags"), ensure_ascii=False) if (seg.get("keywords") or seg.get("tags")) is not None else None
+            entity.attributes_json = json.dumps(seg.get("attributes"), ensure_ascii=False) if seg.get("attributes") is not None else None
+            entity.plot_facts_json = json.dumps(seg.get("plot_facts"), ensure_ascii=False) if seg.get("plot_facts") is not None else None
+            entity.record_json = json.dumps(seg.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(seg, ensure_ascii=False)
+            entity.revision = int((seg.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["segments"] = len(segments)
 
     characters = data.get("characters") or []
-    for c in characters:
-        cid = c["id"]
-        entity = db.get(CatalogCharacter, cid) or CatalogCharacter(id=cid)
-        entity.name = c.get("name", cid)
-        entity.description = c.get("description")
-        entity.series_ids_json = json.dumps(c.get("series_ids"), ensure_ascii=False) if c.get("series_ids") is not None else None
-        entity.role = c.get("role")
-        entity.aliases_json = json.dumps(c.get("aliases"), ensure_ascii=False) if c.get("aliases") is not None else None
-        entity.traits_json = json.dumps(c.get("traits"), ensure_ascii=False) if c.get("traits") is not None else None
-        entity.relationships_json = json.dumps(c.get("relationships"), ensure_ascii=False) if c.get("relationships") is not None else None
-        entity.record_json = json.dumps(c.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(c, ensure_ascii=False)
-        entity.revision = int((c.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if characters:
+        ids = [c["id"] for c in characters if "id" in c]
+        existing = {row.id: row for row in db.query(CatalogCharacter).filter(CatalogCharacter.id.in_(ids)).all()} if ids else {}
+        for c in characters:
+            cid = c["id"]
+            entity = existing.get(cid)
+            if not entity:
+                entity = CatalogCharacter(id=cid)
+                db.add(entity)
+            entity.name = c.get("name", cid)
+            entity.description = c.get("description")
+            entity.series_ids_json = json.dumps(c.get("series_ids"), ensure_ascii=False) if c.get("series_ids") is not None else None
+            entity.role = c.get("role")
+            entity.aliases_json = json.dumps(c.get("aliases"), ensure_ascii=False) if c.get("aliases") is not None else None
+            entity.traits_json = json.dumps(c.get("traits"), ensure_ascii=False) if c.get("traits") is not None else None
+            entity.relationships_json = json.dumps(c.get("relationships"), ensure_ascii=False) if c.get("relationships") is not None else None
+            entity.record_json = json.dumps(c.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(c, ensure_ascii=False)
+            entity.revision = int((c.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["characters"] = len(characters)
 
-    media_assets = data.get("media_assets") or []
-    for ma in media_assets:
-        mid = ma["id"]
-        storage = ma.get("storage") or {}
-        p_str = str(storage.get("provider") or "local").lower()
-        provider = "drive" if p_str in ("drive", "google_drive") else "local"
-        storage_key = storage.get("storage_key") or storage.get("root_storage_key") or "local_main"
-        rel_path = storage.get("relative_path") or f"media/{mid}.mp4"
-        size_bytes = ma.get("size_bytes") if ma.get("size_bytes") is not None else (ma.get("byte_length") or 0)
-        entity = db.get(CatalogMediaAsset, mid) or CatalogMediaAsset(id=mid)
-        entity.content_type = "video"
-        entity.role = ma.get("role", "feature")
-        entity.edition_label = ma.get("edition_label") or ma.get("edition")
-        entity.storage_provider = provider
-        entity.storage_key = storage_key
-        entity.relative_path = rel_path
-        entity.drive_file_id = storage.get("drive_file_id")
-        entity.drive_folder_id = storage.get("drive_folder_id")
-        entity.size_bytes = size_bytes
-        entity.sha256 = ma.get("sha256")
-        entity.duration_ms = ma.get("duration_ms")
-        entity.technical_json = json.dumps(ma.get("technical"), ensure_ascii=False) if ma.get("technical") is not None else None
-        entity.coverage_json = json.dumps(ma.get("coverage"), ensure_ascii=False) if ma.get("coverage") is not None else None
-        entity.access_policy = ma.get("access_policy", "public")
-        entity.enabled = bool(ma.get("enabled", True))
-        entity.record_json = json.dumps(ma.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(ma, ensure_ascii=False)
-        entity.revision = int((ma.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if media_assets:
+        ids = [ma["id"] for ma in media_assets if "id" in ma]
+        existing_cat_assets = {row.id: row for row in db.query(CatalogMediaAsset).filter(CatalogMediaAsset.id.in_(ids)).all()} if ids else {}
+        existing_leg_assets = {row.id: row for row in db.query(MediaAsset).filter(MediaAsset.id.in_(ids)).all()} if ids else {}
+        for ma in media_assets:
+            mid = ma["id"]
+            storage = ma.get("storage") or {}
+            p_str = str(storage.get("provider") or "local").lower()
+            provider = "drive" if p_str in ("drive", "google_drive") else "local"
+            storage_key = storage.get("storage_key") or storage.get("root_storage_key") or "local_main"
+            rel_path = storage.get("relative_path") or f"media/{mid}.mp4"
+            size_bytes = ma.get("size_bytes") if ma.get("size_bytes") is not None else (ma.get("byte_length") or 0)
+            entity = existing_cat_assets.get(mid)
+            if not entity:
+                entity = CatalogMediaAsset(id=mid)
+                db.add(entity)
+            entity.content_type = "video"
+            entity.role = ma.get("role", "feature")
+            entity.edition_label = ma.get("edition_label") or ma.get("edition")
+            entity.storage_provider = provider
+            entity.storage_key = storage_key
+            entity.relative_path = rel_path
+            entity.drive_file_id = storage.get("drive_file_id")
+            entity.drive_folder_id = storage.get("drive_folder_id")
+            entity.size_bytes = size_bytes
+            entity.sha256 = ma.get("sha256")
+            entity.duration_ms = ma.get("duration_ms")
+            entity.technical_json = json.dumps(ma.get("technical"), ensure_ascii=False) if ma.get("technical") is not None else None
+            entity.coverage_json = json.dumps(ma.get("coverage"), ensure_ascii=False) if ma.get("coverage") is not None else None
+            entity.access_policy = ma.get("access_policy", "public")
+            entity.enabled = bool(ma.get("enabled", True))
+            entity.record_json = json.dumps(ma.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(ma, ensure_ascii=False)
+            entity.revision = int((ma.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
 
-        cov = ma.get("coverage") or []
-        movie_id = cov[0].get("episode_id", mid) if isinstance(cov, list) and cov else mid
-        if not db.get(Movie, movie_id):
-            db.add(Movie(id=movie_id, title=f"Phim liên kết {mid}", release_year=2026, rating=0.0, genres="Animation"))
-            db.flush()
-        legacy = db.get(MediaAsset, mid) or MediaAsset(id=mid)
-        legacy.movie_id = movie_id
-        legacy.kind = entity.role
-        legacy.storage_provider = provider
-        legacy.storage_key = storage_key
-        legacy.relative_path = rel_path
-        legacy.version = f"v1_{mid}"
-        legacy.mime_type = "video/mp4"
-        legacy.byte_length = size_bytes
-        legacy.duration_seconds = (entity.duration_ms / 1000.0) if entity.duration_ms else None
-        legacy.is_public = entity.access_policy.lower() == "public"
-        legacy.is_available = entity.enabled
-        db.merge(legacy)
+            cov = ma.get("coverage") or []
+            movie_id = cov[0].get("episode_id", mid) if isinstance(cov, list) and cov else mid
+            if movie_id not in existing_movies:
+                m = Movie(id=movie_id, title=f"Phim liên kết {mid}", release_year=2026, rating=0.0, genres="Animation")
+                db.add(m)
+                existing_movies[movie_id] = m
+            legacy = existing_leg_assets.get(mid)
+            if not legacy:
+                legacy = MediaAsset(id=mid)
+                db.add(legacy)
+            legacy.movie_id = movie_id
+            legacy.kind = entity.role
+            legacy.storage_provider = provider
+            legacy.storage_key = storage_key
+            legacy.relative_path = rel_path
+            legacy.version = f"v1_{mid}"
+            legacy.mime_type = "video/mp4"
+            legacy.byte_length = size_bytes
+            legacy.duration_seconds = (entity.duration_ms / 1000.0) if entity.duration_ms else None
+            legacy.is_public = entity.access_policy.lower() == "public"
+            legacy.is_available = entity.enabled
     counts["mediaAssets"] = len(media_assets)
 
     tracks = data.get("text_tracks") or []
-    for tt in tracks:
-        tid = tt["id"]
-        entity = db.get(CatalogTextTrack, tid) or CatalogTextTrack(id=tid)
-        entity.media_asset_id = tt["media_asset_id"]
-        entity.kind = tt.get("kind", "subtitles")
-        entity.language = tt.get("language", "vi")
-        entity.label = tt.get("label")
-        entity.format = tt.get("format", "vtt")
-        entity.external_file_json = json.dumps(tt.get("external_file"), ensure_ascii=False) if tt.get("external_file") is not None else None
-        entity.cues_json = json.dumps(tt.get("cues"), ensure_ascii=False) if tt.get("cues") is not None else None
-        entity.record_json = json.dumps(tt.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(tt, ensure_ascii=False)
-        entity.revision = int((tt.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if tracks:
+        ids = [tt["id"] for tt in tracks if "id" in tt]
+        existing = {row.id: row for row in db.query(CatalogTextTrack).filter(CatalogTextTrack.id.in_(ids)).all()} if ids else {}
+        for tt in tracks:
+            tid = tt["id"]
+            entity = existing.get(tid)
+            if not entity:
+                entity = CatalogTextTrack(id=tid)
+                db.add(entity)
+            entity.media_asset_id = tt["media_asset_id"]
+            entity.kind = tt.get("kind", "subtitles")
+            entity.language = tt.get("language", "vi")
+            entity.label = tt.get("label")
+            entity.format = tt.get("format", "vtt")
+            entity.external_file_json = json.dumps(tt.get("external_file"), ensure_ascii=False) if tt.get("external_file") is not None else None
+            entity.cues_json = json.dumps(tt.get("cues"), ensure_ascii=False) if tt.get("cues") is not None else None
+            entity.record_json = json.dumps(tt.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(tt, ensure_ascii=False)
+            entity.revision = int((tt.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["textTracks"] = len(tracks)
 
     scenes = data.get("scenes") or []
-    for sc in scenes:
-        sc_id = sc["id"]
-        entity = db.get(CatalogScene, sc_id) or CatalogScene(id=sc_id)
-        entity.media_asset_id = sc.get("media_asset_id")
-        entity.episode_id = sc["episode_id"]
-        entity.segment_id = sc.get("segment_id")
-        entity.start_ms = int(sc.get("start_ms") or 0)
-        entity.end_ms = int(sc.get("end_ms") or 0)
-        entity.title = sc.get("title")
-        entity.summary = sc.get("summary")
-        entity.visual_description = sc.get("visual_description") or sc.get("visual_summary")
-        entity.character_ids_json = json.dumps(sc.get("character_ids"), ensure_ascii=False) if sc.get("character_ids") is not None else None
-        entity.visual_tags_json = json.dumps(sc.get("visual_tags") or sc.get("keywords"), ensure_ascii=False) if (sc.get("visual_tags") or sc.get("keywords")) is not None else None
-        entity.sound_events_json = json.dumps(sc.get("sound_events"), ensure_ascii=False) if sc.get("sound_events") is not None else None
-        entity.transcript_cue_ids_json = json.dumps(sc.get("transcript_cue_ids"), ensure_ascii=False) if sc.get("transcript_cue_ids") is not None else None
-        entity.record_json = json.dumps(sc.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
-        entity.raw_json = json.dumps(sc, ensure_ascii=False)
-        entity.revision = int((sc.get("record") or {}).get("revision") or revision)
-        entity.updated_at = now
-        db.merge(entity)
+    if scenes:
+        ids = [sc["id"] for sc in scenes if "id" in sc]
+        existing = {row.id: row for row in db.query(CatalogScene).filter(CatalogScene.id.in_(ids)).all()} if ids else {}
+        for sc in scenes:
+            sc_id = sc["id"]
+            entity = existing.get(sc_id)
+            if not entity:
+                entity = CatalogScene(id=sc_id)
+                db.add(entity)
+            entity.media_asset_id = sc.get("media_asset_id")
+            entity.episode_id = sc["episode_id"]
+            entity.segment_id = sc.get("segment_id")
+            entity.start_ms = int(sc.get("start_ms") or 0)
+            entity.end_ms = int(sc.get("end_ms") or 0)
+            entity.title = sc.get("title")
+            entity.summary = sc.get("summary")
+            entity.visual_description = sc.get("visual_description") or sc.get("visual_summary")
+            entity.character_ids_json = json.dumps(sc.get("character_ids"), ensure_ascii=False) if sc.get("character_ids") is not None else None
+            entity.visual_tags_json = json.dumps(sc.get("visual_tags") or sc.get("keywords"), ensure_ascii=False) if (sc.get("visual_tags") or sc.get("keywords")) is not None else None
+            entity.sound_events_json = json.dumps(sc.get("sound_events"), ensure_ascii=False) if sc.get("sound_events") is not None else None
+            entity.transcript_cue_ids_json = json.dumps(sc.get("transcript_cue_ids"), ensure_ascii=False) if sc.get("transcript_cue_ids") is not None else None
+            entity.record_json = json.dumps(sc.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
+            entity.raw_json = json.dumps(sc, ensure_ascii=False)
+            entity.revision = int((sc.get("record") or {}).get("revision") or revision)
+            entity.updated_at = now
     counts["scenes"] = len(scenes)
 
     max_ver = db.query(CatalogSnapshot).order_by(CatalogSnapshot.snapshot_version.desc()).first()
@@ -1096,6 +1237,18 @@ def import_catalog_package(db, data: dict) -> dict:
     )
     db.add(snap)
     db.commit()
+    return {
+        "success": True,
+        "importId": snap_id,
+        "packageId": pkg_id,
+        "revision": revision,
+        "snapshotVersion": next_gen,
+        "contentHash": content_hash,
+        "importedAt": now.isoformat(),
+        "counts": counts,
+        "indexStatus": "READY",
+        "message": "Nhập dữ liệu package thành công và đồng bộ trực tiếp trong Python Main.",
+    }
     return {
         "success": True,
         "importId": snap_id,

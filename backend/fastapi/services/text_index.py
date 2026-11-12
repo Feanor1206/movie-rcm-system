@@ -1,7 +1,8 @@
 from collections import Counter, defaultdict
 from contextlib import nullcontext
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import functools
 import hashlib
 import json
 import math
@@ -19,15 +20,33 @@ NEGATION_CUE = re.compile(
     r"\b(?:(?:(?:chứ|chu)\s+)?(?:không|khong)\s+(?:phải|phai|xem)|(?:bỏ|bo)\s+qua|trừ|"
     r"tru(?=\s+(?:s\d+e\d+\b|(?:mùa|mua|season|phần|phan|tập|tap|ep|episode)\s*#?\s*\d)))\b"
 )
+_TOKEN_RE = re.compile(r"\b\w+\b")
+_RRF_SCORES = tuple(1.0 / (60 + rank) for rank in range(1, 65))
+_EMBEDDING_FILE_CACHE: dict[tuple[str, int], np.ndarray] = {}
 
 
+@functools.lru_cache(maxsize=8192)
 def normalize(text: str) -> str:
-    text = unicodedata.normalize("NFD", str(text).casefold().replace("đ", "d"))
-    return "".join(char for char in text if unicodedata.category(char) != "Mn")
+    decomposed = unicodedata.normalize("NFD", str(text).casefold().replace("đ", "d"))
+    return "".join(char for char in decomposed if unicodedata.category(char) != "Mn")
+
+
+@functools.lru_cache(maxsize=4096)
+def _cached_tokenize(text: str) -> tuple[str, ...]:
+    return tuple(_TOKEN_RE.findall(unicodedata.normalize("NFC", str(text).casefold())))
 
 
 def tokenize(text: str) -> list[str]:
-    return re.findall(r"\b\w+\b", unicodedata.normalize("NFC", text.casefold()))
+    return list(_cached_tokenize(text))
+
+
+@functools.lru_cache(maxsize=4096)
+def _cached_bigrams(tokens: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(f"{left}_{right}" for left, right in zip(tokens, tokens[1:]))
+
+
+def _bigrams(tokens: list[str] | tuple[str, ...]) -> list[str]:
+    return list(_cached_bigrams(tuple(tokens)))
 
 
 def parse_season_episode_intent(query: str) -> tuple[int | None, int | None]:
@@ -66,10 +85,6 @@ def _field_values(item: dict, fields: tuple[str, ...]) -> str:
         elif isinstance(value, list):
             values.extend(text for text in value if isinstance(text, str))
     return " ".join(values)
-
-
-def _bigrams(tokens: list[str]) -> list[str]:
-    return [f"{left}_{right}" for left, right in zip(tokens, tokens[1:])]
 
 
 def _coverage_mappings(episodes, payload):
@@ -218,10 +233,16 @@ class TextIndex:
     model_id: str
     missing_embeddings: int
     matrix_path: Path | None
+    _doc_genres: tuple = ()
+    _idf: dict = field(default_factory=dict)
+    _doc_len_penalty: np.ndarray | None = None
 
     @property
     def documents(self) -> list[dict]:
-        return copy.deepcopy(list(self._documents))
+        return [
+            dict(item, genres=list(item["genres"])) if "genres" in item and isinstance(item["genres"], list) else dict(item)
+            for item in self._documents
+        ]
 
     @property
     def dense_ready(self) -> bool:
@@ -247,6 +268,12 @@ class TextIndex:
                 if not path.exists():
                     missing.append((text, path))
                     continue
+                cache_key = (str(path), path.stat().st_mtime_ns)
+                cached_vec = _EMBEDDING_FILE_CACHE.get(cache_key)
+                if cached_vec is not None:
+                    dimension = cached_vec.shape[0]
+                    vectors[text] = cached_vec
+                    continue
                 vector = np.load(path, allow_pickle=False)
                 if vector.ndim != 1:
                     raise ValueError("Cached document embedding must be one-dimensional")
@@ -255,6 +282,7 @@ class TextIndex:
                 matrix = _normalize_vectors(vector.reshape(1, -1), 1, dimension)
                 dimension = matrix.shape[1]
                 vectors[text] = matrix[0]
+                _EMBEDDING_FILE_CACHE[cache_key] = matrix[0]
             if encode_missing and missing:
                 if encoder is None:
                     raise ValueError("An encoder is required to prepare missing embeddings")
@@ -276,15 +304,17 @@ class TextIndex:
                 _atomic_array(matrix_path, embeddings)
         postings = defaultdict(list)
         lengths = np.zeros(len(texts), dtype=np.float32)
+        doc_genres = []
         for index, (item, text) in enumerate(zip(documents, texts)):
-            tokens = tokenize(text)
+            doc_genres.append({normalize(g) for g in (item.get("genres") or [])})
+            tokens = _cached_tokenize(text)
             lengths[index] = len(tokens)
             counts = Counter(tokens)
-            for token in tokenize(_field_values(item, HIGH_WEIGHT_FIELDS)):
+            for token in _cached_tokenize(_field_values(item, HIGH_WEIGHT_FIELDS)):
                 counts[token] += 2
-            for token in tokenize(_field_values(item, MEDIUM_WEIGHT_FIELDS)):
+            for token in _cached_tokenize(_field_values(item, MEDIUM_WEIGHT_FIELDS)):
                 counts[token] += 1
-            for bigram in _bigrams(tokens):
+            for bigram in _cached_bigrams(tokens):
                 counts[bigram] += 2
             for word, count in tuple(counts.items()):
                 folded = "_".join(normalize(part) for part in word.split("_")) if "_" in word else normalize(word)
@@ -293,9 +323,19 @@ class TextIndex:
             for word, count in counts.items():
                 postings[word].append((index, count))
         lengths.flags.writeable = False
+
+        num_texts = len(texts)
+        idf = {
+            term: math.log(1 + (num_texts - len(posting) + 0.5) / (len(posting) + 0.5))
+            for term, posting in postings.items()
+        }
+        avg_len = float(lengths.mean()) if len(lengths) else 1.0
+        doc_len_penalty = (1.5 * (0.25 + 0.75 * lengths / (avg_len or 1.0))).astype(np.float32)
+
         return cls(tuple(documents), texts, dict(postings), lengths,
                    float(lengths.mean()) if len(lengths) else 0, embeddings, encoder,
-                   model_id, missing_count, matrix_path)
+                   model_id, missing_count, matrix_path,
+                   tuple(doc_genres), idf, doc_len_penalty)
 
     def _allowed(self, scopes: list[str], constraints: dict) -> tuple[list[int], bool]:
         season, episode = parse_season_episode_intent(scopes[0])
@@ -314,7 +354,7 @@ class TextIndex:
                 continue
             if negative[0] is not None and negative[1] is None and item.get("season_number") == negative[0]:
                 continue
-            genres = {normalize(genre) for genre in item.get("genres") or []}
+            genres = self._doc_genres[index] if self._doc_genres and index < len(self._doc_genres) else {normalize(genre) for genre in item.get("genres") or []}
             if include and not genres.intersection(include) or genres.intersection(exclude):
                 continue
             year = item.get("year") or item.get("release_year")
@@ -334,16 +374,16 @@ class TextIndex:
         if not allowed or not query.strip():
             return []
         scores = np.zeros(len(self._texts), dtype=np.float32)
-        query_tokens = tokenize(scopes[0])
-        for term in set(query_tokens + _bigrams(query_tokens)):
+        query_tokens = _cached_tokenize(scopes[0])
+        for term in set(query_tokens + _cached_bigrams(query_tokens)):
             posting = self._postings.get(term, [])
             if not posting:
                 continue
             weight = 1.35 if "_" in term else 1.0
-            inverse_frequency = math.log(1 + (len(self._texts) - len(posting) + 0.5) / (len(posting) + 0.5))
+            term_factor = weight * self._idf.get(term, math.log(1 + (len(self._texts) - len(posting) + 0.5) / (len(posting) + 0.5))) * 2.5
             for index, count in posting:
-                denominator = count + 1.5 * (0.25 + 0.75 * self._lengths[index] / (self._average_length or 1))
-                scores[index] += weight * inverse_frequency * count * 2.5 / denominator
+                denominator = count + (self._doc_len_penalty[index] if self._doc_len_penalty is not None else (1.5 * (0.25 + 0.75 * self._lengths[index] / (self._average_length or 1))))
+                scores[index] += term_factor * count / denominator
         lexical = sorted((index for index in allowed if scores[index] > 0), key=lambda index: (-scores[index], index))[:30]
         rankings = [lexical]
         if self.dense_ready:
@@ -354,8 +394,8 @@ class TextIndex:
             rankings = [allowed[:30]]
         fused = defaultdict(float)
         for ranking in rankings:
-            for rank, index in enumerate(ranking, 1):
-                fused[index] += 1 / (60 + rank)
+            for rank, index in enumerate(ranking):
+                fused[index] += _RRF_SCORES[rank] if rank < len(_RRF_SCORES) else (1.0 / (61 + rank))
         candidates = sorted(fused, key=lambda index: (-fused[index], index))[:30]
         raw_scores = dict(fused)
         if reranker is not None and candidates:
@@ -379,7 +419,10 @@ class TextIndex:
             threshold = getattr(calibration, "threshold", 0) if calibration is not None else 0
             if probability is not None and probability < threshold:
                 continue
-            result = copy.deepcopy(by_id.get(result_id, source))
+            base_doc = by_id.get(result_id, source)
+            result = dict(base_doc)
+            if "genres" in result and isinstance(result["genres"], list):
+                result["genres"] = list(result["genres"])
             result["year"] = result.get("year") or result.get("release_year") or 0
             evidence_text = source.get("dialogue_summary") or source.get("visual_summary") or source.get("description") or source.get("synopsis") or source.get("title", "")
             position = source.get("_episode_start_ms", source.get("start_ms"))

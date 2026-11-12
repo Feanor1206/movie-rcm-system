@@ -74,6 +74,7 @@ public class CatalogQueryService {
      */
     public boolean isPublished(String recordJson) {
         if (recordJson == null || recordJson.isBlank()) return false;
+        if (!recordJson.contains("ready") && !recordJson.contains("READY")) return false;
         try {
             JsonNode rec = objectMapper.readTree(recordJson);
             if (rec.has("status")) {

@@ -416,9 +416,9 @@ public class DriveCleanupShutdownOwnershipTest {
                     "Blocker task " + blocker.getId() + " must be closed exactly once");
         }
 
-        // Verify pendingCleanupObligations becomes 0
-        boolean drained = waitForCondition(() -> executor.getPendingCleanupObligations() == 0, 3000);
-        assertTrue(drained, "pendingCleanupObligations must become 0 after shutdown drain");
+        // Verify pendingCleanupObligations and activeCleanupWorkers become 0
+        boolean drained = waitForCondition(() -> executor.getPendingCleanupObligations() == 0 && executor.getActiveCleanupWorkers() == 0, 3000);
+        assertTrue(drained, "pendingCleanupObligations and activeCleanupWorkers must become 0 after shutdown drain");
         assertEquals(0, executor.getPendingCleanupObligations());
         assertEquals(0, executor.getActiveCleanupWorkers(),
                 "Active cleanup workers must return to 0 after drain");

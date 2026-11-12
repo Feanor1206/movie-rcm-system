@@ -6,9 +6,16 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "favorite_items", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "movie_id"})
-})
+@Table(
+    name = "favorite_items",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_user_movie_favorite", columnNames = {"user_id", "movie_id"})
+    },
+    indexes = {
+        @Index(name = "idx_favorite_user", columnList = "user_id"),
+        @Index(name = "idx_favorite_movie", columnList = "movie_id")
+    }
+)
 public class FavoriteItem {
 
     @Id

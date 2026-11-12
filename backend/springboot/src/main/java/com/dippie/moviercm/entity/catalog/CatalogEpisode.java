@@ -4,7 +4,13 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "catalog_episodes")
+@Table(
+    name = "catalog_episodes",
+    indexes = {
+        @Index(name = "idx_cat_ep_series", columnList = "series_id"),
+        @Index(name = "idx_cat_ep_season", columnList = "season_id")
+    }
+)
 public class CatalogEpisode {
 
     @Id

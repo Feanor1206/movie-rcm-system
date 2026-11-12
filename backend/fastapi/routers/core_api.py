@@ -4,7 +4,6 @@ import json
 import math
 import os
 from pathlib import Path
-import re
 import secrets
 
 from types import SimpleNamespace
@@ -250,7 +249,12 @@ def browse_movies(
         return api_response(None, f"Chiều sắp xếp không hợp lệ: '{direction}'", False, 400)
 
     with get_db(request) as db:
-        items = db.query(Movie).all()
+        query = db.query(Movie)
+        if yearMin is not None:
+            query = query.filter(Movie.release_year >= yearMin)
+        if yearMax is not None:
+            query = query.filter(Movie.release_year <= yearMax)
+        items = query.all()
         result = []
         genre_tokens = [t.strip() for t in (genres or "").split(",") if t.strip()]
         for m in items:
@@ -261,10 +265,6 @@ def browse_movies(
             if any(not _matches_genre_token(m.genres, gt) for gt in genre_tokens):
                 continue
             if animationOnly is True and not _matches_genre_token(m.genres, "Animation"):
-                continue
-            if yearMin is not None and (m.release_year or 0) < yearMin:
-                continue
-            if yearMax is not None and (m.release_year or 0) > yearMax:
                 continue
             result.append(m)
 
@@ -421,7 +421,7 @@ def get_catalog_episode_detail(episode_id: str, request: Request, authorization:
             for s in db.query(CatalogSegment).filter(CatalogSegment.episode_id == episode_id).order_by(CatalogSegment.position.asc()).all()
             if is_published(s.record_json)
         ]
-        all_assets = db.query(CatalogMediaAsset).all()
+        all_assets = db.query(CatalogMediaAsset).filter(CatalogMediaAsset.coverage_json.like(f"%{episode_id}%")).all()
         assets = [a.to_dict() for a in all_assets if _asset_covers_episode(a, episode_id) and _asset_allowed(a, user)]
         allowed_asset_ids = {a["id"] for a in assets}
         scenes = [
@@ -817,12 +817,17 @@ def grant_media_token(asset_id: str, request: Request, authorization: str | None
             c_asset = db.get(CatalogMediaAsset, asset_id)
             if c_asset and (c_asset.access_policy or "").lower() == "private" and user.role != "ROLE_ADMIN":
                 return api_response(None, f"Không tìm thấy tài nguyên media: {asset_id}", False, 404)
+        now_ts = datetime.now(timezone.utc).timestamp()
+        if len(MEDIA_TOKENS) > 64:
+            expired = [k for k, v in MEDIA_TOKENS.items() if v[3] < now_ts]
+            for k in expired:
+                del MEDIA_TOKENS[k]
         token = secrets.token_urlsafe(24)
         MEDIA_TOKENS[token] = (
             asset_id,
             user.id if user else None,
             user.role if user else "ROLE_ANONYMOUS",
-            datetime.now(timezone.utc).timestamp() + 300,
+            now_ts + 300,
         )
         return api_response(data={"token": token, "expiresInSeconds": 300}, message="Granted playback token")
 

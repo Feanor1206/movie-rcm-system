@@ -44,10 +44,10 @@ public class AuthAdmissionService {
     }
 
     synchronized Admission tryAdmit(String remoteAddress, Endpoint endpoint, long nowMillis) {
-        removeExpiredClients(nowMillis);
         String clientIp = remoteAddress == null || remoteAddress.isBlank() ? UNKNOWN_REMOTE : remoteAddress;
         IpWindows windows = clients.get(clientIp);
         if (windows == null) {
+            removeExpiredClients(nowMillis);
             if (clients.size() >= maxTrackedIps) {
                 return new Admission(false, secondsUntil(earliestClientExpiry(nowMillis), nowMillis));
             }

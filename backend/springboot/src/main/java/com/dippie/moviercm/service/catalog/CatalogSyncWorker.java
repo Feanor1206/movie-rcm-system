@@ -49,11 +49,15 @@ public class CatalogSyncWorker {
     private int syncTimeoutSeconds = 60;
 
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
+    private final HttpClient httpClient;
 
     @Autowired
     public CatalogSyncWorker(CatalogSnapshotRepository snapshotRepository, CatalogQueryService queryService) {
         this.snapshotRepository = snapshotRepository;
         this.queryService = queryService;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -146,10 +150,6 @@ public class CatalogSyncWorker {
                 return;
             }
 
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(3))
-                    .build();
-
             Map<String, Object> payload = Map.of(
                     "generation", snapshot.getSnapshotVersion(),
                     "content_hash", fullCatalogHash,
@@ -166,7 +166,7 @@ public class CatalogSyncWorker {
                     .timeout(Duration.ofSeconds(syncTimeoutSeconds))
                     .build();
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int statusCode = response.statusCode();
             String responseBody = response.body() != null ? response.body() : "";
 

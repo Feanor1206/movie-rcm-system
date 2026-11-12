@@ -215,14 +215,16 @@ public class DataInitializer implements CommandLineRunner {
                         .build()
         );
 
-        int added = 0;
+        List<Movie> toSave = new ArrayList<>();
         for (Movie m : seedMovies) {
             if (!movieRepository.existsById(m.getId())) {
-                movieRepository.save(m);
-                added++;
+                toSave.add(m);
             }
         }
-        logger.info("Đã đồng bộ kho phim. Thêm mới {} phim.", added);
+        if (!toSave.isEmpty()) {
+            movieRepository.saveAll(toSave);
+        }
+        logger.info("Đã đồng bộ kho phim. Thêm mới {} phim.", toSave.size());
     }
 
     private void seed50Users() {
