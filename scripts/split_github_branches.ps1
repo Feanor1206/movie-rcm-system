@@ -40,23 +40,25 @@ $ErrorActionPreference = "Continue"
 git merge dev --no-commit
 $ErrorActionPreference = $prevEAP
 
-# Lược bỏ các file backend/springboot nếu bị kéo vào hoặc gặp xung đột modify/delete
+# Lược bỏ hoàn toàn backend/springboot khỏi python-main
 if (Test-Path "backend\springboot") {
-    $trackedSpringFiles = git ls-files backend/springboot
-    if ($trackedSpringFiles) {
-        git rm -rf backend/springboot | Out-Null
-    }
+    Remove-Item -Recurse -Force "backend\springboot"
+}
+git rm -rf --cached --ignore-unmatch backend/springboot 2>$null | Out-Null
+
+# Dọn dẹp bất kỳ file conflict nào của backend/springboot (DU, UD, v.v.)
+$springConflicts = @(git diff --name-only --diff-filter=U 2>$null | Where-Object { $_ -like "backend/springboot/*" -or $_ -like "backend\springboot\*" })
+if ($springConflicts.Count -gt 0) {
+    git rm -f $springConflicts 2>$null | Out-Null
 }
 
-# Dọn dẹp các trạng thái modify/delete conflict (UD) đối với backend/springboot
-$conflicts = git status --porcelain
-if ($conflicts) {
-    foreach ($line in ($conflicts -split "`n")) {
-        if ($line -match "^\s*UD\s+(backend/springboot/.*)") {
-            $conflictFile = $matches[1].Trim()
-            git rm -f $conflictFile 2>$null | Out-Null
-        }
-    }
+# Kiểm tra nghiêm ngặt xung đột merge ngoài backend/springboot
+$unmergedFiles = @(git diff --name-only --diff-filter=U 2>$null | Where-Object { $_ -notlike "backend/springboot/*" -and $_ -notlike "backend\springboot\*" })
+if ($unmergedFiles.Count -gt 0) {
+    Write-Warning "Phát hiện xung đột merge ngoài backend/springboot: $($unmergedFiles -join ', ')"
+    git merge --abort 2>$null | Out-Null
+    git checkout $initialBranch
+    throw "Đã tự động abort merge và quay lại nhánh '$initialBranch' do xung đột tại: $($unmergedFiles -join ', ')"
 }
 
 # Đảm bảo start-all.ps1 dùng backend python
@@ -80,9 +82,9 @@ Write-Host "  - main        : Nhánh sản xuất đồng bộ với dev / java-
 Write-Host "  - python-main : FastAPI (Unified Main Backend + AI) + MySQL + Frontend" -ForegroundColor White
 
 if ($PushToOrigin) {
-    Write-Host "`nĐang đẩy cả 4 nhánh lên GitHub (origin) không dùng -f..." -ForegroundColor Yellow
-    git push origin dev main java-main python-main
+    Write-Host "`nĐang đẩy cả 4 nhánh lên GitHub (origin) và thiết lập upstream tracking (-u)..." -ForegroundColor Yellow
+    git push -u origin dev main java-main python-main
 } else {
-    Write-Host "`nĐể đẩy cả 4 nhánh lên GitHub, chạy:" -ForegroundColor Yellow
-    Write-Host "  git push origin dev main java-main python-main" -ForegroundColor White
+    Write-Host "`nĐể đẩy cả 4 nhánh lên GitHub và thiết lập tracking, chạy:" -ForegroundColor Yellow
+    Write-Host "  git push -u origin dev main java-main python-main" -ForegroundColor White
 }
