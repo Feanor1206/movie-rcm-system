@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 load_dotenv()
 
 from routers import chat, core_api, frame, health, recommend, search, sync
+from services.database import _jwt_key
 from services.chat import ChatService
 from services.llm_client import LLMClient
 from services.model_registry import InferenceCapacityError
@@ -34,6 +35,8 @@ def create_app(**options):
     @asynccontextmanager
     async def lifespan(application):
         runtime = application.state.runtime
+        _jwt_key()
+        await run_in_threadpool(runtime.db.secure_accounts)
         if runtime.registry.mode == "cloud":
             _load_deepseek_config()
         await runtime.registry.initialize()

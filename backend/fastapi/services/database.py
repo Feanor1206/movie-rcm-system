@@ -4,6 +4,7 @@ import functools
 import hashlib
 import json
 import os
+import secrets
 from pathlib import Path
 import time
 
@@ -23,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
     event,
+    text,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -699,15 +701,21 @@ def verify_password(raw_password: str, hashed: str) -> bool:
 
 
 def _jwt_key() -> bytes:
-    return _jwt_key_cached(os.getenv("APP_JWT_SECRET", DEFAULT_JWT_SECRET))
+    return _jwt_key_cached(os.getenv("APP_JWT_SECRET", ""))
 
 
 @functools.lru_cache(maxsize=4)
 def _jwt_key_cached(secret: str) -> bytes:
     try:
-        return base64.b64decode(secret)
-    except Exception:
-        return secret.encode("utf-8")
+        key = base64.b64decode(secret, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError("APP_JWT_SECRET phải là khóa Base64 hợp lệ, tối thiểu 32 byte.") from exc
+    if len(key) < 32 or key in (
+        base64.b64decode(DEFAULT_JWT_SECRET),
+        base64.b64decode("dippieSecretKeyForJwtAuthentication2026MustBeLongEnoughForHmacSha256"),
+    ):
+        raise RuntimeError("APP_JWT_SECRET phải là khóa riêng, tối thiểu 32 byte; không dùng khóa mặc định cũ.")
+    return key
 
 
 def create_jwt_token(username: str) -> str:
@@ -832,6 +840,37 @@ class DatabaseManager:
         if self._seed:
             self.seed_defaults()
 
+    def secure_accounts(self):
+        if os.getenv("APP_DEMO_MODE", "").lower() == "true":
+            return
+        username = os.getenv("APP_BOOTSTRAP_ADMIN_USERNAME", "").strip()
+        email = os.getenv("APP_BOOTSTRAP_ADMIN_EMAIL", "").strip()
+        password = os.getenv("APP_BOOTSTRAP_ADMIN_PASSWORD", "")
+        if (username or email or password) and (not username or not password):
+            raise RuntimeError("Cần cả APP_BOOTSTRAP_ADMIN_USERNAME và APP_BOOTSTRAP_ADMIN_PASSWORD.")
+        if password and (len(password.strip()) < 16 or len(password.encode("utf-8")) > 72):
+            raise RuntimeError("Mật khẩu quản trị phải dài từ 16 ký tự đến 72 byte.")
+        with self.session() as db:
+            admins = db.query(User).filter(User.role == "ROLE_ADMIN").all()
+            admin = next((user for user in admins if user.username == username), None)
+            weak_admins = [user for user in admins if verify_password("password123", user.password)]
+            if weak_admins:
+                if len(weak_admins) != 1 or admin is not weak_admins[0] or not password:
+                    raise RuntimeError("Tài khoản quản trị dùng mật khẩu demo; đặt APP_BOOTSTRAP_ADMIN_USERNAME và APP_BOOTSTRAP_ADMIN_PASSWORD để đổi mật khẩu.")
+                admin.password = hash_password(password)
+            elif password and not admin:
+                if admins:
+                    raise RuntimeError("Đã có quản trị viên; không thể tự động tạo thêm tài khoản quản trị.")
+                if not email:
+                    raise RuntimeError("Cần APP_BOOTSTRAP_ADMIN_EMAIL để tạo quản trị viên.")
+                if db.query(User).filter((User.username == username) | (User.email == email)).first():
+                    raise RuntimeError("Tên đăng nhập hoặc email quản trị đã được dùng.")
+                db.add(User(username=username, email=email, password=hash_password(password), role="ROLE_ADMIN"))
+            legacy_user = db.query(User).filter(User.username == "user", User.email == "user@dippie.com", User.role == "ROLE_USER").first()
+            if legacy_user and verify_password("password123", legacy_user.password):
+                legacy_user.password = hash_password(secrets.token_urlsafe(32))
+            db.commit()
+
     def session(self):
         self.ensure_initialized()
         return self.SessionLocal()
@@ -845,18 +884,19 @@ class DatabaseManager:
                         runtime=runtime, genres=genres, description=desc,
                         poster=poster, backdrop=backdrop, video_url=video_url,
                     ))
-            if not db.query(User).filter(User.username == "admin").first():
-                db.add(User(
-                    username="admin", email="admin@dippie.com",
-                    full_name="System Administrator",
-                    password=hash_password("password123"), role="ROLE_ADMIN",
-                ))
-            if not db.query(User).filter(User.username == "user").first():
-                db.add(User(
-                    username="user", email="user@dippie.com",
-                    full_name="Standard User",
-                    password=hash_password("password123"), role="ROLE_USER",
-                ))
+            if os.getenv("APP_DEMO_MODE", "").lower() == "true":
+                if not db.query(User).filter(User.username == "admin").first():
+                    db.add(User(
+                        username="admin", email="admin@dippie.com",
+                        full_name="System Administrator",
+                        password=hash_password("password123"), role="ROLE_ADMIN",
+                    ))
+                if not db.query(User).filter(User.username == "user").first():
+                    db.add(User(
+                        username="user", email="user@dippie.com",
+                        full_name="Standard User",
+                        password=hash_password("password123"), role="ROLE_USER",
+                    ))
             db.flush()
             default_assets = [
                 ("ast-drive-videoplayback", "drive-videoplayback", "feature", "drive", "videoplayback.mp4", "v1", "video/mp4", 29209556, 445.8),
@@ -891,10 +931,148 @@ def compute_sha256(data) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+CATALOG_COLLECTIONS = {
+    "genres": CatalogGenre,
+    "attribute_scales": CatalogAttributeScale,
+    "sources": CatalogSource,
+    "series": CatalogSeries,
+    "seasons": CatalogSeason,
+    "episodes": CatalogEpisode,
+    "segments": CatalogSegment,
+    "characters": CatalogCharacter,
+    "media_assets": CatalogMediaAsset,
+    "text_tracks": CatalogTextTrack,
+    "scenes": CatalogScene,
+}
+
+
+class CatalogInputError(ValueError):
+    def __init__(self, path, message):
+        super().__init__(message)
+        self.path = path
+
+
+class CatalogConflictError(ValueError):
+    pass
+
+
+def is_relative_media_path(value):
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and not value.startswith("/")
+        and not any(char in "\\:" or ord(char) < 32 or ord(char) == 127 for char in value)
+        and all(part.rstrip(" ") != ".." for part in value.split("/"))
+    )
+
+
+def validate_catalog_input(data):
+    def check_revision(value, path):
+        if type(value) is not int or not 1 <= value <= 2_147_483_647:
+            raise CatalogInputError(path, "Phiên bản phải là số nguyên dương hợp lệ.")
+
+    def check_id(value, path, max_length=100):
+        if not isinstance(value, str) or not value.strip() or len(value) > max_length or value != value.strip():
+            raise CatalogInputError(path, "Mã định danh không hợp lệ.")
+
+    pkg = data.get("package") if isinstance(data, dict) else None
+    if not isinstance(pkg, dict) or not pkg.get("id"):
+        raise CatalogInputError("package.id", "Thiếu mã gói danh mục.")
+    check_id(pkg["id"], "package.id")
+    revision = pkg.get("revision", 1)
+    check_revision(revision, "package.revision")
+    for collection in CATALOG_COLLECTIONS:
+        items = data.get(collection)
+        if items is None:
+            continue
+        if not isinstance(items, list):
+            raise CatalogInputError(collection, "Cần một danh sách bản ghi.")
+        ids = set()
+        for index, item in enumerate(items):
+            path = f"{collection}[{index}]"
+            if not isinstance(item, dict):
+                raise CatalogInputError(path, "Bản ghi không hợp lệ.")
+            item_id = item.get("id")
+            check_id(item_id, f"{path}.id", 64 if collection == "media_assets" else 100)
+            if item_id.casefold() in ids:
+                raise CatalogInputError(f"{path}.id", "Mã định danh bị trùng.")
+            ids.add(item_id.casefold())
+            record = item.get("record")
+            if record is not None:
+                if not isinstance(record, dict):
+                    raise CatalogInputError(f"{path}.record", "Bản ghi không hợp lệ.")
+                check_revision(record.get("revision", revision), f"{path}.record.revision")
+            if collection == "media_assets":
+                storage = item.get("storage")
+                if storage is not None and not isinstance(storage, dict):
+                    raise CatalogInputError(f"{path}.storage", "Thông tin lưu trữ không hợp lệ.")
+                media_path = (storage or {}).get("relative_path", f"media/{item_id}.mp4")
+                if not is_relative_media_path(media_path) or len(media_path) > 500:
+                    raise CatalogInputError(f"{path}.storage.relative_path", "Đường dẫn video phải nằm trong thư mục lưu trữ.")
+                if item.get("access_policy", "public") not in ("public", "authenticated", "private"):
+                    raise CatalogInputError(f"{path}.access_policy", "Quyền truy cập video không hợp lệ.")
+    return pkg["id"], revision
+
+
+def _stored_catalog_hash(raw_json):
+    if raw_json:
+        try:
+            return compute_sha256(json.loads(raw_json))
+        except (TypeError, ValueError):
+            return compute_sha256(raw_json)
+    return ""
+
+
+def catalog_diff(db, data, revision, content_hash, existing_pkg, lock=False):
+    counts = dict(toCreate=0, toUpdate=0, unchanged=0, conflicts=0)
+    stored = {}
+
+    def count(stored_revision, incoming_revision, same_content):
+        if stored_revision is None:
+            counts["toCreate"] += 1
+        elif incoming_revision > stored_revision:
+            counts["toUpdate"] += 1
+        elif incoming_revision == stored_revision and same_content:
+            counts["unchanged"] += 1
+        else:
+            counts["conflicts"] += 1
+
+    count(
+        existing_pkg.revision if existing_pkg else None,
+        revision,
+        existing_pkg is not None and content_hash == existing_pkg.content_hash,
+    )
+    for collection, model in CATALOG_COLLECTIONS.items():
+        items = data.get(collection) or []
+        if not items:
+            continue
+        query = db.query(model).filter(model.id.in_([item["id"] for item in items]))
+        if lock:
+            query = query.with_for_update().populate_existing()
+        existing_rows = {row.id: row for row in query}
+        stored[collection] = existing_rows
+        for item in items:
+            existing = existing_rows.get(item["id"])
+            item_revision = (item.get("record") or {}).get("revision", revision)
+            old_revision = existing.revision if existing else None
+            if existing and existing.record_json:
+                try:
+                    recorded = json.loads(existing.record_json)
+                    if isinstance(recorded, dict) and type(recorded.get("revision")) is int:
+                        old_revision = recorded["revision"]
+                except (TypeError, ValueError):
+                    pass
+            same_content = (
+                existing is not None and item_revision == old_revision
+                and compute_sha256(item) == _stored_catalog_hash(existing.raw_json)
+            )
+            count(old_revision, item_revision, same_content)
+    return counts, stored
+
+
 def import_catalog_package(db, data: dict) -> dict:
-    pkg = data.get("package") or {}
-    pkg_id = pkg.get("id") or "pkg_default"
-    revision = int(pkg.get("revision") or 1)
+    pkg_id, revision = validate_catalog_input(data)
+    pkg = data["package"]
     version = str(pkg.get("version") or "1.0.0")
     default_lang = str(pkg.get("default_language") or "vi")
     import_mode = str(pkg.get("import_mode") or "upsert")
@@ -902,7 +1080,38 @@ def import_catalog_package(db, data: dict) -> dict:
     content_hash = compute_sha256(data)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    existing_pkg = db.get(CatalogPackage, pkg_id)
+    connection = db.connection()
+    if connection.dialect.name == "sqlite" and not connection.connection.driver_connection.in_transaction:
+        connection.execute(text("BEGIN IMMEDIATE"))
+    existing_pkg = db.get(CatalogPackage, pkg_id, with_for_update=True, populate_existing=True)
+    changes, stored = catalog_diff(db, data, revision, content_hash, existing_pkg, lock=True)
+    if changes["conflicts"]:
+        raise CatalogConflictError("Gói danh mục xung đột với phiên bản đã lưu.")
+
+    counts = {
+        {"attribute_scales": "attributeScales", "media_assets": "mediaAssets", "text_tracks": "textTracks"}.get(key, key):
+            len(data.get(key) or [])
+        for key in CATALOG_COLLECTIONS
+    }
+    if not changes["toCreate"] and not changes["toUpdate"]:
+        snap = (
+            db.query(CatalogSnapshot).filter_by(content_hash=content_hash)
+            .order_by(CatalogSnapshot.snapshot_version.desc()).with_for_update().first()
+        )
+        if snap:
+            return {
+                "success": True,
+                "unchanged": True,
+                "importId": snap.id,
+                "packageId": pkg_id,
+                "revision": revision,
+                "snapshotVersion": snap.snapshot_version,
+                "contentHash": content_hash,
+                "importedAt": existing_pkg.imported_at.isoformat() if existing_pkg.imported_at else None,
+                "counts": counts,
+                "indexStatus": snap.status,
+                "message": "Gói danh mục đã được nhập.",
+            }
     if existing_pkg:
         existing_pkg.version = version
         existing_pkg.revision = revision
@@ -919,12 +1128,9 @@ def import_catalog_package(db, data: dict) -> dict:
             content_hash=content_hash, status="COMMITTED", created_at=now, imported_at=now,
         ))
 
-    counts = {}
-
     genres = data.get("genres") or []
     if genres:
-        ids = [g["id"] for g in genres if "id" in g]
-        existing = {row.id: row for row in db.query(CatalogGenre).filter(CatalogGenre.id.in_(ids)).all()} if ids else {}
+        existing = stored["genres"]
         for g in genres:
             gid = g["id"]
             entity = existing.get(gid)
@@ -938,12 +1144,10 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(g, ensure_ascii=False)
             entity.revision = int((g.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["genres"] = len(genres)
 
     scales = data.get("attribute_scales") or []
     if scales:
-        ids = [sc["id"] for sc in scales if "id" in sc]
-        existing = {row.id: row for row in db.query(CatalogAttributeScale).filter(CatalogAttributeScale.id.in_(ids)).all()} if ids else {}
+        existing = stored["attribute_scales"]
         for sc in scales:
             sid = sc["id"]
             entity = existing.get(sid)
@@ -961,12 +1165,10 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(sc, ensure_ascii=False)
             entity.revision = int((sc.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["attributeScales"] = len(scales)
 
     sources = data.get("sources") or []
     if sources:
-        ids = [src["id"] for src in sources if "id" in src]
-        existing = {row.id: row for row in db.query(CatalogSource).filter(CatalogSource.id.in_(ids)).all()} if ids else {}
+        existing = stored["sources"]
         for src in sources:
             sid = src["id"]
             entity = existing.get(sid)
@@ -982,7 +1184,6 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(src, ensure_ascii=False)
             entity.revision = int((src.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["sources"] = len(sources)
 
     series_list = data.get("series") or []
     seasons = data.get("seasons") or []
@@ -997,8 +1198,7 @@ def import_catalog_package(db, data: dict) -> dict:
     existing_movies = {row.id: row for row in db.query(Movie).filter(Movie.id.in_(needed_movie_ids)).all()} if needed_movie_ids else {}
 
     if series_list:
-        ids = [s["id"] for s in series_list if "id" in s]
-        existing = {row.id: row for row in db.query(CatalogSeries).filter(CatalogSeries.id.in_(ids)).all()} if ids else {}
+        existing = stored["series"]
         for s in series_list:
             sid = s["id"]
             entity = existing.get(sid)
@@ -1035,12 +1235,10 @@ def import_catalog_package(db, data: dict) -> dict:
                 )
                 db.add(m)
                 existing_movies[sid] = m
-    counts["series"] = len(series_list)
     db.flush()
 
     if seasons:
-        ids = [sea["id"] for sea in seasons if "id" in sea]
-        existing = {row.id: row for row in db.query(CatalogSeason).filter(CatalogSeason.id.in_(ids)).all()} if ids else {}
+        existing = stored["seasons"]
         for sea in seasons:
             sea_id = sea["id"]
             entity = existing.get(sea_id)
@@ -1058,11 +1256,9 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(sea, ensure_ascii=False)
             entity.revision = int((sea.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["seasons"] = len(seasons)
 
     if episodes:
-        ids = [ep["id"] for ep in episodes if "id" in ep]
-        existing = {row.id: row for row in db.query(CatalogEpisode).filter(CatalogEpisode.id.in_(ids)).all()} if ids else {}
+        existing = stored["episodes"]
         for ep in episodes:
             ep_id = ep["id"]
             entity = existing.get(ep_id)
@@ -1099,13 +1295,11 @@ def import_catalog_package(db, data: dict) -> dict:
                 )
                 db.add(m)
                 existing_movies[ep_id] = m
-    counts["episodes"] = len(episodes)
     db.flush()
 
     segments = data.get("segments") or []
     if segments:
-        ids = [seg["id"] for seg in segments if "id" in seg]
-        existing = {row.id: row for row in db.query(CatalogSegment).filter(CatalogSegment.id.in_(ids)).all()} if ids else {}
+        existing = stored["segments"]
         for seg in segments:
             seg_id = seg["id"]
             entity = existing.get(seg_id)
@@ -1126,12 +1320,10 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(seg, ensure_ascii=False)
             entity.revision = int((seg.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["segments"] = len(segments)
 
     characters = data.get("characters") or []
     if characters:
-        ids = [c["id"] for c in characters if "id" in c]
-        existing = {row.id: row for row in db.query(CatalogCharacter).filter(CatalogCharacter.id.in_(ids)).all()} if ids else {}
+        existing = stored["characters"]
         for c in characters:
             cid = c["id"]
             entity = existing.get(cid)
@@ -1149,12 +1341,11 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(c, ensure_ascii=False)
             entity.revision = int((c.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["characters"] = len(characters)
 
     if media_assets:
-        ids = [ma["id"] for ma in media_assets if "id" in ma]
-        existing_cat_assets = {row.id: row for row in db.query(CatalogMediaAsset).filter(CatalogMediaAsset.id.in_(ids)).all()} if ids else {}
-        existing_leg_assets = {row.id: row for row in db.query(MediaAsset).filter(MediaAsset.id.in_(ids)).all()} if ids else {}
+        existing_cat_assets = stored["media_assets"]
+        ids = [ma["id"] for ma in media_assets]
+        existing_leg_assets = {row.id: row for row in db.query(MediaAsset).filter(MediaAsset.id.in_(ids)).with_for_update()}
         for ma in media_assets:
             cov = ma.get("coverage") or []
             movie_id = cov[0].get("episode_id", ma["id"]) if isinstance(cov, list) and cov else ma["id"]
@@ -1212,13 +1403,11 @@ def import_catalog_package(db, data: dict) -> dict:
             legacy.duration_seconds = (entity.duration_ms / 1000.0) if entity.duration_ms else None
             legacy.is_public = entity.access_policy.lower() == "public"
             legacy.is_available = entity.enabled
-    counts["mediaAssets"] = len(media_assets)
     db.flush()
 
     tracks = data.get("text_tracks") or []
     if tracks:
-        ids = [tt["id"] for tt in tracks if "id" in tt]
-        existing = {row.id: row for row in db.query(CatalogTextTrack).filter(CatalogTextTrack.id.in_(ids)).all()} if ids else {}
+        existing = stored["text_tracks"]
         for tt in tracks:
             tid = tt["id"]
             entity = existing.get(tid)
@@ -1236,12 +1425,10 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(tt, ensure_ascii=False)
             entity.revision = int((tt.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["textTracks"] = len(tracks)
 
     scenes = data.get("scenes") or []
     if scenes:
-        ids = [sc["id"] for sc in scenes if "id" in sc]
-        existing = {row.id: row for row in db.query(CatalogScene).filter(CatalogScene.id.in_(ids)).all()} if ids else {}
+        existing = stored["scenes"]
         for sc in scenes:
             sc_id = sc["id"]
             entity = existing.get(sc_id)
@@ -1264,11 +1451,10 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(sc, ensure_ascii=False)
             entity.revision = int((sc.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
-    counts["scenes"] = len(scenes)
 
-    max_ver = db.query(CatalogSnapshot).order_by(CatalogSnapshot.snapshot_version.desc()).first()
+    max_ver = db.query(CatalogSnapshot).order_by(CatalogSnapshot.snapshot_version.desc()).with_for_update().first()
     next_gen = (max_ver.snapshot_version + 1) if max_ver else 1
-    snap_id = f"snap_{int(time.time() * 1000)}_{pkg_id}_g{next_gen}"
+    snap_id = f"snap_{int(time.time() * 1000)}_{pkg_id[:48]}_g{next_gen}"
     snap = CatalogSnapshot(
         id=snap_id, snapshot_version=next_gen, content_hash=content_hash,
         total_items=sum(counts.values()), status="READY", retry_count=0,
@@ -1286,7 +1472,7 @@ def import_catalog_package(db, data: dict) -> dict:
         "importedAt": now.isoformat(),
         "counts": counts,
         "indexStatus": "READY",
-        "message": "Nhập dữ liệu package thành công và đồng bộ trực tiếp trong Python Main.",
+        "message": "Đã nhập gói danh mục.",
     }
 
 
