@@ -1,6 +1,7 @@
 package com.dippie.moviercm;
 
 import com.dippie.moviercm.entity.MediaAsset;
+import com.dippie.moviercm.config.StorageKeyConfig;
 import com.dippie.moviercm.entity.Movie;
 import com.dippie.moviercm.exception.MediaNotFoundException;
 import com.dippie.moviercm.exception.MediaUnavailableException;
@@ -64,6 +65,9 @@ public class DriveMediaStreamingIntegrationTest {
 
     @Autowired
     private MediaStreamService mediaStreamService;
+
+    @Autowired
+    private StorageKeyConfig storageKeyConfig;
 
     @BeforeAll
     static void initMockDriveMount() throws IOException {
@@ -457,6 +461,30 @@ public class DriveMediaStreamingIntegrationTest {
         } finally {
             mediaStreamService.setMaxConcurrentDriveStreams(originalLimit);
         }
+    }
+
+    @Test
+    void catalogStorageKeysUseTheConfiguredDriveMount() {
+        assertEquals(mockDriveMount.toAbsolutePath().normalize(),
+                storageKeyConfig.getRoot("drive", "animation_drive").rootPath());
+    }
+
+    @Test
+    void defaultDriveLimitAllowsFivePlayersToReplaceTheirRangeRequests() {
+        var service = new MediaStreamService(null, null, null, null);
+        int acquired = 0;
+        try {
+            for (; acquired < 10; acquired++) {
+                assertTrue(service.acquireDriveStreamPermit());
+            }
+            assertFalse(service.acquireDriveStreamPermit());
+            assertEquals(10, service.getDriveActiveStreamCount());
+        } finally {
+            for (int index = 0; index < acquired; index++) {
+                service.releaseDriveStreamPermit();
+            }
+        }
+        assertEquals(0, service.getDriveActiveStreamCount());
     }
 
     @Test
