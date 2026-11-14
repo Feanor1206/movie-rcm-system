@@ -2,7 +2,7 @@ package com.dippie.moviercm.service;
 
 import com.dippie.moviercm.dto.AuthRequest;
 import com.dippie.moviercm.dto.AuthResponse;
-import com.dippie.moviercm.dto.RegisterRequest;
+import com.dippie.moviercm.dto.RegistrationRequest;
 import com.dippie.moviercm.dto.UserResponse;
 import com.dippie.moviercm.entity.Role;
 import com.dippie.moviercm.entity.User;
@@ -64,26 +64,26 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse register(RegisterRequest registerRequest) {
-        if (userRepository.existsByUsername(registerRequest.getUsername())) {
+    public AuthResponse register(RegistrationRequest registrationRequest) {
+        if (userRepository.existsByUsername(registrationRequest.getUsername())) {
             throw new IllegalArgumentException("Tên đăng nhập đã được dùng.");
         }
 
-        if (userRepository.existsByEmail(registerRequest.getEmail())) {
+        if (userRepository.existsByEmail(registrationRequest.getEmail())) {
             throw new IllegalArgumentException("Email đã được dùng.");
         }
 
         User user = User.builder()
-                .username(registerRequest.getUsername())
-                .email(registerRequest.getEmail())
-                .password(passwordEncoder.encode(registerRequest.getPassword()))
-                .fullName(registerRequest.getFullName())
+                .username(registrationRequest.getUsername())
+                .email(registrationRequest.getEmail())
+                .password(passwordEncoder.encode(registrationRequest.getPassword()))
+                .fullName(registrationRequest.getFullName())
                 .role(Role.ROLE_USER)
                 .build();
 
         User savedUser = userRepository.save(user);
 
-        return login(new AuthRequest(registerRequest.getUsername(), registerRequest.getPassword()));
+        return login(new AuthRequest(registrationRequest.getUsername(), registrationRequest.getPassword()));
     }
 
     @Transactional(readOnly = true)

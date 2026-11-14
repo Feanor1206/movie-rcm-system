@@ -3,7 +3,7 @@ package com.dippie.moviercm.controller;
 import com.dippie.moviercm.dto.ApiResponse;
 import com.dippie.moviercm.dto.AuthRequest;
 import com.dippie.moviercm.dto.AuthResponse;
-import com.dippie.moviercm.dto.RegisterRequest;
+import com.dippie.moviercm.dto.RegistrationRequest;
 import com.dippie.moviercm.dto.UserResponse;
 import com.dippie.moviercm.security.UserDetailsImpl;
 import com.dippie.moviercm.service.AuthService;
@@ -30,8 +30,8 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest registerRequest) {
-        AuthResponse response = authService.register(registerRequest);
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegistrationRequest registrationRequest) {
+        AuthResponse response = authService.register(registrationRequest);
         return ResponseEntity.ok(ApiResponse.success("Đã tạo tài khoản.", response));
     }
 

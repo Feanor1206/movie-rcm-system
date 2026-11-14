@@ -1,18 +1,16 @@
-# Offline pilot enrichment
+# Xử lý dữ liệu thử nghiệm
 
-Run the stages from the repository root. The inventory caps the pilot at five
-regular episodes with catalog durations of at least 10 minutes. The automatic
-selection prefers 10–40 minute episodes and spreads them across seasons. Explicit
-selection also accepts longer regular episodes. It checks Drive IDs and byte counts before staging the selected
-videos. `ffprobe` checks the staged durations. The inventory also records missing
-assets and episodes outside the pilot duration or kind criteria.
+Chạy các lệnh từ thư mục gốc. Nhóm thử nghiệm gồm tối đa năm tập loại `regular`, dài ít nhất 10 phút theo danh mục. Bộ chọn tự động ưu tiên tập dài 10–40 phút ở các mùa khác nhau; chọn thủ công có thể dùng tập dài hơn.
 
-Use a separate Python environment with `ai/enrich/requirements.txt`. Install
-FFmpeg, FFprobe and rclone for the Drive path. Windows ASR needs CTranslate2
-compatible CUDA and cuDNN DLLs. The ASR launcher can locate those DLLs in a local
-CUDA-enabled Torch install. Download the CTranslate2 Whisper turbo model to
-`ai/artifacts/models/whisper-turbo` before running ASR. ASR loads that local
-directory on GPU 0 with `int8_float16`, Vietnamese VAD and catalog hotwords.
+Bước kiểm kê đối chiếu ID và số byte trên Drive trước khi lấy video, sau đó dùng FFprobe đo thời lượng. Kết quả cũng ghi tài nguyên còn thiếu và các tập không đạt điều kiện.
+
+## Chuẩn bị
+
+Dùng môi trường Python riêng với `ai/enrich/requirements.txt`. Cài FFmpeg, FFprobe và rclone nếu đọc từ Drive.
+
+Nhận dạng lời thoại trên Windows cần CUDA và cuDNN tương thích CTranslate2. Trình chạy có thể tìm DLL trong bản Torch hỗ trợ CUDA trên máy. Tải mô hình CTranslate2 Whisper turbo vào `ai/artifacts/models/whisper-turbo` trước khi chạy. ASR dùng GPU 0, `int8_float16`, VAD tiếng Việt và từ gợi ý trong danh mục.
+
+## Chạy các bước
 
 ```powershell
 python -m ai.enrich.inventory --rclone-root 'gdrive:VideoDieppie' --stage
@@ -24,49 +22,29 @@ python -m ai.enrich.summarize --dry-run
 python -m ai.enrich.export --dialogue-only
 ```
 
-Use `--media-root` with a local folder or mount in place of `--rclone-root`.
-Repeat `--pilot-episode` five times to keep an explicit selection. Media is staged
-under `ai/artifacts/media-mirror/<episode-id>/media.mp4`. Existing per-episode
-media is checked by size and measured duration. Staging uses a hard link when the
-source is on the same volume and copies once otherwise. Keep the original
-file in place to reuse legacy keyframes after hard linking. Newly downloaded files are resumed in
-chunks and checked against the Drive MD5. Use `--rclone-config <path>` or the
-standard `RCLONE_CONFIG` environment variable to select a local rclone config.
-Configure a user-owned Drive client ID and secret in that config.
-A quota or rate limit stops staging, preserves completed byte ranges for a later
-resume and reports the original rclone error. Transient connection errors
-receive at most two short retries.
+Dùng `--media-root` thay `--rclone-root` khi video nằm trong thư mục hoặc ổ đĩa đã gắn. Lặp `--pilot-episode` năm lần để chọn cố định năm tập.
 
-Resume the current five-episode selection with the same IDs. Set `--rclone-config`
-if the remote with the user-owned Drive client is in a different config file.
+Video được lưu tại `ai/artifacts/media-mirror/<episode-id>/media.mp4`. Tệp sẵn có được kiểm tra kích thước và thời lượng. Nguồn cùng ổ đĩa được tạo hard link; khác ổ được sao chép một lần. Giữ tệp gốc để tái sử dụng khung hình cũ sau khi tạo hard link.
+
+Tệp tải mới được tiếp tục theo từng phần và đối chiếu MD5 trên Drive. Chọn cấu hình rclone bằng `--rclone-config <path>` hoặc `RCLONE_CONFIG`; đặt client ID và secret Drive của bạn trong cấu hình đó. Khi gặp giới hạn dung lượng hoặc tần suất, bước tải dừng, giữ phần đã hoàn thành và báo lỗi gốc. Lỗi kết nối tạm thời được thử lại tối đa hai lần.
+
+Để tiếp tục nhóm năm tập hiện tại, giữ nguyên các ID. Thêm `--rclone-config` nếu remote nằm trong tệp cấu hình khác:
 
 ```powershell
 python -m ai.enrich.inventory --rclone-root 'gdrive:VideoDieppie' --stage --pilot-episode ep_jadoo_s01_0022 --pilot-episode ep_jadoo_s04_0021 --pilot-episode ep_jadoo_s04_0011 --pilot-episode ep_jadoo_s03_0008 --pilot-episode ep_jadoo_s01_0007
 ```
 
-ASR and image stages keep per-episode artifacts and reuse outputs when their
-inputs match. Keyframe extraction and scene grouping run on CPU. Keyframes
-record video asset identity and source time. Scene grouping reads the ASR cues
-and the sampled frame hashes. `asr_run.json` reports the sampled GPU memory peak
-for the stage. New `asr.json` files also report the peak during each episode;
-existing files are not altered. Windows reports total device memory including
-other processes.
+ASR và xử lý ảnh lưu kết quả riêng từng tập, tái sử dụng khi đầu vào khớp. Trích khung hình và nhóm cảnh chạy trên CPU. Khung hình ghi định danh video và mốc thời gian; nhóm cảnh đọc các đoạn ASR và mã băm khung hình.
 
-Dry-run writes each caption request plan and image count locally. It sends zero
-requests. `TEACHER_BASE_URL`, `TEACHER_API_KEY` and `TEACHER_MODEL` configure an
-OpenAI-compatible provider for a separately authorized run. Calling it requires
-explicit `--execute --max-requests N --run-id NAME`. The two stages share a
-persistent request cap when they use the same run ID and artifact directory.
-Summarization needs completed captions.
+`asr_run.json` ghi đỉnh bộ nhớ GPU lấy mẫu trong cả bước. Tệp `asr.json` mới ghi thêm số đo từng tập; tệp cũ được giữ nguyên. Trên Windows, số đo gồm bộ nhớ thiết bị mà các tiến trình khác đang dùng.
 
-The DeepSeek pilot covers S01E22 and S04E21 with a shared cap of 40 requests,
-including the image probe. Start with `scripts/configure_llm.ps1` to enter the
-credentials locally. The default offline command plans without API calls.
-`--execute` sends one small pilot keyframe to the configured endpoint. An
-explicit image rejection selects local llama-server captions and DeepSeek text
-summaries. Set `LOCAL_VISION_BASE_URL` to the loopback server's `/v1` URL and
-`LOCAL_VISION_MODEL` to its model ID before continuing that branch. An
-inconclusive probe stops the run and keeps its status for investigation.
+## Mô tả ảnh và tóm tắt
+
+`--dry-run` chỉ lưu kế hoạch yêu cầu và số ảnh trên máy. Đặt `TEACHER_BASE_URL`, `TEACHER_API_KEY` và `TEACHER_MODEL` để dùng dịch vụ tương thích OpenAI. Khi được phép gọi dịch vụ, chạy với `--execute --max-requests N --run-id NAME`. Hai bước dùng chung giới hạn yêu cầu đã lưu nếu cùng mã lần chạy và thư mục kết quả. Bước tóm tắt cần mô tả ảnh hoàn chỉnh.
+
+Lần thử DeepSeek dùng S01E22 và S04E21, tối đa 40 yêu cầu gồm cả lần thử ảnh. Nhập thông tin kết nối cục bộ qua `scripts/configure_llm.ps1`. Lệnh mặc định chỉ lập kế hoạch; `--execute` gửi một khung hình nhỏ tới dịch vụ.
+
+Nếu dịch vụ từ chối ảnh rõ ràng, quy trình dùng llama-server cục bộ để mô tả ảnh và DeepSeek để tóm tắt văn bản. Đặt `LOCAL_VISION_BASE_URL` thành URL `/v1` trên máy và `LOCAL_VISION_MODEL` thành tên mô hình trước khi tiếp tục. Kết quả thử ảnh chưa rõ sẽ dừng lần chạy và giữ trạng thái để kiểm tra.
 
 ```powershell
 python -m ai.enrich.deepseek_offline
@@ -74,38 +52,27 @@ python -m ai.enrich.deepseek_offline --execute
 python -m ai.enrich.teacher_audit --episode ep_jadoo_s01_0022 --episode ep_jadoo_s04_0021 --run-id pilot-two-episodes --output ai/artifacts/pilot-teacher-audit.json
 ```
 
-The default export requires captions and summaries for all five episodes. The
-dialogue-only option produces a valid catalog with ASR tracks and their source
-provenance. It leaves the original scene and synopsis data intact.
+Bản xuất mặc định cần mô tả ảnh và tóm tắt cho đủ năm tập. `--dialogue-only` xuất lời thoại ASR kèm nguồn dữ liệu, giữ nguyên cảnh và tóm tắt gốc.
 
-Use `publish_preview` to generate a scoped draft and a review receipt. Use
-`--dialogue-only` to review ASR before captions are available. Repeating
-`--episode` limits the package to specific pilot episodes.
+## Duyệt và nhập danh mục
+
+`publish_preview` tạo bản nháp và tệp duyệt. Dùng `--dialogue-only` để duyệt ASR trước khi có mô tả ảnh; lặp `--episode` để giới hạn tập:
 
 ```powershell
 python -m ai.enrich.publish_preview --dialogue-only --episode ep_jadoo_s01_0022 --episode ep_jadoo_s04_0021 --output ai/artifacts/dialogue-review-draft.json --review-template ai/artifacts/dialogue-review.json
 ```
 
-Review every listed record against its source. Enter the reviewer name and set
-`approved` to `true` only for records that passed. Keep the record hashes as
-generated. The publish command verifies exact review coverage, checks provenance
-and validates the resulting package. The package retains the model provenance
-and records the human review. Omit `--dialogue-only` in both commands to include
-captions, scenes and summaries when available. Save the reviewed package as
-`ai/artifacts/pilot-published.json` to let cloud chat use its published pilot
-evidence independently of the Spring database.
+Đối chiếu từng bản ghi với nguồn, nhập tên người duyệt và chỉ đặt `approved` thành `true` cho bản ghi đạt yêu cầu. Giữ nguyên mã băm đã sinh. Lệnh xuất kiểm tra đủ bản ghi đã duyệt, nguồn dữ liệu và tính hợp lệ của gói; gói giữ nguồn mô hình cùng thông tin người duyệt.
+
+Bỏ `--dialogue-only` ở cả hai lệnh để đưa mô tả ảnh, cảnh và tóm tắt vào gói khi đã có. Lưu bản đã duyệt tại `ai/artifacts/pilot-published.json` để hội thoại qua dịch vụ LLM dùng bằng chứng đã công bố độc lập với cơ sở dữ liệu Spring.
 
 ```powershell
 python -m ai.enrich.publish_preview --dialogue-only --episode ep_jadoo_s01_0022 --episode ep_jadoo_s04_0021 --output ai/artifacts/dialogue-ready.json --review ai/artifacts/dialogue-review.json
 .\scripts\import_preview_catalog.ps1 -CatalogPath ai/artifacts/dialogue-ready.json -ApiBaseUrl http://127.0.0.1:18081/api -PreviewStateFile ai/artifacts/preview-stack.json
 ```
 
-Start the dedicated preview with `-SpringPort 18081` and `-StateFile
-ai/artifacts/preview-stack.json`. Give it a separate `-DataDirectory` under
-`ai/artifacts/`. The import script checks the recorded Spring process and local
-listener before authentication and again before importing. If Spring reports
-`CACHE_REQUIRED`, run its cache command with the preview encoder selected and
-retry the snapshot from the admin screen. The comparison command may use a
-separate in-memory projection of pilot drafts for offline diagnosis.
+Khởi động bản chạy thử riêng với `-SpringPort 18081`, `-StateFile ai/artifacts/preview-stack.json` và `-DataDirectory` riêng trong `ai/artifacts/`. Script nhập kiểm tra đúng tiến trình Spring và cổng cục bộ trước khi đăng nhập và trước khi nhập.
 
-See [encoder preparation](../EMBEDDING_CACHE.md) and [pilot evaluation](../evaluation/README.md).
+Nếu Spring trả `CACHE_REQUIRED`, chạy lệnh tạo bộ nhớ đệm với bộ mã hóa đã chọn cho bản thử, rồi thử lại bản danh mục từ trang quản trị. Lệnh so sánh có thể đưa bản nháp vào bộ nhớ để chẩn đoán ngoại tuyến.
+
+Xem [chuẩn bị bộ mã hóa](../EMBEDDING_CACHE.md) và [đánh giá tìm kiếm](../evaluation/README.md).
