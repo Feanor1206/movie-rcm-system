@@ -20,15 +20,11 @@ export interface MediaDescriptor {
 const DEFAULT_TIMEOUT_MS = 6000;
 const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
 
-/**
- * Resolves a stream URL returned by descriptor into a full URL if relative.
- */
 export function resolveStreamUrl(streamUrl: string): string {
   if (!streamUrl) return '';
   if (streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) {
     return streamUrl;
   }
-  // Strip trailing '/api' from SPRINGBOOT_API to get base host
   const baseHost = SPRINGBOOT_API.replace(/\/api\/?$/, '');
   const cleanPath = streamUrl.startsWith('/') ? streamUrl : `/${streamUrl}`;
   return `${baseHost}${cleanPath}`;
@@ -45,10 +41,6 @@ function createDOMException(message: string, name: string): DOMException {
   }
 }
 
-/**
- * Fetches the media descriptor for a given movie.
- * Supports public access, handles both direct payloads and wrapped ApiResponse payloads.
- */
 export async function getMediaDescriptor(
   movieId: string,
   options?: { timeoutMs?: number; signal?: AbortSignal }

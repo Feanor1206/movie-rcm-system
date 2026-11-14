@@ -1,3 +1,4 @@
+import { labels } from './labels_fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,14 +7,6 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 
-/**
- * Search Experience & MovieCard Production Component Test Suite (Round 5 - S4)
- *
- * This test suite executes ACTUAL production components (SearchExperience.tsx and MovieCard.tsx)
- * via TypeScript transpile and a lightweight React execution harness.
- * It contains NO simulated search/catalog helpers (such as parseSearchExperienceUrl,
- * serializeSearchUrl, or synthetic mockFetch).
- */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +30,6 @@ const transpileOptions = {
 const searchTranspiled = ts.transpileModule(searchSource, transpileOptions).outputText;
 const movieCardTranspiled = ts.transpileModule(movieCardSource, transpileOptions).outputText;
 
-// Resolve the production navigation helper alongside the component under test.
 const mediaRoutingModule = { exports: {} };
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../lib/services/mediaRouting.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -73,7 +65,6 @@ function sampleMovie(overrides = {}) {
   };
 }
 
-// Tree inspection helpers
 function findNodes(node, pred, out = []) {
   if (!node) return out;
   if (Array.isArray(node)) {
@@ -96,7 +87,6 @@ function getText(node) {
   return collect(node).replace(/\s+/g, ' ').trim();
 }
 
-// Harness to execute actual SearchExperience.tsx
 function createSearchHarness(initialUrl = '', catalogMocks = {}) {
   const mocks = typeof catalogMocks === 'function' ? {} : catalogMocks;
   let params = new URLSearchParams(initialUrl);
@@ -202,6 +192,7 @@ function createSearchHarness(initialUrl = '', catalogMocks = {}) {
       timers.delete(id);
     },
     require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (mod === 'next/navigation') {
         return {
@@ -309,7 +300,6 @@ test('Catalog search input has an accessible name', () => {
   h.unmount();
 });
 
-// Harness to execute actual MovieCard.tsx
 function renderActualMovieCard(movie, watchlistContext = {}) {
   let slots = [];
   let hookIndex = 0;
@@ -344,6 +334,7 @@ function renderActualMovieCard(movie, watchlistContext = {}) {
     exports: moduleObj.exports,
     console,
     require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (mod === 'next/image') {
         return {
@@ -373,9 +364,6 @@ function renderActualMovieCard(movie, watchlistContext = {}) {
   return moduleObj.exports.MovieCard({ movie, fluid: true });
 }
 
-// ============================================================================
-// TEST SUITE: S1, S2, S3, S4 ON ACTUAL PRODUCTION CODE
-// ============================================================================
 
 test('1. S1 (P2): Delayed router navigation does NOT overwrite user typing draft', async () => {
   const h = createSearchHarness('q=A');
@@ -386,31 +374,25 @@ test('1. S1 (P2): Delayed router navigation does NOT overwrite user typing draft
   assert.ok(inputNode, 'Search input must exist');
   assert.equal(inputNode.props.value, 'A', 'Initial input must match URL query A');
 
-  // User types 'B'
   inputNode.props.onChange({ target: { value: 'B' } });
   await h.settle();
 
-  // 350ms debounce fires push to /search?q=B
   const firedDebounce = h.runTimer((t) => t.ms === 350);
   assert.ok(firedDebounce, 'Debounce timer of 350ms must fire');
   assert.deepEqual(h.pushes, ['/search?q=B'], 'Router push must record /search?q=B');
 
-  // User types 'C' before router navigation to B finishes
   findNodes(h.tree, (n) => n.type === 'input')[0].props.onChange({ target: { value: 'C' } });
   await h.settle();
 
   const draftBefore = findNodes(h.tree, (n) => n.type === 'input')[0].props.value;
   assert.equal(draftBefore, 'C');
 
-  // Delayed router navigation to B now arrives
   h.navigate('q=B');
   await h.settle();
 
-  // Input draft MUST NOT be overwritten back to 'B'
   const draftAfter = findNodes(h.tree, (n) => n.type === 'input')[0].props.value;
   assert.equal(draftAfter, 'C', 'User typing of "C" must be preserved over delayed router "B"');
 
-  // Subsequent debounce will now push 'C'
   h.runTimer((t) => t.ms === 350);
   assert.ok(h.pushes.includes('/search?q=C'), 'Subsequent debounce pushes draft C');
 });
@@ -422,7 +404,6 @@ test('2. S1 (P2): External navigation (browser back/forward or deep link) syncs 
 
   assert.equal(findNodes(h.tree, (n) => n.type === 'input')[0].props.value, 'original');
 
-  // External back button navigation to q=previous (no pending push in flight)
   h.navigate('q=previous');
   await h.settle();
 
@@ -438,7 +419,6 @@ test('3. S1 (P2): Clear button resets input draft and triggers push with query r
   h.render();
   await h.settle();
 
-  // Find the clear button (button with aria-label containing "Xóa từ khóa")
   const clearBtn = findNodes(h.tree, (n) => n.type === 'button' && n.props?.['aria-label'] === 'Xóa từ khóa')[0];
   assert.ok(clearBtn, 'Clear button must be rendered when input is non-empty');
 
@@ -596,18 +576,15 @@ test('10. S4 (P2): MovieCard renders fallback placeholder when poster is missing
 
   const cardNode = renderActualMovieCard(movieWithoutPoster);
 
-  // Must NOT render next/image
   const imageNodes = findNodes(cardNode, (n) => n.type === 'next/image');
   assert.equal(imageNodes.length, 0, 'Must NOT render Image when poster is empty');
 
-  // Must render placeholder with Film icon and movie title
   const filmIcons = findNodes(cardNode, (n) => n.type === 'Film');
   assert.ok(filmIcons.length > 0, 'Placeholder must render Film icon');
 
   const cardText = getText(cardNode);
   assert.ok(cardText.includes('The Tale of Princess Kaguya'), 'Placeholder must display movie title');
 
-  // Detail link points to canonical movie path
   const links = findNodes(cardNode, (n) => n.type === 'next/link');
   assert.ok(links.some((l) => l.props.href === '/movies/anim-no-poster'), 'Must link to /movies/anim-no-poster');
 });
@@ -626,7 +603,6 @@ test('11. S4 (P2): MovieCard renders Next Image with correct src and alt when po
   assert.equal(imageNodes[0].props.src, 'https://cdn.example.com/totoro.jpg');
   assert.equal(imageNodes[0].props.alt, 'My Neighbor Totoro');
 
-  // Film placeholder must NOT be rendered when poster is valid
   const filmIcons = findNodes(cardNode, (n) => n.type === 'Film');
   assert.equal(filmIcons.length, 0, 'Must not render Film fallback when valid poster exists');
 });
@@ -652,12 +628,10 @@ test('12. S4 (P2): MovieCard renders unconfirmed watchlist status badge and exec
 
   const cardNode = renderActualMovieCard(movie, watchlistContext);
 
-  // Unconfirmed status badge
   const unconfirmedBadge = findNodes(cardNode, (n) => n.props?.['data-testid'] === 'unconfirmed-badge')[0];
   assert.ok(unconfirmedBadge, 'Unconfirmed status badge must be present');
   assert.ok(getText(unconfirmedBadge).includes('Chưa xác nhận'));
 
-  // Watchlist button aria-label & title reflects retry intent
   const watchlistBtn = findNodes(cardNode, (n) => n.type === 'button')[0];
   assert.ok(watchlistBtn, 'Watchlist toggle button must exist');
   assert.ok(
@@ -667,11 +641,75 @@ test('12. S4 (P2): MovieCard renders unconfirmed watchlist status badge and exec
     watchlistBtn.props.title.includes('Chưa xác nhận lưu • Nhấn để thử lưu lại')
   );
 
-  // Click button triggers toggleWatchlist with exact movie details
   watchlistBtn.props.onClick({ preventDefault: () => {}, stopPropagation: () => {} });
   assert.deepEqual(toggleClicked, {
     id: 'anim-mononoke',
     title: 'Princess Mononoke',
     poster: 'https://cdn.example.com/mononoke.jpg',
   });
+});
+
+test('Genre and size navigation requests the matching catalog and hides stale results', async () => {
+  const calls = [];
+  let resolveNext;
+  const page = (id) => ({ items: [{ id, title: id }], page: 0, size: 12, totalElements: 1, totalPages: 1, hasNext: false, hasPrevious: false });
+  const h = createSearchHarness('q=film&genre=%20Adventure%20&size=12', {
+    browse: (options) => {
+      calls.push(options);
+      if (calls.length === 1) return Promise.resolve(page('adventure-film'));
+      return new Promise((resolve) => { resolveNext = resolve; });
+    },
+  });
+  h.render();
+  await h.settle();
+  assert.equal(calls[0].genre, 'Adventure');
+  assert.equal(calls[0].query, 'film');
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'adventure-film').length, 1);
+  assert.ok(getText(h.tree).includes('Phiêu lưu'));
+
+  h.navigate('q=film&genre=Comedy&size=12');
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'adventure-film').length, 0);
+  await h.settle();
+  assert.equal(calls[1].genre, 'Comedy');
+  resolveNext(page('comedy-film'));
+  await h.settle();
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'comedy-film').length, 1);
+
+  h.navigate('q=film&genre=Comedy&size=2');
+  assert.equal(findNodes(h.tree, (node) => node.props?.['data-result-id'] === 'comedy-film').length, 0);
+  await h.settle();
+  assert.equal(calls[2].size, 2);
+  h.unmount();
+});
+
+
+test('Vietnamese catalog labels preserve unknown values', () => {
+  assert.equal(labels.genreLabel('Adventure'), 'Phiêu lưu');
+  assert.equal(labels.genreLabel('Sci-Fi'), 'Khoa học viễn tưởng');
+  assert.equal(labels.genreLabel('Unlisted'), 'Unlisted');
+  assert.equal(labels.formatRuntime('1h 45m'), '1 giờ 45 phút');
+  assert.equal(labels.formatRuntime('25m'), '25 phút');
+  assert.equal(labels.formatRuntime('7m 25s'), '7 phút 25 giây');
+  assert.equal(labels.formatRuntime('Series'), 'Series');
+  assert.equal(labels.formatRuntime(), '');
+  assert.equal(
+    labels.movieSynopsis('Two estranged sisters cross an unmapped ocean in search of their father.'),
+    'Hai chị em xa cách cùng vượt qua vùng biển chưa có trên bản đồ để tìm cha.',
+  );
+  assert.equal(labels.movieSynopsis('Mô tả do người dùng nhập.'), 'Mô tả do người dùng nhập.');
+});
+
+test('Empty genre results show Vietnamese while requesting the original genre', async () => {
+  const calls = [];
+  const h = createSearchHarness('genre=Adventure', {
+    browse: (options) => {
+      calls.push(options);
+      return Promise.resolve(emptyPage());
+    },
+  });
+  h.render();
+  await h.settle();
+  assert.equal(calls[0].genre, 'Adventure');
+  assert.ok(getText(h.tree).includes('Không có phim hoạt hình thuộc thể loại Phiêu lưu.'));
+  h.unmount();
 });

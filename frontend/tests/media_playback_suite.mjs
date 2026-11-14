@@ -1,3 +1,4 @@
+import { labels } from './labels_fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +13,6 @@ const root = path.resolve(__dirname, '..');
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 
-// Helper to load and transpile mediaService.ts via TypeScript compiler API
 function loadMediaService(mockFetch) {
   const serviceFile = path.resolve(root, 'lib/services/mediaService.ts');
   const code = fs.readFileSync(serviceFile, 'utf8');
@@ -40,7 +40,6 @@ function loadMediaService(mockFetch) {
   return sandbox.module.exports.getMediaDescriptor ? sandbox.module.exports : sandbox.exports;
 }
 
-// Tree walker helper for virtual DOM inspection
 function walk(node, predicate) {
   if (!node) return null;
   if (Array.isArray(node)) {
@@ -70,7 +69,6 @@ function findAll(node, predicate, acc = []) {
   return acc;
 }
 
-// Harness to execute MovieDetail component with hooks and fake DOM simulation
 function createMovieDetailHarness(options = {}) {
   const file = path.resolve(root, 'features/movies/components/MovieDetail.tsx');
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
@@ -160,6 +158,7 @@ function createMovieDetailHarness(options = {}) {
     DOMException: globalThis.DOMException,
     console,
     require(moduleName) {
+      if (moduleName === '@/lib/labels') return labels;
       if (moduleName === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (moduleName === 'next/image' || moduleName === 'next/link') return { __esModule: true, default: moduleName };
       if (moduleName === 'lucide-react') return new Proxy({}, { get: (_, key) => String(key) });
@@ -192,6 +191,7 @@ function createMovieDetailHarness(options = {}) {
           })),
         };
       }
+      if (moduleName.includes('movieProgress')) return options.movieProgress || {};
       if (moduleName.includes('MovieSection')) return { MovieSection: 'MovieSection' };
       return {};
     },
@@ -203,10 +203,9 @@ function createMovieDetailHarness(options = {}) {
     slotIndex = 0;
     pendingEffects = [];
     tree = context.exports.MovieDetail({
-      movie: typeof movie === 'string' ? { id: movie, title: 'Movie ' + movie, genres: ['Action'], rating: 8, year: 2026 } : movie,
+      movie: { runtime: '90m', ...(typeof movie === 'string' ? { id: movie, title: 'Movie ' + movie, genres: ['Action'], rating: 8, year: 2026 } : movie) },
       similarMovies: [],
     });
-    // Commit phase: ensure elements with props.ref have ref.current populated before effects run
     const refNodes = findAll(tree, (n) => n.props?.ref);
     for (const node of refNodes) {
       if (node.props.ref && typeof node.props.ref === 'object' && !node.props.ref.current) {
@@ -257,9 +256,6 @@ function createMovieDetailHarness(options = {}) {
   };
 }
 
-// -------------------------------------------------------------
-// Unit & Integration Tests
-// -------------------------------------------------------------
 
 test('1. resolveStreamUrl correctly handles relative and absolute URLs', () => {
   const { resolveStreamUrl } = loadMediaService();
@@ -362,7 +358,6 @@ test('5. Component Execution: Route swap A -> B clears media state immediately, 
         feature: { streamUrl: 'https://fixture.invalid/feature-A.mp4' },
       };
     }
-    // For movie B, return a promise that stays in flight
     return new Promise((resolve) => {
       pendingBResolver = resolve;
     });
@@ -370,25 +365,20 @@ test('5. Component Execution: Route swap A -> B clears media state immediately, 
 
   const harness = createMovieDetailHarness({ getMediaDescriptor });
 
-  // 1. Render movie A and allow descriptor to resolve
   harness.render('A');
   await new Promise((r) => setImmediate(r));
   harness.render('A');
 
-  // Verify feature button for A is visible
   let tree = harness.getTree();
   let buttonA = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
   assert.ok(buttonA, 'Feature button for Movie A must be visible once resolved');
 
-  // 2. Switch route to movie B (descriptor remains pending)
   harness.render('B');
   tree = harness.getTree();
 
-  // Crucial check: A button must NOT be visible while B is pending
   const buttonBWhilePending = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
   assert.equal(buttonBWhilePending, null, 'Feature button from Movie A must NOT remain visible while Movie B descriptor is pending');
 
-  // 3. Resolve B descriptor
   pendingBResolver({
     movieId: 'B',
     hasFeature: true,
@@ -415,11 +405,9 @@ test('6. Component Execution: Opening player locks body scroll and records opene
   const playBtn = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
   assert.ok(playBtn);
 
-  // Click play
   playBtn.props.onClick({ currentTarget: harness.opener });
   harness.render('A');
 
-  // Modal open assertions
   const modal = walk(harness.getTree(), (n) => n.props?.role === 'dialog');
   assert.ok(modal, 'Modal dialog must be rendered after clicking play');
   assert.equal(harness.doc.body.style.overflow, 'hidden', 'Body scroll must be locked');
@@ -453,18 +441,15 @@ test('7. Component Execution: Focus stability — onLoadedMetadata and volume up
 
   const focusCountBefore = harness.opener.focusCount;
 
-  // Trigger loadedmetadata
   video.props.onLoadedMetadata();
   harness.render('A');
 
-  // Crucial assertion: opener.focus() MUST NOT have been called
   assert.equal(
     harness.opener.focusCount - focusCountBefore,
     0,
     'onLoadedMetadata must NOT restore focus to opener while player remains open'
   );
 
-  // Change volume
   const volumeSlider = walk(harness.getTree(), (n) => n.props?.['aria-label'] === 'Thanh âm lượng');
   assert.ok(volumeSlider);
   volumeSlider.props.onChange({ target: { value: '0.5' } });
@@ -499,7 +484,6 @@ test('8. Component Execution: Modal focus trap selector includes range sliders (
   assert.ok(volumeSlider, 'Volume slider must exist');
   assert.equal(volumeSlider.type, 'input', 'Volume slider must be an input element');
 
-  // Verify touch target requirements (min-h-[44px])
   assert.ok(timeline.props.className.includes('min-h-[44px]'), 'Timeline must satisfy >=44px touch target');
   assert.ok(volumeSlider.props.className.includes('min-h-[44px]'), 'Volume slider must satisfy >=44px touch target');
 
@@ -531,7 +515,6 @@ test('9. Component Execution: Keyboard shortcuts respect editable targets and na
   };
   video.props.ref.current = videoFake;
 
-  // 1. Keydown with target as an INPUT (e.g. range slider or search box)
   let defaultPrevented = false;
   harness.windowMock.dispatchEvent('keydown', {
     key: ' ',
@@ -543,7 +526,6 @@ test('9. Component Execution: Keyboard shortcuts respect editable targets and na
   assert.equal(defaultPrevented, false, 'Space on an interactive input must not be intercepted');
   assert.equal(pausedCalled, false, 'Video play/pause must not trigger when typing in an input');
 
-  // 2. Keydown outside inputs (on player container)
   let spacePrevented = false;
   harness.windowMock.dispatchEvent('keydown', {
     key: ' ',
@@ -564,7 +546,6 @@ test('10. Component Execution: Autoplay rejection transitions state to paused wi
   await new Promise((r) => setImmediate(r));
   harness.render('A');
 
-  // Pre-configure videoRef to reject autoplay with NotAllowedError
   for (const slot of harness.slots) {
     if (slot && 'current' in slot && slot.current === null) {
       slot.current = {
@@ -587,11 +568,9 @@ test('10. Component Execution: Autoplay rejection transitions state to paused wi
   playBtn.props.onClick({ currentTarget: harness.opener });
   harness.render('A');
 
-  // Wait for promise rejection microtask to execute setPlayerState('paused')
   await new Promise((r) => setImmediate(r));
   harness.render('A');
 
-  // Must not have buffering spinner or error overlay; must have play button ready
   const buffering = walk(harness.getTree(), (n) => n.props?.['data-testid'] === 'video-buffering');
   assert.equal(buffering, null, 'Buffering spinner must disappear after autoplay rejection');
 
@@ -638,22 +617,18 @@ test('11. Component Execution: Error and retry restores video.currentTime upon l
   const video = walk(harness.getTree(), (n) => n.type === 'video');
   video.props.ref.current = videoFake;
 
-  // Trigger error during playback
   video.props.onError();
   harness.render('A');
 
   const retryBtn = walk(harness.getTree(), (n) => n.props?.['data-testid'] === 'video-retry-btn');
   assert.ok(retryBtn, 'Retry button must be visible upon playback error');
 
-  // Click retry
   retryBtn.props.onClick();
   harness.render('A');
 
-  // Trigger loadedmetadata event
   assert.ok(videoListeners['loadedmetadata'], 'Retry must register loadedmetadata listener');
   videoListeners['loadedmetadata']();
 
-  // Verify currentTime was restored to 42.5
   assert.equal(videoFake.currentTime, 42.5, 'Retry must restore recorded currentTime upon loadedmetadata');
 
   harness.unmount();
@@ -671,20 +646,16 @@ test('12. Component Execution: Closing player restores body scroll and returns f
 
   const focusCountBeforeClose = harness.opener.focusCount;
 
-  // Click Close button
   const closeBtn = walk(harness.getTree(), (n) => n.props?.['aria-label'] === 'Đóng trình phát');
   assert.ok(closeBtn);
   closeBtn.props.onClick();
   harness.render('A');
 
-  // Modal must be gone
   const modal = walk(harness.getTree(), (n) => n.props?.role === 'dialog');
   assert.equal(modal, null, 'Modal dialog must be closed');
 
-  // Body scroll must be unlocked
   assert.equal(harness.doc.body.style.overflow, '', 'Body overflow must be cleared');
 
-  // Opener focus must be restored exactly once
   assert.equal(
     harness.opener.focusCount - focusCountBeforeClose,
     1,
@@ -776,7 +747,6 @@ test('14. Component Execution: Timeout descriptor displays role="alert" and desc
   const featureBtn = walk(tree, (n) => n.props?.['data-testid'] === 'play-feature-btn');
   assert.equal(featureBtn, null, 'Feature button must NOT appear on timeout');
 
-  // Independent trailer preview remains available
   const trailerBtn = walk(tree, (n) => n.props?.['data-testid'] === 'play-trailer-btn');
   assert.ok(trailerBtn, 'Trailer preview button must remain available when movie has videoUrl');
 
@@ -784,7 +754,6 @@ test('14. Component Execution: Timeout descriptor displays role="alert" and desc
 });
 
 test('15. Component Execution: Malformed descriptor payload (empty {} or wrong movieId) displays role="alert" and retry button', async () => {
-  // Case 1: Empty object rejected by validation or returning invalid descriptor
   const harness1 = createMovieDetailHarness({
     getMediaDescriptor: async () => {
       throw new Error('Dữ liệu mô tả media không khớp mã phim');
@@ -803,7 +772,6 @@ test('15. Component Execution: Malformed descriptor payload (empty {} or wrong m
   assert.ok(retryBtn, 'Retry button must be visible for malformed empty payload');
   harness1.unmount();
 
-  // Case 2: Wrong movieId returned
   const harness2 = createMovieDetailHarness({
     getMediaDescriptor: async () => ({
       movieId: 'completely-different-movie-id',
@@ -846,13 +814,10 @@ test('16. Component Execution: Route swap A -> B aborts in-flight request for A 
 
   const harness = createMovieDetailHarness({ getMediaDescriptor });
 
-  // 1. Render movie A - fetch is initiated and stays in flight
   harness.render('movie-A');
 
-  // 2. Quickly navigate to movie B before A resolves (route swap)
   harness.render('movie-B');
 
-  // Trigger A's rejection (simulating A aborting or network failure for A)
   if (rejectA) {
     try {
       rejectA(new DOMException('The operation was aborted.', 'AbortError'));
@@ -861,12 +826,10 @@ test('16. Component Execution: Route swap A -> B aborts in-flight request for A 
   await new Promise((r) => setImmediate(r));
   harness.render('movie-B');
 
-  // Verify B has NO alert banner caused by A's abort
   let tree = harness.getTree();
   let alert = walk(tree, (n) => n.props?.role === 'alert');
   assert.equal(alert, null, 'Route swap must silently abort A; B must NOT display error alert');
 
-  // 3. Now B resolves successfully
   resolveB({
     movieId: 'movie-B',
     hasFeature: true,
@@ -906,7 +869,6 @@ test('17. Component Execution: Retry recovery after descriptor failure restores 
   const harness = createMovieDetailHarness({ getMediaDescriptor });
   const movie = { id: 'm-recover', title: 'Recovery Movie', genres: ['Action'], year: 2026, rating: 9 };
 
-  // First attempt fails with timeout
   harness.render(movie);
   await new Promise((r) => setImmediate(r));
   harness.render(movie);
@@ -918,14 +880,12 @@ test('17. Component Execution: Retry recovery after descriptor failure restores 
   assert.ok(retryBtn, 'Retry button must be visible');
   assert.equal(attempt, 1);
 
-  // Click retry
   retryBtn.props.onClick();
   await new Promise((r) => setImmediate(r));
   harness.render(movie);
   await new Promise((r) => setImmediate(r));
   harness.render(movie);
 
-  // Second attempt succeeds
   tree = harness.getTree();
   assert.equal(attempt, 2, 'Retry must trigger new descriptor fetch');
 
@@ -936,4 +896,56 @@ test('17. Component Execution: Retry recovery after descriptor failure restores 
   assert.ok(featureBtn, 'Feature button must appear after recovery');
 
   harness.unmount();
+});
+
+
+test('Closing feature playback saves the current position before the video is removed', async () => {
+  for (const close of ['button', 'escape']) {
+    const saved = [];
+    const harness = createMovieDetailHarness({ movieProgress: { saveMovieProgress: (record) => saved.push(record) } });
+    harness.render('A');
+    await new Promise((resolve) => setImmediate(resolve));
+    harness.render('A');
+    walk(harness.getTree(), (node) => node.props?.['data-testid'] === 'play-feature-btn').props.onClick({ currentTarget: harness.opener });
+    harness.render('A');
+    const video = walk(harness.getTree(), (node) => node.type === 'video');
+    video.props.ref.current.currentTime = 2;
+    if (close === 'button') {
+      walk(harness.getTree(), (node) => node.props?.['aria-label'] === 'Đóng trình phát').props.onClick();
+    } else {
+      harness.windowMock.dispatchEvent('keydown', { key: 'Escape', preventDefault() {} });
+    }
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].positionMs, 2000);
+    assert.equal(saved[0].completed, false);
+    harness.render('A');
+    assert.equal(walk(harness.getTree(), (node) => node.type === 'video'), null);
+    harness.unmount();
+  }
+});
+
+test('Closing a trailer or an unstarted or ended feature does not overwrite progress', async () => {
+  for (const scenario of ['trailer', 'zero', 'ended', 'at-duration']) {
+    const saved = [];
+    const harness = createMovieDetailHarness({
+      movieProgress: { saveMovieProgress: (record) => saved.push(record) },
+      getMediaDescriptor: async (id) => ({
+        movieId: id, hasFeature: true, hasTrailer: true,
+        feature: { streamUrl: 'https://fixture.invalid/feature.mp4' },
+        trailer: { streamUrl: 'https://fixture.invalid/trailer.mp4' },
+      }),
+    });
+    harness.render('A');
+    await new Promise((resolve) => setImmediate(resolve));
+    harness.render('A');
+    const buttonId = scenario === 'trailer' ? 'play-trailer-btn' : 'play-feature-btn';
+    walk(harness.getTree(), (node) => node.props?.['data-testid'] === buttonId).props.onClick({ currentTarget: harness.opener });
+    harness.render('A');
+    const video = walk(harness.getTree(), (node) => node.type === 'video').props.ref.current;
+    video.currentTime = scenario === 'zero' ? 0 : scenario === 'at-duration' ? video.duration : 2;
+    video.ended = scenario === 'ended';
+    walk(harness.getTree(), (node) => node.props?.['aria-label'] === 'Đóng trình phát').props.onClick();
+    assert.equal(saved.length, 0, scenario);
+    harness.unmount();
+  }
 });

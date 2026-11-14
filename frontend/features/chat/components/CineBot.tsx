@@ -7,7 +7,6 @@ import {
   X,
   Send,
   Star,
-  Bookmark,
   Check,
   Play,
   RotateCcw,
@@ -17,7 +16,7 @@ import { sendChatMessage, ChatMessage, ChatServiceResponse } from '@/lib/service
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
-import type { Movie } from '@/types/movie';
+import { formatRuntime, genreLabel } from '@/lib/labels';
 
 const QUICK_PROMPTS = [
   'Jadoo Mùa 1 Tập 1',
@@ -43,7 +42,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     {
       id: 'welcome',
       sender: 'bot',
-      text: 'Chào bạn! Mình là CineBot. Bạn đang muốn xem câu chuyện nào? Kể mình nghe một cái tên hay tình tiết bạn còn nhớ nhé.',
+      text: 'Bạn muốn tìm phim nào? Nhập tên phim, nhân vật hoặc cảnh bạn nhớ.',
       timestamp: 'Vừa xong',
       followUps: QUICK_PROMPTS.slice(0, 3),
     },
@@ -192,7 +191,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       const errorMsg: ChatMessage = {
         id: `bot-err-${Date.now()}`,
         sender: 'bot',
-        text: `⚠️ ${err?.message || 'Lỗi kết nối AI Gateway. Thử lại sau.'}`,
+        text: err?.message || 'Không thể kết nối CineBot. Vui lòng thử lại.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev.filter((item) => item.id !== botId), errorMsg]);
@@ -223,7 +222,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       {
         id: `welcome-${Date.now()}`,
         sender: 'bot',
-        text: 'Cuộc trò chuyện đã làm mới.',
+        text: 'Bạn muốn tìm phim nào?',
         timestamp: 'Vừa xong',
         followUps: QUICK_PROMPTS.slice(0, 3),
       },
@@ -248,9 +247,6 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               <h2 id="cinebot-dialog-title" className="comic-heading text-xl font-bold text-ink">
                 CineBot
               </h2>
-              <span className="rounded bg-brand/15 border border-brand/30 px-1.5 py-0.5 text-[10px] text-brand-dark font-semibold">
-                Bạn đồng hành
-              </span>
             </div>
             <p className="text-[11px] text-muted">Gợi ý phim hoạt hình</p>
           </div>
@@ -345,7 +341,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                               </span>
                             </div>
                             <p className="text-[11px] text-muted mt-0.5">
-                              {movie.year} · {movie.runtime} · {movie.genres.join(', ')}
+                              {movie.year} · {formatRuntime(movie.runtime)} · {movie.genres.map(genreLabel).join(', ')}
                             </p>
                           </div>
 
@@ -368,7 +364,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                   <Check size={10} className="text-brand" /> Đã lưu
                                 </>
                               ) : (
-                                '+ Watchlist'
+                                'Lưu phim'
                               )}
                             </button>
                           </div>
@@ -405,7 +401,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
-              <span>CineBot đang suy luận...</span>
+              <span>CineBot đang trả lời...</span>
             </div>
           )}
 

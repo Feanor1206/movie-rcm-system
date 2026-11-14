@@ -47,10 +47,6 @@ export interface MinimalMediaAsset {
   [key: string]: any;
 }
 
-/**
- * Resolves logical episode timestamp (in ms) to file source timestamp (in seconds)
- * using the asset's coverage JSON mapping.
- */
 export function resolveFileTimestamp(
   logicalMs: number,
   asset?: MinimalMediaAsset | null,
@@ -119,12 +115,6 @@ export interface ResolveSeekParams {
   segmentStartMs?: number | null;
 }
 
-/**
- * Resolves seek target in seconds from URL / item metadata.
- * Strictly differentiates between:
- * - File timeline: scene.start_ms or explicit timeline=file -> time / 1000 without coverage shift.
- * - Logical episode timeline: segment or default episode time -> mapped through coverage.
- */
 export function resolveMediaSeekSeconds(params: ResolveSeekParams): number | null {
   const {
     timeMs,
@@ -140,7 +130,6 @@ export function resolveMediaSeekSeconds(params: ResolveSeekParams): number | nul
 
   const isFileTimeline = timeline === 'file' || (isScene && !isSegment);
 
-  // 1. Explicit time parameter provided
   if (timeMs !== undefined && timeMs !== null && timeMs !== '') {
     const num = Number(timeMs);
     if (!isNaN(num) && isFinite(num) && num >= 0) {
@@ -152,7 +141,6 @@ export function resolveMediaSeekSeconds(params: ResolveSeekParams): number | nul
     return null;
   }
 
-  // 2. Scene start timestamp fallback
   if (isScene && sceneStartMs !== undefined && sceneStartMs !== null) {
     if (typeof sceneStartMs === 'number' && !isNaN(sceneStartMs) && isFinite(sceneStartMs) && sceneStartMs >= 0) {
       return sceneStartMs / 1000;
@@ -160,7 +148,6 @@ export function resolveMediaSeekSeconds(params: ResolveSeekParams): number | nul
     return null;
   }
 
-  // 3. Segment start timestamp fallback
   if (isSegment && segmentStartMs !== undefined && segmentStartMs !== null) {
     if (typeof segmentStartMs === 'number' && !isNaN(segmentStartMs) && isFinite(segmentStartMs) && segmentStartMs >= 0) {
       return resolveFileTimestamp(segmentStartMs, asset, segmentId, episodeId);
@@ -171,16 +158,6 @@ export function resolveMediaSeekSeconds(params: ResolveSeekParams): number | nul
   return null;
 }
 
-/**
- * Builds a canonical deep-link URL for an animation or movie catalog item.
- * Adheres strictly to USABILITY-01-F01 and USABILITY-01-F02 routing contracts:
- * - Series: /series/[id]
- * - Episode: /series/[seriesId]?episode=[episodeId] (&asset=...)
- * - Segment: /series/[seriesId]?episode=[episodeId]&segment=[segmentId] (&asset=... &t=[logical_ms])
- * - Scene: /series/[seriesId]?episode=[episodeId]&scene=[sceneId] (&asset=... &t=[file_ms]&timeline=file)
- * - Movie (legacy): /movies/[id]
- * - Missing series context: fallback to /movies/[id] without guessing/inventing IDs
- */
 export function buildMediaItemHref(item: Partial<Movie> | MediaNavigationContext | null | undefined): string {
   if (!item) return '/movies';
 
@@ -253,7 +230,6 @@ export function buildMediaItemHref(item: Partial<Movie> | MediaNavigationContext
       : ''
   );
 
-  // Infer item type if not explicitly set
   let effectiveType = rawType;
   if (!effectiveType) {
     if (segmentId) effectiveType = 'segment';
@@ -263,7 +239,6 @@ export function buildMediaItemHref(item: Partial<Movie> | MediaNavigationContext
     else effectiveType = 'movie';
   }
 
-  // Case A: Series
   if (effectiveType === 'series') {
     const targetSeriesId = seriesId || rawId;
     if (targetSeriesId) {
@@ -272,7 +247,6 @@ export function buildMediaItemHref(item: Partial<Movie> | MediaNavigationContext
     return rawId ? `/movies/${encodeURIComponent(rawId)}` : '/movies';
   }
 
-  // Case B: Episode
   if (effectiveType === 'episode') {
     const targetEpisodeId = episodeId || rawId;
     if (seriesId && targetEpisodeId) {
@@ -283,17 +257,14 @@ export function buildMediaItemHref(item: Partial<Movie> | MediaNavigationContext
       }
       return `/series/${encodeURIComponent(seriesId)}?${params.toString()}`;
     }
-    // Missing series context: fall back safely to standalone movie/item page without guessing
     return rawId ? `/movies/${encodeURIComponent(rawId)}` : '/movies';
   }
 
-  // Case C: Segment or Scene
   if (effectiveType === 'segment' || effectiveType === 'scene') {
     const isSegment = effectiveType === 'segment';
     const subItemId = isSegment ? (segmentId || rawId) : (sceneId || rawId);
     const parentEpisodeId = episodeId || '';
 
-    // For segment/scene, we need parent episode and series context
     if (seriesId && parentEpisodeId) {
       const params = new URLSearchParams();
       params.set('episode', parentEpisodeId);
@@ -313,11 +284,9 @@ export function buildMediaItemHref(item: Partial<Movie> | MediaNavigationContext
       }
       return `/series/${encodeURIComponent(seriesId)}?${params.toString()}`;
     }
-    // Missing context: fall back safely
     return rawId ? `/movies/${encodeURIComponent(rawId)}` : '/movies';
   }
 
-  // Case D: Movie kiểu cũ (legacy)
   if (rawId) {
     return `/movies/${encodeURIComponent(rawId)}`;
   }
