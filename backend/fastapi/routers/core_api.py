@@ -5,6 +5,7 @@ import math
 import os
 from pathlib import Path
 import secrets
+from stat import FILE_ATTRIBUTE_REPARSE_POINT, S_ISDIR, S_ISLNK, S_ISREG
 
 from types import SimpleNamespace
 
@@ -908,26 +909,51 @@ def grant_media_token(asset_id: str, request: Request, authorization: str | None
         )
 
 
+def _drive_file_without_volume_path(root: Path, relative_path: str) -> Path | None:
+    if not is_relative_media_path(relative_path):
+        return None
+    target = Path(os.path.abspath(root)) / relative_path
+    for path in (*reversed(target.parents), target):
+        info = path.lstat()
+        if S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & FILE_ATTRIBUTE_REPARSE_POINT:
+            return None
+        if not (S_ISREG(info.st_mode) if path == target else S_ISDIR(info.st_mode)):
+            return None
+    return target
+
+
 def _resolve_media_file(asset: MediaAsset) -> Path | None:
     rel = asset.relative_path
     if not is_relative_media_path(rel):
         return None
     local_root = os.getenv("APP_MEDIA_ROOT")
-    roots = [Path(local_root)] if local_root else [Path("media"), ROOT / "media"]
+    local_roots = [Path(local_root)] if local_root else [Path("media"), ROOT / "media"]
+    candidates = [(root, rel, False) for root in local_roots]
     if (asset.storage_provider or "").lower() == "drive":
         mount = os.getenv("APP_MEDIA_DRIVE_MOUNT", "X:" if os.name == "nt" else "")
         if mount:
             drive_root = Path(mount)
             if drive_root.drive and mount == drive_root.drive:
                 drive_root = Path(f"{mount}/")
-            roots.insert(0, drive_root)
-    for root in roots:
+            drive_candidates = [(drive_root, rel, True)]
+            if rel.startswith("VideoDieppie/"):
+                drive_candidates.append((drive_root, rel.removeprefix("VideoDieppie/"), True))
+            candidates = drive_candidates + candidates
+    for root, relative_path, is_drive in candidates:
         try:
-            root = root.resolve(strict=True)
-            target = (root / rel).resolve(strict=True)
-            if target.is_relative_to(root) and target.is_file():
+            resolved_root = root.resolve(strict=True)
+            target = (resolved_root / relative_path).resolve(strict=True)
+            if target.is_relative_to(resolved_root) and target.is_file():
                 return target
-        except (OSError, RuntimeError, ValueError):
+        except OSError as exc:
+            if is_drive and getattr(exc, "winerror", None) == 1005:
+                try:
+                    target = _drive_file_without_volume_path(root, relative_path)
+                    if target is not None:
+                        return target
+                except OSError:
+                    continue
+        except (RuntimeError, ValueError):
             continue
     return None
 
