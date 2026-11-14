@@ -1,8 +1,9 @@
-# Database Management
+# Cơ sở dữ liệu
 
-This directory manages database schemas, migration scripts, and seed fixtures.
+Các tệp SQL cho MySQL:
 
-## Structure
-- `migrations/`: Schema migration files (e.g. Flyway SQL or Liquibase changelogs).
-- `seeds/`: Seed SQL data or JSON fixtures for local development and test environments.
-- `schema/`: Raw DDL definitions and ER diagrams.
+- `schema/`: lược đồ khởi tạo, bắt đầu từ `01_init.sql`.
+- `migrations/`: thay đổi bảng danh sách yêu thích, video, danh mục và tiến độ xem.
+- `seeds/`: dữ liệu phim và tài khoản demo.
+
+Compose nạp lược đồ khi tạo cơ sở dữ liệu mới. Bản `docker-compose.dev.yml` nạp thêm dữ liệu demo; chỉ dùng trong môi trường thử nghiệm riêng.
