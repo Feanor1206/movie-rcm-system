@@ -11,14 +11,13 @@ from types import SimpleNamespace
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError, StatementError
 from sqlalchemy.orm.exc import StaleDataError
 
 from services.database import (
-    CatalogAttributeScale,
-    CatalogCharacter,
+    CatalogConflictError,
     CatalogEpisode,
-    CatalogGenre,
+    CatalogInputError,
     CatalogMediaAsset,
     CatalogPackage,
     CatalogScene,
@@ -26,8 +25,6 @@ from services.database import (
     CatalogSegment,
     CatalogSeries,
     CatalogSnapshot,
-    CatalogSource,
-    CatalogTextTrack,
     FavoriteItem,
     MediaAsset,
     Movie,
@@ -35,6 +32,7 @@ from services.database import (
     User,
     WatchProgress,
     WatchlistItem,
+    catalog_diff,
     compute_sha256,
     create_jwt_token,
     create_playback_grant_token,
@@ -43,6 +41,8 @@ from services.database import (
     hash_password,
     import_catalog_package,
     is_published,
+    is_relative_media_path,
+    validate_catalog_input,
     validate_playback_grant_token,
     verify_password,
 )
@@ -908,22 +908,26 @@ def grant_media_token(asset_id: str, request: Request, authorization: str | None
 
 
 def _resolve_media_file(asset: MediaAsset) -> Path | None:
-    rel = (asset.relative_path or "").lstrip("/\\")
+    rel = asset.relative_path
+    if not is_relative_media_path(rel):
+        return None
+    local_root = os.getenv("APP_MEDIA_ROOT")
+    roots = [Path(local_root)] if local_root else [Path("media"), Path(__file__).resolve().parents[3] / "media"]
     if (asset.storage_provider or "").lower() == "drive":
-        mount = os.getenv("APP_MEDIA_DRIVE_MOUNT", "X:")
-        candidate = Path(mount) / rel
-        if candidate.is_file():
-            return candidate
-    for root_candidate in [
-        Path(os.getenv("APP_MEDIA_ROOT", "./media")),
-        Path(__file__).resolve().parents[2] / "springboot" / "media",
-        Path(__file__).resolve().parents[2] / "springboot" / "target" / "test-media",
-        Path(__file__).resolve().parents[3] / "media",
-        Path(__file__).resolve().parents[3] / "ai" / "artifacts",
-    ]:
-        target = (root_candidate / rel).resolve()
-        if target.is_file():
-            return target
+        mount = os.getenv("APP_MEDIA_DRIVE_MOUNT", "X:" if os.name == "nt" else "")
+        if mount:
+            drive_root = Path(mount)
+            if drive_root.drive and mount == drive_root.drive:
+                drive_root = Path(f"{mount}/")
+            roots.insert(0, drive_root)
+    for root in roots:
+        try:
+            root = root.resolve(strict=True)
+            target = (root / rel).resolve(strict=True)
+            if target.is_relative_to(root) and target.is_file():
+                return target
+        except (OSError, RuntimeError, ValueError):
+            continue
     return None
 
 
@@ -976,7 +980,7 @@ def stream_media(
 
         file_path = _resolve_media_file(asset)
         if not file_path:
-            return api_response(None, f"Không tìm thấy tệp media: {asset.relative_path}", False, 404)
+            return api_response(None, "Không tìm thấy tệp video.", False, 404)
         total_length = file_path.stat().st_size
         mime = asset.mime_type or "video/mp4"
 
@@ -1043,9 +1047,10 @@ async def admin_validate_catalog(request: Request, authorization: str | None = H
     with get_db(request) as db:
         if not _require_admin(request, db, authorization):
             return api_response(None, "Quyền truy cập bị từ chối (Yêu cầu ROLE_ADMIN)", False, 403)
-        body = await request.json()
-        pkg = body.get("package") if isinstance(body, dict) else None
-        if not isinstance(pkg, dict) or not pkg.get("id"):
+        try:
+            body = await read_catalog_body(request)
+            pkg_id, revision = validate_catalog_input(body)
+        except CatalogInputError as exc:
             return JSONResponse(
                 {
                     "valid": False,
@@ -1056,82 +1061,30 @@ async def admin_validate_catalog(request: Request, authorization: str | None = H
                     "toUpdate": 0,
                     "unchanged": 0,
                     "conflicts": 0,
-                    "errors": [{"path": "package.id", "code": "MISSING_FIELD", "message": "Thiếu package.id"}],
+                    "errors": [{"path": exc.path, "code": "INVALID_FIELD", "message": str(exc)}],
                 },
                 status_code=400,
             )
-        pkg_id = str(pkg.get("id"))
-        revision = int(pkg.get("revision") or 1)
         content_hash = compute_sha256(body)
-        to_create = 0
-        to_update = 0
-        unchanged = 0
-        conflicts = 0
         existing_pkg = db.get(CatalogPackage, pkg_id)
-        if existing_pkg is None:
-            to_create += 1
-        elif revision < int(existing_pkg.revision or 1):
-            conflicts += 1
-        elif revision == int(existing_pkg.revision or 1):
-            if content_hash == existing_pkg.content_hash:
-                unchanged += 1
-            else:
-                conflicts += 1
-        else:
-            to_update += 1
-
-        collections = (
-            ("genres", CatalogGenre),
-            ("attribute_scales", CatalogAttributeScale),
-            ("sources", CatalogSource),
-            ("series", CatalogSeries),
-            ("seasons", CatalogSeason),
-            ("episodes", CatalogEpisode),
-            ("segments", CatalogSegment),
-            ("characters", CatalogCharacter),
-            ("media_assets", CatalogMediaAsset),
-            ("text_tracks", CatalogTextTrack),
-            ("scenes", CatalogScene),
-        )
-        for col_key, model_cls in collections:
-            for item in body.get(col_key) or []:
-                if not isinstance(item, dict) or not item.get("id"):
-                    continue
-                existing = db.get(model_cls, str(item["id"]))
-                if existing is None:
-                    to_create += 1
-                    continue
-                inc_rev = int((item.get("record") or {}).get("revision") or revision)
-                ex_rev = int(existing.revision or 1)
-                if inc_rev < ex_rev:
-                    conflicts += 1
-                elif inc_rev == ex_rev:
-                    ex_hash = ""
-                    if existing.raw_json:
-                        try:
-                            ex_hash = compute_sha256(json.loads(existing.raw_json))
-                        except Exception:
-                            ex_hash = compute_sha256(existing.raw_json)
-                    if compute_sha256(item) == ex_hash:
-                        unchanged += 1
-                    else:
-                        conflicts += 1
-                else:
-                    to_update += 1
-
+        counts, _ = catalog_diff(db, body, revision, content_hash, existing_pkg)
         return JSONResponse(
             {
                 "valid": True,
                 "packageId": pkg_id,
                 "revision": revision,
                 "contentHash": content_hash,
-                "toCreate": to_create,
-                "toUpdate": to_update,
-                "unchanged": unchanged,
-                "conflicts": conflicts,
+                **counts,
                 "errors": [],
             }
         )
+
+
+async def read_catalog_body(request):
+    try:
+        return await request.json()
+    except (ValueError, RecursionError) as exc:
+        raise CatalogInputError("package", "Dữ liệu JSON không hợp lệ.") from exc
 
 
 @router.post("/api/admin/catalog/import")
@@ -1139,10 +1092,33 @@ async def admin_import_catalog(request: Request, authorization: str | None = Hea
     with get_db(request) as db:
         if not _require_admin(request, db, authorization):
             return api_response(None, "Quyền truy cập bị từ chối (Yêu cầu ROLE_ADMIN)", False, 403)
-        body = await request.json()
-        if not isinstance(body, dict) or not isinstance(body.get("package"), dict):
-            return api_response(None, "Dữ liệu package không hợp lệ", False, 400)
-        resp = import_catalog_package(db, body)
+        try:
+            body = await read_catalog_body(request)
+            resp = import_catalog_package(db, body)
+        except CatalogInputError as exc:
+            return api_response(None, str(exc), False, 400)
+        except CatalogConflictError as exc:
+            return api_response(None, str(exc), False, 409)
+        except IntegrityError as exc:
+            code = exc.orig.args[0] if exc.orig.args else None
+            sqlite_code = getattr(exc.orig, "sqlite_errorcode", None)
+            if code == 1062 or sqlite_code in (1555, 2067):
+                return api_response(None, "Danh mục vừa thay đổi. Kiểm tra lại gói rồi thử lại.", False, 409)
+            return api_response(None, "Gói danh mục có dữ liệu hoặc liên kết không hợp lệ.", False, 400)
+        except OperationalError as exc:
+            code = exc.orig.args[0] if exc.orig.args else None
+            sqlite_code = getattr(exc.orig, "sqlite_errorcode", 0)
+            if code in (1205, 1213) or (sqlite_code & 255) in (5, 6):
+                return api_response(None, "Đang có lần nhập khác. Vui lòng thử lại.", False, 409)
+            raise
+        except (DataError, KeyError, TypeError, ValueError, OverflowError, RecursionError):
+            return api_response(None, "Dữ liệu gói danh mục không hợp lệ.", False, 400)
+        except StatementError as exc:
+            if not isinstance(exc.orig, (TypeError, ValueError, OverflowError)):
+                raise
+            return api_response(None, "Dữ liệu gói danh mục không hợp lệ.", False, 400)
+        if resp.pop("unchanged", False):
+            return JSONResponse(resp)
         runtime = request.app.state.runtime
         try:
             eligible = export_eligible_catalog(db)
