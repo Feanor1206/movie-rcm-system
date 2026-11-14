@@ -1,19 +1,13 @@
 # Viết truy vấn đánh giá tìm kiếm
 
-Điền một dòng cho mỗi truy vấn bạn tự viết trong `search_queries_v1.csv`. Giữ
-nguyên tên cột và lưu UTF-8. Viết câu tự nhiên theo trí nhớ hoặc sau khi xem tập.
-Chọn cách diễn đạt và chốt nhãn trước khi xem kết quả tìm kiếm, caption hoặc lời
-thoại đã sinh. Giữ nguyên dấu tiếng Việt khi đó là cách bạn sẽ nhập câu hỏi.
+Điền một dòng cho mỗi truy vấn tự viết trong `search_queries_v1.csv`, giữ tên cột và lưu UTF-8. Viết theo trí nhớ hoặc sau khi xem tập phim. Chốt cách diễn đạt và nhãn trước khi xem kết quả tìm kiếm, mô tả ảnh hoặc lời thoại máy sinh. Giữ dấu tiếng Việt như khi nhập câu hỏi.
 
-- `query` là câu bạn sẽ gõ vào ô tìm kiếm. Có thể dùng mô tả cảnh, nhân vật hoặc
-  lời thoại bạn nhớ. Nếu câu chứa dấu phẩy, để trình soạn CSV bọc cả ô bằng dấu
-  nháy kép.
-- `episode_id` là ID catalog của tập pilot đúng. Đối chiếu ID từ danh sách pilot.
-- `start_ms` là mốc bắt đầu bạn đã kiểm tra trong tập. `end_ms` có thể để trống.
-  Dùng số nguyên mili giây trên timeline của tập. Nếu chỉ chắc chắn về tập, để
-  trống cả hai mốc.
-- `writer` là tên hoặc mã người viết. `notes` ghi chi tiết giúp đối chiếu nhãn
-  nếu cần.
+| Cột | Nội dung |
+| --- | --- |
+| `query` | Câu tìm kiếm về cảnh, nhân vật hoặc lời thoại. Ô có dấu phẩy cần được trình soạn CSV bọc trong dấu nháy kép. |
+| `episode_id` | ID tập đúng trong danh sách tập thử nghiệm. |
+| `start_ms`, `end_ms` | Mốc thời gian đã kiểm tra, tính bằng số nguyên mili giây. Có thể để trống `end_ms`; nếu chỉ chắc về tập, để trống cả hai mốc. |
+| `writer` | Tên hoặc mã người viết. |
+| `notes` | Ghi chú giúp kiểm tra lại nhãn. |
 
-Giữ bản nhãn đã chốt để dùng cho cả bốn cấu hình. Mẫu CSV chỉ có header để bạn
-tự điền nhãn. Lệnh chạy nằm trong [hướng dẫn đánh giá](../../evaluation/README.md).
+Giữ nguyên bản nhãn đã chốt cho cả bốn cấu hình. Tệp mẫu hiện chỉ có tên cột. Xem [lệnh đánh giá](../../evaluation/README.md).

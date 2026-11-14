@@ -1,20 +1,22 @@
-# Movie Recommendation System - Frontend
+# Giao diện Dippie
 
-Next.js frontend web application for movie discovery and recommendations.
+Giao diện dùng Next.js 15 App Router, React 19, TypeScript, Tailwind CSS và Lucide React.
 
-## Tech Stack
-- Next.js 15 (App Router)
-- React 19
-- TypeScript
-- Tailwind CSS
-- Lucide React
+## Chạy
 
-## Development
+Cần Node.js 20. Từ thư mục `frontend`:
 
-```bash
-# Install dependencies
-npm install
-
-# Run dev server
+```powershell
+npm ci
 npm run dev
+```
+
+Mở [localhost:3000](http://localhost:3000). Để chạy cùng backend Java hoặc Python, dùng các script trong [README chính](../README.md).
+
+## Kiểm tra
+
+```powershell
+npm test
+npm run typecheck
+npm run build
 ```
