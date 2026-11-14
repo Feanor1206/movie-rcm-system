@@ -141,8 +141,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const { user, token, status, isAuthenticated, handleSessionExpired, isAuthModalOpen } = useAuth();
 
   const currentActorKey = getActorKey(status, user, token);
-
-  // Snapshot tied explicitly to its owner (F2 / G1)
   const [snapshot, setSnapshot] = useState<LibrarySnapshot>(() => {
     if (typeof window !== 'undefined' && status === 'guest') {
       const g = readGuestStorage();
@@ -167,38 +165,26 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
-
-  // G1/G2/G3/H1/H2: Session epoch, read versioning, operation ID, and mutation journal
   const sessionGenRef = useRef<number>(0);
   const readGenRef = useRef<number>(0);
   const lastKnownActorKeyRef = useRef<string>(currentActorKey);
   const operationCounterRef = useRef<number>(0);
-
-  // Structured mutation journal and locks
   const operationsJournalRef = useRef<Map<string, OperationRecord>>(new Map());
   const syncPendingLocksRef = useRef<Set<string>>(new Set());
   const activeMutationAbortControllersRef = useRef<Map<number, AbortController>>(new Map());
   const activeReadAbortControllerRef = useRef<AbortController | null>(null);
-
-  // Detect actor / session change synchronously during render and bump session lifecycle
   if (lastKnownActorKeyRef.current !== currentActorKey) {
     sessionGenRef.current += 1;
     lastKnownActorKeyRef.current = currentActorKey;
-
-    // Reset journal, active locks, and read version for new actor session
     operationsJournalRef.current.clear();
     syncPendingLocksRef.current.clear();
     readGenRef.current = 0;
-
-    // Abort in-flight mutations from previous session
     for (const ctrl of activeMutationAbortControllersRef.current.values()) {
       try {
         ctrl.abort();
       } catch {}
     }
     activeMutationAbortControllersRef.current.clear();
-
-    // Abort in-flight read from previous session
     if (activeReadAbortControllerRef.current) {
       try {
         activeReadAbortControllerRef.current.abort();
@@ -206,8 +192,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       activeReadAbortControllerRef.current = null;
     }
   }
-
-  // F2: Derive visible values strictly matching currentActorKey
   const isOwnerCurrent = snapshot.ownerKey === currentActorKey;
   const visibleWatchlist: string[] = isOwnerCurrent
     ? snapshot.watchlist
@@ -238,16 +222,12 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
-
-  // G1/G2/G3/H1/H2: Unified authoritative library fetch and reconciliation core
   const performFetchLibrary = useCallback(
     async (options?: { isBackgroundReconcile?: boolean }) => {
       const thisActorKey = currentActorKey;
       const thisSessionGen = sessionGenRef.current;
       readGenRef.current += 1;
       const thisReadVersion = readGenRef.current;
-
-      // 1. Unverified or intermediate states
       if (!isAuthenticated || !token || !user) {
         if (status === 'checking') {
           setIsLibraryLoading(true);
@@ -264,7 +244,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
           });
           return;
         }
-        // status === 'guest'
         const guestData = readGuestStorage();
         if (sessionGenRef.current === thisSessionGen && lastKnownActorKeyRef.current === thisActorKey) {
           setSnapshot({
@@ -278,8 +257,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-
-      // 2. Authenticated mode: fetch authoritative data
       if (!options?.isBackgroundReconcile) {
         setIsLibraryLoading(true);
       }
@@ -309,8 +286,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
           fetch(`${SPRINGBOOT_API}/users/favorites`, { headers, signal: abortCtrl.signal }),
           fetch(`${SPRINGBOOT_API}/users/ratings`, { headers, signal: abortCtrl.signal }),
         ]);
-
-        // F1: Guard 401 callback against stale session
         if (resWatchlist.status === 401 || resFavorites.status === 401 || resRatings.status === 401) {
           if (sessionGenRef.current === thisSessionGen && lastKnownActorKeyRef.current === thisActorKey) {
             handleSessionExpired();
@@ -336,8 +311,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
           clearTimeout(timeoutId);
           timeoutId = null;
         }
-
-        // Validate session guard
         if (sessionGenRef.current !== thisSessionGen || lastKnownActorKeyRef.current !== thisActorKey) {
           return;
         }
@@ -360,8 +333,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
             nextRatings[r.movieId] = r.rating;
           }
         });
-
-        // G1, G2, H1 & H2 Reconciliation:
         setSnapshot((prev) => {
           if (sessionGenRef.current !== thisSessionGen || lastKnownActorKeyRef.current !== thisActorKey) {
             return prev;
@@ -370,14 +341,11 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
           const resolvedWatchlist = new Set<string>();
           const resolvedFavorites = new Set<string>();
           const resolvedRatings: Record<string, number> = { ...nextRatings };
-
-          // 1. Process server watchlist
           for (const id of nextWatchlist) {
             const op = operationsJournalRef.current.get(`watchlist:${id}`);
             if (!op) {
               resolvedWatchlist.add(id);
             } else {
-              // H1: Read R acknowledges commit ONLY IF R > committedAtReadVersion!
               const isAcknowledged =
                 op.status === 'committed' &&
                 op.committedAtReadVersion !== null &&
@@ -387,7 +355,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
                 resolvedWatchlist.add(id);
               } else if (op.status === 'uncertain') {
                 if (op.desiredValue === true) {
-                  // Background reconcile confirmed item exists on server!
                   op.status = 'committed';
                   op.committedAtReadVersion = thisReadVersion;
                   resolvedWatchlist.add(id);
@@ -402,7 +369,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-          // Process operations that were not in server watchlist
           for (const [key, op] of operationsJournalRef.current.entries()) {
             if (op.action === 'watchlist') {
               const isAcknowledged =
@@ -426,8 +392,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-
-          // 2. Process server favorites
           for (const id of nextFavorites) {
             const op = operationsJournalRef.current.get(`favorite:${id}`);
             if (!op) {
@@ -479,8 +443,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-
-          // 3. Process ratings
           for (const [key, op] of operationsJournalRef.current.entries()) {
             if (op.action === 'rating') {
               const isAcknowledged =
@@ -507,8 +469,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-
-          // H1: Prune committed operations ONLY when thisReadVersion > op.committedAtReadVersion
           for (const [key, op] of operationsJournalRef.current.entries()) {
             if (
               op.status === 'committed' &&
@@ -626,29 +586,33 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // Watchlist Mutation
-  const toggleWatchlist = async (
+  const toggleLibraryItem = async (
+    action: 'watchlist' | 'favorite',
     id: string,
     title?: string,
     poster?: string
   ): Promise<boolean> => {
+    const isWatchlist = action === 'watchlist';
+    const listKey = isWatchlist ? 'watchlist' : 'favorites';
+    const listName = isWatchlist ? 'Danh sách xem' : 'Yêu thích';
+    const addVerb = isWatchlist ? 'lưu' : 'thêm';
+    const visibleItems = isWatchlist ? visibleWatchlist : visibleFavorites;
     const mutationActorKey = currentActorKey;
     const mutationSessionGen = sessionGenRef.current;
-    const lockKey = `${mutationSessionGen}:${mutationActorKey}:watchlist:${id}`;
-    const opKey = `watchlist:${id}`;
+    const lockKey = `${mutationSessionGen}:${mutationActorKey}:${action}:${id}`;
+    const opKey = `${action}:${id}`;
 
     if (syncPendingLocksRef.current.has(lockKey)) return false;
     syncPendingLocksRef.current.add(lockKey);
     setPendingUpdateTick((t) => t + 1);
 
     const existingOp = operationsJournalRef.current.get(opKey);
-    // H2: If retrying an uncertain outcome, retain original desired intent; do not invert!
     const isAdding =
       existingOp && existingOp.status === 'uncertain'
         ? existingOp.desiredValue
-        : !visibleWatchlist.includes(id);
+        : !visibleItems.includes(id);
 
-    const alreadyInWatchlist = !isAdding;
+    const alreadyInList = !isAdding;
     const displayTitle = title || id;
 
     const isStillCurrentSession = () => {
@@ -670,269 +634,18 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setPendingUpdateTick((t) => t + 1);
       return false;
     }
-
-    // 1. Guest Mode
     if (status === 'guest' || !isAuthenticated || !token) {
-      const nextWatchlist = alreadyInWatchlist
-        ? visibleWatchlist.filter((item) => item !== id)
-        : [...visibleWatchlist, id];
+      const nextItems = alreadyInList
+        ? visibleItems.filter((item) => item !== id)
+        : [...visibleItems, id];
 
-      const saved = writeGuestStorage({
-        watchlist: nextWatchlist,
+      const guestLibrary = {
+        watchlist: visibleWatchlist,
         favorites: visibleFavorites,
         ratings: visibleRatings,
-      });
-
-      if (!saved) {
-        showToast('Không thể lưu vào bộ nhớ thiết bị.', 'error');
-        syncPendingLocksRef.current.delete(lockKey);
-        setPendingUpdateTick((t) => t + 1);
-        return false;
-      }
-
-      setSnapshot({
-        ownerKey: 'guest',
-        watchlist: nextWatchlist,
-        favorites: visibleFavorites,
-        ratings: visibleRatings,
-      });
-
-      if (alreadyInWatchlist) {
-        showToast(`Đã xóa ${displayTitle} khỏi Danh sách xem (trên thiết bị)`, 'info');
-      } else {
-        showToast(`Đã lưu ${displayTitle} vào Danh sách xem (trên thiết bị)`, 'success');
-      }
-      syncPendingLocksRef.current.delete(lockKey);
-      setPendingUpdateTick((t) => t + 1);
-      return true;
-    }
-
-    // 2. Authenticated Mode
-    const opId = ++operationCounterRef.current;
-    operationsJournalRef.current.set(opKey, {
-      id: opId,
-      action: 'watchlist',
-      movieId: id,
-      readVersionAtStart: readGenRef.current,
-      committedAtReadVersion: null,
-      status: 'pending',
-      desiredValue: isAdding,
-    });
-
-    setSnapshot((prev) => {
-      const isSameActor = prev.ownerKey === mutationActorKey;
-      const baseWatchlist = isSameActor ? prev.watchlist : [];
-      const nextW = isAdding
-        ? (baseWatchlist.includes(id) ? baseWatchlist : [...baseWatchlist, id])
-        : baseWatchlist.filter((item) => item !== id);
-
-      return {
-        ownerKey: mutationActorKey,
-        watchlist: nextW,
-        favorites: isSameActor ? prev.favorites : [],
-        ratings: isSameActor ? prev.ratings : {},
+        [listKey]: nextItems,
       };
-    });
-
-    const abortCtrl = new AbortController();
-    activeMutationAbortControllersRef.current.set(opId, abortCtrl);
-
-    let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
-      abortCtrl.abort();
-    }, REQUEST_TIMEOUT_MS);
-
-    try {
-      if (alreadyInWatchlist) {
-        const res = await fetch(`${SPRINGBOOT_API}/users/watchlist/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-          signal: abortCtrl.signal,
-        });
-
-        if (res.status === 401) {
-          if (isStillCurrentSession()) {
-            handleSessionExpired();
-            showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
-          }
-          throw new Error('Phiên đăng nhập đã hết hạn.');
-        }
-        if (res.status === 403) {
-          throw new Error('Bạn không có quyền thực hiện thao tác này.');
-        }
-        if (!res.ok) throw new Error(`Xóa khỏi Danh sách xem thất bại (HTTP ${res.status})`);
-
-        const json = await res.json();
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-
-        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
-
-        if (isStillCurrentSession()) {
-          const op = operationsJournalRef.current.get(opKey);
-          if (op && op.id === opId) {
-            op.status = 'committed';
-            op.committedAtReadVersion = readGenRef.current;
-          }
-          showToast(`Đã xóa ${displayTitle} khỏi Danh sách xem`, 'info');
-          return true;
-        }
-        return false;
-      } else {
-        const res = await fetch(`${SPRINGBOOT_API}/users/watchlist`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            movieId: id,
-            movieTitle: displayTitle,
-            posterUrl: poster || '',
-          }),
-          signal: abortCtrl.signal,
-        });
-
-        if (res.status === 401) {
-          if (isStillCurrentSession()) {
-            handleSessionExpired();
-            showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
-          }
-          throw new Error('Phiên đăng nhập đã hết hạn.');
-        }
-        if (res.status === 403) {
-          throw new Error('Bạn không có quyền thực hiện thao tác này.');
-        }
-        if (!res.ok) throw new Error(`Lưu vào Danh sách xem thất bại (HTTP ${res.status})`);
-
-        const json = await res.json();
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-
-        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
-
-        if (isStillCurrentSession()) {
-          const op = operationsJournalRef.current.get(opKey);
-          if (op && op.id === opId) {
-            op.status = 'committed';
-            op.committedAtReadVersion = readGenRef.current;
-          }
-          showToast(`Đã lưu ${displayTitle} vào Danh sách xem`, 'success');
-          return true;
-        }
-        return false;
-      }
-    } catch (err: unknown) {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      if (isStillCurrentSession()) {
-        const isTimeout =
-          (err instanceof DOMException && err.name === 'AbortError') ||
-          (err as any)?.name === 'AbortError';
-        const isNetworkError =
-          err instanceof TypeError || (err as any)?.name === 'TypeError';
-
-        if (isTimeout || isNetworkError) {
-          // H2: Unknown write outcome - mark as uncertain to retain intent and avoid inversion on retry
-          const op = operationsJournalRef.current.get(opKey);
-          if (op && op.id === opId) {
-            op.status = 'uncertain';
-          }
-          showToast('Thời gian gửi yêu cầu quá hạn hoặc mất kết nối. Đang kiểm tra lại trạng thái...', 'error');
-          performFetchLibrary({ isBackgroundReconcile: true });
-        } else {
-          // Definite failure: delete op and rollback
-          const op = operationsJournalRef.current.get(opKey);
-          if (op && op.id === opId) {
-            operationsJournalRef.current.delete(opKey);
-          }
-          setSnapshot((prev) => {
-            if (prev.ownerKey !== mutationActorKey) return prev;
-            return {
-              ...prev,
-              watchlist: alreadyInWatchlist
-                ? (prev.watchlist.includes(id) ? prev.watchlist : [...prev.watchlist, id])
-                : prev.watchlist.filter((item) => item !== id),
-            };
-          });
-          showToast('Không thể cập nhật Danh sách xem. Vui lòng thử lại.', 'error');
-        }
-      }
-      return false;
-    } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      activeMutationAbortControllersRef.current.delete(opId);
-      syncPendingLocksRef.current.delete(lockKey);
-      setPendingUpdateTick((t) => t + 1);
-    }
-  };
-
-  // Favorites Mutation
-  const toggleFavorite = async (
-    id: string,
-    title?: string,
-    poster?: string
-  ): Promise<boolean> => {
-    const mutationActorKey = currentActorKey;
-    const mutationSessionGen = sessionGenRef.current;
-    const lockKey = `${mutationSessionGen}:${mutationActorKey}:favorite:${id}`;
-    const opKey = `favorite:${id}`;
-
-    if (syncPendingLocksRef.current.has(lockKey)) return false;
-    syncPendingLocksRef.current.add(lockKey);
-    setPendingUpdateTick((t) => t + 1);
-
-    const existingOp = operationsJournalRef.current.get(opKey);
-    const isAdding =
-      existingOp && existingOp.status === 'uncertain'
-        ? existingOp.desiredValue
-        : !visibleFavorites.includes(id);
-
-    const alreadyInFavorites = !isAdding;
-    const displayTitle = title || id;
-
-    const isStillCurrentSession = () => {
-      return (
-        sessionGenRef.current === mutationSessionGen &&
-        lastKnownActorKeyRef.current === mutationActorKey
-      );
-    };
-
-    if (status === 'checking') {
-      showToast('Đang kiểm tra phiên đăng nhập, vui lòng đợi...', 'info');
-      syncPendingLocksRef.current.delete(lockKey);
-      setPendingUpdateTick((t) => t + 1);
-      return false;
-    }
-    if (status === 'unavailable') {
-      showToast('Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.', 'error');
-      syncPendingLocksRef.current.delete(lockKey);
-      setPendingUpdateTick((t) => t + 1);
-      return false;
-    }
-
-    // 1. Guest Mode
-    if (status === 'guest' || !isAuthenticated || !token) {
-      const nextFavorites = alreadyInFavorites
-        ? visibleFavorites.filter((item) => item !== id)
-        : [...visibleFavorites, id];
-
-      const saved = writeGuestStorage({
-        watchlist: visibleWatchlist,
-        favorites: nextFavorites,
-        ratings: visibleRatings,
-      });
+      const saved = writeGuestStorage(guestLibrary);
 
       if (!saved) {
         showToast('Không thể lưu vào bộ nhớ thiết bị.', 'error');
@@ -941,28 +654,21 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      setSnapshot({
-        ownerKey: 'guest',
-        watchlist: visibleWatchlist,
-        favorites: nextFavorites,
-        ratings: visibleRatings,
-      });
+      setSnapshot({ ownerKey: 'guest', ...guestLibrary });
 
-      if (alreadyInFavorites) {
-        showToast(`Đã xóa ${displayTitle} khỏi Yêu thích (trên thiết bị)`, 'info');
+      if (alreadyInList) {
+        showToast(`Đã xóa ${displayTitle} khỏi ${listName} (trên thiết bị)`, 'info');
       } else {
-        showToast(`Đã thêm ${displayTitle} vào Yêu thích (trên thiết bị)`, 'success');
+        showToast(`Đã ${addVerb} ${displayTitle} vào ${listName} (trên thiết bị)`, 'success');
       }
       syncPendingLocksRef.current.delete(lockKey);
       setPendingUpdateTick((t) => t + 1);
       return true;
     }
-
-    // 2. Authenticated Mode
     const opId = ++operationCounterRef.current;
     operationsJournalRef.current.set(opKey, {
       id: opId,
-      action: 'favorite',
+      action,
       movieId: id,
       readVersionAtStart: readGenRef.current,
       committedAtReadVersion: null,
@@ -972,18 +678,17 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
     setSnapshot((prev) => {
       const isSameActor = prev.ownerKey === mutationActorKey;
-      const baseFavorites = isSameActor ? prev.favorites : [];
-      const nextF = alreadyInFavorites
-        ? baseFavorites.filter((item) => item !== id)
-        : baseFavorites.includes(id)
-        ? baseFavorites
-        : [...baseFavorites, id];
+      const baseItems = isSameActor ? prev[listKey] : [];
+      const nextItems = isAdding
+        ? (baseItems.includes(id) ? baseItems : [...baseItems, id])
+        : baseItems.filter((item) => item !== id);
 
       return {
         ownerKey: mutationActorKey,
         watchlist: isSameActor ? prev.watchlist : [],
-        favorites: nextF,
+        favorites: isSameActor ? prev.favorites : [],
         ratings: isSameActor ? prev.ratings : {},
+        [listKey]: nextItems,
       };
     });
 
@@ -995,93 +700,67 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     }, REQUEST_TIMEOUT_MS);
 
     try {
-      if (alreadyInFavorites) {
-        const res = await fetch(`${SPRINGBOOT_API}/users/favorites/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-          signal: abortCtrl.signal,
-        });
+      const res = alreadyInList
+        ? await fetch(`${SPRINGBOOT_API}/users/${listKey}/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+            },
+            signal: abortCtrl.signal,
+          })
+        : await fetch(`${SPRINGBOOT_API}/users/${listKey}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              movieId: id,
+              movieTitle: displayTitle,
+              posterUrl: poster || '',
+            }),
+            signal: abortCtrl.signal,
+          });
 
-        if (res.status === 401) {
-          if (isStillCurrentSession()) {
-            handleSessionExpired();
-            showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
-          }
-          throw new Error('Phiên đăng nhập đã hết hạn.');
-        }
-        if (res.status === 403) {
-          throw new Error('Bạn không có quyền thực hiện thao tác này.');
-        }
-        if (!res.ok) throw new Error(`Xóa khỏi Yêu thích thất bại (HTTP ${res.status})`);
-
-        const json = await res.json();
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-
-        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
-
+      if (res.status === 401) {
         if (isStillCurrentSession()) {
-          const op = operationsJournalRef.current.get(opKey);
-          if (op && op.id === opId) {
-            op.status = 'committed';
-            op.committedAtReadVersion = readGenRef.current;
-          }
-          showToast(`Đã xóa ${displayTitle} khỏi Yêu thích`, 'info');
-          return true;
+          handleSessionExpired();
+          showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
         }
-        return false;
-      } else {
-        const res = await fetch(`${SPRINGBOOT_API}/users/favorites`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            movieId: id,
-            movieTitle: displayTitle,
-            posterUrl: poster || '',
-          }),
-          signal: abortCtrl.signal,
-        });
-
-        if (res.status === 401) {
-          if (isStillCurrentSession()) {
-            handleSessionExpired();
-            showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error');
-          }
-          throw new Error('Phiên đăng nhập đã hết hạn.');
-        }
-        if (res.status === 403) {
-          throw new Error('Bạn không có quyền thực hiện thao tác này.');
-        }
-        if (!res.ok) throw new Error(`Lưu vào Yêu thích thất bại (HTTP ${res.status})`);
-
-        const json = await res.json();
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-
-        if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
-
-        if (isStillCurrentSession()) {
-          const op = operationsJournalRef.current.get(opKey);
-          if (op && op.id === opId) {
-            op.status = 'committed';
-            op.committedAtReadVersion = readGenRef.current;
-          }
-          showToast(`Đã thêm ${displayTitle} vào Yêu thích`, 'success');
-          return true;
-        }
-        return false;
+        throw new Error('Phiên đăng nhập đã hết hạn.');
       }
+      if (res.status === 403) {
+        throw new Error('Bạn không có quyền thực hiện thao tác này.');
+      }
+      if (!res.ok) {
+        const operation = alreadyInList ? 'Xóa khỏi' : 'Lưu vào';
+        throw new Error(`${operation} ${listName} thất bại (HTTP ${res.status})`);
+      }
+
+      const json = await res.json();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (!json || json.success !== true) throw new Error('Phản hồi từ máy chủ không hợp lệ.');
+
+      if (isStillCurrentSession()) {
+        const op = operationsJournalRef.current.get(opKey);
+        if (op && op.id === opId) {
+          op.status = 'committed';
+          op.committedAtReadVersion = readGenRef.current;
+        }
+        if (alreadyInList) {
+          showToast(`Đã xóa ${displayTitle} khỏi ${listName}`, 'info');
+        } else {
+          showToast(`Đã ${addVerb} ${displayTitle} vào ${listName}`, 'success');
+        }
+        return true;
+      }
+      return false;
     } catch (err: unknown) {
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -1110,12 +789,12 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
             if (prev.ownerKey !== mutationActorKey) return prev;
             return {
               ...prev,
-              favorites: alreadyInFavorites
-                ? (prev.favorites.includes(id) ? prev.favorites : [...prev.favorites, id])
-                : prev.favorites.filter((item) => item !== id),
+              [listKey]: alreadyInList
+                ? (prev[listKey].includes(id) ? prev[listKey] : [...prev[listKey], id])
+                : prev[listKey].filter((item) => item !== id),
             };
           });
-          showToast('Không thể cập nhật Yêu thích. Vui lòng thử lại.', 'error');
+          showToast(`Không thể cập nhật ${listName}. Vui lòng thử lại.`, 'error');
         }
       }
       return false;
@@ -1129,7 +808,11 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Rating Mutation
+  const toggleWatchlist = (id: string, title?: string, poster?: string) =>
+    toggleLibraryItem('watchlist', id, title, poster);
+
+  const toggleFavorite = (id: string, title?: string, poster?: string) =>
+    toggleLibraryItem('favorite', id, title, poster);
   const rateMovie = async (
     id: string,
     rating: number,
@@ -1167,8 +850,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setPendingUpdateTick((t) => t + 1);
       return false;
     }
-
-    // 1. Guest Mode
     if (status === 'guest' || !isAuthenticated || !token) {
       const nextRatings = { ...visibleRatings, [id]: validRating };
       const saved = writeGuestStorage({
@@ -1196,8 +877,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setPendingUpdateTick((t) => t + 1);
       return true;
     }
-
-    // 2. Authenticated Mode
     const opId = ++operationCounterRef.current;
     operationsJournalRef.current.set(opKey, {
       id: opId,
@@ -1319,8 +998,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setPendingUpdateTick((t) => t + 1);
     }
   };
-
-  // Remove Rating Mutation
   const removeRating = async (id: string, title?: string): Promise<boolean> => {
     const mutationActorKey = currentActorKey;
     const mutationSessionGen = sessionGenRef.current;
@@ -1353,8 +1030,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setPendingUpdateTick((t) => t + 1);
       return false;
     }
-
-    // 1. Guest Mode
     if (status === 'guest' || !isAuthenticated || !token) {
       const nextRatings = { ...visibleRatings };
       delete nextRatings[id];
@@ -1383,8 +1058,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setPendingUpdateTick((t) => t + 1);
       return true;
     }
-
-    // 2. Authenticated Mode
     const opId = ++operationCounterRef.current;
     operationsJournalRef.current.set(opKey, {
       id: opId,
@@ -1542,14 +1215,14 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     >
       {children}
 
-      {/* Global Auth Modal */}
+
       {isAuthModalOpen && <AuthModal />}
 
-      {/* Global CineBot Widget & Modal */}
+
       {!isChatOpen && <CineBotFloatingTrigger onClick={openChat} />}
       {hasOpenedChat && <CineBot isOpen={isChatOpen} onClose={closeChat} />}
 
-      {/* Global Toast Container */}
+
       <div
         role="region"
         aria-label="Thông báo hệ thống"

@@ -681,6 +681,10 @@ class WatchProgress(Base):
     position_ms = Column(BigInteger, nullable=False)
     opt_lock_version = Column(BigInteger, nullable=False, default=0)
     updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    __mapper_args__ = {
+        "version_id_col": opt_lock_version,
+        "version_id_generator": lambda version: 0 if version is None else version + 1,
+    }
 
 
 def hash_password(raw_password: str) -> str:
@@ -768,19 +772,19 @@ def resolve_database_url(explicit_url: str | None = None) -> str:
 
 
 SEED_MOVIES = [
-    ("drive-videoplayback", "Shin Cậu Bé Bút Chì: Chuyến phiêu lưu kỳ thú", 2026, 8.8, "7m 25s", "Animation,Comedy,Adventure,Family", "Tập phim hoạt hình Shin Cậu Bé Bút Chì được phát và giải mã trực tiếp từ Google Drive storage.", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1800&q=85", "/api/media/stream/ast-drive-videoplayback"),
-    ("the-last-orbit", "The Last Orbit", 2026, 8.7, "2h 14m", "Animation,Sci-Fi,Drama", "A lone astronaut discovers that the signal guiding her home may be the final memory of a world already gone.", "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1800&q=85", "/videos/the-last-orbit.mp4"),
-    ("spirited-away", "Spirited Away", 2001, 8.6, "2h 05m", "Animation,Adventure,Family,Fantasy", "A young girl wanders into a magical bathhouse ruled by spirits and witches, where she must find the courage to free her parents.", "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1800&q=85", "/videos/the-last-orbit.mp4"),
-    ("your-name", "Your Name", 2016, 8.4, "1h 46m", "Animation,Romance,Drama,Fantasy", "Two teenagers share a profound, magical connection upon discovering they are swapping bodies across time and space.", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1800&q=85", "/videos/afterlight.mp4"),
-    ("spider-verse", "Spider-Man: Into the Spider-Verse", 2018, 8.4, "1h 57m", "Animation,Action,Adventure,Sci-Fi", "Teen Miles Morales becomes the Spider-Man of his universe and crosses paths with five counterparts from other dimensions.", "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=1800&q=85", "/videos/glass-horizon.mp4"),
-    ("isle-of-dogs", "Isle of Dogs", 2018, 7.8, "1h 41m", "Animation,Adventure,Comedy,Drama", "Set in dystopian Japan, a young boy journeys to Trash Island in a stop-motion quest to rescue his exiled dog Spots.", "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1800&q=85", "/videos/deep-blue.mp4"),
-    ("coraline", "Coraline", 2009, 7.7, "1h 40m", "Animation,Drama,Family,Fantasy,Horror", "An adventurous 11-year-old girl finds another world that is a strangely idealized version of her frustrating home, but it has sinister secrets.", "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1800&q=85", "/videos/nocturne.mp4"),
-    ("fantasia-1940", "Fantasia", 1940, 7.7, "2h 05m", "Animation,Family,Fantasy,Musical", "A timeless collection of animated interpretations of great works of Western classical music.", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1800&q=85", "/videos/quiet-places.mp4"),
-    ("afterlight", "Afterlight", 2025, 8.3, "1h 58m", "Animation,Drama,Mystery", "In a city where night never ends, a photographer follows one impossible beam of sunlight.", "https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=1800&q=85", "/videos/afterlight.mp4"),
-    ("glass-horizon", "Glass Horizon", 2026, 8.1, "2h 06m", "Animation,Thriller,Sci-Fi", "A brilliant architect is asked to design a city that no one is meant to leave.", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=85", "/videos/glass-horizon.mp4"),
-    ("deep-blue", "Deep Blue", 2024, 7.9, "1h 46m", "Animation,Adventure,Drama", "Two estranged sisters cross an unmapped ocean in search of their father.", "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=1800&q=85", "/videos/deep-blue.mp4"),
-    ("quiet-places", "Quiet Places", 2025, 8.5, "2h 01m", "Animation,Romance,Drama", "A composer returns to the town she fled and finds an old song waiting for her.", "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1800&q=85", "/videos/quiet-places.mp4"),
-    ("nocturne", "Nocturne", 2024, 7.8, "1h 52m", "Animation,Crime,Thriller", "A detective investigates a string of elegant crimes committed at midnight.", "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1800&q=85", "/videos/nocturne.mp4"),
+    ("drive-videoplayback", "Shin Cậu Bé Bút Chì: Chuyến phiêu lưu kỳ thú", 2026, 8.8, "7m 25s", "Animation,Comedy,Adventure,Family", "Tập phim Shin Cậu Bé Bút Chì phát từ Google Drive.", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1800&q=85", "/api/media/stream/ast-drive-videoplayback"),
+    ("the-last-orbit", "The Last Orbit", 2026, 8.7, "2h 14m", "Animation,Sci-Fi,Drama", "Một nữ phi hành gia lần theo tín hiệu dẫn cô về nhà. Đó có thể là ký ức cuối cùng của một thế giới đã mất.", "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1800&q=85", "/videos/the-last-orbit.mp4"),
+    ("spirited-away", "Spirited Away", 2001, 8.6, "2h 05m", "Animation,Adventure,Family,Fantasy", "Một cô bé lạc vào nhà tắm của các linh hồn và phù thủy. Cô phải tìm cách cứu cha mẹ.", "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1800&q=85", "/videos/the-last-orbit.mp4"),
+    ("your-name", "Your Name", 2016, 8.4, "1h 46m", "Animation,Romance,Drama,Fantasy", "Hai thiếu niên phát hiện họ có thể hoán đổi thân xác dù sống ở những nơi và thời điểm khác nhau.", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1800&q=85", "/videos/afterlight.mp4"),
+    ("spider-verse", "Spider-Man: Into the Spider-Verse", 2018, 8.4, "1h 57m", "Animation,Action,Adventure,Sci-Fi", "Miles Morales trở thành Người Nhện và gặp năm Người Nhện đến từ các chiều không gian khác.", "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=1800&q=85", "/videos/glass-horizon.mp4"),
+    ("isle-of-dogs", "Isle of Dogs", 2018, 7.8, "1h 41m", "Animation,Adventure,Comedy,Drama", "Một cậu bé ở Nhật Bản đến đảo rác để tìm Spots, chú chó bị đày khỏi thành phố.", "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1800&q=85", "/videos/deep-blue.mp4"),
+    ("coraline", "Coraline", 2009, 7.7, "1h 40m", "Animation,Drama,Family,Fantasy,Horror", "Coraline, 11 tuổi, tìm thấy một thế giới giống nhà mình đến kỳ lạ. Nơi tưởng chừng hoàn hảo ấy che giấu những bí mật đáng sợ.", "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1800&q=85", "/videos/nocturne.mp4"),
+    ("fantasia-1940", "Fantasia", 1940, 7.7, "2h 05m", "Animation,Family,Fantasy,Musical", "Tuyển tập hoạt hình lấy cảm hứng từ các tác phẩm nhạc cổ điển phương Tây.", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1800&q=85", "/videos/quiet-places.mp4"),
+    ("afterlight", "Afterlight", 2025, 8.3, "1h 58m", "Animation,Drama,Mystery", "Trong thành phố chìm trong đêm, một nhiếp ảnh gia lần theo tia nắng duy nhất.", "https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=1800&q=85", "/videos/afterlight.mp4"),
+    ("glass-horizon", "Glass Horizon", 2026, 8.1, "2h 06m", "Animation,Thriller,Sci-Fi", "Một kiến trúc sư được giao thiết kế một thành phố mà cư dân không thể rời đi.", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=85", "/videos/glass-horizon.mp4"),
+    ("deep-blue", "Deep Blue", 2024, 7.9, "1h 46m", "Animation,Adventure,Drama", "Hai chị em xa cách cùng vượt qua vùng biển chưa có trên bản đồ để tìm cha.", "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=1800&q=85", "/videos/deep-blue.mp4"),
+    ("quiet-places", "Quiet Places", 2025, 8.5, "2h 01m", "Animation,Romance,Drama", "Một nữ nhạc sĩ trở về thị trấn từng bỏ đi và tìm lại một ca khúc cũ.", "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1800&q=85", "/videos/quiet-places.mp4"),
+    ("nocturne", "Nocturne", 2024, 7.8, "1h 52m", "Animation,Crime,Thriller", "Một thám tử điều tra chuỗi vụ án xảy ra đúng nửa đêm.", "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85", "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1800&q=85", "/videos/nocturne.mp4"),
 ]
 
 
@@ -1032,6 +1036,7 @@ def import_catalog_package(db, data: dict) -> dict:
                 db.add(m)
                 existing_movies[sid] = m
     counts["series"] = len(series_list)
+    db.flush()
 
     if seasons:
         ids = [sea["id"] for sea in seasons if "id" in sea]
@@ -1095,6 +1100,7 @@ def import_catalog_package(db, data: dict) -> dict:
                 db.add(m)
                 existing_movies[ep_id] = m
     counts["episodes"] = len(episodes)
+    db.flush()
 
     segments = data.get("segments") or []
     if segments:
@@ -1150,6 +1156,14 @@ def import_catalog_package(db, data: dict) -> dict:
         existing_cat_assets = {row.id: row for row in db.query(CatalogMediaAsset).filter(CatalogMediaAsset.id.in_(ids)).all()} if ids else {}
         existing_leg_assets = {row.id: row for row in db.query(MediaAsset).filter(MediaAsset.id.in_(ids)).all()} if ids else {}
         for ma in media_assets:
+            cov = ma.get("coverage") or []
+            movie_id = cov[0].get("episode_id", ma["id"]) if isinstance(cov, list) and cov else ma["id"]
+            if movie_id not in existing_movies:
+                movie = Movie(id=movie_id, title=f"Phim liên kết {ma['id']}", release_year=2026, rating=0.0, genres="Animation")
+                db.add(movie)
+                existing_movies[movie_id] = movie
+        db.flush()
+        for ma in media_assets:
             mid = ma["id"]
             storage = ma.get("storage") or {}
             p_str = str(storage.get("provider") or "local").lower()
@@ -1183,10 +1197,6 @@ def import_catalog_package(db, data: dict) -> dict:
 
             cov = ma.get("coverage") or []
             movie_id = cov[0].get("episode_id", mid) if isinstance(cov, list) and cov else mid
-            if movie_id not in existing_movies:
-                m = Movie(id=movie_id, title=f"Phim liên kết {mid}", release_year=2026, rating=0.0, genres="Animation")
-                db.add(m)
-                existing_movies[movie_id] = m
             legacy = existing_leg_assets.get(mid)
             if not legacy:
                 legacy = MediaAsset(id=mid)
@@ -1203,6 +1213,7 @@ def import_catalog_package(db, data: dict) -> dict:
             legacy.is_public = entity.access_policy.lower() == "public"
             legacy.is_available = entity.enabled
     counts["mediaAssets"] = len(media_assets)
+    db.flush()
 
     tracks = data.get("text_tracks") or []
     if tracks:

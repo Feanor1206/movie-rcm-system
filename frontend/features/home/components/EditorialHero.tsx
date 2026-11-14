@@ -1,5 +1,7 @@
 'use client';
 
+import { formatRuntime, genreLabel, movieSynopsis } from '@/lib/labels';
+
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -31,14 +33,14 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
       ? `Chưa xác nhận lưu • Thử lưu lại ${movie.title} vào danh sách xem`
       : `Chưa xác nhận xóa • Thử xóa lại ${movie.title} khỏi danh sách xem`
     : inWatchlist
-    ? 'Xóa khỏi Watchlist'
-    : 'Thêm vào Watchlist';
+    ? 'Xóa khỏi danh sách xem'
+    : 'Thêm vào danh sách xem';
 
   const hasBackdrop = Boolean(movie.backdrop && movie.backdrop.trim() && !backdropError);
 
   return (
     <section className="relative min-h-[420px] sm:min-h-[500px] lg:min-h-[560px] flex items-center overflow-hidden border-b border-surface-border bg-background">
-      {/* 1. Backdrop Image Layer - z-0 with vivid visibility */}
+
       <div className="absolute inset-0 z-0 h-full w-full">
         {hasBackdrop ? (
           <Image
@@ -56,15 +58,13 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
           </div>
         )}
 
-        {/* 2. Directional gradient overlays for maximum text legibility & gentle fade */}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/40 sm:via-background/80 sm:to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/50" />
       </div>
 
-      {/* 3. Foreground Text & Controls - z-10 */}
       <div className="page-shell relative z-10 py-10 sm:py-16 lg:py-20">
         <div className="max-w-2xl">
-          {/* Metadata Line */}
+
           <div className="flex items-center gap-3 text-xs font-semibold tracking-wider text-zinc-300">
             <span className="text-brand font-bold uppercase tracking-wider">Hoạt hình tiêu điểm</span>
             <span className="text-zinc-600">•</span>
@@ -75,24 +75,20 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
             <span className="text-zinc-400">{movie.year}</span>
           </div>
 
-          {/* Main Title */}
           <h1 className="mt-2.5 text-3xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl drop-shadow-md">
             {movie.title}
           </h1>
 
-          {/* Quick Specs */}
           <div className="mt-2.5 flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
-            <span>{movie.runtime}</span>
+            <span>{formatRuntime(movie.runtime)}</span>
             <span className="text-zinc-600">•</span>
-            <span>{movie.genres.join(', ')}</span>
+            <span>{movie.genres.map(genreLabel).join(', ')}</span>
           </div>
 
-          {/* Synopsis */}
           <p className="mt-3.5 max-w-xl text-xs sm:text-sm leading-relaxed text-zinc-200 line-clamp-3 sm:line-clamp-none drop-shadow">
-            {movie.description}
+            {movieSynopsis(movie.description)}
           </p>
 
-          {/* Action CTAs */}
           <div className="mt-6 flex flex-wrap items-center gap-2.5 sm:gap-3">
             <Link
               href={`/movies/${movie.id}`}
@@ -134,10 +130,10 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
               ) : inWatchlist ? (
                 <>
                   <Check size={15} className="text-brand" />
-                  <span>Đã lưu Watchlist</span>
+                  <span>Đã lưu vào danh sách xem</span>
                 </>
               ) : (
-                '+ Thêm vào Watchlist'
+                'Thêm vào danh sách xem'
               )}
             </button>
 

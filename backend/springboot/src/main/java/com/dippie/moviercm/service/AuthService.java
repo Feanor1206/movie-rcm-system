@@ -66,11 +66,11 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest registerRequest) {
         if (userRepository.existsByUsername(registerRequest.getUsername())) {
-            throw new IllegalArgumentException("Username is already taken!");
+            throw new IllegalArgumentException("Tên đăng nhập đã được dùng.");
         }
 
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
-            throw new IllegalArgumentException("Email is already in use!");
+            throw new IllegalArgumentException("Email đã được dùng.");
         }
 
         User user = User.builder()
@@ -83,7 +83,6 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Auto login after registration
         return login(new AuthRequest(registerRequest.getUsername(), registerRequest.getPassword()));
     }
 

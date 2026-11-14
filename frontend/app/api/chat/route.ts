@@ -8,8 +8,8 @@ type HistoryMessage = { role: 'user' | 'assistant'; content: string };
 function unavailable(status: number) {
   return NextResponse.json({
     text: status === 429
-      ? 'CineBot đang bận. Bạn thử lại sau một chút nhé.'
-      : 'CineBot hiện chưa sẵn sàng. Bạn vẫn có thể tìm phim trong Kho phim nhé.',
+      ? 'CineBot đang bận. Thử lại sau.'
+      : 'CineBot đang gián đoạn. Bạn có thể tìm trong Kho phim.',
     recommendedMovies: [], followUps: [], structuredIntent: null, pipelineStages: {},
   }, { status });
 }
