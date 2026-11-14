@@ -158,6 +158,14 @@ function Get-PreviewRuntimeContract {
         $springEnvironment["SPRING_DATASOURCE_USERNAME"] = if ($env:MYSQL_USER) { $env:MYSQL_USER } else { "root" }
         $springEnvironment["SPRING_DATASOURCE_PASSWORD"] = if ($env:MYSQL_PASSWORD) { $env:MYSQL_PASSWORD } else { "" }
     }
+    $jwtSecret = $env:APP_JWT_SECRET
+    if (-not $jwtSecret) {
+        $jwtBytes = New-Object byte[] 32
+        $jwtGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $jwtGenerator.GetBytes($jwtBytes) } finally { $jwtGenerator.Dispose() }
+        $jwtSecret = [Convert]::ToBase64String($jwtBytes)
+    }
+    $springEnvironment["APP_JWT_SECRET"] = $jwtSecret
     $springEnvironment["APP_CATALOG_SNAPSHOT_PATH"] = Join-Path $DataDirectory "committed_catalog_snapshot.json"
     $springEnvironment["APP_CATALOG_SYNC_URL"] = $syncUrl
     $springEnvironment["CATALOG_SYNC_TOKEN"] = $syncToken
@@ -179,6 +187,8 @@ function Get-PreviewRuntimeContract {
     $fastApiEnvironment["PORT"] = [string]$FastApiPort
     $fastApiEnvironment["CATALOG_SYNC_TOKEN"] = $syncToken
     $fastApiEnvironment["FASTAPI_SYNC_SECRET"] = $syncToken
+    $fastApiEnvironment["APP_JWT_SECRET"] = $jwtSecret
+    $fastApiEnvironment["APP_DEMO_MODE"] = "true"
     $fastApiEnvironment["MODEL_MODE"] = $ModelMode
     $fastApiEnvironment["SERVING_MODE"] = $ModelMode
     $fastApiEnvironment["SYNC_STATE_PATH"] = Join-Path $DataDirectory "catalog_sync_state.json"

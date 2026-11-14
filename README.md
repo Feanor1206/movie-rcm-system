@@ -28,6 +28,9 @@ cd ..
 ```
 
 ### 2. Khởi chạy MySQL 8.0 (Docker)
+
+Đặt `APP_JWT_SECRET` theo [hướng dẫn cấu hình](backend/fastapi/README.md#2-cấu-hình-biến-môi-trường) trước khi chạy Compose.
+
 ```powershell
 cd infrastructure
 docker compose up -d mysql
