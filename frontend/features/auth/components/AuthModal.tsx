@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Lock, User, Mail, Loader2, ArrowRight } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
@@ -19,26 +19,16 @@ export function AuthModal() {
   const modalRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Manage body scroll lock, focus trapping, Escape key, and focus restore (M3 A11y)
   useEffect(() => {
     if (!isAuthModalOpen) return;
-
-    // Save previous active element to restore focus upon closing (only if outside modal)
     if (document.activeElement && (!modalRef.current || !modalRef.current.contains(document.activeElement))) {
       openerRef.current = document.activeElement as HTMLElement | null;
     }
-
-    // Lock background body scroll
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
-    // Auto-focus first input field after animation frame
     const timer = setTimeout(() => {
       firstInputRef.current?.focus();
     }, 50);
-
-    // Trap focus inside modal and handle Escape key
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isSubmitting) {
         e.preventDefault();
@@ -101,7 +91,7 @@ export function AuthModal() {
       if (isLogin) {
         const res = await login(username, password);
         if (res.success) {
-          showToast('Đăng nhập thành công! Chào mừng bạn trở lại.');
+          showToast('Đăng nhập thành công.');
           closeAuthModal();
         } else {
           setError(res.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.');
@@ -109,7 +99,7 @@ export function AuthModal() {
       } else {
         const res = await register(username, email, password, fullName);
         if (res.success) {
-          showToast('Đăng ký tài khoản thành công!');
+          showToast('Đăng ký thành công.');
           closeAuthModal();
         } else {
           setError(res.message || 'Đăng ký không thành công. Vui lòng thử lại.');
@@ -131,34 +121,33 @@ export function AuthModal() {
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
     >
       <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-surface-border bg-surface p-6 sm:p-8 shadow-2xl">
-        {/* Close Button */}
+
         <button
           type="button"
           onClick={closeAuthModal}
           disabled={isSubmitting}
           className="absolute right-3 top-3 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-muted hover:bg-surface-elevated hover:text-ink transition-colors cursor-pointer disabled:opacity-50"
-          aria-label="Đóng popup"
+          aria-label="Đóng cửa sổ"
         >
           <X size={20} />
         </button>
 
-        {/* Brand Header */}
+
         <div className="mb-6">
           <div className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-ink">
             <span className="tracking-tighter font-extrabold text-2xl">DIPPIE</span>
-            <span className="h-2 w-2 rounded-full bg-brand shadow-brand-sm" />
           </div>
           <h2 id="auth-modal-title" className="mt-2 text-xl font-bold tracking-tight text-ink">
             {isLogin ? 'Đăng nhập tài khoản' : 'Tạo tài khoản mới'}
           </h2>
           <p className="mt-1 text-xs text-muted">
             {isLogin
-              ? 'Lưu trữ Watchlist và đồng bộ điểm đánh giá phim của bạn'
-              : 'Tham gia khám phá phim hoạt hình và nhận đề xuất cá nhân hóa'}
+              ? 'Lưu danh sách xem và điểm đánh giá.'
+              : 'Tạo tài khoản để lưu danh sách và điểm đánh giá.'}
           </p>
         </div>
 
-        {/* Tab Switcher */}
+
         <div className="grid grid-cols-2 gap-1 rounded-lg border border-surface-border bg-surface-muted p-1 mb-6">
           <button
             type="button"
@@ -188,14 +177,14 @@ export function AuthModal() {
           </button>
         </div>
 
-        {/* Error Alert */}
+
         {error && (
           <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-400 leading-relaxed">
             {error}
           </div>
         )}
 
-        {/* Form */}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
@@ -203,7 +192,7 @@ export function AuthModal() {
                 Họ và tên
               </label>
               <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
-                <User size={15} className="text-muted mr-2 shrink-0" />
+
                 <input
                   id="auth-full-name"
                   ref={!isLogin ? firstInputRef : undefined}
@@ -223,7 +212,7 @@ export function AuthModal() {
               {isLogin ? 'Tên đăng nhập hoặc Email' : 'Tên đăng nhập'}
             </label>
             <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
-              <User size={15} className="text-muted mr-2 shrink-0" />
+
               <input
                 id="auth-username"
                 ref={isLogin ? firstInputRef : undefined}
@@ -246,7 +235,7 @@ export function AuthModal() {
                 Email
               </label>
               <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
-                <Mail size={15} className="text-muted mr-2 shrink-0" />
+
                 <input
                   id="auth-email"
                   type="email"
@@ -267,7 +256,7 @@ export function AuthModal() {
               Mật khẩu
             </label>
             <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
-              <Lock size={15} className="text-muted mr-2 shrink-0" />
+
               <input
                 id="auth-password"
                 data-testid="login-password-input"
@@ -296,11 +285,11 @@ export function AuthModal() {
               </span>
             ) : isLogin ? (
               <span className="flex items-center gap-1.5">
-                Đăng nhập <ArrowRight size={14} />
+                Đăng nhập
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
-                Tạo tài khoản <ArrowRight size={14} />
+                Tạo tài khoản
               </span>
             )}
           </button>

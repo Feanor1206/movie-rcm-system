@@ -15,14 +15,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Service providing catalog querying, search, detail retrieval, and self-contained eligible snapshots.
- * Enforces unified publication policy cascading (G4):
- * - Deny-by-default: only record status == 'ready' is considered published.
- * - Parent cascade: draft/archived series excludes child seasons, episodes, segments, scenes.
- * - Draft/archived episode excludes child segments and scenes.
- * - Private/disabled media assets exclude linked scenes and text tracks from public views and snapshots.
- */
 @Service
 public class CatalogQueryService {
 
@@ -68,10 +60,6 @@ public class CatalogQueryService {
         this.sceneRepository = sceneRepository;
     }
 
-    /**
-     * Strict publication check (G4): deny-by-default.
-     * Only returns true if record_json is present, parses cleanly, has 'status', and status is 'ready'.
-     */
     public boolean isPublished(String recordJson) {
         if (recordJson == null || recordJson.isBlank()) return false;
         if (!recordJson.contains("ready") && !recordJson.contains("READY")) return false;
@@ -158,7 +146,6 @@ public class CatalogQueryService {
             scenes = scenes.stream().filter(sc -> isPublished(sc.getRecordJson())).toList();
         }
 
-        // Find media assets covering this episode
         List<CatalogMediaAsset> allAssets = mediaAssetRepository.findByEnabledTrue();
         List<CatalogMediaAsset> matchingAssets = new ArrayList<>();
         Set<String> privateAssetIds = new HashSet<>();
@@ -205,8 +192,31 @@ public class CatalogQueryService {
         List<CatalogSearchResult> results = new ArrayList<>();
         boolean admin = isUserAdmin();
 
-        // 1. Search series
         List<CatalogSeries> matchedSeries = seriesRepository.searchSeries(q);
+        List<CatalogEpisode> matchedEpisodes = episodeRepository.searchEpisodes(q);
+        List<CatalogSegment> matchedSegments = segmentRepository.searchSegments(q);
+        List<CatalogScene> matchedScenes = sceneRepository.searchScenes(q);
+
+        Set<String> episodeIds = new HashSet<>();
+        matchedSegments.stream().map(CatalogSegment::getEpisodeId).filter(Objects::nonNull).forEach(episodeIds::add);
+        matchedScenes.stream().map(CatalogScene::getEpisodeId).filter(Objects::nonNull).forEach(episodeIds::add);
+        Map<String, CatalogEpisode> parentEpisodes = episodeRepository.findAllById(episodeIds).stream()
+                .collect(Collectors.toMap(CatalogEpisode::getId, ep -> ep));
+
+        Map<String, CatalogSeries> parentSeries = Collections.emptyMap();
+        Map<String, CatalogMediaAsset> assets = Collections.emptyMap();
+        if (!admin) {
+            Set<String> seriesIds = new HashSet<>();
+            matchedEpisodes.stream().map(CatalogEpisode::getSeriesId).filter(Objects::nonNull).forEach(seriesIds::add);
+            parentEpisodes.values().stream().map(CatalogEpisode::getSeriesId).filter(Objects::nonNull).forEach(seriesIds::add);
+            parentSeries = seriesRepository.findAllById(seriesIds).stream()
+                    .collect(Collectors.toMap(CatalogSeries::getId, series -> series));
+            Set<String> assetIds = matchedScenes.stream().map(CatalogScene::getMediaAssetId)
+                    .filter(Objects::nonNull).collect(Collectors.toSet());
+            assets = mediaAssetRepository.findAllById(assetIds).stream()
+                    .collect(Collectors.toMap(CatalogMediaAsset::getId, asset -> asset));
+        }
+
         for (CatalogSeries s : matchedSeries) {
             if (!admin && !isPublished(s.getRecordJson())) {
                 continue;
@@ -225,15 +235,13 @@ public class CatalogQueryService {
             ));
         }
 
-        // 2. Search episodes
-        List<CatalogEpisode> matchedEpisodes = episodeRepository.searchEpisodes(q);
         for (CatalogEpisode ep : matchedEpisodes) {
             if (!admin) {
                 if (!isPublished(ep.getRecordJson())) {
                     continue;
                 }
                 if (ep.getSeriesId() != null) {
-                    CatalogSeries s = seriesRepository.findById(ep.getSeriesId()).orElse(null);
+                    CatalogSeries s = parentSeries.get(ep.getSeriesId());
                     if (s == null || !isPublished(s.getRecordJson())) {
                         continue;
                     }
@@ -253,8 +261,6 @@ public class CatalogQueryService {
             ));
         }
 
-        // 3. Search segments
-        List<CatalogSegment> matchedSegments = segmentRepository.searchSegments(q);
         for (CatalogSegment seg : matchedSegments) {
             if (!admin && !isPublished(seg.getRecordJson())) {
                 continue;
@@ -262,7 +268,7 @@ public class CatalogQueryService {
             String seriesId = null;
             String parentTitle = seg.getEpisodeId();
             if (seg.getEpisodeId() != null) {
-                Optional<CatalogEpisode> parentEp = episodeRepository.findById(seg.getEpisodeId());
+                Optional<CatalogEpisode> parentEp = Optional.ofNullable(parentEpisodes.get(seg.getEpisodeId()));
                 if (parentEp.isPresent()) {
                     if (!admin && !isPublished(parentEp.get().getRecordJson())) {
                         continue;
@@ -270,7 +276,7 @@ public class CatalogQueryService {
                     seriesId = parentEp.get().getSeriesId();
                     parentTitle = parentEp.get().getTitle();
                     if (!admin && seriesId != null) {
-                        CatalogSeries s = seriesRepository.findById(seriesId).orElse(null);
+                        CatalogSeries s = parentSeries.get(seriesId);
                         if (s == null || !isPublished(s.getRecordJson())) {
                             continue;
                         }
@@ -293,8 +299,6 @@ public class CatalogQueryService {
             ));
         }
 
-        // 4. Search scenes
-        List<CatalogScene> matchedScenes = sceneRepository.searchScenes(q);
         for (CatalogScene sc : matchedScenes) {
             if (!admin && !isPublished(sc.getRecordJson())) {
                 continue;
@@ -302,7 +306,7 @@ public class CatalogQueryService {
             String seriesId = null;
             String parentTitle = sc.getEpisodeId();
             if (sc.getEpisodeId() != null) {
-                Optional<CatalogEpisode> parentEp = episodeRepository.findById(sc.getEpisodeId());
+                Optional<CatalogEpisode> parentEp = Optional.ofNullable(parentEpisodes.get(sc.getEpisodeId()));
                 if (parentEp.isPresent()) {
                     if (!admin && !isPublished(parentEp.get().getRecordJson())) {
                         continue;
@@ -310,7 +314,7 @@ public class CatalogQueryService {
                     seriesId = parentEp.get().getSeriesId();
                     parentTitle = parentEp.get().getTitle();
                     if (!admin && seriesId != null) {
-                        CatalogSeries s = seriesRepository.findById(seriesId).orElse(null);
+                        CatalogSeries s = parentSeries.get(seriesId);
                         if (s == null || !isPublished(s.getRecordJson())) {
                             continue;
                         }
@@ -320,7 +324,7 @@ public class CatalogQueryService {
                 }
             }
             if (!admin && sc.getMediaAssetId() != null) {
-                Optional<CatalogMediaAsset> assetOpt = mediaAssetRepository.findById(sc.getMediaAssetId());
+                Optional<CatalogMediaAsset> assetOpt = Optional.ofNullable(assets.get(sc.getMediaAssetId()));
                 if (assetOpt.isPresent()) {
                     CatalogMediaAsset ma = assetOpt.get();
                     if ("private".equalsIgnoreCase(ma.getAccessPolicy()) || (ma.getEnabled() != null && !ma.getEnabled())) {
@@ -345,15 +349,10 @@ public class CatalogQueryService {
         return results;
     }
 
-    /**
-     * Builds full self-contained snapshot from eligible committed database entities (G4).
-     * Guarantees reference integrity: no dangling text tracks, scenes, characters, or sources.
-     */
     public Map<String, Object> exportEligibleSnapshot(boolean includeDraft, boolean includePrivate) {
         Map<String, Object> export = new LinkedHashMap<>();
         export.put("schema_version", "dippie.catalog.v1");
 
-        // Package header
         List<CatalogPackage> packages = packageRepository.findAll();
         Map<String, Object> pkgMap = new LinkedHashMap<>();
         if (!packages.isEmpty()) {
@@ -378,13 +377,11 @@ public class CatalogQueryService {
         }
         export.put("package", pkgMap);
 
-        // 1. Series
         List<CatalogSeries> allSeries = seriesRepository.findAll();
         List<CatalogSeries> eligibleSeries = includeDraft ? allSeries
                 : allSeries.stream().filter(s -> isPublished(s.getRecordJson())).toList();
         Set<String> eligibleSeriesIds = eligibleSeries.stream().map(CatalogSeries::getId).collect(Collectors.toSet());
 
-        // 2. Seasons (cascade parent series)
         List<CatalogSeason> allSeasons = seasonRepository.findAll();
         List<CatalogSeason> eligibleSeasons = allSeasons.stream()
                 .filter(sea -> eligibleSeriesIds.contains(sea.getSeriesId()))
@@ -392,7 +389,6 @@ public class CatalogQueryService {
                 .toList();
         Set<String> eligibleSeasonIds = eligibleSeasons.stream().map(CatalogSeason::getId).collect(Collectors.toSet());
 
-        // 3. Episodes (cascade parent series & season)
         List<CatalogEpisode> allEpisodes = episodeRepository.findAll();
         List<CatalogEpisode> eligibleEpisodes = allEpisodes.stream()
                 .filter(ep -> eligibleSeriesIds.contains(ep.getSeriesId()))
@@ -401,7 +397,6 @@ public class CatalogQueryService {
                 .toList();
         Set<String> eligibleEpisodeIds = eligibleEpisodes.stream().map(CatalogEpisode::getId).collect(Collectors.toSet());
 
-        // 4. Segments (cascade parent episode)
         List<CatalogSegment> allSegments = segmentRepository.findAll();
         List<CatalogSegment> eligibleSegments = allSegments.stream()
                 .filter(seg -> eligibleEpisodeIds.contains(seg.getEpisodeId()))
@@ -409,7 +404,6 @@ public class CatalogQueryService {
                 .toList();
         Set<String> eligibleSegmentIds = eligibleSegments.stream().map(CatalogSegment::getId).collect(Collectors.toSet());
 
-        // 5. Media Assets (cascade policy & enabled status & coverage of eligible episodes)
         List<CatalogMediaAsset> allAssets = mediaAssetRepository.findAll();
         List<CatalogMediaAsset> eligibleAssets = allAssets.stream()
                 .filter(a -> includePrivate || (!"private".equalsIgnoreCase(a.getAccessPolicy()) && (a.getEnabled() == null || a.getEnabled())))
@@ -417,14 +411,12 @@ public class CatalogQueryService {
                 .toList();
         Set<String> eligibleAssetIds = eligibleAssets.stream().map(CatalogMediaAsset::getId).collect(Collectors.toSet());
 
-        // 6. Text Tracks (strictly self-contained: only tracks belonging to eligible assets)
         List<CatalogTextTrack> allTracks = textTrackRepository.findAll();
         List<CatalogTextTrack> eligibleTextTracks = allTracks.stream()
                 .filter(tt -> eligibleAssetIds.contains(tt.getMediaAssetId()))
                 .filter(tt -> includeDraft || isPublished(tt.getRecordJson()))
                 .toList();
 
-        // 7. Scenes (cascade parent episode and media asset)
         List<CatalogScene> allScenes = sceneRepository.findAll();
         List<CatalogScene> eligibleScenes = allScenes.stream()
                 .filter(sc -> eligibleEpisodeIds.contains(sc.getEpisodeId()))
@@ -433,7 +425,6 @@ public class CatalogQueryService {
                 .filter(sc -> includeDraft || isPublished(sc.getRecordJson()))
                 .toList();
 
-        // 8. Collect referenced character IDs across eligible entities to preserve self-containment
         Set<String> referencedCharIds = new HashSet<>();
         for (CatalogSeries s : eligibleSeries) {
             extractIdsFromJson(s.getCharacterIdsJson(), referencedCharIds);
