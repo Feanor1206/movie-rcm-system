@@ -45,6 +45,18 @@ def test_exports_real_fp32_and_int8_onnx_with_dynamic_shapes(tmp_path, monkeypat
             super().__init__()
             self.embedding = torch.nn.Embedding(4, 4)
             self.dense = torch.nn.Linear(4, 3, bias=False)
+            with torch.no_grad():
+                self.embedding.weight.copy_(torch.tensor([
+                    [0.2, 0.4, 0.6, 0.8],
+                    [0.0, 0.0, 0.0, 0.0],
+                    [1.0, 0.2, 0.5, 0.3],
+                    [0.1, 0.9, 0.3, 0.6],
+                ]))
+                self.dense.weight.copy_(torch.tensor([
+                    [1.0, 0.1, 0.2, 0.0],
+                    [0.1, 0.8, 0.0, 0.2],
+                    [0.0, 0.2, 0.7, 0.3],
+                ]))
 
         def forward(self, input_ids, attention_mask):
             features = self.embedding(input_ids) * attention_mask.unsqueeze(-1)
@@ -64,4 +76,5 @@ def test_exports_real_fp32_and_int8_onnx_with_dynamic_shapes(tmp_path, monkeypat
     texts = ["xin chào", "chào xin xin", "xin"]
     expected, actual = fp32.encode_documents(texts), int8.encode_documents(texts)
     assert expected.shape == actual.shape == (3, 3)
+    assert not np.allclose(expected[0], expected[1])
     assert np.min(np.sum(expected * actual, axis=1)) > 0.99
