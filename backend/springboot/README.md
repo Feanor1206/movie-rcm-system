@@ -28,6 +28,8 @@ cd ../backend/springboot
 - Server chạy tại: [http://localhost:8080](http://localhost:8080)
 - Cơ sở dữ liệu mặc định: `jdbc:mysql://localhost:3306/movie_rcm_db`
 
+Đặt `APP_MEDIA_DRIVE_MOUNT` thành thư mục hoặc ổ đĩa đã gắn Google Drive để phát video. Giới hạn mặc định là 10 kết nối HTTP phát Drive, chỉnh qua `APP_MEDIA_MAX_CONCURRENT_DRIVE_STREAMS`. Khi tua, trình duyệt có thể mở kết nối mới trước khi đóng kết nối cũ.
+
 ---
 
 ### 2. Chạy kiểm thử tự động với profile `test` (H2 In-Memory ở chế độ tương thích MySQL)

@@ -1,7 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from stat import FILE_ATTRIBUTE_REPARSE_POINT
 import sys
 from threading import Barrier
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -110,6 +112,66 @@ def test_stream_contains_existing_media_paths(catalog_client, provider):
         db.get(MediaAsset, "ast-orbit-feat").relative_path = "inside.mp4"
         db.commit()
     assert client.get(url).content == b"inside"
+
+
+def test_drive_stream_accepts_catalog_path_relative_to_parent_of_mount(catalog_client):
+    client, _, database = catalog_client
+    with database.session() as db:
+        asset = db.get(MediaAsset, "ast-orbit-feat")
+        asset.storage_provider = "drive"
+        asset.relative_path = "VideoDieppie/inside.mp4"
+        db.commit()
+    result = client.get("/api/media/stream/ast-orbit-feat", headers={"Range": "bytes=1-3"})
+    assert result.status_code == 206
+    assert result.headers["content-range"] == "bytes 1-3/6"
+    assert result.content == b"nsi"
+
+
+@pytest.mark.parametrize("reparse_point", [False, True])
+def test_drive_stream_checks_containment_when_mount_has_no_canonical_paths(catalog_client, tmp_path, monkeypatch, reparse_point):
+    client, _, database = catalog_client
+    root = tmp_path / "media"
+    folder = root / "series"
+    folder.mkdir()
+    (folder / "inside.mp4").write_bytes(b"inside")
+    with database.session() as db:
+        asset = db.get(MediaAsset, "ast-orbit-feat")
+        asset.storage_provider = "drive"
+        asset.relative_path = "VideoDieppie/series/inside.mp4"
+        db.commit()
+
+    resolve = Path.resolve
+    lstat = Path.lstat
+
+    def resolve_without_drive_volume(path, *args, **kwargs):
+        if path == root:
+            error = OSError("Volume name unavailable")
+            error.winerror = 1005
+            raise error
+        return resolve(path, *args, **kwargs)
+
+    def flag_junction(path):
+        info = lstat(path)
+        if reparse_point and path == folder:
+            return SimpleNamespace(st_mode=info.st_mode, st_file_attributes=FILE_ATTRIBUTE_REPARSE_POINT)
+        return info
+
+    monkeypatch.setattr(Path, "resolve", resolve_without_drive_volume)
+    monkeypatch.setattr(Path, "lstat", flag_junction)
+    result = client.get("/api/media/stream/ast-orbit-feat", headers={"Range": "bytes=1-3"})
+    if reparse_point:
+        assert result.status_code == 404
+    else:
+        assert result.status_code == 206
+        assert result.content == b"nsi"
+
+
+def test_drive_volume_fallback_rejects_rooted_path_after_prefix_removal(tmp_path):
+    video = tmp_path / "outside.mp4"
+    video.write_bytes(b"outside")
+    root = tmp_path / "mount"
+    root.mkdir()
+    assert core_api._drive_file_without_volume_path(root, video.as_posix()) is None
 
 
 def test_stream_rejects_links_outside_media_root(catalog_client, tmp_path):
