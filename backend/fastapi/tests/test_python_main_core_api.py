@@ -13,6 +13,7 @@ if str(ROOT / "backend" / "fastapi") not in sys.path:
     sys.path.insert(0, str(ROOT / "backend" / "fastapi"))
 
 from main import create_app
+from routers import core_api
 from services.database import CatalogSnapshot, MediaAsset
 
 
@@ -124,6 +125,20 @@ def test_stream_rejects_links_outside_media_root(catalog_client, tmp_path):
         db.get(MediaAsset, "ast-orbit-feat").relative_path = "link.mp4"
         db.commit()
     assert client.get("/api/media/stream/ast-orbit-feat").status_code == 404
+
+
+def test_media_root_works_with_a_flat_container_layout(tmp_path, monkeypatch):
+    monkeypatch.delenv("APP_MEDIA_ROOT", raising=False)
+    app_root = Path(Path.cwd().anchor) / "app"
+    monkeypatch.setattr(core_api, "__file__", str(app_root / "routers/core_api.py"))
+    monkeypatch.setattr(core_api, "ROOT", app_root, raising=False)
+    monkeypatch.chdir(tmp_path)
+    media = tmp_path / "media"
+    media.mkdir()
+    video = media / "inside.mp4"
+    video.write_bytes(b"inside")
+    asset = MediaAsset(relative_path="inside.mp4", storage_provider="local")
+    assert core_api._resolve_media_file(asset) == video.resolve()
 
 
 @pytest.mark.parametrize("endpoint", ["validate", "import"])
