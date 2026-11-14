@@ -108,13 +108,20 @@ try {
     Assert-Equal "http://127.0.0.1:1/api/chat" $contract.FrontendEnvironment["NEXT_PUBLIC_MODEL_API_URL"] "ModelMode off client chat endpoint changed."
     Assert-Equal "" $contract.SpringEnvironment["CATALOG_SYNC_TOKEN"] "ModelMode off must not inherit or create a sync secret."
     Assert-Equal "http://127.0.0.1:1/api/index/sync" $contract.SpringEnvironment["APP_CATALOG_SYNC_URL"] "ModelMode off sync target must be unavailable."
-    Assert-True ($contract.SpringEnvironment["SPRING_DATASOURCE_URL"] -match "/preview_db;") "Preview H2 must use its isolated preview_db filename."
+    if ($env:SPRING_DATASOURCE_URL) {
+        Assert-Equal $env:SPRING_DATASOURCE_URL $contract.SpringEnvironment["SPRING_DATASOURCE_URL"] "Preview must preserve an explicit datasource."
+    } else {
+        Assert-True ($contract.SpringEnvironment["SPRING_DATASOURCE_URL"] -like "jdbc:mysql://*") "Preview must use MySQL by default."
+    }
     Assert-Equal ([System.IO.Path]::GetFullPath((Join-Path $dataDirectory "committed_catalog_snapshot.json"))) $contract.SpringEnvironment["APP_CATALOG_SNAPSHOT_PATH"] "Catalog snapshot must stay under the preview data directory."
     $offPorts = Get-PreviewPortsToCheck -ModelMode off -SpringPort 18080 -FastApiPort 18000 -FrontendPort 13000
     Assert-Equal "18080,13000" (@($offPorts | ForEach-Object { $_.Port }) -join ",") "ModelMode off must not probe the FastAPI port."
 
     $lightContract = Get-PreviewRuntimeContract -ModelMode light -SpringPort 18080 -FastApiPort 18000 -FrontendPort 13000 -DataDirectory $dataDirectory -SyncSecret "test-sync-secret"
     Assert-True $lightContract.StartFastApi "Explicit light mode must start FastAPI."
+    $previewKey = $lightContract.SpringEnvironment["APP_JWT_SECRET"]
+    Assert-Equal $previewKey $lightContract.FastApiEnvironment["APP_JWT_SECRET"] "Java and FastAPI must share the JWT key."
+    Assert-True (([Convert]::FromBase64String($previewKey)).Length -ge 32) "Preview JWT key must contain at least 32 bytes."
     Assert-Equal "test-sync-secret" $lightContract.SpringEnvironment["CATALOG_SYNC_TOKEN"] "Explicit model mode should retain the supplied sync token in child environment."
     Assert-Equal "http://127.0.0.1:18000/api/chat" $lightContract.FrontendEnvironment["MODEL_API_URL"] "Explicit model mode should route server chat to its selected FastAPI port."
     $springArguments = Get-SpringBootArguments -SpringPort 18080 -DriveMountPoint "X:" -JarFile "backend.jar"

@@ -8,6 +8,12 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $fastapiDir = Join-Path $root "backend\fastapi"
 if ($ServingMode -eq "full") { $ServingMode = "cloud" }
 
+if (-not $env:APP_JWT_SECRET) {
+    $jwtBytes = New-Object byte[] 32
+    $jwtGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $jwtGenerator.GetBytes($jwtBytes) } finally { $jwtGenerator.Dispose() }
+    $env:APP_JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
+}
 $env:PYTHONPATH = $fastapiDir
 $env:PORT = $Port
 $env:MODEL_MODE = $ServingMode

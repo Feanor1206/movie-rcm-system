@@ -38,6 +38,12 @@ $env:BACKEND_INTERNAL_URL = "http://127.0.0.1:$FastApiPort"
 $env:SPRINGBOOT_INTERNAL_URL = "http://127.0.0.1:$FastApiPort"
 $env:MODEL_API_URL = "http://127.0.0.1:$FastApiPort/api/chat"
 $env:MODEL_MODE = $ModelMode
+if (-not $env:APP_JWT_SECRET) {
+    $jwtBytes = New-Object byte[] 32
+    $jwtGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $jwtGenerator.GetBytes($jwtBytes) } finally { $jwtGenerator.Dispose() }
+    $env:APP_JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
+}
 $env:PYTHONPATH = $fastapiDir
 
 Write-Host "==========================================================================" -ForegroundColor Cyan

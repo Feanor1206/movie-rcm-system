@@ -1,6 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sys
+from threading import Barrier
 
+import pytest
 from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -10,6 +13,141 @@ if str(ROOT / "backend" / "fastapi") not in sys.path:
     sys.path.insert(0, str(ROOT / "backend" / "fastapi"))
 
 from main import create_app
+from routers import core_api
+from services.database import CatalogSnapshot, MediaAsset
+
+
+@pytest.fixture
+def catalog_client(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    (tmp_path / "canary.mp4").write_bytes(b"outside")
+    (media_root / "inside.mp4").write_bytes(b"inside")
+    monkeypatch.setenv("APP_MEDIA_ROOT", str(media_root))
+    monkeypatch.setenv("APP_MEDIA_DRIVE_MOUNT", str(media_root))
+    app = create_app(
+        sync_path=tmp_path / "sync.json",
+        cache_dir=tmp_path / "cache",
+        model_mode="light",
+        load_default=False,
+        database_url=f"sqlite:///{tmp_path / 'catalog.db'}",
+    )
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            login = client.post("/api/auth/login", json={"usernameOrEmail": "admin", "password": "password123"})
+            assert login.status_code == 200
+            headers = {"Authorization": f"Bearer {login.json()['data']['token']}"}
+            yield client, headers, app.state.runtime.db
+    finally:
+        app.state.runtime.db.engine.dispose()
+
+
+def test_catalog_import_rejects_older_packages_and_records_atomically(catalog_client):
+    client, headers, database = catalog_client
+    first = {"package": {"id": "catalog", "revision": 2}, "genres": [
+        {"id": "genre", "labels": {"vi": "Gia đình"}, "record": {"revision": 2}}
+    ]}
+    assert client.post("/api/admin/catalog/import", json=first, headers=headers).status_code == 200
+    for package_id, package_revision, record_revision in [("catalog", 1, 2), ("catalog", 3, 1), ("other", 3, 2)]:
+        genre = first["genres"][0] if package_revision == 1 else {
+            "id": "genre", "labels": {"vi": "Sai phiên bản"}, "record": {"revision": record_revision},
+        }
+        stale = {"package": {"id": package_id, "revision": package_revision}, "genres": [
+            genre, {"id": "new-genre", "labels": {"vi": "Chưa nhập"}},
+        ]}
+        preview = client.post("/api/admin/catalog/validate", json=stale, headers=headers)
+        assert preview.status_code == 200 and preview.json()["conflicts"] == 1
+        denied = client.post("/api/admin/catalog/import", json=stale, headers=headers)
+        assert denied.status_code == 409
+    exported = client.get("/api/admin/catalog/export", headers=headers).json()
+    assert exported["package"]["revision"] == 2
+    assert exported["genres"] == first["genres"]
+    with database.session() as db:
+        assert db.query(CatalogSnapshot).count() == 1
+
+
+def test_parallel_catalog_imports_cannot_commit_the_same_revision(catalog_client):
+    client, headers, database = catalog_client
+    barrier = Barrier(2)
+
+    def submit(label):
+        package = {"package": {"id": "parallel", "revision": 1}, "genres": [
+            {"id": "genre", "labels": {"vi": label}},
+        ]}
+        barrier.wait(timeout=5)
+        return client.post("/api/admin/catalog/import", json=package, headers=headers).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(submit, ["Gia đình", "Phiêu lưu"])) == [200, 409]
+    with database.session() as db:
+        assert db.query(CatalogSnapshot).count() == 1
+
+
+@pytest.mark.parametrize("relative_path", ["../canary.mp4", "..\\canary.mp4", "C:/canary.mp4", "/canary.mp4", "canary.mp4:stream"])
+def test_catalog_rejects_unsafe_media_paths_on_preview_and_import(catalog_client, relative_path):
+    client, headers, _ = catalog_client
+    package = {"package": {"id": "catalog", "revision": 1}, "media_assets": [
+        {"id": "outside", "storage": {"provider": "local", "relative_path": relative_path}},
+    ]}
+    preview = client.post("/api/admin/catalog/validate", json=package, headers=headers)
+    assert preview.status_code == 400
+    assert preview.json()["errors"][0]["path"] == "media_assets[0].storage.relative_path"
+    assert client.post("/api/admin/catalog/import", json=package, headers=headers).status_code == 400
+    assert client.get("/api/media/stream/outside").status_code == 404
+
+
+@pytest.mark.parametrize("provider", ["local", "drive"])
+def test_stream_contains_existing_media_paths(catalog_client, provider):
+    client, _, database = catalog_client
+    with database.session() as db:
+        asset = db.get(MediaAsset, "ast-orbit-feat")
+        asset.storage_provider = provider
+        asset.relative_path = "../canary.mp4"
+        db.commit()
+    url = "/api/media/stream/ast-orbit-feat"
+    assert client.get(url).status_code == 404
+    with database.session() as db:
+        db.get(MediaAsset, "ast-orbit-feat").relative_path = "inside.mp4"
+        db.commit()
+    assert client.get(url).content == b"inside"
+
+
+def test_stream_rejects_links_outside_media_root(catalog_client, tmp_path):
+    client, _, database = catalog_client
+    link = tmp_path / "media" / "link.mp4"
+    try:
+        link.symlink_to(tmp_path / "canary.mp4")
+    except OSError as exc:
+        if sys.platform != "win32" or getattr(exc, "winerror", None) != 1314:
+            raise
+        pytest.skip("Tạo liên kết tượng trưng trên Windows cần thêm quyền")
+    with database.session() as db:
+        db.get(MediaAsset, "ast-orbit-feat").relative_path = "link.mp4"
+        db.commit()
+    assert client.get("/api/media/stream/ast-orbit-feat").status_code == 404
+
+
+def test_media_root_works_with_a_flat_container_layout(tmp_path, monkeypatch):
+    monkeypatch.delenv("APP_MEDIA_ROOT", raising=False)
+    app_root = Path(Path.cwd().anchor) / "app"
+    monkeypatch.setattr(core_api, "__file__", str(app_root / "routers/core_api.py"))
+    monkeypatch.setattr(core_api, "ROOT", app_root, raising=False)
+    monkeypatch.chdir(tmp_path)
+    media = tmp_path / "media"
+    media.mkdir()
+    video = media / "inside.mp4"
+    video.write_bytes(b"inside")
+    asset = MediaAsset(relative_path="inside.mp4", storage_provider="local")
+    assert core_api._resolve_media_file(asset) == video.resolve()
+
+
+@pytest.mark.parametrize("endpoint", ["validate", "import"])
+def test_catalog_bad_revision_returns_400(catalog_client, endpoint):
+    client, headers, _ = catalog_client
+    response = client.post(
+        f"/api/admin/catalog/{endpoint}", json={"package": {"id": "catalog", "revision": "bad"}}, headers=headers,
+    )
+    assert response.status_code == 400
 
 
 def test_python_main_auth_movies_and_user_library(tmp_path, monkeypatch):
@@ -250,6 +388,12 @@ def test_python_main_catalog_import_search_and_watch_progress(tmp_path):
         conflict_val = client.post("/api/admin/catalog/validate", json=conflict_pkg, headers=admin_headers)
         assert conflict_val.status_code == 200
         assert conflict_val.json()["conflicts"] == 2
+
+        repeat = client.post("/api/admin/catalog/import", json=sample_package, headers=admin_headers)
+        assert repeat.status_code == 200
+        assert repeat.json()["importId"] == imp_res.json()["importId"]
+        conflict_import = client.post("/api/admin/catalog/import", json=conflict_pkg, headers=admin_headers)
+        assert conflict_import.status_code == 409
 
         hist_res = client.get("/api/admin/catalog/history", headers=admin_headers)
         assert hist_res.status_code == 200
