@@ -24,7 +24,7 @@ public class StorageKeyConfig {
 
     public StorageKeyConfig(
             @Value("${app.media.root:./media}") String localMediaRoot,
-            @Value("${app.media.drive.mount-path:X:}") String driveMountPath
+            @Value("${app.media.drive.mount-path:${app.media.drive-mount:X:}}") String driveMountPath
     ) {
         Path localPath = Paths.get(localMediaRoot).toAbsolutePath().normalize();
         Path drivePath;

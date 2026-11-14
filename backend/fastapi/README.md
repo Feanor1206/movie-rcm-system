@@ -29,6 +29,8 @@ Khi nâng cấp database có quản trị viên dùng mật khẩu demo `passwor
 
 Chỉ dùng `APP_DEMO_MODE=true` trong môi trường thử nghiệm riêng: chế độ này tạo tài khoản demo có mật khẩu công khai. Các script local tạo khóa ngẫu nhiên tạm thời nếu chưa cấu hình; phiên sẽ hết hiệu lực khi khởi động lại. Compose yêu cầu cung cấp khóa qua môi trường; override `docker-compose.dev.yml` bật chế độ demo.
 
+Đặt `APP_MEDIA_DRIVE_MOUNT` thành thư mục hoặc ổ đĩa đã gắn Google Drive để phát video. Danh mục có thể giữ tiền tố `VideoDieppie/` khi ổ đĩa được gắn trực tiếp vào thư mục đó.
+
 - **Chế độ vận hành**:
   - `MODEL_MODE=light`: Sử dụng tìm kiếm Hybrid/BM25 và câu trả lời mẫu xác định (không cần LLM).
   - `MODEL_MODE=cloud`: Bật LLM (DeepSeek / OpenAI-compatible Cloud hoặc Local Ollama/vLLM qua `http://127.0.0.1`).
