@@ -46,6 +46,7 @@ from services.database import (
     validate_playback_grant_token,
     verify_password,
 )
+from services.runtime import ROOT
 
 router = APIRouter()
 
@@ -912,7 +913,7 @@ def _resolve_media_file(asset: MediaAsset) -> Path | None:
     if not is_relative_media_path(rel):
         return None
     local_root = os.getenv("APP_MEDIA_ROOT")
-    roots = [Path(local_root)] if local_root else [Path("media"), Path(__file__).resolve().parents[3] / "media"]
+    roots = [Path(local_root)] if local_root else [Path("media"), ROOT / "media"]
     if (asset.storage_provider or "").lower() == "drive":
         mount = os.getenv("APP_MEDIA_DRIVE_MOUNT", "X:" if os.name == "nt" else "")
         if mount:
