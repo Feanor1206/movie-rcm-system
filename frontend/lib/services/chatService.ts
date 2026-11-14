@@ -77,7 +77,7 @@ export async function sendChatMessage(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.text || 'Lỗi kết nối tới máy chủ AI');
+    throw new Error(errorData.text || 'Không thể kết nối CineBot. Vui lòng thử lại.');
   }
 
   if (!response.headers?.get('Content-Type')?.toLowerCase().includes('text/event-stream')) {

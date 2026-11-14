@@ -1,5 +1,7 @@
 'use client';
 
+import { formatRuntime, genreLabel, movieSynopsis } from '@/lib/labels';
+
 import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -67,7 +69,6 @@ function rememberFilm(movie: Movie, seconds: number, durationSeconds: number, co
       completed,
     });
   } catch {
-    // Playback continues when this browser cannot store the resume point.
   }
 }
 const CARD = 'rounded-lg border border-surface-border bg-surface p-4';
@@ -123,8 +124,6 @@ export function MovieDetail({
   const playerOpenerRef = useRef<HTMLElement | null>(null);
   const resumeSecondsRef = useRef(0);
   const lastSavedMsRef = useRef(0);
-
-  // Fetch descriptor for movie
   useEffect(() => {
     setDescriptor(null);
     setDescriptorError(null);
@@ -203,6 +202,15 @@ export function MovieDetail({
     rememberFilm(movie, seconds, durationSeconds, completed);
   };
 
+  const closePlayer = () => {
+    const video = videoRef.current;
+    if (video && Number.isFinite(video.currentTime) && video.currentTime > 0 && !video.ended &&
+        (!Number.isFinite(video.duration) || video.duration <= 0 || video.currentTime < video.duration)) {
+      rememberPosition(video.currentTime, video.duration || duration, false, true);
+    }
+    setIsPlaying(false);
+  };
+
   const handleRetry = () => {
     setPlaybackError(null);
     setPlayerState('buffering');
@@ -244,8 +252,6 @@ export function MovieDetail({
       v.volume = vol;
     }
   };
-
-  // Autoplay rejection handler: transition to paused so user can click to play
   useEffect(() => {
     if (isPlaying && activeMediaUrl) {
       videoRef.current?.play()?.catch((err: any) => {
@@ -253,8 +259,6 @@ export function MovieDetail({
       });
     }
   }, [isPlaying, activeMediaUrl]);
-
-  // Video modal accessibility: Escape key, body scroll lock, focus trap, focus restoration, shortcuts
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -273,7 +277,7 @@ export function MovieDetail({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        setIsPlaying(false);
+        closePlayer();
         return;
       }
 
@@ -343,8 +347,8 @@ export function MovieDetail({
       ? 'Chưa xác nhận lưu • Thử lưu lại vào Danh sách xem'
       : 'Chưa xác nhận xóa • Thử xóa lại khỏi Danh sách xem'
     : inWatchlist
-    ? 'Xóa khỏi Watchlist'
-    : 'Thêm vào Watchlist';
+    ? 'Xóa khỏi danh sách xem'
+    : 'Thêm vào danh sách xem';
 
   const favAria = isFavoritePending
     ? 'Đang cập nhật...'
@@ -358,7 +362,7 @@ export function MovieDetail({
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Video Player Modal / Player Overlay */}
+
       {isPlaying && (
         <div
           ref={videoModalRef}
@@ -368,7 +372,7 @@ export function MovieDetail({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4"
         >
           <div className="relative w-full max-w-5xl overflow-hidden rounded-lg border border-surface-border bg-surface flex flex-col">
-            {/* Player Header Bar */}
+
             <div className="flex items-center justify-between border-b border-surface-border bg-surface-muted px-4 py-3">
               <div className="flex items-center gap-2 truncate">
                 <span className="h-2 w-2 rounded-full bg-brand shrink-0" />
@@ -376,11 +380,11 @@ export function MovieDetail({
                   {movie.title}
                 </h3>
                 <span className="text-xs text-muted shrink-0">
-                  • {activeMediaKind === 'feature' ? 'Phim chính' : 'Trailer'}
+                  • {activeMediaKind === 'feature' ? 'Phim chính' : 'Đoạn giới thiệu'}
                 </span>
               </div>
               <button
-                onClick={() => setIsPlaying(false)}
+                onClick={closePlayer}
                 className={BTN_ICON}
                 aria-label="Đóng trình phát"
               >
@@ -388,7 +392,6 @@ export function MovieDetail({
               </button>
             </div>
 
-            {/* Video Container with Overlays */}
             <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
               <video
                 ref={videoRef}
@@ -402,7 +405,7 @@ export function MovieDetail({
                   setDuration(nextDuration);
                   const startAt = retryTime > 0 ? retryTime : resumeSecondsRef.current;
                   if (startAt > 0 && v && startAt < (nextDuration || startAt + 1)) {
-                    try { v.currentTime = startAt; } catch { /* the file may not accept a seek yet */ }
+                    try { v.currentTime = startAt; } catch {  }
                     setCurrentTime(startAt);
                   }
                 }}
@@ -432,14 +435,12 @@ export function MovieDetail({
                 onClick={togglePlayPause}
               />
 
-              {/* Buffering Indicator */}
               {playerState === 'buffering' && (
                 <div data-testid="video-buffering" className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none">
                   <Loader2 size={36} className="animate-spin text-brand" />
                 </div>
               )}
 
-              {/* Error Overlay with Retry */}
               {playerState === 'error' && (
                 <div data-testid="video-error-overlay" className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 p-6 text-center z-20">
                   <AlertCircle size={44} className="text-amber-400 mb-3" />
@@ -457,9 +458,8 @@ export function MovieDetail({
               )}
             </div>
 
-            {/* Custom Control Bar with HTTP Range Timeline */}
             <div className="flex flex-col gap-2 border-t border-surface-border bg-surface-muted/95 p-3 sm:px-4">
-              {/* Timeline Scrubber */}
+
               <div className="flex items-center gap-3">
                 <span data-testid="video-time-display" className="text-xs font-mono text-muted shrink-0 min-w-[80px]">
                   {formatTime(currentTime)} / {formatTime(duration)}
@@ -481,7 +481,6 @@ export function MovieDetail({
                 />
               </div>
 
-              {/* Player Control Buttons */}
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-2">
                   <button
@@ -540,10 +539,8 @@ export function MovieDetail({
         </div>
       )}
 
-
-      {/* Hero Backdrop */}
       <section className="relative overflow-hidden border-b border-surface-border bg-background">
-        {/* Backdrop Image Layer */}
+
         <div className="absolute inset-0 z-0 h-full w-full">
           {movie.backdrop?.trim() && !backdropError ? (
             <Image
@@ -560,14 +557,13 @@ export function MovieDetail({
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
         </div>
 
-        {/* Content Layer */}
         <div className="page-shell relative z-10 pb-12 pt-6 sm:pt-10">
           <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted mb-6">
             &larr; Trang chủ
           </Link>
 
           <div className="flex flex-col gap-6 md:flex-row md:items-end">
-            {/* Poster */}
+
             <div className="relative shrink-0">
               <div className="relative aspect-[2/3] w-44 overflow-hidden rounded-lg border border-surface-border bg-surface sm:w-56">
                 {movie.poster?.trim() && !posterError ? (
@@ -593,10 +589,9 @@ export function MovieDetail({
               </div>
             </div>
 
-            {/* Info */}
             <div className="flex-1">
               <span className="rounded bg-brand px-2 py-0.5 font-bold text-zinc-950 text-[10px]">
-                Tuyển chọn Dippie
+                Phim hoạt hình
               </span>
 
               <h1 className="mt-3 text-3xl font-extrabold text-ink sm:text-5xl">
@@ -608,14 +603,13 @@ export function MovieDetail({
                   <Star size={14} className="fill-amber-400 text-amber-400" />
                   {movie.rating} / 10
                 </span>
-                <span>{movie.year} · {movie.runtime} · {movie.genres.join(', ')}</span>
+                <span>{movie.year} · {formatRuntime(movie.runtime)} · {movie.genres.map(genreLabel).join(', ')}</span>
               </div>
 
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink">
-                {movie.description}
+                {movieSynopsis(movie.description)}
               </p>
 
-              {/* Descriptor Error Alert */}
               {descriptorError && (
                 <div role="alert" className={ALERT_BOX}>
                   <div className="flex items-center gap-2 truncate">
@@ -633,7 +627,6 @@ export function MovieDetail({
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 {hasValidFeature && (
                   <button
@@ -659,7 +652,7 @@ export function MovieDetail({
                     ) : (
                       <Film size={16} />
                     )}
-                    Xem trailer
+                    Xem đoạn giới thiệu
                   </button>
                 )}
 
@@ -675,9 +668,9 @@ export function MovieDetail({
                   ) : isWatchlistUnconfirmed ? (
                     <span className="flex items-center gap-1.5 font-bold"><RefreshCw size={15} className="text-amber-400" /> Thử lại</span>
                   ) : inWatchlist ? (
-                    '✓ Đã lưu Watchlist'
+                    'Đã lưu vào danh sách xem'
                   ) : (
-                    '+ Thêm vào Watchlist'
+                    'Thêm vào danh sách xem'
                   )}
                 </button>
 
@@ -710,12 +703,11 @@ export function MovieDetail({
         </div>
       </section>
 
-      {/* Main Details Body */}
       <div className="page-shell py-10">
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-          {/* Left: Overview & Rating Selector */}
+
           <div className="space-y-8">
-            {/* Interactive Rating Selector */}
+
             <div className={CARD}>
               <h2 className="text-sm font-bold text-ink">Đánh giá bộ phim này</h2>
 
@@ -773,15 +765,13 @@ export function MovieDetail({
             </div>
           </div>
 
-          {/* Right: Technical Attributes */}
           <div className={`${CARD} h-fit space-y-2 text-xs`}>
             <h3 className="font-bold uppercase text-muted">Thông tin</h3>
-            <p><span className="text-muted">Thể loại: </span>{movie.genres.join(', ')}</p>
-            <p className={BORDER_T}><span className="text-muted">Năm / Thời lượng: </span>{movie.year} · {movie.runtime}</p>
+            <p><span className="text-muted">Thể loại: </span>{movie.genres.map(genreLabel).join(', ')}</p>
+            <p className={BORDER_T}><span className="text-muted">Năm / Thời lượng: </span>{movie.year} · {formatRuntime(movie.runtime)}</p>
           </div>
         </div>
 
-        {/* Similar Movies */}
         <div className="mt-12 pt-8 border-t border-surface-border">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-bold text-ink uppercase">Phim tương tự</h2>
@@ -809,7 +799,7 @@ export function MovieDetail({
                     <div className="p-3">
                       <Link href={`/movies/${m.id}`} className="block truncate text-sm font-semibold text-ink hover:text-brand">{m.title}</Link>
                       <div className="mt-1 flex items-center justify-between text-xs text-muted">
-                        <span>{m.year} · {m.runtime}</span>
+                        <span>{m.year} · {formatRuntime(m.runtime)}</span>
                       </div>
                     </div>
                   </div>

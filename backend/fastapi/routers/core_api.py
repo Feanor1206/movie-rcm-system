@@ -9,8 +9,10 @@ import secrets
 from types import SimpleNamespace
 
 from fastapi import APIRouter, Header, Query, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import StaleDataError
 
 from services.database import (
     CatalogAttributeScale,
@@ -50,7 +52,7 @@ router = APIRouter()
 MEDIA_TOKENS: dict[str, tuple[str, int | None, str, float]] = {}
 
 
-def api_response(data=None, message: str = "Success", success: bool = True, status_code: int = 200):
+def api_response(data=None, message: str = "Thành công", success: bool = True, status_code: int = 200):
     body = {
         "success": success,
         "message": message,
@@ -316,7 +318,7 @@ def get_movie_by_id(movie_id: str, request: Request):
     with get_db(request) as db:
         movie = db.get(Movie, movie_id)
         if not movie:
-            return api_response(None, f"Movie not found with id: {movie_id}", False, 404)
+            return api_response(None, "Không tìm thấy phim.", False, 404)
         return api_response(data=movie.to_response())
 
 
@@ -676,19 +678,13 @@ def _covers_full_episode(coverage_json: str | None, episode_id: str) -> bool:
         return False
 
 
-def _resolve_episode_context(db, episode_id: str, asset_id: str, user: User):
-    ep = db.get(CatalogEpisode, episode_id)
+def _valid_episode_context(ep, series, season, asset, playable, episode_id, user):
     if not ep or not is_published(ep.record_json):
         return None
-    series = db.get(CatalogSeries, ep.series_id)
     if not series or not is_published(series.record_json):
         return None
-    season = None
-    if ep.season_id:
-        season = db.get(CatalogSeason, ep.season_id)
-        if not season or not is_published(season.record_json):
-            return None
-    asset = db.get(CatalogMediaAsset, asset_id)
+    if ep.season_id and (not season or not is_published(season.record_json)):
+        return None
     if not asset or not _asset_allowed(asset, user):
         return None
     role = (asset.role or "").lower()
@@ -696,10 +692,18 @@ def _resolve_episode_context(db, episode_id: str, asset_id: str, user: User):
         return None
     if not _covers_full_episode(asset.coverage_json, episode_id):
         return None
-    playable = db.get(MediaAsset, asset_id)
     if not playable or not playable.is_available or not (playable.mime_type or "").lower().startswith("video/"):
         return None
     return ep, series, season, asset
+
+
+def _resolve_episode_context(db, episode_id: str, asset_id: str, user: User):
+    ep = db.get(CatalogEpisode, episode_id)
+    series = db.get(CatalogSeries, ep.series_id) if ep else None
+    season = db.get(CatalogSeason, ep.season_id) if ep and ep.season_id else None
+    asset = db.get(CatalogMediaAsset, asset_id)
+    playable = db.get(MediaAsset, asset_id)
+    return _valid_episode_context(ep, series, season, asset, playable, episode_id, user)
 
 
 def _to_progress_response(progress: WatchProgress, ctx) -> dict:
@@ -736,17 +740,22 @@ def get_recent_watch_progress(request: Request, authorization: str | None = Head
         if not user:
             return api_response(None, "Chưa xác thực người dùng", False, 401)
         rows = (
-            db.query(WatchProgress)
+            db.query(WatchProgress, CatalogEpisode, CatalogSeries, CatalogSeason, CatalogMediaAsset, MediaAsset)
+            .outerjoin(CatalogEpisode, CatalogEpisode.id == WatchProgress.episode_id)
+            .outerjoin(CatalogSeries, CatalogSeries.id == CatalogEpisode.series_id)
+            .outerjoin(CatalogSeason, CatalogSeason.id == CatalogEpisode.season_id)
+            .outerjoin(CatalogMediaAsset, CatalogMediaAsset.id == WatchProgress.asset_id)
+            .outerjoin(MediaAsset, MediaAsset.id == WatchProgress.asset_id)
             .filter(WatchProgress.user_id == user.id)
             .order_by(WatchProgress.updated_at.desc())
             .limit(30)
             .all()
         )
         result = []
-        for p in rows:
-            ctx = _resolve_episode_context(db, p.episode_id, p.asset_id, user)
+        for progress, ep, series, season, asset, playable in rows:
+            ctx = _valid_episode_context(ep, series, season, asset, playable, progress.episode_id, user)
             if ctx:
-                result.append(_to_progress_response(p, ctx))
+                result.append(_to_progress_response(progress, ctx))
         return api_response(data=result)
 
 
@@ -820,9 +829,29 @@ async def save_watch_progress(episode_id: str, request: Request, authorization: 
             current.opt_lock_version = expected_version + 1
             current.updated_at = now
             progress = current
-        db.commit()
-        db.refresh(progress)
-        return api_response(data=_to_progress_response(progress, ctx), message="Đã lưu tiến độ xem")
+        try:
+            db.flush()
+            db.refresh(progress, attribute_names=["updated_at"])
+            result = _to_progress_response(progress, ctx)
+            db.commit()
+        except StaleDataError:
+            db.rollback()
+            return api_response(None, "Watch progress changed since it was loaded; refresh and retry.", False, 409)
+        except IntegrityError as exc:
+            db.rollback()
+            error = str(exc.orig)
+            duplicate = (
+                db.bind.dialect.name == "sqlite"
+                and "UNIQUE constraint failed: watch_progress.user_id, watch_progress.episode_id" in error
+            ) or (
+                db.bind.dialect.name in {"mysql", "mariadb"}
+                and exc.orig.args and exc.orig.args[0] == 1062
+                and "uq_watch_progress_user_episode" in error
+            )
+            if expected_version != -1 or not duplicate:
+                raise
+            return api_response(None, "Watch progress changed since it was loaded; refresh and retry.", False, 409)
+        return api_response(data=result, message="Đã lưu tiến độ xem")
 
 
 @router.delete("/api/users/watch-progress/{episode_id}")
@@ -898,6 +927,17 @@ def _resolve_media_file(asset: MediaAsset) -> Path | None:
     return None
 
 
+def _stream_file(path: Path, start: int, length: int):
+    with path.open("rb") as file:
+        file.seek(start)
+        while length > 0:
+            chunk = file.read(min(length, 65536))
+            if not chunk:
+                break
+            length -= len(chunk)
+            yield chunk
+
+
 @router.api_route("/api/media/stream/{asset_id}", methods=["GET", "HEAD"])
 def stream_media(
     asset_id: str,
@@ -948,16 +988,15 @@ def stream_media(
             )
 
         if not range or not range.strip():
-            data = file_path.read_bytes()
-            return Response(
-                content=data,
+            return StreamingResponse(
+                content=_stream_file(file_path, 0, total_length),
                 status_code=200,
                 media_type=mime,
                 headers={"Accept-Ranges": "bytes", "Content-Length": str(total_length)},
             )
 
         trimmed = range.strip()
-        if not trimmed.startswith("bytes=") or "-" not in trimmed[6:]:
+        if not total_length or not trimmed.startswith("bytes=") or "-" not in trimmed[6:]:
             return Response(status_code=416, headers={"Content-Range": f"bytes */{total_length}"})
         spec = trimmed[6:].strip()
         try:
@@ -980,17 +1019,14 @@ def stream_media(
             return Response(status_code=416, headers={"Content-Range": f"bytes */{total_length}"})
 
         length = end - start + 1
-        with file_path.open("rb") as f:
-            f.seek(start)
-            chunk = f.read(length)
-        return Response(
-            content=chunk,
+        return StreamingResponse(
+            content=_stream_file(file_path, start, length),
             status_code=206,
             media_type=mime,
             headers={
                 "Accept-Ranges": "bytes",
                 "Content-Range": f"bytes {start}-{end}/{total_length}",
-                "Content-Length": str(len(chunk)),
+                "Content-Length": str(length),
             },
         )
 

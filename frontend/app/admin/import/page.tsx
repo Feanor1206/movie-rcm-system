@@ -5,11 +5,8 @@ import Link from 'next/link';
 import {
   Database,
   Film,
-  Calendar,
-  Layers,
   ArrowRight,
   Clock,
-  Sparkles,
   RefreshCw,
   RotateCcw,
   CheckCircle2,
@@ -73,13 +70,13 @@ export default function AdminImportPage() {
     try {
       const updated = await retryCatalogSnapshot(id);
       setActionMessage({
-        text: `Đã kích hoạt thử lại cho Snapshot [${id}] (Thế hệ ${updated.snapshotVersion}).`,
+        text: `Đã gửi yêu cầu thử lại bản dữ liệu [${id}] (Thế hệ ${updated.snapshotVersion}).`,
         type: 'success',
       });
       setRefreshNonce((n) => n + 1);
     } catch (err: any) {
       setActionMessage({
-        text: err?.message || `Lỗi khi thử lại snapshot [${id}]`,
+        text: err?.message || `Không thể thử lại bản dữ liệu [${id}]`,
         type: 'error',
       });
     } finally {
@@ -101,10 +98,10 @@ export default function AdminImportPage() {
             <span>Quản trị danh mục</span>
           </div>
           <h1 className="mt-1 text-2xl font-extrabold text-ink sm:text-3xl">
-            Nhập Dữ Liệu Hoạt Hình (dippie.catalog.v1)
+            Nhập dữ liệu hoạt hình
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Nhập dữ liệu JSON từ bên ngoài, kiểm tra tính hợp lệ trước khi lưu trữ bền vững trong cơ sở dữ liệu.
+            Chọn tệp JSON và kiểm tra dữ liệu trước khi nhập.
           </p>
         </div>
 
@@ -213,6 +210,7 @@ export default function AdminImportPage() {
                 <span>{actionMessage.text}</span>
               </div>
               <button
+                aria-label="Đóng thông báo"
                 onClick={() => setActionMessage(null)}
                 className="text-muted hover:text-ink"
               >
@@ -226,22 +224,22 @@ export default function AdminImportPage() {
               <div className="flex items-center gap-2">
                 <Activity size={18} className="text-brand" />
                 <h2 className="text-base font-bold text-ink">
-                  Hàng đợi Outbox & Đồng bộ Chỉ mục AI ({snapshots.length})
+                  Đồng bộ dữ liệu tìm kiếm ({snapshots.length})
                 </h2>
               </div>
-              <span className="text-xs text-muted">Trạng thái đồng bộ tự động giữa Spring Boot và FastAPI</span>
+              <span className="text-xs text-muted">Trạng thái đồng bộ sau khi nhập</span>
             </div>
 
             {isLoading ? (
               <div className="flex items-center justify-center py-8 text-xs text-muted">
                 <RefreshCw size={16} className="animate-spin text-brand mr-2" />
-                <span>Đang kiểm tra hàng đợi outbox...</span>
+                <span>Đang tải trạng thái đồng bộ...</span>
               </div>
             ) : loadErrors.snapshots ? (
               <LoadError label="trạng thái đồng bộ" onRetry={() => setRefreshNonce((n) => n + 1)} />
             ) : snapshots.length === 0 ? (
               <div className="py-6 text-center text-xs text-muted">
-                Chưa có snapshot nào được tạo. Khi bạn nhập gói catalog, snapshot sẽ được ghi nhận tại đây.
+                Chưa có bản dữ liệu nào. Trạng thái đồng bộ sẽ xuất hiện sau khi nhập.
               </div>
             ) : (
               <div className="mt-4 space-y-3">
@@ -265,28 +263,28 @@ export default function AdminImportPage() {
                         <div className="flex items-center gap-2">
                           {snap.status === 'READY' && (
                             <span className="flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/30">
-                              <CheckCircle2 size={12} /> READY (Đã chỉ mục)
+                              <CheckCircle2 size={12} /> Đã đồng bộ
                             </span>
                           )}
                           {snap.status === 'SYNCING' && (
                             <span className="flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[11px] font-bold text-blue-400 border border-blue-500/30 animate-pulse">
-                              <RefreshCw size={12} className="animate-spin" /> SYNCING (Đang đồng bộ)
+                              <RefreshCw size={12} className="animate-spin" /> Đang đồng bộ
                             </span>
                           )}
                           {snap.status === 'PENDING' && (
                             <span className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-amber-500/30">
-                              <Clock size={12} /> PENDING (Chờ xử lý)
+                              <Clock size={12} /> Chờ xử lý
                             </span>
                           )}
                           {snap.status === 'BLOCKED' && (
                             <span className="flex items-center gap-1 rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-bold text-orange-400 border border-orange-500/30">
                               <AlertTriangle size={12} /> {snap.errorMessage?.startsWith('CACHE_REQUIRED')
-                                ? 'BLOCKED (Thiếu cache embedding)' : 'BLOCKED (Thiếu token)'}
+                                ? 'Tạm dừng: thiếu dữ liệu chỉ mục' : 'Tạm dừng: thiếu mã truy cập'}
                             </span>
                           )}
                           {snap.status === 'SYNC_FAILED' && (
                             <span className="flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-400 border border-red-500/30">
-                              <XCircle size={12} /> SYNC_FAILED (Lỗi đồng bộ)
+                              <XCircle size={12} /> Lỗi đồng bộ
                             </span>
                           )}
 
@@ -326,48 +324,6 @@ export default function AdminImportPage() {
 
         <div className="space-y-6">
           <div className="rounded-xl border border-surface-border bg-surface p-5">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
-              <Sparkles size={16} className="text-brand" />
-              <span>Quy trình nhập dữ liệu</span>
-            </h3>
-            <ol className="mt-3 space-y-2.5 text-xs text-muted">
-              <li className="flex gap-2">
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
-                  1
-                </span>
-                <span>
-                  <strong>JSON bên ngoài:</strong> Chuẩn hóa theo hợp đồng{' '}
-                  <code className="text-muted">dippie.catalog.v1</code>.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
-                  2
-                </span>
-                <span>
-                  <strong>Xác thực & Preview:</strong> Kiểm tra ràng buộc tham chiếu, tính SHA-256 và diff toCreate/toUpdate.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
-                  3
-                </span>
-                <span>
-                  <strong>Atomic Transaction:</strong> Nhập 12 bảng thực thể và ánh xạ video Google Drive vào Media Service.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand/20 font-mono text-[11px] font-bold text-brand">
-                  4
-                </span>
-                <span>
-                  <strong>AI Index Sync:</strong> Tự động cập nhật chỉ mục Hybrid Retrieval và CineBot.
-                </span>
-              </li>
-            </ol>
-          </div>
-
-          <div className="rounded-xl border border-surface-border bg-surface p-5">
             <div className="flex items-center gap-2 border-b border-surface-border pb-3">
               <Clock size={16} className="text-brand" />
               <h3 className="text-sm font-bold text-ink">Lịch sử gói nhập</h3>
@@ -387,7 +343,7 @@ export default function AdminImportPage() {
                     <div className="flex items-center justify-between">
                       <strong className="text-ink font-mono">{pkg.id}</strong>
                       <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand border border-brand/20">
-                        Rev {pkg.revision}
+                        Phiên bản {pkg.revision}
                       </span>
                     </div>
                     {pkg.description && (

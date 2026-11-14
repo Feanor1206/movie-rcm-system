@@ -1,3 +1,4 @@
+import { labels } from './labels_fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -77,6 +78,7 @@ test('Resetting a pending chat discards its reply and allows a new conversation'
   const module = { exports: {} };
   vm.runInNewContext(componentCode, { module, exports: module.exports, console, Date, AbortController, setTimeout, clearTimeout,
     require(name) {
+      if (name === '@/lib/labels') return labels;
       if (name === 'react') return react;
       if (name === '@/lib/services/chatService') return { sendChatMessage: (text, history, options) => new Promise((resolve) => requests.push({ resolve, options })) };
       if (name === '@/lib/context/WatchlistContext') return { useWatchlist: () => ({ isWatchlisted: () => false, toggleWatchlist() {} }) };
@@ -131,6 +133,7 @@ test('Chat changes actor without exposing old messages or reusing the session', 
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, console, Date, AbortController, setTimeout, clearTimeout,
     require(name) {
+      if (name === '@/lib/labels') return labels;
       if (name === 'react') return react;
       if (name === '@/lib/context/AuthContext') return { useAuth: () => actor };
       if (name === '@/lib/context/WatchlistContext') return { useWatchlist: () => ({ isWatchlisted: () => false, toggleWatchlist() {} }) };
@@ -172,6 +175,7 @@ test('Oversized messages show an error without entering history', async () => {
   const react = { useState(v) { const i = index++; if (!(i in slots)) slots[i] = typeof v === 'function' ? v() : v; return [slots[i], (n) => { slots[i] = typeof n === 'function' ? n(slots[i]) : n; }]; }, useRef(v) { const i = index++; return slots[i] ||= { current: v }; }, useEffect() {}, createElement(type, props, ...children) { return { type, props: { ...props, children } }; } };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, console, Date, AbortController, setTimeout, clearTimeout, require(name) {
+      if (name === '@/lib/labels') return labels;
     if (name === 'react') return react;
     if (name === '@/lib/context/AuthContext') return { useAuth: () => ({ status: 'guest', user: null, token: null }) };
     if (name === '@/lib/context/WatchlistContext') return { useWatchlist: () => ({ isWatchlisted: () => false, toggleWatchlist() {} }) };

@@ -1,5 +1,7 @@
 'use client';
 
+import { genreLabel, movieSynopsis } from '@/lib/labels';
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { AlertCircle, ChevronLeft, ChevronRight, Film, RefreshCw, Search, X } from 'lucide-react';
@@ -9,7 +11,9 @@ import type { Movie } from '@/types/movie';
 
 type SearchSnapshot = {
   query: string;
+  genre: string;
   page: number;
+  size: number;
   results: Movie[];
   totalElements: number;
   totalPages: number;
@@ -23,8 +27,8 @@ function parseNonNegativeInteger(value: string | null, fallback: number): number
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function emptySnapshot(query: string, page: number): SearchSnapshot {
-  return { query, page, results: [], totalElements: 0, totalPages: 0 };
+function emptySnapshot(query: string, genre: string, page: number, size: number): SearchSnapshot {
+  return { query, genre, page, size, results: [], totalElements: 0, totalPages: 0 };
 }
 
 export function SearchExperience() {
@@ -32,6 +36,7 @@ export function SearchExperience() {
   const router = useRouter();
   const pathname = usePathname();
   const urlQuery = (searchParams.get('q') || searchParams.get('query') || '').trim();
+  const genre = (searchParams.get('genre') || '').trim();
   const page = parseNonNegativeInteger(searchParams.get('page'), 0);
   const requestedSize = parseNonNegativeInteger(searchParams.get('size'), PAGE_SIZE_DEFAULT);
   const pageSize = requestedSize >= 1 && requestedSize <= 48 ? requestedSize : PAGE_SIZE_DEFAULT;
@@ -85,6 +90,7 @@ export function SearchExperience() {
     setError(null);
     browseCatalog({
       query: urlQuery || undefined,
+      genre: genre || undefined,
       animationOnly: true,
       page,
       size: pageSize,
@@ -93,7 +99,9 @@ export function SearchExperience() {
       if (controller.signal.aborted || requestId !== requestIdRef.current) return;
       setSnapshot({
         query: urlQuery,
+        genre,
         page,
+        size: pageSize,
         results: result.items,
         totalElements: result.totalElements,
         totalPages: result.totalPages,
@@ -101,15 +109,15 @@ export function SearchExperience() {
       setLoading(false);
     }).catch((err: any) => {
       if (controller.signal.aborted || requestId !== requestIdRef.current || err?.name === 'AbortError' || err?.isCanceled) return;
-      setSnapshot(emptySnapshot(urlQuery, page));
+      setSnapshot(emptySnapshot(urlQuery, genre, page, pageSize));
       setError(err?.message || 'Không thể tải kho phim hoạt hình.');
       setLoading(false);
     });
 
     return () => controller.abort();
-  }, [urlQuery, page, pageSize, retryTrigger]);
+  }, [urlQuery, genre, page, pageSize, retryTrigger]);
 
-  const isCurrentSnapshot = snapshot?.query === urlQuery && snapshot.page === page;
+  const isCurrentSnapshot = snapshot?.query === urlQuery && snapshot.genre === genre && snapshot.page === page && snapshot.size === pageSize;
   const currentResults = isCurrentSnapshot ? snapshot.results : [];
   const totalElements = isCurrentSnapshot ? snapshot.totalElements : 0;
   const totalPages = Math.max(1, isCurrentSnapshot ? snapshot.totalPages : 1);
@@ -157,7 +165,7 @@ export function SearchExperience() {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-y border-surface-border py-3 text-xs text-muted">
-        <div className="flex items-center gap-2"><Film size={14} /><span>{urlQuery ? `Kết quả cho “${urlQuery}”` : 'Phim hoạt hình trong kho'}</span></div>
+        <div className="flex items-center gap-2"><Film size={14} /><span>{urlQuery ? `Kết quả cho “${urlQuery}”` : 'Phim hoạt hình trong kho'}{genre ? ` · Thể loại: ${genreLabel(genre)}` : ''}</span></div>
         <div className="flex items-center gap-2">
           {loading && snapshot && <span className="flex items-center gap-1 text-brand"><RefreshCw size={11} className="animate-spin" />Đang cập nhật…</span>}
           {isCurrentSnapshot && !loading && <span>{totalElements} phim</span>}
@@ -165,7 +173,7 @@ export function SearchExperience() {
       </div>
 
       <section className="mt-6" aria-live="polite">
-        {error ? (
+        {error && isCurrentSnapshot ? (
           <div role="alert" className="flex flex-col items-center rounded-lg border border-red-500/30 bg-red-950/10 px-6 py-12 text-center">
             <AlertCircle size={24} className="text-red-400" />
             <h2 className="mt-3 font-bold text-ink">Không thể tải kho phim</h2>
@@ -174,13 +182,13 @@ export function SearchExperience() {
               <RefreshCw size={13} /> Thử lại
             </button>
           </div>
-        ) : loading && !isCurrentSnapshot ? (
+        ) : !isCurrentSnapshot ? (
           <div data-testid="catalog-skeleton" role="status" className="rounded-lg border border-surface-border bg-surface p-8 text-center text-sm text-muted">Đang tải kho phim…</div>
         ) : isCurrentSnapshot && currentResults.length === 0 ? (
           <div className="rounded-lg border border-dashed border-surface-border bg-surface px-6 py-16 text-center">
             <Search size={22} className="mx-auto text-muted" />
             <h2 className="mt-3 font-bold text-ink">Không tìm thấy phim phù hợp</h2>
-            <p className="mt-1 text-sm text-muted">{urlQuery ? `Không có phim hoạt hình khớp với “${urlQuery}”.` : 'Kho hiện chưa có phim hoạt hình nào.'}</p>
+            <p className="mt-1 text-sm text-muted">{urlQuery ? `Không có phim hoạt hình khớp với “${urlQuery}”.` : genre ? `Không có phim hoạt hình thuộc thể loại ${genreLabel(genre)}.` : 'Kho hiện chưa có phim hoạt hình nào.'}</p>
           </div>
         ) : isCurrentSnapshot ? (
           <>
@@ -200,7 +208,7 @@ export function SearchExperience() {
                       {movie.year ? <span className="text-xs text-muted">{movie.year}</span> : null}
                     </div>
                     <h2 className="comic-heading mt-2 line-clamp-2 text-base font-bold text-ink">{movie.title}</h2>
-                    {movie.description && <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted">{movie.description}</p>}
+                    {movie.description && <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted">{movieSynopsis(movie.description)}</p>}
                   </div>
                   <span className="mt-3 text-right text-xs font-semibold text-brand-dark">Xem phim →</span>
                 </Link>

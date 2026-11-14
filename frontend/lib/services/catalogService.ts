@@ -50,41 +50,31 @@ export class CatalogApiError extends Error {
 const DEFAULT_TIMEOUT_MS = 7000;
 const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
 
-/**
- * Normalizes a raw backend movie response into the frontend Movie type.
- * Validates required contract fields (id, title, year, rating) and throws 502 for malformed payloads.
- * Safe fallback for optional/nullable media fields (poster, backdrop, videoUrl).
- */
 export function normalizeCatalogMovie(raw: any): Movie {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new CatalogApiError('Dữ liệu phim từ máy chủ không hợp lệ (không phải object)', 502);
   }
 
-  // 1. Required ID: non-empty string
   if (typeof raw.id !== 'string' || !raw.id.trim()) {
     throw new CatalogApiError('Dữ liệu phim thiếu hoặc sai định dạng ID bắt buộc', 502);
   }
   const id = raw.id.trim();
 
-  // 2. Required Title: non-empty string
   if (typeof raw.title !== 'string' || !raw.title.trim()) {
     throw new CatalogApiError(`Phim [${id}] thiếu hoặc sai tiêu đề bắt buộc`, 502);
   }
   const title = raw.title.trim();
 
-  // 3. Required Year: finite number > 1800 (reject missing/0/negative)
   if (typeof raw.year !== 'number' || !Number.isFinite(raw.year) || raw.year <= 1800) {
     throw new CatalogApiError(`Phim [${id}] thiếu hoặc sai định dạng năm phát hành (year)`, 502);
   }
   const year = Math.round(raw.year);
 
-  // 4. Required Rating: finite number between 0 and 10
   if (typeof raw.rating !== 'number' || !Number.isFinite(raw.rating) || raw.rating < 0 || raw.rating > 10) {
     throw new CatalogApiError(`Phim [${id}] thiếu hoặc sai định dạng điểm đánh giá (rating: 0..10)`, 502);
   }
   const rating = Number(raw.rating.toFixed(1));
 
-  // 5. Genres: list of trimmed non-empty strings
   let genres: string[] = [];
   if (Array.isArray(raw.genres)) {
     genres = raw.genres
@@ -97,7 +87,6 @@ export function normalizeCatalogMovie(raw: any): Movie {
       .filter((g: string) => g.length > 0);
   }
 
-  // 6. Optional & Nullable media/metadata fields
   const runtime = (typeof raw.runtime === 'string' || typeof raw.runtime === 'number')
     ? String(raw.runtime).trim()
     : '';
@@ -120,12 +109,6 @@ export function normalizeCatalogMovie(raw: any): Movie {
   };
 }
 
-/**
- * C1 Helper: Executes a network request and response body parsing under a single unified lifecycle.
- * - Timer and caller abort listener cover BOTH fetch() and res.json() (streaming body).
- * - Distinguishes intentional caller cancellation (499, isCanceled: true) from timeout (408, isTimeout: true) and network errors (0).
- * - Guaranteed cleanup in finally after all promises resolve or reject.
- */
 async function executeWithLifecycle<T>(
   action: (signal: AbortSignal) => Promise<T>,
   options: {
@@ -137,7 +120,6 @@ async function executeWithLifecycle<T>(
     ? options.timeoutMs
     : DEFAULT_TIMEOUT_MS;
 
-  // Immediate rejection for pre-aborted signal
   if (options.signal?.aborted) {
     throw new CatalogApiError('Yêu cầu đã bị hủy bởi người dùng', 499, undefined, { isCanceled: true });
   }
@@ -188,18 +170,12 @@ async function executeWithLifecycle<T>(
   }
 }
 
-/**
- * Browse catalog movies with pagination, filtering, and sorting.
- * C2: Validates success=true, page numbers, sizes, and item payloads.
- * C2: Preserves search/query precedence (query takes precedence unless empty, falling back to search).
- */
 export async function browseCatalog(
   options: CatalogBrowseOptions = {},
   baseUrl = SPRINGBOOT_API
 ): Promise<PageResponse<Movie>> {
   const params = new URLSearchParams();
 
-  // Precedence: non-empty query takes precedence, otherwise fallback to non-empty search
   const qTrim = typeof options.query === 'string' ? options.query.trim() : '';
   const sTrim = typeof options.search === 'string' ? options.search.trim() : '';
   const effectiveQuery = qTrim || sTrim;
@@ -265,7 +241,6 @@ export async function browseCatalog(
           const errBody = await res.json();
           if (errBody?.message) errorMsg = errBody.message;
         } catch {
-          // ignore JSON parse error on HTTP error response
         }
         throw new CatalogApiError(errorMsg, res.status);
       }
@@ -316,11 +291,6 @@ export async function browseCatalog(
   );
 }
 
-/**
- * Fetch a single catalog movie by canonical ID.
- * C2: Returns null if HTTP 404 (safely distinguishes 404 HTML/empty bodies from server errors).
- * C2: Validates returned movie ID strictly equals requested canonical ID.
- */
 export async function getCatalogMovieById(
   id: string,
   options: { signal?: AbortSignal; timeoutMs?: number } = {},
@@ -341,7 +311,6 @@ export async function getCatalogMovieById(
         signal,
       });
 
-      // 404 Policy: If 404, return null directly without parsing body (safe against HTML/empty 404s)
       if (res.status === 404) {
         return null;
       }
@@ -352,7 +321,6 @@ export async function getCatalogMovieById(
           const errBody = await res.json();
           if (errBody?.message) errorMsg = errBody.message;
         } catch {
-          // non-JSON error
         }
         throw new CatalogApiError(errorMsg, res.status);
       }
@@ -370,7 +338,6 @@ export async function getCatalogMovieById(
 
       const movie = normalizeCatalogMovie(body.data);
 
-      // Verify literal ID equality according to contract (no case-insensitive mapping)
       if (movie.id !== cleanId) {
         throw new CatalogApiError(
           `ID phim trong phản hồi (${movie.id}) không khớp với ID yêu cầu (${cleanId})`,
@@ -384,9 +351,6 @@ export async function getCatalogMovieById(
   );
 }
 
-// =============================================================================
-// CATALOG-01 ANIMATION CATALOG CONTRACT & API METHODS
-// =============================================================================
 
 export interface CatalogValidationError {
   path: string;
@@ -550,9 +514,6 @@ function getAuthHeader(): Record<string, string> {
   return {};
 }
 
-/**
- * Validate an external animation catalog JSON payload (dry-run preview).
- */
 export async function validateCatalogPackage(
   payload: any,
   baseUrl = SPRINGBOOT_API
@@ -575,9 +536,6 @@ export async function validateCatalogPackage(
   return result;
 }
 
-/**
- * Atomically commit and import an animation catalog JSON package into the database.
- */
 export async function importCatalogPackage(
   payload: any,
   baseUrl = SPRINGBOOT_API
@@ -597,7 +555,6 @@ export async function importCatalogPackage(
     try {
       errBody = await res.json();
     } catch {
-      // non-JSON
     }
     throw new CatalogApiError(
       errBody?.message || `Lỗi khi nhập dữ liệu catalog (HTTP ${res.status})`,
@@ -609,9 +566,6 @@ export async function importCatalogPackage(
   return await res.json();
 }
 
-/**
- * Fetch catalog packages import history.
- */
 export async function getImportHistory(
   baseUrl = SPRINGBOOT_API,
   signal?: AbortSignal,
@@ -627,9 +581,6 @@ export async function getImportHistory(
   }, { signal, timeoutMs });
 }
 
-/**
- * Fetch catalog sync snapshots history and status.
- */
 export async function getCatalogSnapshots(
   baseUrl = SPRINGBOOT_API,
   signal?: AbortSignal,
@@ -645,9 +596,6 @@ export async function getCatalogSnapshots(
   }, { signal, timeoutMs });
 }
 
-/**
- * Retry an outbox catalog snapshot sync.
- */
 export async function retryCatalogSnapshot(
   snapshotId: string,
   baseUrl = SPRINGBOOT_API
@@ -666,9 +614,6 @@ export async function retryCatalogSnapshot(
   return await res.json();
 }
 
-/**
- * Fetch all imported animation series.
- */
 export async function getCatalogSeriesList(
   baseUrl = SPRINGBOOT_API,
   signal?: AbortSignal,
@@ -717,9 +662,6 @@ function normalizeCatalogSeriesSummary(raw: any): CatalogSeriesSummary {
   };
 }
 
-/**
- * Fetch series detail with seasons and episodes.
- */
 export async function getCatalogSeriesDetail(
   id: string,
   baseUrl = SPRINGBOOT_API,
@@ -741,9 +683,6 @@ export async function getCatalogSeriesDetail(
   return await res.json();
 }
 
-/**
- * Fetch episode detail with segments, media assets, and scenes.
- */
 export async function getCatalogEpisodeDetail(
   id: string,
   baseUrl = SPRINGBOOT_API,
@@ -765,9 +704,6 @@ export async function getCatalogEpisodeDetail(
   return await res.json();
 }
 
-/**
- * Search animation catalog across series, episodes, segments, and scenes.
- */
 export async function searchAnimationCatalog(
   q: string,
   baseUrl = SPRINGBOOT_API,
