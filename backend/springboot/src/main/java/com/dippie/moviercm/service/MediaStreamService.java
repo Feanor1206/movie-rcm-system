@@ -110,13 +110,7 @@ public class MediaStreamService {
     // --- Bulkhead Permit Management: Local ---
 
     public boolean acquireStreamPermit() {
-        int current = activeStreamCount.incrementAndGet();
-        if (current > maxConcurrentStreams) {
-            activeStreamCount.decrementAndGet();
-            totalRejectedCount.incrementAndGet();
-            return false;
-        }
-        return true;
+        return tryAcquirePermit(activeStreamCount, totalRejectedCount, maxConcurrentStreams);
     }
 
     public void releaseStreamPermit() {
@@ -142,13 +136,16 @@ public class MediaStreamService {
     // --- Bulkhead Permit Management: Drive ---
 
     public boolean acquireDriveStreamPermit() {
-        int current = activeDriveStreamCount.incrementAndGet();
-        if (current > maxConcurrentDriveStreams) {
-            activeDriveStreamCount.decrementAndGet();
-            totalDriveRejectedCount.incrementAndGet();
-            return false;
+        return tryAcquirePermit(activeDriveStreamCount, totalDriveRejectedCount, maxConcurrentDriveStreams);
+    }
+
+    private static boolean tryAcquirePermit(AtomicInteger activeCount, AtomicLong rejectedCount, int limit) {
+        int previous = activeCount.getAndUpdate(count -> count < limit ? count + 1 : count);
+        if (previous < limit) {
+            return true;
         }
-        return true;
+        rejectedCount.incrementAndGet();
+        return false;
     }
 
     public void releaseDriveStreamPermit() {
