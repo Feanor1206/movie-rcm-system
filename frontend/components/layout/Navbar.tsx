@@ -16,13 +16,11 @@ export function Navbar() {
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
 
   const navLinks = [
-    { name: 'Trang bìa', href: '/' },
+    { name: 'Trang chủ', href: '/' },
     { name: 'Kho phim', href: '/search' },
     { name: 'Danh sách xem', href: '/profile', count: watchlist.length },
     { name: 'Nhập dữ liệu', href: '/admin/import' },
   ];
-
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -43,17 +41,16 @@ export function Navbar() {
   return (
     <header className="comic-navbar sticky top-0 z-40 border-b-2 border-ink bg-paper-white">
       <nav className="mx-auto flex h-[86px] max-w-[1280px] items-center justify-between px-5 sm:px-8">
-        {/* Left: Brand Logo & Links */}
+
         <div className="flex items-center gap-8">
           <Link
             href="/"
             className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
           >
             <span className="comic-wordmark">Dippie</span>
-            <span className="logo-stamp" aria-hidden="true">✳</span>
           </Link>
 
-          {/* Desktop Nav Items */}
+
           <div className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -78,17 +75,17 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* Right: Actions */}
+
         <div className="hidden md:flex items-center gap-3">
-          {/* Chatbot Trigger */}
+
           <button
             onClick={openChat}
             className="rounded-md border border-surface-border bg-surface-elevated px-3.5 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand hover:text-ink cursor-pointer"
           >
-            Trò chuyện
+            Hỏi CineBot
           </button>
 
-          {/* Search Button */}
+
           <Link
             href="/search"
             aria-label="Tìm kiếm phim"
@@ -98,7 +95,7 @@ export function Navbar() {
             <span>Tìm kiếm</span>
           </Link>
 
-          {/* User Auth Section */}
+
           {isAuthenticated && user ? (
             <div className="relative" ref={dropdownRef}>
               <button
@@ -116,7 +113,7 @@ export function Navbar() {
               </button>
 
 
-              {/* Dropdown Menu */}
+
               {userDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-52 rounded-lg border border-surface-border bg-surface-elevated p-2 shadow-2xl animate-fade-in z-50">
                   <div className="px-2.5 py-2 border-b border-surface-border">
@@ -137,7 +134,7 @@ export function Navbar() {
                       onClick={() => setUserDropdownOpen(false)}
                       className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted hover:bg-surface-hover hover:text-ink transition-colors"
                     >
-                      <Bookmark size={14} /> Watchlist ({watchlist.length})
+                      <Bookmark size={14} /> Danh sách xem ({watchlist.length})
                     </Link>
                   </div>
 
@@ -167,7 +164,7 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Mobile Toggle */}
+
         <div className="flex items-center gap-2 md:hidden">
           {isAuthenticated ? (
             <Link
@@ -198,7 +195,7 @@ export function Navbar() {
         </div>
       </nav>
 
-      {/* Mobile Drawer */}
+
       {open && (
         <div id="mobile-navigation" className="border-b border-surface-border bg-background px-5 py-5 md:hidden animate-slide-up">
           <div className="flex flex-col gap-3">
@@ -231,14 +228,14 @@ export function Navbar() {
                 }}
                 className="btn-primary w-full justify-center text-xs"
               >
-                Trò chuyện gợi ý hoạt hình
+                Hỏi CineBot
               </button>
               <Link
                 href="/search"
                 onClick={() => setOpen(false)}
                 className="btn-secondary w-full justify-center text-xs"
               >
-                Tìm kiếm hoạt hình
+                Tìm phim
               </Link>
               {isAuthenticated && (
                 <button

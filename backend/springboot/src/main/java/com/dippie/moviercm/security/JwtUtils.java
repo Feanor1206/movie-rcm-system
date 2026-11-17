@@ -27,9 +27,30 @@ public class JwtUtils {
     @Value("${app.jwt.expiration-ms}")
     private long jwtExpirationMs;
 
+    private volatile SecretKey signingKey;
+    private volatile JwtParser jwtParser;
+
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
-        return Keys.hmacShaKeyFor(keyBytes);
+        if (signingKey == null) {
+            synchronized (this) {
+                if (signingKey == null) {
+                    byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+                    signingKey = Keys.hmacShaKeyFor(keyBytes);
+                }
+            }
+        }
+        return signingKey;
+    }
+
+    private JwtParser getJwtParser() {
+        if (jwtParser == null) {
+            synchronized (this) {
+                if (jwtParser == null) {
+                    jwtParser = Jwts.parser().verifyWith(getSigningKey()).build();
+                }
+            }
+        }
+        return jwtParser;
     }
 
     public String generateJwtToken(Authentication authentication) {
@@ -69,9 +90,7 @@ public class JwtUtils {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
+        return getJwtParser()
                 .parseSignedClaims(token)
                 .getPayload();
     }
@@ -82,7 +101,7 @@ public class JwtUtils {
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Claims claims = Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(authToken).getPayload();
+            Claims claims = getJwtParser().parseSignedClaims(authToken).getPayload();
             Object type = claims.get("type");
             if ("playback_grant".equals(type) || "playback".equals(claims.get("purpose"))) {
                 logger.warn("Rejecting playback grant presented as general access token");

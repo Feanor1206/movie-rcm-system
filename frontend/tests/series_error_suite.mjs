@@ -1,3 +1,4 @@
+import { labels } from './labels_fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -32,6 +33,7 @@ test('Episode loading failure offers retry instead of claiming a missing video',
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, AbortController, URL, console,
     require(name) {
+      if (name === '@/lib/labels') return labels;
       if (name === 'react') return react;
       if (name === 'next/navigation') return { useParams: () => ({ id: 'series1' }), useSearchParams: () => new URLSearchParams() };
       if (name.includes('catalogService')) return {

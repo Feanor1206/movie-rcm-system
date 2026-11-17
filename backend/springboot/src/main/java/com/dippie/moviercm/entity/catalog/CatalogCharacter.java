@@ -11,37 +11,37 @@ public class CatalogCharacter {
     @Column(length = 100)
     private String id;
 
-    @Column(name = "series_ids_json", columnDefinition = "TEXT")
+    @Column(name = "series_ids_json", columnDefinition = "LONGTEXT")
     private String seriesIdsJson;
 
     @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(name = "aliases_json", columnDefinition = "TEXT")
+    @Column(name = "aliases_json", columnDefinition = "LONGTEXT")
     private String aliasesJson;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
 
     @Column(length = 50)
     private String role;
 
-    @Column(name = "traits_json", columnDefinition = "TEXT")
+    @Column(name = "traits_json", columnDefinition = "LONGTEXT")
     private String traitsJson;
 
-    @Column(name = "relationships_json", columnDefinition = "TEXT")
+    @Column(name = "relationships_json", columnDefinition = "LONGTEXT")
     private String relationshipsJson;
 
-    @Column(name = "voice_credits_json", columnDefinition = "TEXT")
+    @Column(name = "voice_credits_json", columnDefinition = "LONGTEXT")
     private String voiceCreditsJson;
 
-    @Column(name = "artworks_json", columnDefinition = "TEXT")
+    @Column(name = "artworks_json", columnDefinition = "LONGTEXT")
     private String artworksJson;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

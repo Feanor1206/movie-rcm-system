@@ -27,11 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Background outbox worker responsible for generating full committed eligible catalog snapshots,
- * writing them atomically to configured disk paths, and synchronizing with FastAPI retrieval index.
- * Handles retries, server restart recovery, disk failure propagation, and stale generation protection (G1).
- */
 @Component
 public class CatalogSyncWorker {
 
@@ -54,18 +49,21 @@ public class CatalogSyncWorker {
     private int syncTimeoutSeconds = 60;
 
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
+    private final HttpClient httpClient;
 
     @Autowired
     public CatalogSyncWorker(CatalogSnapshotRepository snapshotRepository, CatalogQueryService queryService) {
         this.snapshotRepository = snapshotRepository;
         this.queryService = queryService;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         logger.info("[CatalogSyncWorker] Starting recovery check on application startup...");
         try {
-            // Recover any crashed SYNCING snapshots back to PENDING (G1)
             List<CatalogSnapshot> abandoned = snapshotRepository.findByStatusInOrderBySnapshotVersionAsc(List.of("SYNCING"));
             for (CatalogSnapshot s : abandoned) {
                 logger.info("[CatalogSyncWorker] Phục hồi snapshot bị gián đoạn sau restart: {} (gen {})", s.getId(), s.getSnapshotVersion());
@@ -96,7 +94,7 @@ public class CatalogSyncWorker {
 
             for (CatalogSnapshot snapshot : pendingSnapshots) {
                 if (snapshot.getRetryCount() != null && snapshot.getRetryCount() >= 5) {
-                    continue; // Skip exhausted retries until manual operator intervention (G1)
+                    continue;
                 }
                 processSingleSnapshot(snapshot);
             }
@@ -125,12 +123,10 @@ public class CatalogSyncWorker {
             snapshot.setUpdatedAt(LocalDateTime.now());
             snapshotRepository.save(snapshot);
 
-            // 1. Generate full committed eligible catalog JSON from database (self-contained)
             Map<String, Object> fullEligibleCatalog = queryService.exportEligibleSnapshot(false, false);
             String catalogJson = objectMapper.writeValueAsString(fullEligibleCatalog);
             String fullCatalogHash = CatalogImportService.computeSha256(catalogJson);
 
-            // 2. Write full committed catalog snapshot to configured disk path atomically (G1)
             try {
                 writeSnapshotToDisk(catalogJson);
             } catch (Exception diskEx) {
@@ -144,7 +140,6 @@ public class CatalogSyncWorker {
                 return;
             }
 
-            // 3. Dispatch to FastAPI if sync token is configured
             if (syncToken == null || syncToken.trim().isEmpty()) {
                 logger.warn("[CatalogSyncWorker] Không cấu hình syncToken ngoài Git; snapshot đã ghi ra đĩa tại {}. Đánh dấu BLOCKED (chưa có index ack).", snapshotPath);
                 snapshot.setStatus("BLOCKED");
@@ -154,10 +149,6 @@ public class CatalogSyncWorker {
                 snapshotRepository.save(snapshot);
                 return;
             }
-
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(3))
-                    .build();
 
             Map<String, Object> payload = Map.of(
                     "generation", snapshot.getSnapshotVersion(),
@@ -175,7 +166,7 @@ public class CatalogSyncWorker {
                     .timeout(Duration.ofSeconds(syncTimeoutSeconds))
                     .build();
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int statusCode = response.statusCode();
             String responseBody = response.body() != null ? response.body() : "";
 
@@ -187,20 +178,37 @@ public class CatalogSyncWorker {
             String ackStatus = respMap != null ? (String) respMap.get("status") : null;
             Number ackGen = respMap != null ? (Number) respMap.get("generation") : null;
             String ackHash = respMap != null ? (String) respMap.get("content_hash") : null;
+            boolean genMatches = ackGen != null && snapshot.getSnapshotVersion().toString().equals(ackGen.toString());
+            boolean hashMatches = ackHash != null && ackHash.equalsIgnoreCase(fullCatalogHash);
 
-            if (statusCode == 409 || "SKIPPED".equalsIgnoreCase(ackStatus) || responseBody.contains("SKIPPED")) {
+            if (statusCode == 503 && "CACHE_REQUIRED".equals(ackStatus) && genMatches && hashMatches
+                    && Boolean.FALSE.equals(respMap.get("index_ready"))
+                    && respMap.get("missing_embeddings") instanceof Integer missing && missing > 0
+                    && respMap.get("cache_command") instanceof String command && !command.isBlank()
+                    && respMap.get("message") instanceof String message && !message.isBlank()) {
+                snapshot.setStatus("BLOCKED");
+                snapshot.setContentHash(fullCatalogHash);
+                snapshot.setErrorMessage("CACHE_REQUIRED · Thiếu " + missing + " embedding. " + message + "\n" + command);
+                snapshot.setUpdatedAt(LocalDateTime.now());
+                snapshotRepository.save(snapshot);
+                logger.info("[CatalogSyncWorker] Snapshot generation {} cần dựng cache offline cho {} tài liệu.",
+                        snapshot.getSnapshotVersion(), missing);
+            } else if (statusCode == 409 || "SKIPPED".equalsIgnoreCase(ackStatus)) {
                 snapshot.setStatus("STALE_SKIPPED");
                 snapshot.setCompletedAt(LocalDateTime.now());
                 snapshot.setErrorMessage("Generation cũ bị từ chối/bỏ qua bởi FastAPI: " + responseBody);
                 snapshotRepository.save(snapshot);
                 logger.warn("[CatalogSyncWorker] Snapshot generation {} bị bỏ qua do stale: {}", snapshot.getSnapshotVersion(), responseBody);
             } else if (statusCode >= 200 && statusCode < 300) {
-                boolean statusOk = "success".equalsIgnoreCase(ackStatus) || "OK".equalsIgnoreCase(ackStatus)
-                        || "SYNCED".equalsIgnoreCase(ackStatus) || "UNCHANGED".equalsIgnoreCase(ackStatus);
-                boolean genMatches = ackGen != null && ackGen.longValue() == snapshot.getSnapshotVersion();
-                boolean hashMatches = ackHash != null && ackHash.equalsIgnoreCase(fullCatalogHash);
-
-                if (statusOk && genMatches && hashMatches) {
+                boolean statusOk = statusCode != 202 && ("success".equalsIgnoreCase(ackStatus) || "OK".equalsIgnoreCase(ackStatus)
+                        || "SYNCED".equalsIgnoreCase(ackStatus) || "UNCHANGED".equalsIgnoreCase(ackStatus));
+                if (statusCode == 202 && "BUILDING".equalsIgnoreCase(ackStatus) && genMatches && hashMatches) {
+                    snapshot.setStatus("PENDING");
+                    snapshot.setErrorMessage(null);
+                    snapshot.setUpdatedAt(LocalDateTime.now());
+                    snapshotRepository.save(snapshot);
+                    logger.info("[CatalogSyncWorker] FastAPI đang chuẩn bị snapshot generation {}; tiếp tục chờ ACK hoàn tất.", snapshot.getSnapshotVersion());
+                } else if (statusOk && genMatches && hashMatches && Boolean.TRUE.equals(respMap.get("index_ready"))) {
                     snapshot.setStatus("READY");
                     snapshot.setContentHash(fullCatalogHash);
                     snapshot.setCompletedAt(LocalDateTime.now());

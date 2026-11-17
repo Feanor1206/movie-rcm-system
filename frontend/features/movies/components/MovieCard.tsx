@@ -1,5 +1,7 @@
 'use client';
 
+import { formatRuntime, genreLabel } from '@/lib/labels';
+
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -35,8 +37,8 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
       ? `Chưa xác nhận lưu • Thử lưu lại ${movie.title} vào danh sách xem`
       : `Chưa xác nhận xóa • Thử xóa lại ${movie.title} khỏi danh sách xem`
     : inWatchlist
-    ? `Xóa ${movie.title} khỏi watchlist`
-    : `Thêm ${movie.title} vào watchlist`;
+    ? `Xóa ${movie.title} khỏi danh sách xem`
+    : `Thêm ${movie.title} vào danh sách xem`;
 
   const buttonTitle = isUnconfirmed
     ? unconfirmedIntent === 'add'
@@ -53,7 +55,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
       }`}
     >
       <article className="comic-card overflow-hidden transition-all duration-200 group-hover:shadow-card-hover">
-        {/* Poster Media */}
+
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-elevated">
           {hasPoster ? (
             <Image
@@ -77,16 +79,13 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
             </div>
           )}
 
-          {/* Overlay gradient */}
           <div className="absolute inset-0 comic-halftone pointer-events-none opacity-20" />
 
-          {/* Rating Badge */}
           <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-2 py-0.5 text-[11px] font-bold text-ink border border-surface-border backdrop-blur-md">
             <Star size={11} className="fill-mint" />
             {movie.rating}
           </span>
 
-          {/* Unconfirmed Status Badge */}
           {isUnconfirmed && (
             <span
               data-testid="unconfirmed-badge"
@@ -97,7 +96,6 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
             </span>
           )}
 
-          {/* Hover / Focus Overlay: Navigate to Details */}
           <Link
             href={buildMediaItemHref(movie)}
             aria-label={`Xem chi tiết ${movie.title}`}
@@ -108,7 +106,6 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
             </span>
           </Link>
 
-          {/* Quick Watchlist Toggle - z-20 so it is NEVER blocked by the overlay link */}
           <button
             type="button"
             aria-label={buttonAriaLabel}
@@ -139,7 +136,6 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
           </button>
         </div>
 
-        {/* Content Info */}
         <div className="border-t-2 border-ink p-3">
           <Link
             href={buildMediaItemHref(movie)}
@@ -149,11 +145,11 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
           </Link>
 
           <div className="mt-1 flex items-center justify-between text-xs text-muted">
-            <span>{movie.year} · {movie.runtime}</span>
+            <span>{movie.year} · {formatRuntime(movie.runtime)}</span>
           </div>
 
           <p className="mt-1 truncate text-xs text-muted">
-            {movie.genres.join(', ')}
+            {movie.genres.map(genreLabel).join(', ')}
           </p>
         </div>
       </article>

@@ -29,9 +29,6 @@ type HydratedItem = {
   status: HydrationStatus;
   expiresAt?: number;
 };
-
-// Bounded in-memory metadata cache for public catalog movies (max 200 entries, 5-min TTL)
-// Strictly stores public movie metadata; never user-specific state or account lists.
 const METADATA_TTL_MS = 5 * 60 * 1000;
 const profileMetadataCache = new Map<string, { movie: Movie; expiresAt: number }>();
 
@@ -62,8 +59,6 @@ export function ProfileOverview() {
   } = useWatchlist();
 
   const { user, status, openAuthModal, retryVerify } = useAuth();
-
-  // Remote catalog hydration for canonical IDs (no static fixture dependency)
   const [remoteMovies, setRemoteMovies] = useState<Record<string, HydratedItem>>({});
 
   const allItemIds = useMemo(() => {
@@ -78,7 +73,6 @@ export function ProfileOverview() {
 
   const fetchRemoteMovie = useCallback(async (id: string) => {
     const now = Date.now();
-    // Check bounded metadata cache first
     const cached = profileMetadataCache.get(id);
     if (cached && cached.expiresAt > now) {
       setRemoteMovies((prev) => ({
@@ -107,11 +101,9 @@ export function ProfileOverview() {
       });
 
       if (!movie) {
-        // HTTP 404: Orphan item not found in backend catalog
         setRemoteMovies((prev) => ({ ...prev, [id]: { status: 'not_found' } }));
       } else {
         const expiresAt = Date.now() + METADATA_TTL_MS;
-        // Enforce bounded cache size
         if (profileMetadataCache.size >= 200) {
           const oldestKey = profileMetadataCache.keys().next().value;
           if (oldestKey) profileMetadataCache.delete(oldestKey);
@@ -122,9 +114,8 @@ export function ProfileOverview() {
       }
     } catch (err: any) {
       if (err?.isCanceled || err?.name === 'AbortError') {
-        return; // Caller unmounted or cancelled
+        return;
       }
-      // Server error / network error / timeout: mark as 'error', preserve item in library!
       setRemoteMovies((prev) => ({ ...prev, [id]: { status: 'error' } }));
     } finally {
       activeHydrationAbortControllersRef.current.delete(id);
@@ -141,8 +132,6 @@ export function ProfileOverview() {
       activeHydrationAbortControllersRef.current.clear();
     };
   }, []);
-
-  // Cleanup removed IDs from remoteMovies and abort in-flight hydration
   useEffect(() => {
     const currentIdSet = new Set(allItemIds);
     for (const [id, ctrl] of activeHydrationAbortControllersRef.current.entries()) {
@@ -164,8 +153,6 @@ export function ProfileOverview() {
       return next;
     });
   }, [allItemIds]);
-
-  // Hydrate missing or expired catalog metadata for current library items
   useEffect(() => {
     const now = Date.now();
     const staleOrMissing = allItemIds.filter((id) => {
@@ -186,8 +173,6 @@ export function ProfileOverview() {
       fetchRemoteMovie(id);
     });
   }, [allItemIds, remoteMovies, fetchRemoteMovie]);
-
-  // Window focus listener: revalidate expired items upon returning to tab without background polling
   useEffect(() => {
     const handleRevalidateStale = () => {
       const now = Date.now();
@@ -252,8 +237,6 @@ export function ProfileOverview() {
       })),
     [ratings, resolveMovieItem]
   );
-
-  // Genre analysis on known movies
   const genreCounts: Record<string, number> = {};
   [...watchlistItems, ...favoriteItems, ...ratingItems].forEach((item) => {
     if (item.movie) {
@@ -296,14 +279,13 @@ export function ProfileOverview() {
           return;
         }
       }
-      // Confirmed removal or normal deletion
       await removeRating(id, title);
     }
   };
 
   return (
     <main className="page-shell min-h-[75vh] py-8 sm:py-12">
-      {/* Session Unavailable Alert */}
+
       {status === 'unavailable' && (
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200">
           <div className="flex items-center gap-3">
@@ -321,7 +303,7 @@ export function ProfileOverview() {
         </div>
       )}
 
-      {/* Profile Header */}
+
       <div className="rounded-xl border border-surface-border bg-surface p-6 sm:p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
@@ -335,38 +317,38 @@ export function ProfileOverview() {
                 </span>
                 <span className="text-muted">•</span>
                 <span className="text-xs text-muted">
-                  {isGuestMode ? 'Lưu trữ cục bộ trên thiết bị' : user?.email || 'Tài khoản đám mây'}
+                  {isGuestMode ? 'Lưu trên thiết bị' : user?.email || 'Tài khoản đám mây'}
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-ink mt-0.5">
-                {isGuestMode ? 'Khách ghé thăm' : user?.fullName || user?.username}
+                {isGuestMode ? 'Khách' : user?.fullName || user?.username}
               </h1>
             </div>
           </div>
 
-          {/* Quick CTA */}
+
           <div className="flex items-center gap-3">
             {isGuestMode ? (
               <button
                 onClick={() => openAuthModal('register')}
                 className="btn-primary text-xs w-full sm:w-auto"
               >
-                Đăng ký để đồng bộ đám mây
+                Đăng ký tài khoản
               </button>
             ) : (
               <button onClick={openChat} className="btn-secondary text-xs w-full sm:w-auto">
-                Tư vấn gu phim với CineBot
+                Hỏi CineBot
               </button>
             )}
           </div>
         </div>
 
-        {/* Stats Row */}
+
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 border-t border-surface-border pt-6">
           <div className="rounded-lg border border-surface-border bg-surface-muted p-3 sm:p-4">
             <div className="flex items-center gap-2 text-muted text-xs">
               <Bookmark size={14} className="text-brand" />
-              <span>Watchlist</span>
+              <span>Danh sách xem</span>
             </div>
             <p className="mt-1 text-lg sm:text-2xl font-bold text-ink">{watchlist.length}</p>
           </div>
@@ -401,7 +383,7 @@ export function ProfileOverview() {
         </div>
       </div>
 
-      {/* Tabs Section */}
+
       <section className="mt-8">
         <div className="flex border-b border-surface-border">
           <button
@@ -412,7 +394,7 @@ export function ProfileOverview() {
                 : 'border-transparent text-muted hover:text-ink'
             }`}
           >
-            <Bookmark size={15} /> Watchlist ({watchlist.length})
+            <Bookmark size={15} /> Danh sách xem ({watchlist.length})
           </button>
 
           <button
@@ -438,11 +420,11 @@ export function ProfileOverview() {
           </button>
         </div>
 
-        {/* Guest Mode notice */}
+
         {isGuestMode && (
           <div className="my-4 flex items-center justify-between rounded-lg border border-surface-border bg-surface-muted px-4 py-3 text-xs text-muted">
             <span>
-              Dữ liệu danh sách đang lưu trên trình duyệt của thiết bị này. Đăng nhập để bảo lưu và mở khóa gợi ý cá nhân hóa sâu.
+              Danh sách đang lưu trên thiết bị này.
             </span>
             <button
               onClick={() => openAuthModal('login')}
@@ -453,7 +435,7 @@ export function ProfileOverview() {
           </div>
         )}
 
-        {/* Persistent Library / Reconciliation Error Alert Banner */}
+
         {libraryError && (
           <div
             data-testid="library-error-banner"
@@ -479,7 +461,7 @@ export function ProfileOverview() {
           </div>
         )}
 
-        {/* Tab Content Panels */}
+
         <div className="mt-6">
           {isLibraryLoading && watchlist.length === 0 && favorites.length === 0 && Object.keys(ratings).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted">
@@ -487,7 +469,6 @@ export function ProfileOverview() {
               <p className="text-xs">Đang tải thư viện cá nhân từ máy chủ...</p>
             </div>
           ) : (
-            /* Data Grid */
             <>
               {activeTab === 'watchlist' && (
                 watchlistItems.length > 0 ? (
@@ -565,7 +546,6 @@ export function ProfileOverview() {
                           </div>
                         </div>
                       ) : (
-                        /* Movie absent from catalog (404) */
                         <div
                           key={item.id}
                           className="flex flex-col justify-between rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs"
@@ -720,7 +700,6 @@ export function ProfileOverview() {
                           </div>
                         </div>
                       ) : (
-                        /* Movie absent from catalog (404) */
                         <div
                           key={item.id}
                           className="flex flex-col justify-between rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs"
@@ -925,7 +904,6 @@ export function ProfileOverview() {
                             </div>
                           </div>
                         ) : (
-                          /* Absent from catalog (404) */
                           <div className="flex flex-col justify-between rounded-lg border border-ink/30 bg-surface-muted p-4 text-xs">
                             <div>
                               <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
@@ -999,7 +977,7 @@ export function ProfileOverview() {
                 ) : (
                   <EmptyState
                     title="Chưa có phim nào được chấm điểm"
-                    description="Hãy chấm điểm các phim bạn đã xem để CineBot hiểu rõ gu và gợi ý chuẩn xác hơn."
+                    description="Chấm điểm phim bạn đã xem."
                     openChat={openChat}
                   />
                 )
@@ -1031,7 +1009,7 @@ function EmptyState({
           Khám phá phim <ArrowRight size={13} />
         </Link>
         <button onClick={openChat} className="btn-secondary text-xs">
-          Nhờ CineBot gợi ý
+          Hỏi CineBot
         </button>
       </div>
     </div>

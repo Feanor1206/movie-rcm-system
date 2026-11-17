@@ -2,7 +2,7 @@
 -- SEED DATA: 6 MOVIES WITH LOCAL VIDEO URLS
 -- ==========================================================
 
-INSERT INTO movies (id, title, release_year, rating, runtime, genres, description, poster, backdrop, video_url) VALUES
+INSERT IGNORE INTO movies (id, title, release_year, rating, runtime, genres, description, poster, backdrop, video_url) VALUES
 ('the-last-orbit', 'The Last Orbit', 2026, 8.7, '2h 14m', 'Sci-Fi,Drama', 
  'A lone astronaut discovers that the signal guiding her home may be the final memory of a world already gone.', 
  'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85', 
@@ -37,5 +37,4 @@ INSERT INTO movies (id, title, release_year, rating, runtime, genres, descriptio
  'A detective investigates a string of elegant crimes committed at midnight.', 
  'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85', 
  'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1800&q=85', 
- '/videos/nocturne.mp4')
-ON CONFLICT (id) DO NOTHING;
+ '/videos/nocturne.mp4');

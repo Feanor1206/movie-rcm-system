@@ -1,56 +1,35 @@
-# AI & Machine Learning Pipeline (`movie-rcm-system/ai`)
+# Xử lý dữ liệu và tìm kiếm
 
-Tài liệu hướng dẫn phát triển và mở rộng hệ thống **Cascading Multi-Stage AI Recommendation Pipeline**:
+Mã trong `ai/` chuẩn bị dữ liệu, mô hình và đánh giá. API phục vụ nằm ở `backend/fastapi/services`.
 
-```text
-Qwen 4B (NLU) ➔ Embedding / Retrieval ➔ Qwen 0.6B Recommender ➔ Qwen 0.6B Ranker ➔ Qwen 4B (Explanation)
+Tìm kiếm dùng BM25 theo trọng số trường và cụm từ tiếng Việt. Khi có mô hình cục bộ, hệ thống kết hợp vector ONNX qua RRF, xếp hạng lại bằng TorchScript và hiệu chuẩn điểm. Tìm bằng ảnh dùng pHash 64 bit từ kho khung hình.
+
+CineBot lấy bằng chứng từ danh mục, hỗ trợ API LLM tương thích OpenAI trên máy hoặc qua HTTPS. Cấu hình dịch vụ và phạm vi tập phim nằm trong [hướng dẫn FastAPI](../backend/fastapi/README.md).
+
+## Chuẩn bị dữ liệu tập phim
+
+Quy trình thử nghiệm gồm nhận dạng lời thoại bằng Whisper, trích khung hình, nhóm cảnh, tạo mô tả ảnh, tóm tắt tập và xuất danh mục. Mỗi bước có đầu vào và kết quả riêng; xem [hướng dẫn xử lý dữ liệu](enrich/README.md).
+
+Lệnh sau dùng bản ghi lời thoại đã có để trích khung hình, nhóm cảnh và xuất danh mục cho một tập:
+
+```powershell
+python -m ai.enrich.pipeline --episode ep_jadoo_s01_0022 --dialogue-only
 ```
 
----
+## Tạo vector văn bản
 
-## 📁 Cấu trúc thư mục & Vai trò
+Chạy từ thư mục gốc sau khi chuẩn bị mô hình ONNX:
 
-```text
-ai/
-├── 📁 datasets/
-│   ├── preprocess_data.py          # Script tiền xử lý dữ liệu phim và lịch sử người dùng
-│   ├── raw/                        # Dữ liệu thô (MovieLens, TMDB, crawl)
-│   └── processed/                  # Dữ liệu sau khi trích xuất vector đặc trưng
-│
-├── 📁 training/
-│   ├── train_recommender.py        # Huấn luyện / Fine-tune Qwen 0.6B Recommender (LoRA)
-│   └── train_ranker.py             # Huấn luyện / Fine-tune Qwen 0.6B Ranker (Re-ranking)
-│
-├── 📁 models/
-│   ├── qwen-0.6b/                  # Trọng số model Qwen 0.6B local (.gguf / .safetensors)
-│   └── checkpoints/                # Các adapter LoRA đã huấn luyện
-│
-└── 📁 evaluation/
-    └── evaluate_metrics.py         # Đo lường chất lượng: NDCG@K, Hit Rate@K, Precision, Recall
+```powershell
+python ai/build_text_embeddings.py --catalog data/catalog.jadoo_all.json --artifact ai/models/text-onnx --device cpu
 ```
 
----
+## Đánh giá tìm kiếm
 
-## 🚀 Hướng dẫn phát triển thêm trong tương lai
+Chuẩn bị nhãn do người viết độc lập trước khi chạy. Tệp CSV mẫu hiện chỉ có tên cột.
 
-### 1. Tiền xử lý dữ liệu mới
-```bash
-python ai/datasets/preprocess_data.py --input raw/my_movies.json --output processed/
+```powershell
+python -m ai.evaluation.retrieval_gate --labels ai/datasets/gold/search_queries_v1.csv --original-catalog data/catalog.jadoo_all.json --enriched-catalog ai/artifacts/pilot-enriched.json --encoder ai/models/text-onnx
 ```
 
-### 2. Huấn luyện 0.6B Recommender & 0.6B Ranker
-```bash
-# Train Recommender (Candidate Filtering)
-python ai/training/train_recommender.py --base_model Qwen/Qwen2.5-0.5B-Instruct
-
-# Train Ranker (Fine-grained Re-ranking)
-python ai/training/train_ranker.py --base_model Qwen/Qwen2.5-0.5B-Instruct
-```
-
-### 3. Đánh giá chất lượng mô hình (Benchmarking)
-```bash
-python ai/evaluation/evaluate_metrics.py
-```
-
-### 4. Kết nối vào FastAPI Online Inference
-File [`backend/fastapi/services/ai_pipeline.py`](file:///d:/movie-rcm-system/backend/fastapi/services/ai_pipeline.py) đã được chia sẵn thành 5 lớp Node độc lập (`NLUUnderstandingNode`, `EmbeddingRetrievalNode`, `Recommender06BNode`, `Ranker06BNode`, `ExplanationGeneratorNode`). Khi bạn hoàn thiện mô hình mới ở thư mục `ai/`, chỉ cần cập nhật trọng số trong các lớp Node tương ứng!
+Cách tính chỉ số và điều kiện đánh giá nằm trong [hướng dẫn đánh giá](evaluation/README.md).

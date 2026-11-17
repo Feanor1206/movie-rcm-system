@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
+import { movieSynopsis } from '@/lib/labels';
 import type { Movie } from '@/types/movie';
 
 type FilmShelfProps = {
@@ -23,7 +24,7 @@ export function FilmShelf({
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <h2 className="comic-heading text-2xl font-bold text-ink">{title}</h2>
-          <p className="mt-1 text-sm text-muted">{subtitle}</p>
+          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
         </div>
         <Link href={exploreHref} className="hidden items-center gap-1 text-xs font-semibold text-brand-dark sm:flex">
           Mở kho <ArrowUpRight size={15} />
@@ -47,7 +48,7 @@ export function FilmShelf({
                   {movie.year ? <span className="shrink-0 text-xs text-muted">{movie.year}</span> : null}
                 </div>
                 {movie.description && (
-                  <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted">{movie.description}</p>
+                  <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted">{movieSynopsis(movie.description)}</p>
                 )}
               </div>
               <span className="mt-4 flex items-center justify-end gap-1 text-xs font-semibold text-brand-dark">

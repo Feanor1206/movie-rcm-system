@@ -3,7 +3,7 @@ package com.dippie.moviercm.controller;
 import com.dippie.moviercm.dto.ApiResponse;
 import com.dippie.moviercm.dto.AuthRequest;
 import com.dippie.moviercm.dto.AuthResponse;
-import com.dippie.moviercm.dto.RegisterRequest;
+import com.dippie.moviercm.dto.RegistrationRequest;
 import com.dippie.moviercm.dto.UserResponse;
 import com.dippie.moviercm.security.UserDetailsImpl;
 import com.dippie.moviercm.service.AuthService;
@@ -26,22 +26,22 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest loginRequest) {
         AuthResponse response = authService.login(loginRequest);
-        return ResponseEntity.ok(ApiResponse.success("Login successful", response));
+        return ResponseEntity.ok(ApiResponse.success("Đã đăng nhập.", response));
     }
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest registerRequest) {
-        AuthResponse response = authService.register(registerRequest);
-        return ResponseEntity.ok(ApiResponse.success("User registered successfully", response));
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegistrationRequest registrationRequest) {
+        AuthResponse response = authService.register(registrationRequest);
+        return ResponseEntity.ok(ApiResponse.success("Đã tạo tài khoản.", response));
     }
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Yêu cầu đăng nhập hoặc Token không hợp lệ"));
+                    .body(ApiResponse.error("Vui lòng đăng nhập lại."));
         }
         UserResponse response = authService.getCurrentUser(userDetails);
-        return ResponseEntity.ok(ApiResponse.success("User profile fetched successfully", response));
+        return ResponseEntity.ok(ApiResponse.success("Đã tải hồ sơ.", response));
     }
 }

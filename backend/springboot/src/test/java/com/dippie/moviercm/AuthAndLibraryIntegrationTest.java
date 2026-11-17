@@ -80,10 +80,10 @@ class AuthAndLibraryIntegrationTest {
     }
 
     private String registerAndGetToken(String username, String email, String password, String fullName) throws Exception {
-        RegisterRequest registerReq = new RegisterRequest(username, email, password, fullName);
+        RegistrationRequest registrationRequest = new RegistrationRequest(username, email, password, fullName);
         MvcResult result = mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(registerReq)))
+                        .content(objectMapper.writeValueAsString(registrationRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.token").isNotEmpty())
@@ -97,7 +97,7 @@ class AuthAndLibraryIntegrationTest {
     @DisplayName("1. User registration preserves raw password with spaces and login succeeds")
     void testRegistrationAndLoginWithSpacesInPassword() throws Exception {
         String rawPassword = " my secret pass 123 ";
-        RegisterRequest req = new RegisterRequest("testuser", "testuser@example.com", rawPassword, "Test User");
+        RegistrationRequest req = new RegistrationRequest("testuser", "testuser@example.com", rawPassword, "Test User");
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

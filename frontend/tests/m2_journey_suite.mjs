@@ -1,3 +1,4 @@
+import { labels } from './labels_fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,16 +7,6 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 
-/**
- * M2 Catalog UI Cutover Journey Test Suite (Round 6)
- *
- * Tests actual production components across Home, Movie Detail, and Profile:
- * 1. Home Page: animationOnly constraint, loading skeleton, error retry, empty catalog state.
- * 2. Movie Detail Page: canonical ID resolution (200, real 404, 5xx/timeout with retry, deterministic similar rail).
- * 3. Movie Detail Media Fallbacks: safe backdrop, poster placeholder, video playback capability strictly on valid data.
- * 4. Profile Overview: shared catalog client hydration for all canonical IDs, bounded metadata cache, orphan vs network error.
- * 5. Cross-surface journey: consistent canonical ID between Home, Detail, and Profile library.
- */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,7 +35,6 @@ const profileOverviewTranspiled = ts.transpileModule(fs.readFileSync(profileOver
 const editorialHeroTranspiled = ts.transpileModule(fs.readFileSync(editorialHeroCompFilePath, 'utf8'), transpileOptions).outputText;
 const watchlistProviderTranspiled = ts.transpileModule(fs.readFileSync(watchlistProviderFilePath, 'utf8'), transpileOptions).outputText;
 
-// Validate B3: synthetic canonical ID must not exist in local static fixture (frontend/lib/data/movies.ts)
 const moviesFilePath = path.join(root, 'lib/data/movies.ts');
 const moviesTranspiled = ts.transpileModule(fs.readFileSync(moviesFilePath, 'utf8'), transpileOptions).outputText;
 const moviesContext = { exports: {} };
@@ -77,7 +67,6 @@ function sampleMovie(overrides = {}) {
   };
 }
 
-// Tree inspection helpers
 function findNodes(node, pred, out = []) {
   if (!node) return out;
   if (Array.isArray(node)) {
@@ -100,7 +89,6 @@ function getText(node) {
   return collect(node).replace(/\s+/g, ' ').trim();
 }
 
-// Harness to execute actual HomePage
 function createHomeHarness(moviesMock) {
   let slots = [];
   let hookIndex = 0;
@@ -158,6 +146,7 @@ function createHomeHarness(moviesMock) {
     console,
     AbortController,
     require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (mod === 'next/link') return { default: 'next/link', __esModule: true };
       if (mod === 'next/image') return { default: 'next/image', __esModule: true };
@@ -226,7 +215,6 @@ function createHomeHarness(moviesMock) {
   return { render, settle, get tree() { return tree; } };
 }
 
-// Harness to execute actual MovieDetailPage
 function createDetailHarness(requestedId, getCatalogMovieByIdMock, browseCatalogMock) {
   let slots = [];
   let hookIndex = 0;
@@ -284,6 +272,7 @@ function createDetailHarness(requestedId, getCatalogMovieByIdMock, browseCatalog
     console,
     AbortController,
     require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (mod === 'next/navigation') {
         return {
@@ -336,7 +325,6 @@ function createDetailHarness(requestedId, getCatalogMovieByIdMock, browseCatalog
   return { render, settle, get tree() { return tree; } };
 }
 
-// Harness to execute actual MovieDetail component
 function renderMovieDetail(movie, similarMovies = [], watchlistContext = {}) {
   let slots = [];
   let hookIndex = 0;
@@ -352,7 +340,6 @@ function renderMovieDetail(movie, similarMovies = [], watchlistContext = {}) {
       return slots[idx];
     },
     useEffect(fn, deps) {
-      // No-op in node harness
     },
     createElement(type, props, ...children) {
       const flat = children.length === 1 ? children[0] : children.length > 1 ? children : undefined;
@@ -382,6 +369,7 @@ function renderMovieDetail(movie, similarMovies = [], watchlistContext = {}) {
     exports: moduleObj.exports,
     console,
     require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (mod === 'next/image') return { default: 'next/image', __esModule: true };
       if (mod === 'next/link') return { default: 'next/link', __esModule: true };
@@ -397,7 +385,6 @@ function renderMovieDetail(movie, similarMovies = [], watchlistContext = {}) {
   return moduleObj.exports.MovieDetail({ movie, similarMovies });
 }
 
-// Harness to execute actual EditorialHero component
 function renderEditorialHero(movie, watchlistContext = {}) {
   let slots = [];
   let hookIndex = 0;
@@ -435,6 +422,7 @@ function renderEditorialHero(movie, watchlistContext = {}) {
     exports: moduleObj.exports,
     console,
     require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (mod === 'next/image') return { default: 'next/image', __esModule: true };
       if (mod === 'next/link') return { default: 'next/link', __esModule: true };
@@ -449,7 +437,6 @@ function renderEditorialHero(movie, watchlistContext = {}) {
   return moduleObj.exports.EditorialHero({ movie });
 }
 
-// Harness to execute actual ProfileOverview component
 function createProfileHarness(initialLibrary, getCatalogMovieByIdMock, customClock = null) {
   let slots = [];
   let hookIndex = 0;
@@ -536,6 +523,7 @@ function createProfileHarness(initialLibrary, getCatalogMovieByIdMock, customClo
     AbortController,
     ...(customClock ? { Date: customClock } : {}),
     require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (mod === 'next/link') return { default: 'next/link', __esModule: true };
       if (mod === 'next/image') return { default: 'next/image', __esModule: true };
@@ -554,7 +542,6 @@ function createProfileHarness(initialLibrary, getCatalogMovieByIdMock, customClo
 
   vm.runInNewContext(profileOverviewTranspiled, context, { filename: profileOverviewFilePath });
 
-  // Clear cache between test runs
   if (typeof moduleObj.exports.clearProfileMetadataCache === 'function') {
     moduleObj.exports.clearProfileMetadataCache();
   }
@@ -586,7 +573,6 @@ function createProfileHarness(initialLibrary, getCatalogMovieByIdMock, customClo
   return { render, settle, setLibrary, get tree() { return tree; } };
 }
 
-// Helper to mount production WatchlistProvider with custom fetcher
 function mountProductionProvider(fetcher, customAuth = {}) {
   let slots = [];
   let hookIndex = 0;
@@ -668,6 +654,7 @@ function mountProductionProvider(fetcher, customAuth = {}) {
     setTimeout: (fn) => setTimeout(fn, 0),
     clearTimeout: (id) => clearTimeout(id),
     require: (name) => {
+      if (name === '@/lib/labels') return labels;
       if (name === 'next/dynamic') return { __esModule: true, default: () => () => null };
       if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
       if (name.includes('AuthContext')) {
@@ -707,9 +694,6 @@ function mountProductionProvider(fetcher, customAuth = {}) {
   return { render, settle, get value() { return value; } };
 }
 
-// ============================================================================
-// TEST CASES: ROUND 6 CUTOVER & JOURNEY INTEGRATION
-// ============================================================================
 
 test('1. Home: Loads standalone films once and preserves loading, empty, error, retry, and cover states', async () => {
   let listCalls = 0;
@@ -739,7 +723,6 @@ test('1. Home: Loads standalone films once and preserves loading, empty, error, 
   assert.deepEqual(emptyShelf.props.movies, []);
   assert.ok(findNodes(emptyHarness.tree, (n) => n.type === 'h1').length, 'The cover stays visible for an empty catalog');
 
-  // Catalog errors stay visible and a retry reloads the endpoint.
   let retryTriggered = false;
   const errorHarness = createHomeHarness(async () => {
     if (retryTriggered) {
@@ -752,12 +735,11 @@ test('1. Home: Loads standalone films once and preserves loading, empty, error, 
 
   const errorText = getText(errorHarness.tree);
   assert.ok(
-    errorText.includes('Kệ phim đang nghỉ một chút'),
+    errorText.includes('Không thể tải phim. Vui lòng thử lại.'),
     'Must render error state when catalog service is down'
   );
 
-  // Retry button
-  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Tải lại kệ phim'))[0];
+  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Thử lại'))[0];
   assert.ok(retryBtn, 'Retry button must be provided');
   retryTriggered = true;
   retryBtn.props.onClick();
@@ -767,7 +749,6 @@ test('1. Home: Loads standalone films once and preserves loading, empty, error, 
 });
 
 test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministic similar rail (D1 decoupled)', async () => {
-  // 2A. Valid 200 Movie: Main detail renders immediately while similar rail is pending!
   let similarDeferredResolve;
   const pendingSimilarPromise = new Promise((resolve) => {
     similarDeferredResolve = resolve;
@@ -791,13 +772,11 @@ test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministi
   validHarness.render();
   await validHarness.settle();
 
-  // D1 Verification: Main detail must be visible immediately even while similar rail is pending!
   assert.equal(mainLookupResolved, true, 'Main lookup resolved');
   const immediateDetailNodes = findNodes(validHarness.tree, (n) => n.type === 'MovieDetail');
   assert.equal(immediateDetailNodes.length, 1, 'D1: MovieDetail must be visible immediately while similar rail is pending');
   assert.equal(immediateDetailNodes[0].props.movie.id, 'spirited-away');
 
-  // Now resolve similar rail
   similarDeferredResolve({
     items: [sampleMovie({ id: 'kaguya', title: 'The Tale of Princess Kaguya' })],
     page: 0,
@@ -812,7 +791,6 @@ test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministi
   assert.equal(finalDetailNodes[0].props.movie.id, 'spirited-away');
   assert.equal(similarQuery?.animationOnly, true, 'Similar rail query must enforce animationOnly');
 
-  // 2B. Similar rail failure (timeout/500) must NOT turn main detail into error or 404
   const failureSimilarHarness = createDetailHarness(
     'spirited-away',
     async (id) => sampleMovie({ id: 'spirited-away', title: 'Spirited Away' }),
@@ -827,7 +805,6 @@ test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministi
   assert.equal(afterFailureNodes.length, 1, 'Main detail must remain visible when similar rail throws');
   assert.equal(getText(failureSimilarHarness.tree).includes('Không thể kết nối'), false, 'Similar failure must not trigger page error banner');
 
-  // 2C. Real 404: Nonexistent movie returns null from getCatalogMovieById
   const notFoundHarness = createDetailHarness('nonexistent-id', async () => null);
   notFoundHarness.render();
   await notFoundHarness.settle();
@@ -836,7 +813,6 @@ test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministi
   assert.ok(notFoundText.includes('Không tìm thấy phim hoạt hình'), 'Must render dedicated 404 message');
   assert.ok(notFoundText.includes('nonexistent-id'), 'Must display requested canonical ID in 404 view');
 
-  // 2D. 5xx/Timeout Server Error: Must NOT render fake 404, must render error banner with retry
   let detailRetryTriggered = false;
   const errorDetailHarness = createDetailHarness('failing-movie', async () => {
     if (detailRetryTriggered) {
@@ -861,30 +837,25 @@ test('2. Detail: Canonical ID lookup, real 404 vs server error, and deterministi
 });
 
 test('3. MovieDetail: Safe media fallbacks (missing backdrop, missing poster, and video playback capability)', () => {
-  // 3A. Movie with missing backdrop and missing poster
   const minimalMovie = sampleMovie({
     id: 'minimal-movie',
     title: 'Minimal Anime',
     backdrop: '',
     poster: '',
-    videoUrl: '', // No video
+    videoUrl: '',
   });
 
   const nodeMinimal = renderMovieDetail(minimalMovie);
 
-  // Must NOT render next/image with empty src
   const images = findNodes(nodeMinimal, (n) => n.type === 'next/image');
   assert.equal(images.length, 0, 'Must NOT render next/image with empty poster or backdrop');
 
-  // Poster placeholder renders Film icon and movie title
   const filmIcons = findNodes(nodeMinimal, (n) => n.type === 'Film');
   assert.ok(filmIcons.length > 0, 'Must render Film placeholder icon when poster is empty');
 
-  // Trailer button must NOT be rendered when videoUrl is empty
-  const playButtons = findNodes(nodeMinimal, (n) => n.type === 'button' && getText(n).includes('Xem trailer'));
+  const playButtons = findNodes(nodeMinimal, (n) => n.type === 'button' && getText(n).includes('Xem đoạn giới thiệu'));
   assert.equal(playButtons.length, 0, 'Must NOT render play trailer button when videoUrl is empty');
 
-  // 3B. Movie with valid backdrop, poster, and videoUrl
   const fullMovie = sampleMovie({
     id: 'full-movie',
     title: 'Full Anime',
@@ -899,8 +870,7 @@ test('3. MovieDetail: Safe media fallbacks (missing backdrop, missing poster, an
   assert.equal(fullImages[0].props.src, 'https://img.com/backdrop.jpg');
   assert.equal(fullImages[1].props.src, 'https://img.com/poster.jpg');
 
-  // Trailer play button is present when videoUrl is valid
-  const fullPlayButtons = findNodes(nodeFull, (n) => n.type === 'button' && getText(n).includes('Xem trailer'));
+  const fullPlayButtons = findNodes(nodeFull, (n) => n.type === 'button' && getText(n).includes('Xem đoạn giới thiệu'));
   assert.equal(fullPlayButtons.length, 1, 'Trailer play button rendered when videoUrl exists');
 });
 
@@ -908,9 +878,8 @@ test('4. EditorialHero: Preserves M1 pending feedback and uncertain retry intent
   const heroMovie = sampleMovie({ id: 'hero-anim', title: 'Hero Animation' });
   let toggleCalledWith = null;
 
-  // 4A. Uncertain ADD (commit POST succeeded on server but response lost; reconcile pending)
   const heroAddNode = renderEditorialHero(heroMovie, {
-    isWatchlisted: () => true, // optimistic state in library
+    isWatchlisted: () => true,
     isActionPending: () => false,
     isActionUnconfirmed: (id, act) => id === 'hero-anim' && (!act || act === 'watchlist'),
     getActionIntent: (id, act) => (id === 'hero-anim' && (!act || act === 'watchlist') ? 'add' : null),
@@ -920,7 +889,7 @@ test('4. EditorialHero: Preserves M1 pending feedback and uncertain retry intent
   const addButton = findNodes(heroAddNode, (n) => n.type === 'button' && n.props['aria-label'])[0];
   assert.ok(addButton, 'Must render watchlist button');
   assert.ok(addButton.props['aria-label'].includes('Thử lưu lại'), 'Aria label must preserve ADD intent');
-  assert.equal(addButton.props['aria-label'].includes('Xóa khỏi Watchlist'), false, 'Must NOT show remove label on add retry');
+  assert.equal(addButton.props['aria-label'].includes('Xóa khỏi danh sách xem'), false, 'Must NOT show remove label on add retry');
   assert.ok(getText(addButton).includes('Thử lưu lại'), 'Button text must show Thử lưu lại');
 
   const addBadge = findNodes(heroAddNode, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
@@ -929,10 +898,9 @@ test('4. EditorialHero: Preserves M1 pending feedback and uncertain retry intent
   addButton.props.onClick();
   assert.equal(toggleCalledWith?.id, 'hero-anim', 'Clicking button calls toggleWatchlist');
 
-  // 4B. Uncertain REMOVE (commit DELETE succeeded on server but response lost; reconcile pending)
   toggleCalledWith = null;
   const heroRemoveNode = renderEditorialHero(heroMovie, {
-    isWatchlisted: () => false, // optimistic state removed
+    isWatchlisted: () => false,
     isActionPending: () => false,
     isActionUnconfirmed: (id, act) => id === 'hero-anim' && (!act || act === 'watchlist'),
     getActionIntent: (id, act) => (id === 'hero-anim' && (!act || act === 'watchlist') ? 'remove' : null),
@@ -941,13 +909,12 @@ test('4. EditorialHero: Preserves M1 pending feedback and uncertain retry intent
 
   const removeButton = findNodes(heroRemoveNode, (n) => n.type === 'button' && n.props['aria-label'])[0];
   assert.ok(removeButton.props['aria-label'].includes('Thử xóa lại'), 'Aria label must preserve REMOVE intent');
-  assert.equal(removeButton.props['aria-label'].includes('Thêm vào Watchlist'), false, 'Must NOT show add label on remove retry');
+  assert.equal(removeButton.props['aria-label'].includes('Thêm vào danh sách xem'), false, 'Must NOT show add label on remove retry');
   assert.ok(getText(removeButton).includes('Thử xóa lại'), 'Button text must show Thử xóa lại');
 
   removeButton.props.onClick();
   assert.equal(toggleCalledWith?.id, 'hero-anim', 'Clicking button calls toggleWatchlist to retry remove');
 
-  // 4C. In-flight Pending state
   const heroPendingNode = renderEditorialHero(heroMovie, {
     isWatchlisted: () => false,
     isActionPending: () => true,
@@ -959,7 +926,6 @@ test('4. EditorialHero: Preserves M1 pending feedback and uncertain retry intent
   assert.equal(pendingButton.props.disabled, true, 'Pending button must be disabled to prevent duplicate submissions');
   assert.ok(getText(pendingButton).includes('Đang cập nhật'), 'Pending button must display in-flight loading text');
 
-  // 4D. Confirmed state returns to normal toggle
   const heroConfirmedNode = renderEditorialHero(heroMovie, {
     isWatchlisted: () => true,
     isActionPending: () => false,
@@ -967,8 +933,8 @@ test('4. EditorialHero: Preserves M1 pending feedback and uncertain retry intent
     getActionIntent: () => null,
   });
   const confirmedButton = findNodes(heroConfirmedNode, (n) => n.type === 'button' && n.props['aria-label'])[0];
-  assert.equal(confirmedButton.props['aria-label'], 'Xóa khỏi Watchlist');
-  assert.ok(getText(confirmedButton).includes('Đã lưu Watchlist'));
+  assert.equal(confirmedButton.props['aria-label'], 'Xóa khỏi danh sách xem');
+  assert.ok(getText(confirmedButton).includes('Đã lưu vào danh sách xem'));
 });
 
 test('5. Profile: Enforces 5-min TTL, clears stale IDs on library update, and preserves items on network error (D3)', async () => {
@@ -981,7 +947,7 @@ test('5. Profile: Enforces 5-min TTL, clears stale IDs on library update, and pr
   const mockApi = async (id) => {
     calls++;
     if (calls === 1) return sampleMovie({ id, title: 'Old Title V1' });
-    if (calls === 2) return null; // 404 on re-fetch
+    if (calls === 2) return null;
     throw new Error('Network error 503');
   };
 
@@ -993,26 +959,21 @@ test('5. Profile: Enforces 5-min TTL, clears stale IDs on library update, and pr
   const card1 = findNodes(p.tree, (n) => n.type === 'MovieCard')[0];
   assert.equal(card1?.props.movie.title, 'Old Title V1');
 
-  // Advance fake clock by 6 minutes (> 5 minutes TTL)
   fakeNow += 6 * 60 * 1000;
 
-  // Remove item from library -> state cleanup
   p.setLibrary({ watchlist: [] });
   await p.settle();
 
-  // Re-add item to library -> TTL expired, MUST re-fetch from API!
   p.setLibrary({ watchlist: ['movie-x'] });
   await p.settle();
 
   assert.equal(calls, 2, 'D3: Re-adding item after TTL expiry must trigger fresh API fetch');
 
-  // Call 2 returned null (404 orphan)
   const cardAfter404 = findNodes(p.tree, (n) => n.type === 'MovieCard')[0];
   assert.equal(cardAfter404, undefined, 'Orphan 404 item must NOT render valid MovieCard');
   assert.ok(getText(p.tree).includes('Không có trong catalog (404)'), 'Must render orphan 404 message');
 
-  // 5B. Test Network error on re-fetch: MUST NOT delete library item or treat as 404
-  calls = 2; // Next call will throw 503
+  calls = 2;
   fakeNow += 6 * 60 * 1000;
   p.setLibrary({ watchlist: [] });
   await p.settle();
@@ -1041,7 +1002,6 @@ test('6. Home uses the standalone film catalog while detail and Profile keep can
   assert.equal(shelf.props.movies[0].id, 'totoro');
   assert.equal(shelf.props.movies[0].year, 1988);
 
-  // Detail renders exact same canonical ID 'totoro'
   const detail = createDetailHarness('totoro', async () => canonicalMovie);
   detail.render();
   await detail.settle();
@@ -1051,7 +1011,6 @@ test('6. Home uses the standalone film catalog while detail and Profile keep can
   assert.equal(movieDetail.props.movie.id, 'totoro');
   assert.equal(movieDetail.props.movie.title, 'My Neighbor Totoro');
 
-  // Profile resolves exact same canonical ID 'totoro' from backend
   const profile = createProfileHarness(
     { watchlist: ['totoro'], favorites: [], ratings: {} },
     async (id) => (id === 'totoro' ? canonicalMovie : null)
@@ -1066,12 +1025,10 @@ test('6. Home uses the standalone film catalog while detail and Profile keep can
 });
 
 test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Reload Profile (Cross-surface integration)', async () => {
-  // 1. Fake persisted backend store
   const persistedWatchlist = new Set();
   const persistedRatings = new Map();
   const capturedRequests = [];
 
-  // Canonical movie outside local fixture (guaranteed not in frontend/lib/data/movies.ts)
   const canonicalMovie = sampleMovie({
     id: SYNTHETIC_MOVIE_ID,
     title: 'The Quantum Garden',
@@ -1082,13 +1039,11 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
     poster: 'https://images.unsplash.com/photo-synthetic-anim-001',
   });
 
-  // 2. Persisted transport interceptor
   const persistedFetcher = async (url, options = {}) => {
     const method = options.method || 'GET';
     const parsedUrl = new URL(url, 'http://localhost');
     const pathname = parsedUrl.pathname;
 
-    // GET /users/watchlist
     if (pathname.includes('/users/watchlist') && method === 'GET') {
       return {
         ok: true,
@@ -1099,7 +1054,6 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
         }),
       };
     }
-    // POST /users/watchlist
     if (pathname.includes('/users/watchlist') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       capturedRequests.push({ method: 'POST', endpoint: 'watchlist', body });
@@ -1110,7 +1064,6 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
         json: async () => ({ success: true, data: { movieId: body.movieId, movieTitle: body.movieTitle } }),
       };
     }
-    // DELETE /users/watchlist/:id
     if (pathname.includes('/users/watchlist/') && method === 'DELETE') {
       const parts = pathname.split('/');
       const id = decodeURIComponent(parts[parts.length - 1]);
@@ -1122,7 +1075,6 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
         json: async () => ({ success: true, data: true }),
       };
     }
-    // GET /users/ratings
     if (pathname.includes('/users/ratings') && method === 'GET') {
       return {
         ok: true,
@@ -1133,7 +1085,6 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
         }),
       };
     }
-    // POST /users/ratings
     if (pathname.includes('/users/ratings') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       capturedRequests.push({ method: 'POST', endpoint: 'ratings', body });
@@ -1144,7 +1095,6 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
         json: async () => ({ success: true, data: { movieId: body.movieId, rating: body.rating } }),
       };
     }
-    // GET /users/favorites
     if (pathname.includes('/users/favorites') && method === 'GET') {
       return {
         ok: true,
@@ -1160,33 +1110,28 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
     };
   };
 
-  // --- Step 1: User discovers movie on Home / Hero and clicks save to Watchlist ---
   const session1 = mountProductionProvider(persistedFetcher);
   await session1.settle();
 
   const heroTree1 = renderEditorialHero(canonicalMovie, session1.value);
   const saveBtn = findNodes(
     heroTree1,
-    (n) => n.type === 'button' && (getText(n).includes('Thêm vào Watchlist') || n.props?.['aria-label']?.includes('Thêm vào danh sách'))
+    (n) => n.type === 'button' && (getText(n).includes('Thêm vào danh sách xem') || n.props?.['aria-label']?.includes('Thêm vào danh sách'))
   )[0];
   assert.ok(saveBtn, 'EditorialHero must render interactive save button');
 
-  // Trigger click via actual component handler
   await saveBtn.props.onClick();
   await session1.settle();
 
-  // Assertions on persisted transport and POST body
   assert.ok(persistedWatchlist.has(SYNTHETIC_MOVIE_ID), 'Persisted transport must record synthetic movie in watchlist');
   const postWatchlist = capturedRequests.find((r) => r.endpoint === 'watchlist' && r.method === 'POST');
   assert.ok(postWatchlist, 'Must issue POST /users/watchlist upon hero button click');
   assert.equal(postWatchlist.body.movieId, SYNTHETIC_MOVIE_ID, 'POST body must contain canonical synthetic movieId');
 
-  // Hero updates to reflect saved status
   const heroTreeAfterSave = renderEditorialHero(canonicalMovie, session1.value);
-  const savedHeroBtn = findNodes(heroTreeAfterSave, (n) => n.type === 'button' && getText(n).includes('Đã lưu Watchlist'))[0];
-  assert.ok(savedHeroBtn, 'Hero component must update to display "Đã lưu Watchlist"');
+  const savedHeroBtn = findNodes(heroTreeAfterSave, (n) => n.type === 'button' && getText(n).includes('Đã lưu vào danh sách xem'))[0];
+  assert.ok(savedHeroBtn, 'Hero component must update to display "Đã lưu vào danh sách xem"');
 
-  // --- Step 2: User navigates to Detail page and clicks rating star 9 ---
   const detailTree = renderMovieDetail(canonicalMovie, [], session1.value);
   const star9Btn = findNodes(
     detailTree,
@@ -1194,25 +1139,21 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
   )[0];
   assert.ok(star9Btn, 'MovieDetail must render interactive rating button for star 9');
 
-  // Trigger click via actual component handler
   await star9Btn.props.onClick();
   await session1.settle();
 
-  // Assertions on persisted transport and POST body
   assert.equal(persistedRatings.get(SYNTHETIC_MOVIE_ID), 9, 'Persisted transport must record rating 9 for synthetic movie');
   const postRating = capturedRequests.find((r) => r.endpoint === 'ratings' && r.method === 'POST');
   assert.ok(postRating, 'Must issue POST /users/ratings upon star rating button click');
   assert.equal(postRating.body.movieId, SYNTHETIC_MOVIE_ID, 'Rating POST body must have canonical synthetic movieId');
   assert.equal(postRating.body.rating, 9, 'Rating POST body must have rating value 9');
 
-  // --- Step 3: Simulate browser reload / provider remount for the user ---
   const session2 = mountProductionProvider(persistedFetcher);
   await session2.settle();
 
   assert.equal(session2.value.isWatchlisted(SYNTHETIC_MOVIE_ID), true, 'Reloaded provider must restore watchlist from backend');
   assert.equal(session2.value.getRating(SYNTHETIC_MOVIE_ID), 9, 'Reloaded provider must restore rating 9 from backend');
 
-  // --- Step 4: ProfileOverview mounts under reloaded provider and resolves catalog metadata ---
   const profileHarness = createProfileHarness(
     {
       watchlist: session2.value.watchlist,
@@ -1226,25 +1167,21 @@ test('7. End-to-End M2 User Journey: Home -> Save/Rate -> Provider Persist -> Re
   profileHarness.render();
   await profileHarness.settle();
 
-  // Watchlist tab renders MovieCard for synthetic movie with exact canonical metadata
   const profileCards = findNodes(profileHarness.tree, (n) => n.type === 'MovieCard');
   assert.equal(profileCards.length, 1, 'Profile must render MovieCard for the persisted item');
   assert.equal(profileCards[0].props.movie.id, SYNTHETIC_MOVIE_ID, 'Profile card must use synthetic canonical ID');
   assert.equal(profileCards[0].props.movie.title, 'The Quantum Garden', 'Profile card title must match');
   assert.equal(profileCards[0].props.movie.year, 2026, 'Profile card year must match');
 
-  // --- Step 5: B3 UI Verification - Click "Đánh giá" tab and assert score 9 is actually rendered in Profile UI ---
   const ratingsTabBtn = findNodes(
     profileHarness.tree,
     (n) => n.type === 'button' && (getText(n).includes('Đã chấm điểm') || getText(n).includes('ratings'))
   )[0];
   assert.ok(ratingsTabBtn, 'Profile must render "Đã chấm điểm" tab button');
 
-  // Click tab via component handler
   await ratingsTabBtn.props.onClick();
   await profileHarness.settle();
 
-  // Assert rating score 9 is rendered on the UI
   const ratingScoreElements = findNodes(
     profileHarness.tree,
     (n) => /9\s*\/10/.test(getText(n))
@@ -1267,7 +1204,6 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
     const parsedUrl = new URL(url, 'http://localhost');
     const pathname = parsedUrl.pathname;
 
-    // GET /users/watchlist (background reconcile or initial fetch)
     if (pathname.includes('/users/watchlist') && method === 'GET') {
       if (reconcileFails) {
         return {
@@ -1286,12 +1222,10 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
       };
     }
 
-    // POST /users/watchlist
     if (pathname.includes('/users/watchlist') && method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       requestsLog.push({ method: 'POST', body });
       if (dropWatchlistResponse) {
-        // Backend committed, but response network dropped / client connection lost
         persistedWatchlist.add(body.movieId);
         throw new TypeError('Network error: connection dropped after write');
       }
@@ -1303,7 +1237,6 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
       };
     }
 
-    // DELETE /users/watchlist/:id
     if (pathname.includes('/users/watchlist/') && method === 'DELETE') {
       const parts = pathname.split('/');
       const id = decodeURIComponent(parts[parts.length - 1]);
@@ -1320,7 +1253,6 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
       };
     }
 
-    // Default 200 for other endpoints
     return {
       ok: true,
       status: 200,
@@ -1337,27 +1269,19 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   const session = mountProductionProvider(transportFetcher);
   await session.settle();
 
-  // -------------------------------------------------------------------------
-  // PHASE A: ADD uncertain outcome + retry
-  // -------------------------------------------------------------------------
-  // 1. Initial Hero: '+ Thêm vào Watchlist'
   let heroTree = renderEditorialHero(canonicalMovie, session.value);
-  let btn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thêm vào Watchlist'))[0];
-  assert.ok(btn, 'Initial Hero must show "+ Thêm vào Watchlist"');
+  let btn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thêm vào danh sách xem'))[0];
+  assert.ok(btn, 'Initial Hero must show "+ Thêm vào danh sách xem"');
 
-  // 2. Enable network fault: write commit succeeds in DB, response dropped, reconcile 500 error
   dropWatchlistResponse = true;
   reconcileFails = true;
 
-  // 3. User clicks "+ Thêm vào Watchlist"
   await btn.props.onClick();
   await session.settle();
 
-  // 4. Provider detects uncertain outcome:
   assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), true, 'Action must be marked uncertain');
   assert.equal(session.value.getActionIntent(SYNTHETIC_MOVIE_ID, 'watchlist'), 'add', 'Desired intent must be add');
 
-  // 5. Hero UI displays uncertain state with badge and "Thử lưu lại" retry label
   heroTree = renderEditorialHero(canonicalMovie, session.value);
   const unconfirmedBadge = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
   assert.ok(unconfirmedBadge, 'Hero must display "Chưa xác nhận" badge');
@@ -1366,40 +1290,30 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   assert.ok(retryAddBtn, 'Hero button must display "Thử lưu lại" for uncertain add intent');
   assert.equal(retryAddBtn.props['aria-label'], `Chưa xác nhận lưu • Thử lưu lại ${canonicalMovie.title} vào danh sách xem`);
 
-  // 6. Transport recovers: network healthy
   dropWatchlistResponse = false;
   reconcileFails = false;
 
-  // 7. User clicks "Thử lưu lại" to retry
   await retryAddBtn.props.onClick();
   await session.settle();
 
-  // 8. Operation confirms: badge disappears, button returns to normal "Đã lưu Watchlist"
   assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), false, 'Action is confirmed');
   assert.equal(session.value.isWatchlisted(SYNTHETIC_MOVIE_ID), true, 'Watchlist is confirmed');
 
   heroTree = renderEditorialHero(canonicalMovie, session.value);
   const badgeAfterAddConfirm = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
   assert.equal(badgeAfterAddConfirm, undefined, 'Unconfirmed badge must disappear after successful retry');
-  let confirmedSavedBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Đã lưu Watchlist'))[0];
-  assert.ok(confirmedSavedBtn, 'Hero must display "Đã lưu Watchlist" upon confirmed retry');
+  let confirmedSavedBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Đã lưu vào danh sách xem'))[0];
+  assert.ok(confirmedSavedBtn, 'Hero must display "Đã lưu vào danh sách xem" upon confirmed retry');
 
-  // -------------------------------------------------------------------------
-  // PHASE B: DELETE uncertain outcome + retry
-  // -------------------------------------------------------------------------
-  // 9. Enable network fault for DELETE
   dropWatchlistResponse = true;
   reconcileFails = true;
 
-  // 10. User clicks "Đã lưu Watchlist" to remove
   await confirmedSavedBtn.props.onClick();
   await session.settle();
 
-  // 11. Provider detects uncertain remove outcome:
   assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), true, 'Action must be marked uncertain for remove');
   assert.equal(session.value.getActionIntent(SYNTHETIC_MOVIE_ID, 'watchlist'), 'remove', 'Desired intent must be remove');
 
-  // 12. Hero UI displays uncertain state with badge and "Thử xóa lại" retry label
   heroTree = renderEditorialHero(canonicalMovie, session.value);
   const unconfirmedDeleteBadge = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
   assert.ok(unconfirmedDeleteBadge, 'Hero must display "Chưa xác nhận" badge on delete failure');
@@ -1408,22 +1322,19 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   assert.ok(retryDeleteBtn, 'Hero button must display "Thử xóa lại" for uncertain remove intent');
   assert.equal(retryDeleteBtn.props['aria-label'], `Chưa xác nhận xóa • Thử xóa lại ${canonicalMovie.title} khỏi danh sách xem`);
 
-  // 13. Transport recovers
   dropWatchlistResponse = false;
   reconcileFails = false;
 
-  // 14. User clicks "Thử xóa lại" to retry
   await retryDeleteBtn.props.onClick();
   await session.settle();
 
-  // 15. Confirmed removal: badge disappears, button returns to "+ Thêm vào Watchlist"
   assert.equal(session.value.isActionUnconfirmed(SYNTHETIC_MOVIE_ID, 'watchlist'), false, 'Action is confirmed');
   assert.equal(session.value.isWatchlisted(SYNTHETIC_MOVIE_ID), false, 'Watchlist item is confirmed removed');
 
   heroTree = renderEditorialHero(canonicalMovie, session.value);
   const badgeAfterDeleteConfirm = findNodes(heroTree, (n) => n.props?.['data-testid'] === 'hero-unconfirmed-badge')[0];
   assert.equal(badgeAfterDeleteConfirm, undefined, 'Unconfirmed badge must disappear');
-  let finalAddBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thêm vào Watchlist'))[0];
-  assert.ok(finalAddBtn, 'Hero must return to "+ Thêm vào Watchlist"');
+  let finalAddBtn = findNodes(heroTree, (n) => n.type === 'button' && getText(n).includes('Thêm vào danh sách xem'))[0];
+  assert.ok(finalAddBtn, 'Hero must return to "+ Thêm vào danh sách xem"');
 });
 

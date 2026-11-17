@@ -4,7 +4,12 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "catalog_text_tracks")
+@Table(
+    name = "catalog_text_tracks",
+    indexes = {
+        @Index(name = "idx_cat_track_asset", columnList = "media_asset_id")
+    }
+)
 public class CatalogTextTrack {
 
     @Id
@@ -29,19 +34,19 @@ public class CatalogTextTrack {
     @Column(name = "is_default", nullable = false)
     private Boolean isDefault = false;
 
-    @Column(name = "external_file_json", columnDefinition = "TEXT")
+    @Column(name = "external_file_json", columnDefinition = "LONGTEXT")
     private String externalFileJson;
 
-    @Column(name = "cues_json", columnDefinition = "TEXT")
+    @Column(name = "cues_json", columnDefinition = "LONGTEXT")
     private String cuesJson;
 
-    @Column(name = "provenance_json", columnDefinition = "TEXT")
+    @Column(name = "provenance_json", columnDefinition = "LONGTEXT")
     private String provenanceJson;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

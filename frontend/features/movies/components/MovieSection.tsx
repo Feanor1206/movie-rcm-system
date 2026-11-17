@@ -32,7 +32,6 @@ export function MovieSection({
 
   return (
     <section className="py-6 sm:py-8">
-      {/* Header */}
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <h2 className="section-title">{title}</h2>
@@ -40,7 +39,6 @@ export function MovieSection({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Scroll Navigation Controls */}
           <div className="hidden sm:flex items-center gap-1">
             <button
               onClick={() => handleScroll(-420)}
@@ -68,7 +66,6 @@ export function MovieSection({
         </div>
       </div>
 
-      {/* Row or Empty State */}
       {movies.length > 0 ? (
         <div
           ref={scrollRef}

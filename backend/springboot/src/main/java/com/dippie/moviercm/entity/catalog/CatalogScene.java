@@ -4,7 +4,13 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "catalog_scenes")
+@Table(
+    name = "catalog_scenes",
+    indexes = {
+        @Index(name = "idx_cat_scene_ep", columnList = "episode_id"),
+        @Index(name = "idx_cat_scene_asset", columnList = "media_asset_id")
+    }
+)
 public class CatalogScene {
 
     @Id
@@ -29,40 +35,40 @@ public class CatalogScene {
     @Column(length = 255)
     private String title;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String summary;
 
-    @Column(name = "visual_description", columnDefinition = "TEXT")
+    @Column(name = "visual_description", columnDefinition = "LONGTEXT")
     private String visualDescription;
 
-    @Column(name = "visual_tags_json", columnDefinition = "TEXT")
+    @Column(name = "visual_tags_json", columnDefinition = "LONGTEXT")
     private String visualTagsJson;
 
-    @Column(name = "sound_events_json", columnDefinition = "TEXT")
+    @Column(name = "sound_events_json", columnDefinition = "LONGTEXT")
     private String soundEventsJson;
 
-    @Column(name = "transcript_cue_ids_json", columnDefinition = "TEXT")
+    @Column(name = "transcript_cue_ids_json", columnDefinition = "LONGTEXT")
     private String transcriptCueIdsJson;
 
-    @Column(name = "character_ids_json", columnDefinition = "TEXT")
+    @Column(name = "character_ids_json", columnDefinition = "LONGTEXT")
     private String characterIdsJson;
 
-    @Column(name = "keywords_json", columnDefinition = "TEXT")
+    @Column(name = "keywords_json", columnDefinition = "LONGTEXT")
     private String keywordsJson;
 
-    @Column(name = "themes_json", columnDefinition = "TEXT")
+    @Column(name = "themes_json", columnDefinition = "LONGTEXT")
     private String themesJson;
 
-    @Column(name = "attributes_json", columnDefinition = "TEXT")
+    @Column(name = "attributes_json", columnDefinition = "LONGTEXT")
     private String attributesJson;
 
-    @Column(name = "provenance_json", columnDefinition = "TEXT")
+    @Column(name = "provenance_json", columnDefinition = "LONGTEXT")
     private String provenanceJson;
 
-    @Column(name = "record_json", columnDefinition = "TEXT")
+    @Column(name = "record_json", columnDefinition = "LONGTEXT")
     private String recordJson;
 
-    @Column(name = "raw_json", columnDefinition = "TEXT")
+    @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 
     @Column(nullable = false)

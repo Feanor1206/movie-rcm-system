@@ -64,7 +64,7 @@ public class MovieController {
             return ResponseEntity.ok(ApiResponse.success(movie));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.error("Movie not found with id: " + id));
+                    .body(ApiResponse.error("Không tìm thấy phim."));
         }
     }
 }

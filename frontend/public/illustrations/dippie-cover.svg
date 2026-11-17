@@ -8,7 +8,6 @@
 <g stroke="#233a2b" stroke-width="3" stroke-linejoin="round"><path d="M57 470V155"/><path d="M60 155C-4 197 1 306 59 345c72-55 71-149 1-190Z" fill="#6f976c"/><path d="m60 186-1 143m-1-92-24-21m25 69 27-23"/><path d="M687 452V207"/><path d="M689 188c-49 24-71 96-46 141 21 36 71 23 88-12 23-48 6-104-42-129Z" fill="#aac99a"/><path d="m689 220-2 130m1-82 20-17m-20 65-22-22"/>
 <path d="M139 518V347m-19 30 19-41 18 41-18 26Z" fill="#bed7a9"/>
 <path d="M597 506V368m-32 38 32-71 37 71-37 33Z" fill="#c9dda9"/></g>
-<!-- The little woodland cinema, drawn as a storybook house -->
 <g stroke="#21372a" stroke-width="3" stroke-linejoin="round"><path d="m277 284 110-99 119 99-21 9H295Z" fill="#f8f4e7"/><path d="m265 282 121-113 132 114-15 10-116-97-106 99Z" fill="#284a37"/>
 <path d="M298 286h184v132H298Z" fill="#f8f4e7"/><path d="M306 286h169v132H306Z" fill="url(#lines)"/><path d="M363 333c0-35 62-35 62 0v85h-62Z" fill="#2b4c37"/>
 <path d="M317 319h30v39h-30Zm117 0h30v39h-30Z" fill="#b6d7a1"/><path d="M332 320v37m-15-18h30m102-19v37m-15-18h30"/>
@@ -16,7 +15,6 @@
 <path d="M286 419h208l13 11H275Z" fill="#d8e8c8"/><path d="M354 427h77l13 10h-104Z" fill="#f8f4e7"/>
 <path d="m386 149 1-34h49l-8 13 8 14h-49" fill="#f8f4e7"/>
 </g>
-<!-- A reader and a small friend on their way to the next adventure -->
 <g stroke="#21372a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
 <path d="m246 477-8 55m36-55 6 55"/><path d="M226 532h19m30 0h18" stroke-width="6"/>
 <path d="m230 429-13 46c16 13 50 15 74-1l-13-45Z" fill="#f8f4e7"/><path d="M232 430c-21 0-29 22-25 36l25-6m44-29c19 3 24 22 20 29l-23-4" fill="#95b888"/>

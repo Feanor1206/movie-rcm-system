@@ -1,5 +1,7 @@
 'use client';
 
+import { genreLabel } from '@/lib/labels';
+
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -10,7 +12,6 @@ import {
   Calendar,
   Layers,
   ChevronRight,
-  Sparkles,
   ArrowLeft,
   Volume2,
   VolumeX,
@@ -54,8 +55,6 @@ export default function SeriesDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const seriesId = (params?.id as string) || '';
-
-  // Deep linking parameters
   const targetEpisodeId = searchParams.get('episode');
   const targetSceneId = searchParams.get('scene');
   const targetSegmentId = searchParams.get('segment');
@@ -76,8 +75,6 @@ export default function SeriesDetailPage() {
   const [episodeError, setEpisodeError] = useState<string | null>(null);
   const [episodeRetry, setEpisodeRetry] = useState(0);
   const [playbackWarning, setPlaybackWarning] = useState<string | null>(null);
-
-  // Player state
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -108,28 +105,20 @@ export default function SeriesDetailPage() {
     targetSec: number;
     generation: number;
   }
-
-  // Race condition & deep-link guard refs
   const episodeGenRef = useRef<number>(0);
   const seriesGenRef = useRef<number>(0);
   const playGenRef = useRef<number>(0);
   const pendingSeekRef = useRef<PendingSeekIdentity | null>(null);
   const initialDeepLinkHandledRef = useRef<boolean>(false);
   const prevUrlEpisodeIdRef = useRef<string | null>(targetEpisodeId);
-
-  // Unmount cleanup guard
   useEffect(() => {
     return () => {
       pendingSeekRef.current = null;
     };
   }, []);
-
-  // Reset deep-link handling when search params change
   useEffect(() => {
     initialDeepLinkHandledRef.current = false;
   }, [targetEpisodeId, targetAssetId, targetSceneId, targetSegmentId, targetTimeMs]);
-
-  // Load series data with AbortController and generation guard
   useEffect(() => {
     if (!seriesId) return;
     setIsLoadingSeries(true);
@@ -164,8 +153,6 @@ export default function SeriesDetailPage() {
       controller.abort();
     };
   }, [seriesId, seriesRetry]);
-
-  // Synchronize selectedEpisode when targetEpisodeId in URL changes (deep-link or back/forward)
   useEffect(() => {
     if (!seriesData?.episodes) return;
     if (targetEpisodeId !== prevUrlEpisodeIdRef.current) {
@@ -183,8 +170,6 @@ export default function SeriesDetailPage() {
       }
     }
   }, [targetEpisodeId, seriesData]);
-
-  // Manual episode selection handler that updates state and keeps URL in sync without page reloads
   const handleSelectEpisode = (ep: CatalogEpisode) => {
     if (ep.id !== selectedEpisode?.id) saveCurrentProgress('episode-change');
     setNextCountdown(null);
@@ -205,7 +190,6 @@ export default function SeriesDetailPage() {
       window.history.replaceState(null, '', currentUrl.toString());
       prevUrlEpisodeIdRef.current = ep.id;
     } catch {
-      // Safe fallback in SSR or non-browser environments
     }
   };
 
@@ -230,7 +214,6 @@ export default function SeriesDetailPage() {
       currentUrl.searchParams.delete('asset');
       window.history.replaceState(null, '', currentUrl.toString());
     } catch {
-      // Safe fallback in SSR or non-browser environments
     }
   };
 
@@ -298,14 +281,11 @@ export default function SeriesDetailPage() {
     if (video.readyState >= 3) playNext();
     return () => video.removeEventListener('canplay', playNext);
   }, [streamUrl, selectedEpisode?.id, selectedAsset?.id, episodeDetail?.episode?.id]);
-
-  // Load episode detail when selectedEpisode changes (with race condition prevention & AbortSignal)
   useEffect(() => {
     pendingSeekRef.current = null;
     setPlaybackWarning(null);
     setActiveSegmentId(null);
     setEpisodeError(null);
-    // Immediately clear active asset and scenes of old episode to eliminate race conditions
     setEpisodeDetail(null);
     setSelectedAsset(null);
     setActiveSceneId(null);
@@ -323,12 +303,7 @@ export default function SeriesDetailPage() {
         if (controller.signal.aborted || currentGen !== episodeGenRef.current) return;
         if (detail) {
           setEpisodeDetail(detail);
-
-          // Only apply URL targetSceneId / targetSegmentId / targetTimeMs / targetAssetId
-          // if this selected episode matches the URL's targetEpisodeId!
           const isUrlEpisode = targetEpisodeId ? detail.episode.id === targetEpisodeId : false;
-
-          // Select asset based on deep-link or default to first
           let assetToSelect: CatalogMediaAsset | null = null;
           if (isUrlEpisode && targetAssetId && detail.mediaAssets) {
             assetToSelect = detail.mediaAssets.find((a) => a.id === targetAssetId) || null;
@@ -343,8 +318,6 @@ export default function SeriesDetailPage() {
             assetToSelect = detail.mediaAssets[0];
           }
           setSelectedAsset(assetToSelect);
-
-          // Handle initial deep-link seek only for the URL's target episode
           if (isUrlEpisode && !initialDeepLinkHandledRef.current && assetToSelect) {
             initialDeepLinkHandledRef.current = true;
             const sc = targetSceneId && detail.scenes ? detail.scenes.find((s) => s.id === targetSceneId) : undefined;
@@ -404,8 +377,6 @@ export default function SeriesDetailPage() {
     };
   }, [selectedEpisode?.id, targetAssetId, targetSceneId, targetSegmentId, targetTimeMs, seriesId, targetEpisodeId, episodeRetry]);
 
-  // Video stream URL resolution with short-lived playback grant for protected media (H4)
-
   useEffect(() => {
     if (!selectedAsset?.id) {
       setStreamUrl('');
@@ -453,15 +424,11 @@ export default function SeriesDetailPage() {
       setStreamUrl(defaultUrl);
     }
   }, [selectedAsset?.id, selectedAsset?.accessPolicy]);
-
-  // Seek video to specific scene & switch asset with strict identity guard (F6, G6, H3)
   const handleSeekScene = (scene: CatalogScene) => {
     setPlaybackWarning(null);
     const currentEpId = selectedEpisode?.id || '';
     const currentGen = ++playGenRef.current;
-    const targetSec = scene.startMs / 1000; // Scene start_ms is file timeline directly (H3)
-
-    // Check if scene requires switching media asset
+    const targetSec = scene.startMs / 1000;
     if (scene.mediaAssetId && episodeDetail?.mediaAssets && selectedAsset?.id !== scene.mediaAssetId) {
       const matchingAsset = episodeDetail.mediaAssets.find((a) => a.id === scene.mediaAssetId);
       if (matchingAsset) {
@@ -475,9 +442,8 @@ export default function SeriesDetailPage() {
         };
         setActiveSceneId(scene.id);
         setSelectedAsset(matchingAsset);
-        return; // Do NOT manipulate currentTime on existing asset video element!
+        return;
       } else {
-        // Missing scene asset: DO NOT seek on an unrelated asset!
         setPlaybackWarning(
           `Phân cảnh [${scene.title || scene.id}] thuộc tệp phát [${scene.mediaAssetId}] không có trong tập này.`
         );
@@ -486,8 +452,6 @@ export default function SeriesDetailPage() {
     }
 
     setActiveSceneId(scene.id);
-
-    // Same asset: apply seek directly if metadata ready, otherwise queue
     if (videoRef.current && videoRef.current.readyState >= 1) {
       const dur = videoRef.current.duration || 0;
       const clamped = dur > 0 ? Math.min(targetSec, Math.max(0, dur - 0.5)) : targetSec;
@@ -506,8 +470,6 @@ export default function SeriesDetailPage() {
       };
     }
   };
-
-  // Seek video to specific segment (truyện ngắn / phân đoạn) via coverage timestamp (H3)
   const handleSeekSegment = (segment: CatalogSegment) => {
     setPlaybackWarning(null);
     setActiveSegmentId(segment.id);
@@ -547,8 +509,6 @@ export default function SeriesDetailPage() {
   const handleLoadedMetadata = () => {
     const pending = pendingSeekRef.current;
     if (!pending || !videoRef.current) return;
-
-    // Strict identity tuple & generation verification (F6, G6)
     if (
       pending.generation === playGenRef.current &&
       pending.seriesId === String(seriesId) &&
@@ -578,16 +538,12 @@ export default function SeriesDetailPage() {
       setDuration(videoRef.current.duration || 0);
 
       const curMs = cur * 1000;
-
-      // Highlight active scene matching current media asset
       if (episodeDetail?.scenes) {
         const matching = episodeDetail.scenes.find(
           (s) => curMs >= s.startMs && curMs < s.endMs && (!selectedAsset || !s.mediaAssetId || s.mediaAssetId === selectedAsset.id)
         );
         setActiveSceneId(matching ? matching.id : null);
       }
-
-      // Highlight active segment
       if (episodeDetail?.segments) {
         const matchingSeg = episodeDetail.segments.find((seg) => {
           const sStart = seg.episodeStartMs ?? 0;
@@ -629,7 +585,7 @@ export default function SeriesDetailPage() {
 
   return (
     <main className="series-page mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Breadcrumb Navigation */}
+
       <div className="mb-6 flex items-center gap-2 text-xs text-muted">
         <Link href="/" className="hover:text-ink transition-colors">Trang chủ</Link>
         <ChevronRight size={12} />
@@ -638,13 +594,12 @@ export default function SeriesDetailPage() {
         <span className="text-ink font-medium">{series.title}</span>
       </div>
 
-      {/* Series Hero Metadata Card */}
       <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-md mb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="rounded bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand border border-brand/20">
-                Bộ Hoạt Hình
+                Loạt phim hoạt hình
               </span>
               {series.releaseYearStart && (
                 <span className="rounded bg-surface-elevated px-2 py-0.5 text-xs text-muted border border-surface-border">
@@ -667,13 +622,12 @@ export default function SeriesDetailPage() {
               </p>
             )}
 
-            {/* Tags / Genres / Keywords */}
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {series.genreIds && (
                 <div className="flex items-center gap-1.5 text-xs text-muted">
                   <Tag size={12} className="text-brand" />
                   <span>Thể loại:</span>
-                  <span className="text-ink font-medium">{series.genreIds}</span>
+                  <span className="text-ink font-medium">{series.genreIds.split(',').map((genre) => genreLabel(genre.trim())).join(', ')}</span>
                 </div>
               )}
               {series.studios && (
@@ -687,11 +641,10 @@ export default function SeriesDetailPage() {
         </div>
       </div>
 
-      {/* Main Content Layout: Player & Episode Detail */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left 2 Cols: Video Player & Scene Navigator */}
+
         <div className="lg:col-span-2 space-y-6">
-          {/* Playback Warning Banner */}
+
           {playbackWarning && (
             <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
               <div className="flex items-center gap-2">
@@ -707,7 +660,6 @@ export default function SeriesDetailPage() {
             </div>
           )}
 
-          {/* Production Video Player */}
           <div className="relative overflow-hidden rounded-xl border border-surface-border bg-black shadow-2xl aspect-video flex items-center justify-center">
             {isLoadingEpisode || isResolvingStream ? (
               <p role="status" className="p-6 text-center text-xs text-zinc-200">Đang tải tập phim…</p>
@@ -744,9 +696,8 @@ export default function SeriesDetailPage() {
             )}
           </div>
 
-          {/* Episode Info & Media Assets Selector */}
           {offerResume && savedProgress && <div className="comic-card flex flex-wrap items-center gap-3 p-3" data-testid="resume-choice">
-            <span className="text-sm">Bạn đang đọc dở ở {formatDuration(savedProgress.positionMs)}.</span>
+            <span className="text-sm">Bạn đang xem dở ở {formatDuration(savedProgress.positionMs)}.</span>
             <button className="btn-primary text-xs" onClick={() => {
               const video = videoRef.current;
               if (video && Number.isFinite(video.duration) && savedProgress.positionMs < video.duration * 1000) {
@@ -791,7 +742,6 @@ export default function SeriesDetailPage() {
                 </p>
               )}
 
-              {/* Media Assets (Storage info: Google Drive) */}
               {episodeDetail?.mediaAssets && episodeDetail.mediaAssets.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-surface-border flex items-center gap-2 text-xs">
                   <span className="text-muted">Nguồn phát:</span>
@@ -800,6 +750,7 @@ export default function SeriesDetailPage() {
                       key={asset.id}
                       data-testid="media-asset-button"
                       data-asset-id={asset.id}
+                      aria-pressed={selectedAsset?.id === asset.id}
                       onClick={() => setSelectedAsset(asset)}
                       className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer border ${
                         selectedAsset?.id === asset.id
@@ -807,7 +758,7 @@ export default function SeriesDetailPage() {
                           : 'border-surface-border bg-surface-elevated text-muted hover:text-ink'
                       }`}
                     >
-                      {asset.storageProvider === 'drive' ? 'Google Drive Video' : 'Local Video'} [{asset.id}]
+                      {asset.storageProvider === 'drive' ? 'Google Drive' : 'Tệp cục bộ'} [{asset.id}]
                     </button>
                   ))}
                 </div>
@@ -815,17 +766,16 @@ export default function SeriesDetailPage() {
             </div>
           )}
 
-          {/* Segments List with Seek Trigger */}
           {episodeDetail?.segments && episodeDetail.segments.length > 0 && (
             <div className="rounded-xl border border-surface-border bg-surface p-5">
               <div className="flex items-center justify-between border-b border-surface-border pb-3">
                 <div className="flex items-center gap-2">
                   <Layers size={16} className="text-brand" />
                   <h3 className="text-sm font-bold text-ink">
-                    Truyện ngắn / Phân đoạn ({episodeDetail.segments.length})
+                    Phân đoạn ({episodeDetail.segments.length})
                   </h3>
                 </div>
-                <span className="text-xs text-muted">Nhấp vào phân đoạn để tua video</span>
+                <span className="text-xs text-muted">Chọn phân đoạn để xem</span>
               </div>
 
               <div className="mt-3 divide-y divide-surface-border">
@@ -881,17 +831,15 @@ export default function SeriesDetailPage() {
             </div>
           )}
 
-          {/* Scenes List with Seek Trigger */}
           {episodeDetail?.scenes && episodeDetail.scenes.length > 0 && (
             <div className="rounded-xl border border-surface-border bg-surface p-5">
               <div className="flex items-center justify-between border-b border-surface-border pb-3">
                 <div className="flex items-center gap-2">
-                  <Sparkles size={16} className="text-brand" />
                   <h3 className="text-sm font-bold text-ink">
-                    Phân cảnh chi tiết ({episodeDetail.scenes.length})
+                    Phân cảnh ({episodeDetail.scenes.length})
                   </h3>
                 </div>
-                <span className="text-xs text-muted">Nhấp vào phân cảnh để tua video</span>
+                <span className="text-xs text-muted">Chọn phân cảnh để xem</span>
               </div>
 
               <div className="mt-3 divide-y divide-surface-border">
@@ -952,7 +900,6 @@ export default function SeriesDetailPage() {
           )}
         </div>
 
-        {/* Right Col: Episodes List */}
         <div className="space-y-6">
           <div className="rounded-xl border border-surface-border bg-surface p-5">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">

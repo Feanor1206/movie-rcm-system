@@ -51,8 +51,6 @@ function validateAuthPayload(data: any, fallbackToken?: string): { user: AuthUse
   if (!rawToken || typeof rawToken !== 'string' || rawToken.trim().length === 0) {
     return null;
   }
-
-  // ID must be a valid positive integer number
   let numericId: number | null = null;
   if (typeof data.id === 'number' && Number.isFinite(data.id) && data.id > 0) {
     numericId = data.id;
@@ -90,8 +88,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-
-  // Generation counter to invalidate stale asynchronous responses across async boundaries
   const generationRef = useRef<number>(0);
   const activeAbortCtrlRef = useRef<AbortController | null>(null);
 
@@ -115,8 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('dippie_auth_user', JSON.stringify(authUser));
     } catch {}
   }, []);
-
-  // Verify stored session with backend /api/auth/me
   const verifySession = useCallback(
     async (authToken: string, generation: number) => {
       abortActiveRequest();
@@ -134,8 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
           signal: abortCtrl.signal,
         });
-
-        // 1. Guard check immediately after fetch
         if (generation !== generationRef.current) {
           return;
         }
@@ -150,15 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setErrorMessage('Phản hồi từ máy chủ không hợp lệ.');
             return;
           }
-
-          // 2. Guard check after reading json body
           if (generation !== generationRef.current) {
             return;
           }
 
           const validated = validateAuthPayload(json?.data, authToken);
           if (json?.success && validated) {
-            // 3. Guard check immediately before commit
             if (generation !== generationRef.current) {
               return;
             }
@@ -169,7 +158,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             saveSessionStorage(validated.token, validated.user);
             return;
           } else {
-            // Malformed data
             if (generation !== generationRef.current) return;
             setUser(null);
             setToken(null);
@@ -199,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (err instanceof DOMException && err.name === 'AbortError') {
           setStatus('unavailable');
-          setErrorMessage('Kết nối tới máy chủ quá thời gian chờ (timeout).');
+          setErrorMessage('Kết nối máy chủ quá thời gian chờ.');
         } else {
           setStatus('unavailable');
           setErrorMessage('Không thể kết nối đến máy chủ xác thực.');
@@ -215,8 +203,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [abortActiveRequest, clearSessionStorage, saveSessionStorage]
   );
-
-  // Boot check
   useEffect(() => {
     let savedToken: string | null = null;
     try {
@@ -282,7 +268,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string
   ): Promise<{ success: boolean; message?: string }> => {
     const cleanUsername = usernameOrEmail.trim();
-    // Raw password verbatim - NEVER trimmed or lowercased
     const rawPassword = password;
 
     if (!cleanUsername) {
@@ -315,8 +300,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
         signal: abortCtrl.signal,
       });
-
-      // 1. Guard check after fetch
       if (currentGen !== generationRef.current) {
         return { success: false, message: 'Thao tác đã bị hủy.' };
       }
@@ -330,15 +313,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return { success: false, message: 'Phản hồi từ máy chủ không hợp lệ.' };
       }
-
-      // 2. Guard check after reading json body
       if (currentGen !== generationRef.current) {
         return { success: false, message: 'Thao tác đã bị hủy.' };
       }
 
       const validated = validateAuthPayload(json?.data);
       if (res.ok && json?.success && validated) {
-        // 3. Guard check immediately before commit
         if (currentGen !== generationRef.current) {
           return { success: false, message: 'Thao tác đã bị hủy.' };
         }
@@ -351,11 +331,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         closeAuthModal();
         return { success: true };
       } else {
-        const errorMsg =
-          json?.message ||
-          (res.status === 401
-            ? 'Tên đăng nhập hoặc mật khẩu không chính xác.'
-            : 'Đăng nhập thất bại.');
+        const errorMsg = res.status === 401
+          ? 'Sai tên đăng nhập hoặc mật khẩu.'
+          : json?.message || 'Không thể đăng nhập. Thử lại.';
         return { success: false, message: errorMsg };
       }
     } catch (err: unknown) {
@@ -364,7 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (err instanceof DOMException && err.name === 'AbortError') {
-        return { success: false, message: 'Kết nối máy chủ quá thời gian chờ (timeout).' };
+        return { success: false, message: 'Kết nối máy chủ quá thời gian chờ.' };
       }
       return {
         success: false,
@@ -388,7 +366,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<{ success: boolean; message?: string }> => {
     const cleanUsername = username.trim();
     const cleanEmail = email.trim();
-    const rawPassword = password; // Verbatim raw password
+    const rawPassword = password;
 
     if (!cleanUsername || cleanUsername.length < 3) {
       return { success: false, message: 'Tên đăng nhập phải có ít nhất 3 ký tự.' };
@@ -425,8 +403,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
         signal: abortCtrl.signal,
       });
-
-      // 1. Guard check after fetch
       if (currentGen !== generationRef.current) {
         return { success: false, message: 'Thao tác đã bị hủy.' };
       }
@@ -440,15 +416,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return { success: false, message: 'Phản hồi từ máy chủ không hợp lệ.' };
       }
-
-      // 2. Guard check after reading json body
       if (currentGen !== generationRef.current) {
         return { success: false, message: 'Thao tác đã bị hủy.' };
       }
 
       const validated = validateAuthPayload(json?.data);
       if (res.ok && json?.success && validated) {
-        // 3. Guard check immediately before commit
         if (currentGen !== generationRef.current) {
           return { success: false, message: 'Thao tác đã bị hủy.' };
         }
@@ -470,7 +443,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (err instanceof DOMException && err.name === 'AbortError') {
-        return { success: false, message: 'Kết nối máy chủ quá thời gian chờ (timeout).' };
+        return { success: false, message: 'Kết nối máy chủ quá thời gian chờ.' };
       }
       return {
         success: false,
@@ -488,7 +461,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     abortActiveRequest();
-    generationRef.current += 1; // Invalidate any incoming response across all boundaries
+    generationRef.current += 1;
     setUser(null);
     setToken(null);
     setStatus('guest');

@@ -72,7 +72,7 @@ public class MediaStreamService {
                               @Autowired(required = false) StorageKeyConfig storageKeyConfig,
                               @Autowired(required = false) CatalogMediaAssetRepository catalogMediaAssetRepository,
                               @Value("${app.media.max-concurrent-streams:10}") int maxConcurrentStreams,
-                              @Value("${app.media.max-concurrent-drive-streams:5}") int maxConcurrentDriveStreams) {
+                              @Value("${app.media.max-concurrent-drive-streams:10}") int maxConcurrentDriveStreams) {
         this.movieRepository = movieRepository;
         this.mediaAssetRepository = mediaAssetRepository;
         this.localStorageAdapter = localStorageAdapter;
@@ -80,7 +80,7 @@ public class MediaStreamService {
         this.storageKeyConfig = storageKeyConfig;
         this.catalogMediaAssetRepository = catalogMediaAssetRepository;
         this.maxConcurrentStreams = maxConcurrentStreams > 0 ? maxConcurrentStreams : 10;
-        this.maxConcurrentDriveStreams = maxConcurrentDriveStreams > 0 ? maxConcurrentDriveStreams : 5;
+        this.maxConcurrentDriveStreams = maxConcurrentDriveStreams > 0 ? maxConcurrentDriveStreams : 10;
     }
 
     public MediaStreamService(MovieRepository movieRepository,
@@ -97,14 +97,14 @@ public class MediaStreamService {
                               LocalMediaStorageAdapter localStorageAdapter,
                               DriveMediaStorageAdapter driveStorageAdapter,
                               int maxConcurrentStreams) {
-        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, null, null, maxConcurrentStreams, 5);
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, null, null, maxConcurrentStreams, 10);
     }
 
     public MediaStreamService(MovieRepository movieRepository,
                               MediaAssetRepository mediaAssetRepository,
                               LocalMediaStorageAdapter localStorageAdapter,
                               DriveMediaStorageAdapter driveStorageAdapter) {
-        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, null, null, 10, 5);
+        this(movieRepository, mediaAssetRepository, localStorageAdapter, driveStorageAdapter, null, null, 10, 10);
     }
 
     // --- Bulkhead Permit Management: Local ---
@@ -172,7 +172,7 @@ public class MediaStreamService {
     }
 
     public void setMaxConcurrentDriveStreams(int maxConcurrentDriveStreams) {
-        this.maxConcurrentDriveStreams = maxConcurrentDriveStreams > 0 ? maxConcurrentDriveStreams : 5;
+        this.maxConcurrentDriveStreams = maxConcurrentDriveStreams > 0 ? maxConcurrentDriveStreams : 10;
     }
 
     // --- Unified Bulkhead Dispatch ---

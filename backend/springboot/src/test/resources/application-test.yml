@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:m1_test_db;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER
+    url: jdbc:h2:mem:m1_test_db;DB_CLOSE_DELAY=-1;MODE=MySQL;NON_KEYWORDS=YEAR,USER
     driver-class-name: org.h2.Driver
     username: sa
     password: 

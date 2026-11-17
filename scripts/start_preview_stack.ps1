@@ -1,50 +1,12 @@
-﻿<#
-.SYNOPSIS
-    Khởi động toàn bộ cụm dịch vụ Bản dùng thử (Usable Preview) Dippie Cinema.
-.DESCRIPTION
-    Khởi động Spring Boot và Next.js; FastAPI chỉ chạy khi chọn -ModelMode light/full:
-    1. FastAPI (Cổng 8000 hoặc tùy chọn) - AI & Hybrid Index Sync (tùy chọn)
-    2. Spring Boot (Cổng 8080 hoặc tùy chọn) - Core Backend sử dụng moviercm-backend-0.0.1-SNAPSHOT.jar
-    3. Next.js Frontend (Cổng 3000 hoặc tùy chọn) - Giao diện Web
-    Tùy chọn gắn Google Drive (X:) an toàn qua rclone WinFsp (--drive-root-folder-id 1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ).
-    Tương thích hoàn toàn Windows PowerShell 5.1 và PowerShell 7+.
-    Ghi nhận quyền sở hữu (ownership) tăng dần ngay sau từng bước tạo tài nguyên.
-    Bọc toàn bộ vòng đời khởi tạo bằng khối dọn dẹp tự động (cleanup on failure) chuẩn xác theo PID.
-.PARAMETER SpringPort
-    Cổng lắng nghe của Spring Boot (mặc định: 8080).
-.PARAMETER FastApiPort
-    Cổng lắng nghe của FastAPI (mặc định: 8000).
-.PARAMETER FrontendPort
-    Cổng lắng nghe của Next.js (mặc định: 3000).
-.PARAMETER SyncSecret
-    Mã bí mật đồng bộ catalog giữa Spring Boot và FastAPI. Lấy từ biến môi trường ngoài Git nếu không truyền.
-.PARAMETER ModelMode
-    Chế độ AI: 'off' (mặc định, không chạy FastAPI), 'light' hoặc 'full' (Qwen3-4B + Phase23 LoRA trên CUDA).
-.PARAMETER DataDirectory
-    Thư mục H2 và catalog snapshot riêng cho preview.
-.PARAMETER StateFile
-    Tệp trạng thái riêng để quản lý tiến trình preview.
-.PARAMETER MountDrive
-    Gắn kết ổ đĩa Google Drive chế độ chỉ đọc vào điểm gắn chỉ định.
-.PARAMETER DriveMountPoint
-    Điểm gắn Google Drive (mặc định: 'X:').
-.PARAMETER DriveRemote
-    Tên remote rclone đã cấu hình (mặc định: 'cinema-drive:').
-.PARAMETER DriveFolderId
-    ID thư mục gốc Google Drive (mặc định: '1Ypyq-KuQKEhHrWuxtrrR8Y4G7DwbeyZQ').
-.PARAMETER Background
-    Chạy các tiến trình ở chế độ nền và lưu tệp trạng thái để quản lý sau.
-.PARAMETER TestInjectFailureAfter
-    Tham số kiểm thử nội bộ để giả lập lỗi có kiểm soát sau một mốc cụ thể.
-#>
+﻿
 [CmdletBinding()]
 param(
     [int]$SpringPort = 8080,
     [int]$FastApiPort = 8000,
     [int]$FrontendPort = 3000,
     [string]$SyncSecret,
-    [ValidateSet("off", "light", "full")]
-    [string]$ModelMode = "off",
+    [ValidateSet("off", "light", "full", "cloud")]
+    [string]$ModelMode = "light",
     [string]$DataDirectory,
     [string]$StateFile,
     [switch]$MountDrive,
@@ -62,6 +24,10 @@ $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location -Path $root
 
+if ($ModelMode -eq "full" -or (!$PSBoundParameters.ContainsKey("ModelMode") -and (Test-Path -LiteralPath (Join-Path $root ".env.deepseek.local") -PathType Leaf))) {
+    $ModelMode = "cloud"
+}
+
 $backendDir = Join-Path $root "backend\springboot"
 $fastapiDir = Join-Path $root "backend\fastapi"
 $frontendDir = Join-Path $root "frontend"
@@ -71,9 +37,9 @@ Write-Host "====================================================================
 Write-Host " KHỞI ĐỘNG BẢN DÙNG THỬ (USABLE PREVIEW) — DIPPIE CINEMA" -ForegroundColor Cyan
 Write-Host "==========================================================================" -ForegroundColor Cyan
 
-# -----------------------------------------------------------------------------
-# Helper: Định dạng đối số dòng lệnh an toàn cho PowerShell 5.1 & Windows
-# -----------------------------------------------------------------------------
+
+
+
 function Format-NativeArgument {
     param([string]$Arg)
     if ([string]::IsNullOrEmpty($Arg)) { return '""' }
@@ -83,9 +49,9 @@ function Format-NativeArgument {
     return '"' + $escaped + '"'
 }
 
-# -----------------------------------------------------------------------------
-# Helper: Khởi chạy tiến trình con tương thích PowerShell 5.1 & PowerShell 7+
-# -----------------------------------------------------------------------------
+
+
+
 function Start-ChildServiceProcess {
     param(
         [string]$FileName,
@@ -144,7 +110,7 @@ function Start-ChildServiceProcess {
     if (-not $proc) {
         throw "Không thể khởi tạo tiến trình con cho '$FileName'."
     }
-    # Keep the native handle open so PowerShell 5.1 retains ExitCode after WaitForExit.
+
     $null = $proc.Handle
     return $proc
 }
@@ -164,7 +130,7 @@ function Get-PreviewPaths {
 
 function Get-PreviewRuntimeContract {
     param(
-        [ValidateSet("off", "light", "full")][string]$ModelMode,
+        [ValidateSet("off", "light", "full", "cloud")][string]$ModelMode = "light",
         [int]$SpringPort,
         [int]$FastApiPort,
         [int]$FrontendPort,
@@ -178,7 +144,28 @@ function Get-PreviewRuntimeContract {
     $modelUrl = if ($ModelMode -eq "off") { "http://127.0.0.1:1/api/chat" } else { "http://127.0.0.1:$FastApiPort/api/chat" }
     $syncToken = if ($ModelMode -eq "off") { "" } else { $SyncSecret }
     $springEnvironment = [System.Collections.Generic.Dictionary[string, string]]::new()
-    $springEnvironment["SPRING_DATASOURCE_URL"] = "jdbc:h2:file:$databasePath;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=YEAR,USER"
+    if ($env:SPRING_DATASOURCE_URL) {
+        $springEnvironment["SPRING_DATASOURCE_URL"] = $env:SPRING_DATASOURCE_URL
+        if ($env:SPRING_DATASOURCE_DRIVER_CLASS_NAME) { $springEnvironment["SPRING_DATASOURCE_DRIVER_CLASS_NAME"] = $env:SPRING_DATASOURCE_DRIVER_CLASS_NAME }
+        if ($env:SPRING_DATASOURCE_USERNAME) { $springEnvironment["SPRING_DATASOURCE_USERNAME"] = $env:SPRING_DATASOURCE_USERNAME }
+        if ($null -ne $env:SPRING_DATASOURCE_PASSWORD) { $springEnvironment["SPRING_DATASOURCE_PASSWORD"] = $env:SPRING_DATASOURCE_PASSWORD }
+    } else {
+        $mysqlHost = if ($env:MYSQL_HOST) { $env:MYSQL_HOST } else { "localhost" }
+        $mysqlPort = if ($env:MYSQL_PORT) { $env:MYSQL_PORT } else { "3306" }
+        $mysqlDb = if ($env:MYSQL_DB) { $env:MYSQL_DB } else { "movie_rcm_db" }
+        $springEnvironment["SPRING_DATASOURCE_URL"] = "jdbc:mysql://${mysqlHost}:${mysqlPort}/${mysqlDb}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC"
+        $springEnvironment["SPRING_DATASOURCE_DRIVER_CLASS_NAME"] = "com.mysql.cj.jdbc.Driver"
+        $springEnvironment["SPRING_DATASOURCE_USERNAME"] = if ($env:MYSQL_USER) { $env:MYSQL_USER } else { "root" }
+        $springEnvironment["SPRING_DATASOURCE_PASSWORD"] = if ($env:MYSQL_PASSWORD) { $env:MYSQL_PASSWORD } else { "" }
+    }
+    $jwtSecret = $env:APP_JWT_SECRET
+    if (-not $jwtSecret) {
+        $jwtBytes = New-Object byte[] 32
+        $jwtGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $jwtGenerator.GetBytes($jwtBytes) } finally { $jwtGenerator.Dispose() }
+        $jwtSecret = [Convert]::ToBase64String($jwtBytes)
+    }
+    $springEnvironment["APP_JWT_SECRET"] = $jwtSecret
     $springEnvironment["APP_CATALOG_SNAPSHOT_PATH"] = Join-Path $DataDirectory "committed_catalog_snapshot.json"
     $springEnvironment["APP_CATALOG_SYNC_URL"] = $syncUrl
     $springEnvironment["CATALOG_SYNC_TOKEN"] = $syncToken
@@ -196,12 +183,27 @@ function Get-PreviewRuntimeContract {
     $frontendEnvironment["NEXT_PUBLIC_MODEL_API_URL"] = $modelUrl
     $frontendEnvironment["MODEL_API_URL"] = $modelUrl
 
+    $fastApiEnvironment = [System.Collections.Generic.Dictionary[string, string]]::new()
+    $fastApiEnvironment["PORT"] = [string]$FastApiPort
+    $fastApiEnvironment["CATALOG_SYNC_TOKEN"] = $syncToken
+    $fastApiEnvironment["FASTAPI_SYNC_SECRET"] = $syncToken
+    $fastApiEnvironment["APP_JWT_SECRET"] = $jwtSecret
+    $fastApiEnvironment["APP_DEMO_MODE"] = "true"
+    $fastApiEnvironment["MODEL_MODE"] = $ModelMode
+    $fastApiEnvironment["SERVING_MODE"] = $ModelMode
+    $fastApiEnvironment["SYNC_STATE_PATH"] = Join-Path $DataDirectory "catalog_sync_state.json"
+    $fastApiEnvironment["CATALOG_SNAPSHOT_PATH"] = $springEnvironment["APP_CATALOG_SNAPSHOT_PATH"]
+    $fastApiEnvironment["DEFAULT_CATALOG_PATH"] = $springEnvironment["APP_CATALOG_SNAPSHOT_PATH"]
+    $fastApiEnvironment["EMBEDDING_CACHE_DIR"] = Join-Path $DataDirectory "embedding_cache"
+    $fastApiEnvironment["CORS_ALLOWED_ORIGINS"] = $springEnvironment["APP_CORS_ALLOWED_ORIGINS"]
+
     $serviceNames = if ($ModelMode -eq "off") { @("SpringBoot", "NextFrontend") } else { @("FastAPI", "SpringBoot", "NextFrontend") }
     return [PSCustomObject]@{
         StartFastApi = ($ModelMode -ne "off")
         ServiceNames = $serviceNames
         SpringEnvironment = $springEnvironment
         FrontendEnvironment = $frontendEnvironment
+        FastApiEnvironment = $fastApiEnvironment
         CatalogSyncUrl = $syncUrl
         ModelApiUrl = $modelUrl
     }
@@ -222,13 +224,19 @@ function Get-SpringBootArguments {
 }
 
 function Get-PreviewPortsToCheck {
-    param([ValidateSet("off", "light", "full")][string]$ModelMode, [int]$SpringPort, [int]$FastApiPort, [int]$FrontendPort)
+    param([ValidateSet("off", "light", "full", "cloud")][string]$ModelMode = "light", [int]$SpringPort, [int]$FastApiPort, [int]$FrontendPort)
     $ports = @(
         @{ Port = $SpringPort; Name = "Spring Boot Backend" },
         @{ Port = $FrontendPort; Name = "Next.js Web Frontend" }
     )
     if ($ModelMode -ne "off") { $ports = @(@{ Port = $FastApiPort; Name = "FastAPI AI Engine" }) + $ports }
     return $ports
+}
+
+function Get-FastApiArguments {
+    param([int]$FastApiPort)
+    return @("-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", [string]$FastApiPort,
+             "--workers", "1", "--log-level", "warning")
 }
 
 function Test-FrontendBuildStale {
@@ -273,9 +281,9 @@ $driveStateFile = $previewPaths.DriveStateFile
 New-Item -ItemType Directory -Path $DataDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path ([System.IO.Path]::GetDirectoryName($stateFile)) -Force | Out-Null
 
-# -----------------------------------------------------------------------------
-# 0. Kiểm tra Stack đang chạy (không ghi đè state của stack đang hoạt động)
-# -----------------------------------------------------------------------------
+
+
+
 if (Test-Path -Path $stateFile -PathType Leaf -ErrorAction SilentlyContinue) {
     try {
         $existingState = Get-Content -Path $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -301,11 +309,11 @@ if (Test-Path -Path $stateFile -PathType Leaf -ErrorAction SilentlyContinue) {
             }
         }
     } catch [System.Management.Automation.ItemNotFoundException] {
-        # File không tồn tại, tiếp tục
+
     }
 }
 
-# Khởi tạo đối tượng trạng thái theo dõi tăng dần
+
 $stackState = [PSCustomObject]@{
     Timestamp       = [DateTime]::UtcNow.ToString("o")
     ReleaseLevel    = "usable_preview"
@@ -332,16 +340,16 @@ function Save-StackState {
     [System.IO.File]::WriteAllText($stateFile, $json, [System.Text.UTF8Encoding]::new($false))
 }
 
-# Lưu trạng thái STARTING ban đầu
+
 Save-StackState
 
-# -----------------------------------------------------------------------------
-# Khối Thực Thi Có Bọc Dọn Dẹp An Toàn (Try / Catch Cleanup Handler)
-# -----------------------------------------------------------------------------
+
+
+
 try {
-    # -------------------------------------------------------------------------
-    # 1. Preflight kiểm tra cổng mạng
-    # -------------------------------------------------------------------------
+
+
+
     Write-Host "`n[1/7] Kiểm tra sẵn sàng các cổng mạng..." -ForegroundColor Yellow
     $portsToCheck = Get-PreviewPortsToCheck -ModelMode $ModelMode -SpringPort $SpringPort -FastApiPort $FastApiPort -FrontendPort $FrontendPort
 
@@ -354,9 +362,9 @@ try {
     $checkedPorts = @($portsToCheck | ForEach-Object { $_.Port }) -join ", "
     Write-Host "  -> Tất cả các cổng ($checkedPorts) đều đang trống và sẵn sàng." -ForegroundColor Green
 
-    # -------------------------------------------------------------------------
-    # 2. Phát hiện JDK cho tiến trình (không thay đổi biến môi trường OS)
-    # -------------------------------------------------------------------------
+
+
+
     Write-Host "`n[2/7] Kiểm tra môi trường Java & JDK..." -ForegroundColor Yellow
     if (-not $env:JAVA_HOME) {
         if (Test-Path "C:\Program Files\Java\jdk-25.0.3") {
@@ -377,9 +385,9 @@ try {
     Write-Host "  -> Java executable: $javaBin" -ForegroundColor Green
     Write-Host "  -> Process JAVA_HOME: $env:JAVA_HOME (chỉ áp dụng trong phiên làm việc này)" -ForegroundColor Gray
 
-    # -------------------------------------------------------------------------
-    # 3. Kiểm tra và đảm bảo Backend Jar tươi mới (moviercm-backend-0.0.1-SNAPSHOT.jar)
-    # -------------------------------------------------------------------------
+
+
+
     Write-Host "`n[3/7] Kiểm tra tính tươi mới của artifact Backend..." -ForegroundColor Yellow
     $jarFile = Join-Path $backendDir "target\moviercm-backend-0.0.1-SNAPSHOT.jar"
     $needsBuild = -not (Test-Path $jarFile)
@@ -409,9 +417,9 @@ try {
         Write-Host "  -> Artifact jar đã sẵn sàng và khớp mã nguồn: $jarFile" -ForegroundColor Green
     }
 
-    # -------------------------------------------------------------------------
-    # 4. Thiết lập Secret đồng bộ và chế độ Mô hình AI
-    # -------------------------------------------------------------------------
+
+
+
     Write-Host "`n[4/7] Thiết lập cấu hình đồng bộ bảo mật và Mô hình AI..." -ForegroundColor Yellow
     if ($ModelMode -eq "off") {
         $SyncSecret = ""
@@ -434,18 +442,17 @@ try {
         -SyncSecret $SyncSecret
 
     Write-Host "  -> Chế độ phục vụ AI (ModelMode): $ModelMode" -ForegroundColor Cyan
-    if ($ModelMode -eq "full") {
-        Write-Host "  -> CHÚ Ý: Chế độ 'full' sử dụng mô hình thật Qwen3-4B + Phase23 LoRA trên CUDA/GPU." -ForegroundColor Magenta
-        Write-Host "  -> Tuyệt đối không gọi fallback/template là mô hình thật." -ForegroundColor Magenta
+    if ($ModelMode -eq "cloud") {
+        Write-Host "  -> DeepSeek hội thoại qua API; mẫu dự phòng dùng khi API chưa sẵn sàng." -ForegroundColor Gray
     } elseif ($ModelMode -eq "light") {
         Write-Host "  -> Chế độ 'light' sử dụng semantic search và embedding gọn nhẹ, phù hợp CPU." -ForegroundColor Gray
     } else {
         Write-Host "  -> AI tắt; Spring Boot và giao diện vẫn chạy, FastAPI không được khởi động." -ForegroundColor Gray
     }
 
-    # -------------------------------------------------------------------------
-    # 5. Gắn kết Google Drive (nếu được yêu cầu)
-    # -------------------------------------------------------------------------
+
+
+
     if ($MountDrive) {
         Write-Host "`n[5/7] Gắn kết Google Drive ($DriveRemote) vào điểm gắn $DriveMountPoint..." -ForegroundColor Yellow
         $mountScript = Join-Path $root "scripts\drive\mount_drive.ps1"
@@ -461,12 +468,12 @@ try {
         Write-Host "`n[5/7] Bỏ qua gắn kết Google Drive (truyền -MountDrive để tự động gắn)." -ForegroundColor Gray
     }
 
-    # -------------------------------------------------------------------------
-    # 6. Khởi chạy 3 Dịch vụ
-    # -------------------------------------------------------------------------
+
+
+
     Write-Host "`n[6/7] Đang khởi động các dịch vụ..." -ForegroundColor Yellow
 
-    # Tạo thư mục và đường dẫn log riêng cho các dịch vụ nền
+
     $logsDir = Join-Path $root "target\preview_logs"
     if (-not (Test-Path $logsDir)) {
         New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
@@ -479,21 +486,19 @@ try {
     $feErr = Join-Path $logsDir "nextjs.stderr.log"
 
     if ($runtimeContract.StartFastApi) {
-        # 6.1. FastAPI AI Engine (explicit light/full opt-in only)
+
         Write-Host "  [a] Khởi động FastAPI trên cổng $FastApiPort..." -ForegroundColor Yellow
         $faEnv = [System.Collections.Generic.Dictionary[string, string]]::new()
         foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
             $faEnv[$key] = [System.Environment]::GetEnvironmentVariable($key)
         }
-        $faEnv["PORT"] = [string]$FastApiPort
-        $faEnv["FASTAPI_SYNC_SECRET"] = $SyncSecret
-        $faEnv["CATALOG_SYNC_TOKEN"] = $SyncSecret
-        $faEnv["SERVING_MODE"] = $ModelMode
-        $faEnv["USE_FULL_QWEN3_4B_LORA"] = if ($ModelMode -eq "full") { "true" } else { "false" }
+        foreach ($key in $runtimeContract.FastApiEnvironment.Keys) {
+            $faEnv[$key] = $runtimeContract.FastApiEnvironment[$key]
+        }
         $faEnv["PYTHONPATH"] = $fastapiDir
 
         $pythonExe = (Get-Command python -ErrorAction Stop).Source
-        $faArgs = @("-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", [string]$FastApiPort, "--log-level", "warning")
+        $faArgs = Get-FastApiArguments -FastApiPort $FastApiPort
         $faProc = Start-ChildServiceProcess -FileName $pythonExe -Arguments $faArgs -WorkingDirectory $fastapiDir -EnvironmentVariables $faEnv -StdOutFile $faLog -StdErrFile $faErr
 
         $stackState.Processes += @{
@@ -526,7 +531,7 @@ try {
         Write-Host "  [a] FastAPI không được khởi động trong ModelMode off." -ForegroundColor Gray
     }
 
-    # 6.2. Spring Boot Core Backend
+
     Write-Host "  [b] Khởi động Spring Boot trên cổng $SpringPort..." -ForegroundColor Yellow
     $springArgs = Get-SpringBootArguments -SpringPort $SpringPort -DriveMountPoint $DriveMountPoint -JarFile $jarFile
 
@@ -539,7 +544,7 @@ try {
     }
     $sbProc = Start-ChildServiceProcess -FileName $javaBin -Arguments $springArgs -WorkingDirectory $backendDir -EnvironmentVariables $sbEnv -StdOutFile $sbLog -StdErrFile $sbErr
 
-    # Lưu ownership ngay khi tiến trình spawn
+
     $stackState.Processes += @{
         Name           = "SpringBoot"
         PID            = $sbProc.Id
@@ -551,12 +556,12 @@ try {
     Save-StackState
     Write-Host "      Spring Boot đã spawn với PID $($sbProc.Id). Chờ readiness..." -ForegroundColor Gray
 
-    # Failure Injection Hook kiểm thử
+
     if ($TestInjectFailureAfter -eq "SpringBootSpawn") {
         throw "TEST_INJECTED_FAILURE: Giả lập lỗi có kiểm soát ngay sau khi Spring Boot vừa spawn."
     }
 
-    # Chờ Spring Boot sẵn sàng
+
     $sbReady = $false
     $deadline = [DateTime]::UtcNow.AddSeconds(90)
     while ([DateTime]::UtcNow -lt $deadline) {
@@ -569,7 +574,7 @@ try {
     if (-not $sbReady) { throw "Spring Boot không sẵn sàng trên cổng $SpringPort sau 60 giây." }
     Write-Host "      Spring Boot HEALTHY (200 OK)." -ForegroundColor Green
 
-    # 6.3. Next.js Web Frontend
+
     Write-Host "  [c] Khởi động Next.js Frontend trên cổng $FrontendPort..." -ForegroundColor Yellow
     $feEnv = [System.Collections.Generic.Dictionary[string, string]]::new()
     foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
@@ -628,7 +633,7 @@ try {
 
     $feProc = Start-ChildServiceProcess -FileName $nodeExe -Arguments @("server.js") -WorkingDirectory $standaloneDir -EnvironmentVariables $feEnv -StdOutFile $feLog -StdErrFile $feErr
 
-    # Lưu ownership ngay khi tiến trình spawn
+
     $stackState.Processes += @{
         Name           = "NextFrontend"
         PID            = $feProc.Id
@@ -640,7 +645,7 @@ try {
     Save-StackState
     Write-Host "      Next.js đã spawn với PID $($feProc.Id). Chờ readiness..." -ForegroundColor Gray
 
-    # Chờ Next.js sẵn sàng
+
     $feReady = $false
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
     while ([DateTime]::UtcNow -lt $deadline) {
@@ -653,7 +658,7 @@ try {
     if (-not $feReady) { throw "Next.js không sẵn sàng trên cổng $FrontendPort sau 45 giây." }
     Write-Host "      Next.js Frontend HEALTHY (200 OK)." -ForegroundColor Green
 
-    # Cập nhật trạng thái READY chính thức
+
     $stackState.Status = "READY"
     Save-StackState
 
@@ -697,7 +702,7 @@ catch {
 
     $cleanupFailed = $false
 
-    # Dừng ngược thứ tự các tiến trình đã tạo
+
     if ($stackState.Processes -and $stackState.Processes.Count -gt 0) {
         for ($i = $stackState.Processes.Count - 1; $i -ge 0; $i--) {
             $pInfo = $stackState.Processes[$i]
@@ -714,7 +719,7 @@ catch {
                             Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
                         } catch {}
 
-                        # Chờ tối đa 5 giây
+
                         $dead = [DateTime]::UtcNow.AddSeconds(5)
                         while ([DateTime]::UtcNow -lt $dead) {
                             if (-not (Get-CimInstance Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue)) { break }
@@ -738,7 +743,7 @@ catch {
         }
     }
 
-    # Tháo gắn Google Drive nếu đã được gắn
+
     if ($stackState.DriveMounted) {
         Write-Host "  -> Tháo gắn Google Drive ($DriveMountPoint)..." -ForegroundColor Gray
         $stopDriveScript = Join-Path $root "scripts\drive\stop_drive.ps1"

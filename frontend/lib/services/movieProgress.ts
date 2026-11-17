@@ -119,7 +119,6 @@ export function readFilmResumeSeconds(movieId: string): number {
       if (Number.isSafeInteger(positionMs) && positionMs > 0) return positionMs / 1000;
     }
   } catch {
-    // Ignore a missing or restricted location and fall through to stored progress.
   }
   const saved = getMovieProgress(movieId);
   if (saved && !saved.completed && saved.positionMs > 0) return saved.positionMs / 1000;

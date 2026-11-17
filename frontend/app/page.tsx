@@ -14,6 +14,7 @@ import {
   HeartHandshake,
   Sparkles,
 } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { FilmShelf } from '@/features/movies/components/FilmShelf';
@@ -50,15 +51,18 @@ const chapters = [
 ] as const;
 
 const quickTopics = [
-  { label: '✦ Ghibli', href: '/search?q=Ghibli' },
+  { label: 'Ghibli', href: '/search?q=Ghibli' },
   { label: 'Gia đình', href: '/search?genre=Family' },
   { label: 'Phiêu lưu', href: '/search?genre=Adventure' },
   { label: 'Hài hước', href: '/search?genre=Comedy' },
   { label: 'Phép thuật', href: '/search?genre=Fantasy' },
 ] as const;
+  { label: 'Hài', href: '/search?genre=Comedy' },
+  { label: 'Giả tưởng', href: '/search?genre=Fantasy' },
+];
 
 export default function HomePage() {
-  const { openChat, watchlist } = useWatchlist();
+  const { openChat } = useWatchlist();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -94,11 +98,6 @@ export default function HomePage() {
     <>
       <Navbar />
       <main className="comic-book">
-        <div className="edition-line">
-          <span>MỘT GÓC NHỎ DÀNH CHO TRÍ TƯỞNG TƯỢNG</span>
-          <span>HOẠT HÌNH · NHỮNG CÂU CHUYỆN · BẠN</span>
-        </div>
-
         <section className="cover-grid" aria-labelledby="cover-title">
           <div className="cover-copy">
             <div>
@@ -164,10 +163,23 @@ export default function HomePage() {
                 Không cần lớn lên hôm nay. Thong thả thưởng thức từng thước phim.
               </div>
             </div>
+            <h1 id="cover-title">Kho phim<br /><em>hoạt hình</em></h1>
+
+            <div className="hero-cta-group">
+              <Link href="/search" className="cover-cta">Tìm phim</Link>
+              <button type="button" onClick={openChat} className="cover-secondary-cta">Hỏi CineBot</button>
+            </div>
+
+            <nav className="topics-list" aria-label="Gợi ý tìm phim">
+              {quickTopics.map((topic) => (
+                <Link key={topic.label} href={topic.href} className="topic-chip">
+                  {topic.label}
+                </Link>
+              ))}
+            </nav>
           </div>
 
           <div className="cover-art-panel">
-            <div className="panel-index">KHUNG HÌNH / 01 · TUYỂN CHỌN</div>
             <img
               src="/illustrations/dippie-cover.svg"
               alt="Nét vẽ truyện tranh: một bạn nhỏ và thỏ mang sách đi qua khu rừng xanh đến rạp chiếu phim"
@@ -175,11 +187,10 @@ export default function HomePage() {
               height={580}
               loading="eager"
               fetchPriority="high"
+              alt="Bạn nhỏ và thỏ đi đến rạp chiếu phim trong rừng"
+              width="760"
+              height="580"
             />
-            <div className="art-caption">
-              <span>Đích đến: một thế giới khác.</span>
-              <span>✦ TO BE CONTINUED…</span>
-            </div>
           </div>
         </section>
 
@@ -310,6 +321,22 @@ export default function HomePage() {
           <span aria-hidden="true">✦</span>
           <span>DIPPIE / MỘT THẾ GIỚI NHO NHỎ</span>
         </div>
+        <ContinueWatching />
+
+        {loading ? (
+          <div className="comic-loading" role="status">
+            <p>Đang tải phim…</p>
+          </div>
+        ) : error ? (
+          <div className="comic-loading" role="alert">
+            <p>Không thể tải phim. Vui lòng thử lại.</p>
+            <button className="btn-secondary" onClick={() => setRetry((n) => n + 1)}>
+              <RefreshCw size={15} /> Thử lại
+            </button>
+          </div>
+        ) : (
+          <FilmShelf movies={movies} title="Phim trong kho" subtitle="" />
+        )}
       </main>
       <Footer />
     </>

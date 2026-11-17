@@ -7,9 +7,16 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "movie_ratings", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "movie_id"})
-})
+@Table(
+    name = "movie_ratings",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_user_movie_rating", columnNames = {"user_id", "movie_id"})
+    },
+    indexes = {
+        @Index(name = "idx_ratings_user", columnList = "user_id"),
+        @Index(name = "idx_ratings_movie", columnList = "movie_id")
+    }
+)
 public class MovieRating {
 
     @Id

@@ -30,7 +30,7 @@ export function SeriesShelf({
         </Link>
       </div>
       {series.length === 0 ? (
-        <div className="comic-card border-dashed p-6 text-sm text-muted">Chưa có bộ hoạt hình nào trong catalog.</div>
+        <div className="comic-card border-dashed p-6 text-sm text-muted">Chưa có bộ hoạt hình.</div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {series.map((item) => {

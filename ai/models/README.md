@@ -1,9 +1,7 @@
-# Thư mục chứa AI Models & Weights
+# Mô hình cục bộ
 
-Thư mục này dùng để lưu trữ trọng số mô hình cục bộ phục vụ suy luận nhanh (Inference).
+Lưu trọng số dùng cho tìm kiếm, xếp hạng lại và hội thoại trong thư mục này. Các tệp trọng số lớn, gồm `.onnx`, `.pt` và `.gguf`, được Git bỏ qua.
 
-### Mô hình khuyến nghị:
-- **Qwen 0.6B GGUF**: `ai/models/qwen-0.6b/Qwen3-0.6B-Q8_0.gguf` (hoặc định dạng `.gguf` tương đương).
-- File `.gguf` đã được bỏ qua trong `.gitignore` để tránh đẩy file dung lượng lớn (>500MB) lên GitHub.
+Ví dụ đường dẫn GGUF: `ai/models/qwen-0.6b/Qwen3-0.6B-Q8_0.gguf`. Cần chuẩn bị trọng số trên máy mới và cấu hình đúng dịch vụ sử dụng chúng.
 
-Khi clone dự án về máy mới, bạn có thể tải model Qwen GGUF từ Hugging Face hoặc để hệ thống tự động tải qua thư viện Transformers.
+Xem [chuẩn bị bộ mã hóa văn bản](../EMBEDDING_CACHE.md) và [cấu hình FastAPI](../../backend/fastapi/README.md).

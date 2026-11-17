@@ -7,7 +7,14 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "movies")
+@Table(
+    name = "movies",
+    indexes = {
+        @Index(name = "idx_movies_title", columnList = "title"),
+        @Index(name = "idx_movies_year", columnList = "release_year"),
+        @Index(name = "idx_movies_rating", columnList = "rating")
+    }
+)
 public class Movie {
 
     @Id
@@ -26,10 +33,10 @@ public class Movie {
     @Column(length = 20)
     private String runtime;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String genres;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
 
     @Column(length = 500)

@@ -12,12 +12,8 @@ CREATE TABLE IF NOT EXISTS catalog_audit_logs (
     raw_data JSON,
     PRIMARY KEY (entity_id, entity_type)
 );
+-- Migration 04: Add catalog collections tables for dippie.catalog.v1 (MySQL 8.0)
 
--- ==========================================================
--- 7. DIPPIE CATALOG V1 COLLECTIONS
--- ==========================================================
-
--- 7.1 Packages & Import History
 CREATE TABLE IF NOT EXISTS catalog_packages (
     id VARCHAR(36) PRIMARY KEY,
     version VARCHAR(50) NOT NULL,
@@ -26,27 +22,31 @@ CREATE TABLE IF NOT EXISTS catalog_packages (
     import_mode VARCHAR(50) NOT NULL,
     reference_scope VARCHAR(50) NOT NULL,
     name VARCHAR(200),
-    description TEXT,
+    description LONGTEXT,
     content_hash VARCHAR(100) NOT NULL,
     status VARCHAR(50) NOT NULL,
-    error_message TEXT,
+    error_message LONGTEXT,
     opt_lock_version BIGINT DEFAULT 0,
-    created_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7.2 Genres Dictionary
 CREATE TABLE IF NOT EXISTS catalog_genres (
     id VARCHAR(36) PRIMARY KEY,
     labels JSON NOT NULL,
     aliases JSON,
     description TEXT,
+    id VARCHAR(100) PRIMARY KEY,
+    labels_json LONGTEXT NOT NULL,
+    aliases_json LONGTEXT,
+    description LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 7.3 Attribute Scales
 CREATE TABLE IF NOT EXISTS catalog_attribute_scales (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -56,25 +56,33 @@ CREATE TABLE IF NOT EXISTS catalog_attribute_scales (
     levels JSON NOT NULL,
     version VARCHAR(50),
     source_ids JSON,
+    definition LONGTEXT,
+    minimum DOUBLE NOT NULL,
+    maximum DOUBLE NOT NULL,
+    levels_json LONGTEXT NOT NULL,
+    version VARCHAR(50),
+    source_ids_json LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 7.4 Metadata Sources
 CREATE TABLE IF NOT EXISTS catalog_sources (
     id VARCHAR(36) PRIMARY KEY,
     kind VARCHAR(50) NOT NULL,
     title VARCHAR(255) NOT NULL,
     uri VARCHAR(1000),
-    note TEXT,
+    note LONGTEXT,
     retrieved_at VARCHAR(100),
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 7.5 Series
 CREATE TABLE IF NOT EXISTS catalog_series (
     id VARCHAR(36) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -95,31 +103,56 @@ CREATE TABLE IF NOT EXISTS catalog_series (
     advisories JSON,
     credits JSON,
     external_ids JSON,
+    aliases_json LONGTEXT,
+    synopsis LONGTEXT,
+    translations_json LONGTEXT,
+    genre_ids_json LONGTEXT,
+    keywords_json LONGTEXT,
+    themes_json LONGTEXT,
+    origin_countries_json LONGTEXT,
+    original_languages_json LONGTEXT,
+    release_year_start INT,
+    release_year_end INT,
+    release_status VARCHAR(50),
+    character_ids_json LONGTEXT,
+    artworks_json LONGTEXT,
+    attributes_json LONGTEXT,
+    ratings_json LONGTEXT,
+    advisories_json LONGTEXT,
+    credits_json LONGTEXT,
+    external_ids_json LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_cat_series_title (title)
 );
 
--- 7.6 Seasons
 CREATE TABLE IF NOT EXISTS catalog_seasons (
     id VARCHAR(36) PRIMARY KEY,
     series_id VARCHAR(36) NOT NULL,
     number INT,
     title VARCHAR(255) NOT NULL,
-    synopsis TEXT,
+    synopsis LONGTEXT,
     kind VARCHAR(50),
     translations JSON,
     release_date VARCHAR(50),
     artworks JSON,
     attributes JSON,
+    translations_json LONGTEXT,
+    release_date VARCHAR(50),
+    artworks_json LONGTEXT,
+    attributes_json LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_season_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE
 );
 
--- 7.7 Episodes
 CREATE TABLE IF NOT EXISTS catalog_episodes (
     id VARCHAR(36) PRIMARY KEY,
     series_id VARCHAR(36) NOT NULL,
@@ -142,10 +175,32 @@ CREATE TABLE IF NOT EXISTS catalog_episodes (
     ratings JSON,
     artworks JSON,
     credits JSON,
+    aliases_json LONGTEXT,
+    synopsis LONGTEXT,
+    translations_json LONGTEXT,
+    kind VARCHAR(50) NOT NULL,
+    release_date VARCHAR(50),
+    duration_ms BIGINT,
+    genre_ids_json LONGTEXT,
+    primary_language VARCHAR(50),
+    orders_json LONGTEXT,
+    links_json LONGTEXT,
+    character_ids_json LONGTEXT,
+    plot_facts_json LONGTEXT,
+    keywords_json LONGTEXT,
+    themes_json LONGTEXT,
+    attributes_json LONGTEXT,
+    ratings_json LONGTEXT,
+    artworks_json LONGTEXT,
+    credits_json LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_episode_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_episode_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE,
+    INDEX idx_cat_ep_series (series_id),
+    INDEX idx_cat_ep_season (season_id)
 );
 
 -- 7.8 Segments
@@ -164,13 +219,26 @@ CREATE TABLE IF NOT EXISTS catalog_segments (
     attributes JSON,
     episode_start_ms BIGINT,
     episode_end_ms BIGINT,
+    aliases_json LONGTEXT,
+    synopsis LONGTEXT,
+    translations_json LONGTEXT,
+    primary_language VARCHAR(50),
+    character_ids_json LONGTEXT,
+    plot_facts_json LONGTEXT,
+    keywords_json LONGTEXT,
+    themes_json LONGTEXT,
+    attributes_json LONGTEXT,
+    episode_start_ms BIGINT,
+    episode_end_ms BIGINT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_segment_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_segment_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
+    INDEX idx_cat_seg_ep (episode_id)
 );
 
--- 7.9 Characters
 CREATE TABLE IF NOT EXISTS catalog_characters (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -181,9 +249,21 @@ CREATE TABLE IF NOT EXISTS catalog_characters (
     relationships JSON,
     voice_credits JSON,
     artworks JSON,
+    id VARCHAR(100) PRIMARY KEY,
+    series_ids_json LONGTEXT,
+    name VARCHAR(255) NOT NULL,
+    aliases_json LONGTEXT,
+    description LONGTEXT,
+    role VARCHAR(50),
+    traits_json LONGTEXT,
+    relationships_json LONGTEXT,
+    voice_credits_json LONGTEXT,
+    artworks_json LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- ==========================================================
@@ -234,6 +314,8 @@ CREATE TABLE IF NOT EXISTS catalog_media_assets (
     edition_label VARCHAR(100),
     spoken_languages JSON,
     embedded_subtitle_languages JSON,
+    spoken_languages_json LONGTEXT,
+    embedded_subtitle_languages_json LONGTEXT,
     storage_provider VARCHAR(50) NOT NULL,
     storage_key VARCHAR(100) NOT NULL,
     relative_path VARCHAR(500) NOT NULL,
@@ -247,12 +329,18 @@ CREATE TABLE IF NOT EXISTS catalog_media_assets (
     related_asset_id VARCHAR(36),
     access_policy VARCHAR(50) NOT NULL DEFAULT 'public',
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    technical_json LONGTEXT,
+    coverage_json LONGTEXT,
+    related_asset_id VARCHAR(100),
+    access_policy VARCHAR(50) NOT NULL DEFAULT 'public',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 7.11 Text Tracks & Cues
 CREATE TABLE IF NOT EXISTS catalog_text_tracks (
     id VARCHAR(36) PRIMARY KEY,
     media_asset_id VARCHAR(36) NOT NULL,
@@ -264,13 +352,18 @@ CREATE TABLE IF NOT EXISTS catalog_text_tracks (
     external_file JSON,
     cues JSON,
     provenance JSON,
+    external_file_json LONGTEXT,
+    cues_json LONGTEXT,
+    provenance_json LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_text_track_asset FOREIGN KEY (media_asset_id) REFERENCES catalog_media_assets(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_text_track_asset FOREIGN KEY (media_asset_id) REFERENCES catalog_media_assets(id) ON DELETE CASCADE,
+    INDEX idx_cat_track_asset (media_asset_id)
 );
 
--- 7.12 Scenes
 CREATE TABLE IF NOT EXISTS catalog_scenes (
     id VARCHAR(36) PRIMARY KEY,
     media_asset_id VARCHAR(36),
@@ -288,10 +381,24 @@ CREATE TABLE IF NOT EXISTS catalog_scenes (
     themes JSON,
     attributes JSON,
     provenance JSON,
+    summary LONGTEXT,
+    visual_description LONGTEXT,
+    visual_tags_json LONGTEXT,
+    sound_events_json LONGTEXT,
+    transcript_cue_ids_json LONGTEXT,
+    character_ids_json LONGTEXT,
+    keywords_json LONGTEXT,
+    themes_json LONGTEXT,
+    attributes_json LONGTEXT,
+    provenance_json LONGTEXT,
+    record_json LONGTEXT,
+    raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_scene_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_scene_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
+    INDEX idx_cat_scene_ep (episode_id),
+    INDEX idx_cat_scene_asset (media_asset_id)
 );
 
 CREATE TABLE IF NOT EXISTS catalog_scene_characters (
@@ -310,10 +417,12 @@ CREATE TABLE IF NOT EXISTS catalog_snapshots (
     total_items INT NOT NULL,
     status VARCHAR(50) NOT NULL,
     retry_count INT DEFAULT 0,
-    error_message TEXT,
+    error_message LONGTEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    completed_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_cat_snap_status (status),
+    UNIQUE INDEX uq_cat_snap_version (snapshot_version)
 );
 
 -- ==========================================================

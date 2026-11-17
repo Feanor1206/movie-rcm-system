@@ -1,9 +1,5 @@
 @echo off
-title Dippie Cinema Fullstack Microservices Launcher
-echo ============================================================
-echo    DIPPIE CINEMA - KHOI CHAY DONG THOI TAT CA MICROSERVICES
-echo ============================================================
-
+setlocal
 set ROOT_DIR=%~dp0
 
 echo.
@@ -28,3 +24,4 @@ echo - 3. Backend AI Gateway:  http://localhost:8000/docs
 echo.
 echo ============================================================
 pause
+powershell -ExecutionPolicy Bypass -File "%ROOT_DIR%start-all.ps1" %*

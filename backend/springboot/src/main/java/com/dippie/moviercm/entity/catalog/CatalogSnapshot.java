@@ -4,7 +4,15 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "catalog_snapshots")
+@Table(
+    name = "catalog_snapshots",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_cat_snap_version", columnNames = {"snapshot_version"})
+    },
+    indexes = {
+        @Index(name = "idx_cat_snap_status", columnList = "status")
+    }
+)
 public class CatalogSnapshot {
 
     @Id
@@ -23,7 +31,7 @@ public class CatalogSnapshot {
     @Column(nullable = false, length = 50)
     private String status; // PENDING, SYNCING, READY, FAILED
 
-    @Column(name = "error_message", columnDefinition = "TEXT")
+    @Column(name = "error_message", columnDefinition = "LONGTEXT")
     private String errorMessage;
 
     @Column(name = "retry_count")
