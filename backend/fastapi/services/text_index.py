@@ -124,7 +124,15 @@ def _episode_position(position, mapping):
 def _documents(catalog: list[dict], payload: dict | None) -> list[dict]:
     documents = copy.deepcopy(catalog)
     episodes = {item["id"]: item for item in documents if item.get("item_type") == "episode"}
+    episode_counts = Counter(item.get("series_id") for item in episodes.values())
+    seasons = defaultdict(set)
+    for episode in episodes.values():
+        if episode.get("season_number") is not None:
+            seasons[episode.get("series_id")].add(episode["season_number"])
     for item in documents:
+        if item.get("item_type") == "series":
+            item["episode_count"] = episode_counts[item["id"]]
+            item["season_count"] = len(seasons[item["id"]])
         parent = episodes.get(item.get("episode_id"), {})
         for field in ("episode_number", "season_number", "series_id", "series_title", "year", "genres"):
             if item.get(field) is None or field not in item:
@@ -236,6 +244,7 @@ class TextIndex:
     _doc_genres: tuple = ()
     _idf: dict = field(default_factory=dict)
     _doc_len_penalty: np.ndarray | None = None
+    _series_names: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     @property
     def documents(self) -> list[dict]:
@@ -305,8 +314,15 @@ class TextIndex:
         postings = defaultdict(list)
         lengths = np.zeros(len(texts), dtype=np.float32)
         doc_genres = []
+        series_names = {}
         for index, (item, text) in enumerate(zip(documents, texts)):
             doc_genres.append({normalize(g) for g in (item.get("genres") or [])})
+            if item.get("item_type") == "series":
+                names = (item.get("title"), *(item.get("aliases") or []))
+                series_names[item["id"]] = tuple(
+                    f" {' '.join(_cached_tokenize(normalize(name)))} " for name in names
+                    if isinstance(name, str) and _cached_tokenize(name)
+                )
             tokens = _cached_tokenize(text)
             lengths[index] = len(tokens)
             counts = Counter(tokens)
@@ -335,24 +351,41 @@ class TextIndex:
         return cls(tuple(documents), texts, dict(postings), lengths,
                    float(lengths.mean()) if len(lengths) else 0, embeddings, encoder,
                    model_id, missing_count, matrix_path,
-                   tuple(doc_genres), idf, doc_len_penalty)
+                   tuple(doc_genres), idf, doc_len_penalty, series_names)
+
+    def _series_in(self, query: str) -> set[str]:
+        words = f" {' '.join(_cached_tokenize(normalize(query)))} "
+        return {series_id for series_id, names in self._series_names.items() if any(name in words for name in names)}
 
     def _allowed(self, scopes: list[str], constraints: dict) -> tuple[list[int], bool]:
         season, episode = parse_season_episode_intent(scopes[0])
         negative = parse_season_episode_intent(scopes[1]) if len(scopes) > 1 else (None, None)
         season = constraints.get("season_number", season)
         episode = constraints.get("episode_number", episode)
+        series = self._series_in(scopes[0])
+        excluded_series = self._series_in(scopes[1]) if len(scopes) > 1 else set()
+        series_only = constraints.get("series_only") is True
+        if series_only and not series:
+            return [], False
+        has_exclusion = bool(excluded_series or any(number is not None for number in negative))
         include = {normalize(genre) for genre in constraints.get("include_genres", [])}
         exclude = {normalize(genre) for genre in constraints.get("exclude_genres", [])}
         allowed = []
         for index, item in enumerate(self._documents):
+            if series_only and item.get("item_type") != "series":
+                continue
+            series_id = item.get("series_id") or (item["id"] if item.get("item_type") == "series" else None)
+            if series and series_id not in series:
+                continue
             if season is not None and item.get("season_number") != season:
                 continue
             if episode is not None and item.get("episode_number") != episode:
                 continue
-            if negative[1] is not None and item.get("episode_number") == negative[1] and (negative[0] is None or item.get("season_number") == negative[0]):
-                continue
-            if negative[0] is not None and negative[1] is None and item.get("season_number") == negative[0]:
+            if has_exclusion and (not excluded_series or series_id in excluded_series) and (
+                negative[0] is None or item.get("season_number") == negative[0]
+            ) and (
+                negative[1] is None or item.get("episode_number") == negative[1]
+            ):
                 continue
             genres = self._doc_genres[index] if self._doc_genres and index < len(self._doc_genres) else {normalize(genre) for genre in item.get("genres") or []}
             if include and not genres.intersection(include) or genres.intersection(exclude):

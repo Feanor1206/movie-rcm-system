@@ -48,6 +48,7 @@ export default function SeriesDetailPage() {
   const [episodeQuery, setEpisodeQuery] = useState('');
   const [episodeDetail, setEpisodeDetail] = useState<CatalogEpisodeResponse | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<CatalogMediaAsset | null>(null);
+  const [youtubeSeekMs, setYoutubeSeekMs] = useState<number | null>(null);
 
   const [isLoadingSeries, setIsLoadingSeries] = useState<boolean>(true);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState<boolean>(false);
@@ -213,6 +214,17 @@ export default function SeriesDetailPage() {
   const savedProgress = progress.records.find(record => record.episodeId === selectedEpisode?.id && record.assetId === selectedAsset?.id);
   const offerResume = !targetTimeMs && !targetSceneId && !targetSegmentId
     && dismissedResume !== progressIdentity && isUsableResumeProgress(savedProgress) && savedProgress.positionMs >= 5000;
+  const youtubeSource = !selectedAsset && episodeDetail?.episode.id === selectedEpisode?.id ? episodeDetail?.youtube : null;
+  const youtubeVideoId = /^[A-Za-z0-9_-]{11}$/.test(youtubeSource?.videoId || '') ? youtubeSource?.videoId : null;
+  const youtubeEmbed = youtubeVideoId && youtubeSource?.canEmbed;
+  const youtubeTargetMs = targetEpisodeId === selectedEpisode?.id
+    ? targetTimeMs ?? episodeDetail?.segments.find(segment => segment.id === targetSegmentId)?.episodeStartMs
+      ?? episodeDetail?.scenes.find(scene => scene.id === targetSceneId)?.startMs
+    : 0;
+  const youtubeTime = Number(youtubeSeekMs ?? youtubeTargetMs ?? 0);
+  const youtubeStart = Number.isSafeInteger(youtubeTime) && youtubeTime > 0
+    && (!selectedEpisode?.durationMs || youtubeTime < selectedEpisode.durationMs) ? Math.floor(youtubeTime / 1000) : 0;
+  const youtubeUrl = youtubeVideoId ? `https://www.youtube.com/watch?v=${youtubeVideoId}&t=${youtubeStart}` : null;
 
   function saveCurrentProgress(reason: 'interval' | 'pause' | 'ended' | 'episode-change') {
     const video = videoRef.current;
@@ -269,6 +281,7 @@ export default function SeriesDetailPage() {
     setEpisodeError(null);
     setEpisodeDetail(null);
     setSelectedAsset(null);
+    setYoutubeSeekMs(null);
     setActiveSceneId(null);
 
     const currentGen = ++episodeGenRef.current;
@@ -407,6 +420,11 @@ export default function SeriesDetailPage() {
   }, [selectedAsset?.id, selectedAsset?.accessPolicy]);
   const handleSeekScene = (scene: CatalogScene) => {
     setPlaybackWarning(null);
+    if (youtubeVideoId) {
+      setActiveSceneId(scene.id);
+      setYoutubeSeekMs(scene.startMs);
+      return;
+    }
     const currentEpId = selectedEpisode?.id || '';
     const currentGen = ++playGenRef.current;
     const targetSec = scene.startMs / 1000;
@@ -456,6 +474,10 @@ export default function SeriesDetailPage() {
     setActiveSegmentId(segment.id);
     if (typeof segment.episodeStartMs !== 'number' || isNaN(segment.episodeStartMs)) {
       setPlaybackWarning(`Phân đoạn [${segment.title || segment.id}] chưa xác định thời điểm bắt đầu (episode_start_ms = null).`);
+      return;
+    }
+    if (youtubeVideoId) {
+      setYoutubeSeekMs(segment.episodeStartMs);
       return;
     }
     const targetSec = resolveFileTimestamp(segment.episodeStartMs, selectedAsset, segment.id, selectedEpisode?.id);
@@ -604,7 +626,7 @@ export default function SeriesDetailPage() {
             </div>
           )}
 
-          <div className="relative overflow-hidden rounded-xl border border-surface-border bg-black shadow-2xl aspect-video flex items-center justify-center">
+          <div className={`relative overflow-hidden rounded-xl border border-surface-border bg-black shadow-2xl aspect-video flex items-center justify-center ${youtubeEmbed ? 'min-h-[200px]' : ''}`}>
             {isLoadingEpisode || isResolvingStream ? (
               <p role="status" className="p-6 text-center text-xs text-zinc-200">Đang tải tập phim…</p>
             ) : episodeError ? (
@@ -612,6 +634,18 @@ export default function SeriesDetailPage() {
                 <p>{episodeError}</p>
                 <button data-testid="retry-episode" onClick={() => setEpisodeRetry((value) => value + 1)} className="btn-secondary mt-3">Thử lại</button>
               </div>
+            ) : youtubeEmbed ? (
+              <iframe
+                data-testid="series-youtube-player"
+                className="absolute inset-0 h-full w-full"
+                title={selectedEpisode?.title || 'Tập phim trên YouTube'}
+                src={`https://www.youtube-nocookie.com/embed/${youtubeVideoId}?start=${youtubeStart}`}
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            ) : youtubeUrl ? (
+              <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary">Mở trên YouTube</a>
             ) : streamUrl ? (
               <video
                 ref={videoRef}
@@ -639,6 +673,7 @@ export default function SeriesDetailPage() {
             )}
           </div>
 
+          {youtubeEmbed && youtubeUrl && <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-brand-dark underline">Mở trên YouTube</a>}
           {offerResume && savedProgress && <div className="rounded-xl border border-brand/30 bg-brand/10 flex flex-wrap items-center justify-between gap-3 p-4" data-testid="resume-choice">
             <span className="text-xs sm:text-sm text-foreground">Bạn đang xem dở ở <strong className="font-mono text-brand-dark">{formatDuration(savedProgress.positionMs)}</strong>.</span>
             <div className="flex items-center gap-2">
@@ -655,9 +690,9 @@ export default function SeriesDetailPage() {
             </div>
           </div>}
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
-            <label className="inline-flex min-h-10 items-center gap-2 cursor-pointer hover:text-ink"><input type="checkbox" className="rounded border-surface-border bg-surface accent-brand" checked={autoNext} onChange={event => {
+            {!youtubeVideoId && <label className="inline-flex min-h-10 items-center gap-2 cursor-pointer hover:text-ink"><input type="checkbox" className="rounded border-surface-border bg-surface accent-brand" checked={autoNext} onChange={event => {
               setAutoNext(event.target.checked); writeAutoNextPreference(event.target.checked); setNextCountdown(null);
-            }} />Tự chuyển tập trong mùa</label>
+            }} />Tự chuyển tập trong mùa</label>}
             {nextCountdown !== null && nextEpisode && <div role="status" className="rounded-xl border border-surface-border bg-surface-elevated flex items-center gap-3 px-3 py-2 text-xs text-ink" data-testid="next-countdown">
               Tập tiếp theo sau <strong className="text-brand-dark font-mono">{nextCountdown}</strong> giây
               <button className="underline text-muted hover:text-ink cursor-pointer ml-1" onClick={() => setNextCountdown(null)}>Hủy</button>

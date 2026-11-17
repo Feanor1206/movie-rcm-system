@@ -9,6 +9,7 @@ from services.llm_client import LLMProtocolError
 
 _WORDS = re.compile(r"[^\W\d_]+")
 _UNSUPPORTED_REFERENCE = re.compile(r'\d|[\"“”«»]|\b(?:tap|episode|phut|giay)\b')
+_VIDEO_SUFFIX = re.compile(r"(?:\s*\[[A-Za-z0-9_-]{11}\])?\.(?:mp4|mkv|webm)$", re.IGNORECASE)
 _CONNECTIVES = set(
     "da dang se la mot nhung va cua trong o thi cung duoc khi nay do co ve ban dang tim "
     "bo phim canh doan noi dung nhan vat tinh huong dien ra tai vi nen bi roi lai rat "
@@ -35,6 +36,7 @@ def evidence_texts(item):
 
 
 def source_intro(title, start_ms, mode):
+    title = _VIDEO_SUFFIX.sub("", title.strip()).rstrip(".")
     intro = "Bạn có thể xem" if mode == "recommend" else "Có vẻ bạn đang tìm"
     if start_ms is None:
         return f"{intro} {title}."
@@ -51,7 +53,30 @@ def catalog_reply(results, mode):
     title = first.get("title") or first.get("episode_title") or "Tập phim"
     prefix = source_intro(title, first.get("startMs", first.get("start_ms")), mode)
     quotes = evidence_texts(first)
-    return f"{prefix} {quotes[0]}" if quotes else prefix
+    if not quotes:
+        return prefix
+    quote = quotes[0]
+    if quote.startswith(f"Tập phim {title}") and "của bộ hoạt hình" in quote:
+        return prefix
+    if quote == f"Episode {first.get('episode_number')}: {title}":
+        return prefix
+    return f"{prefix} {quote}"
+
+
+def series_reply(results, detail):
+    if not results:
+        return "Chưa tìm thấy bộ phim này trong danh mục."
+    series = results[0]
+    title = series["title"]
+    if detail == "episodes":
+        return f"Danh mục hiện có {series.get('episode_count', 0)} tập {title}."
+    if detail == "seasons":
+        return f"Danh mục hiện có {series.get('season_count', 0)} mùa {title}."
+    if detail == "characters" and series.get("characters"):
+        return f"Nhân vật trong {title} gồm {', '.join(series['characters'])}."
+    if detail == "summary" and series.get("synopsis"):
+        return series["synopsis"]
+    return f"Danh mục chưa có thông tin này về {title}."
 
 
 async def summarize_sources(llm, intent, sources):

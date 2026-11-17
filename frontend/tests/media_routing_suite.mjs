@@ -87,6 +87,15 @@ test('3. Cross-season same episode number: resolves to distinct episode IDs with
   assert.match(href2, /episode=ep_jadoo_s03_0001/);
 });
 
+test('Episodes open at the catalog match on the correct playback timeline', () => {
+  const episode = { id: 'ep1', series_id: 'ser1', item_type: 'episode', start_ms: 630000, startMs: 33000 };
+  const segment = { itemType: 'segment', documentId: 'segment1', timeline: 'episode', startMs: 33000 };
+  const scene = { itemType: 'scene', documentId: 'scene1', timeline: 'file', sourceStartMs: 630000, mediaAssetId: 'clip' };
+  assert.equal(buildMediaItemHref({ ...episode, evidence: [segment] }), '/series/ser1?episode=ep1&segment=segment1&t=33000');
+  assert.equal(buildMediaItemHref({ ...episode, evidence: [scene] }), '/series/ser1?episode=ep1&asset=clip&t=630000&timeline=file');
+  assert.equal(buildMediaItemHref({ ...episode, evidence: [{ ...scene, mediaAssetId: null }] }), '/series/ser1?episode=ep1');
+});
+
 test('4. Segment card: resolves to /series/[seriesId]?episode=[epId]&segment=[segId]&t=[time]', () => {
   const segment = {
     id: 'seg_jadoo_s01_008a',

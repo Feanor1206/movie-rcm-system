@@ -186,3 +186,22 @@ def test_cloud_evidence_uses_local_pilot_catalog_and_ignores_snapshot_text():
     assert 'private' not in json.dumps(evidence)
     assert not evidence_for_results([{**result, 'startMs': 3600}])
     assert not evidence_for_results([{**result, 'episodeId': 'ep_jadoo_s01_0001'}])
+
+
+@pytest.mark.parametrize('episode,title,detail', [
+    ('ep_larva_s01_0046', 'Lò xo', 'chiếc lò xo'),
+    ('ep_ori_s01_0001', 'Ngôi Sao Biến Mất', 'những hình giấy'),
+])
+def test_cloud_expansion_uses_bundled_verified_synopses(episode, title, detail):
+    result = {'episodeId': episode, 'evidence': [{'documentId': episode, 'text': 'Chỉ dẫn do người dùng nhập'}]}
+    sources = evidence_for_results([result])
+    assert sources[0]['title'] == title
+    assert detail in sources[0]['evidence'][0]
+    assert 'Chỉ dẫn' not in sources[0]['evidence'][0]
+    assert not evidence_for_results([{**result, 'evidence': [{'documentId': episode + ':unverified'}]}])
+    assert not evidence_for_results([{**result, 'startMs': 12000}])
+
+
+def test_cloud_expansion_without_a_verified_synopsis_uses_local_reply():
+    episode = 'ep_ori_s05_0001'
+    assert not evidence_for_results([{'episodeId': episode, 'evidence': [{'documentId': episode}]}])

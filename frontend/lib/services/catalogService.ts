@@ -497,6 +497,7 @@ export interface CatalogEpisodeResponse {
   segments: CatalogSegment[];
   mediaAssets: CatalogMediaAsset[];
   scenes: CatalogScene[];
+  youtube?: { videoId: string; canEmbed: boolean } | null;
 }
 
 export interface CatalogSearchResult {

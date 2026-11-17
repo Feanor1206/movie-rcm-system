@@ -37,5 +37,14 @@ export type Movie = {
   timescale?: string;
   matchPercentage?: number | null;
   calibratedScore?: number | null;
-  evidence?: { documentId: string; text: string; startMs: number | null; endMs: number | null; itemType: string }[];
+  evidence?: {
+    documentId: string;
+    text: string;
+    startMs: number | null;
+    endMs: number | null;
+    itemType: string;
+    timeline?: 'episode' | 'file';
+    sourceStartMs?: number | null;
+    mediaAssetId?: string | null;
+  }[];
 };

@@ -1,27 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router';
-import {
-  X,
-  Send,
-  Star,
-  Check,
-  Play,
-  RotateCcw,
-  Film,
-} from 'lucide-react';
 import { sendChatMessage, ChatMessage, ChatServiceResponse } from '@/lib/services/chatService';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
-import { formatRuntime, genreLabel } from '@/lib/labels';
+import { chatGenres, chatTitle, formatRuntime } from '@/lib/labels';
 
 const QUICK_PROMPTS = [
-  'Jadoo Mùa 1 Tập 1',
   'Jadoo sợ tăng cân',
-  'Tìm tiểu phẩm Jadoo',
+  'Larva mùa 1 tập 1',
+  'Công chúa Ori mùa 1 tập 1',
 ];
 
-const BTN_HEAD = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer';
+const BTN_HEAD = 'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md px-3 text-xs text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer';
+const TIME_FORMAT = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
 function newConversationId() {
   return globalThis.crypto?.randomUUID?.() ?? `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -149,7 +141,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       id: `user-${Date.now()}`,
       sender: 'user',
       text: text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: TIME_FORMAT.format(new Date()),
     };
 
     const nextMessages = [...messages, userMessage];
@@ -165,7 +157,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         id: botId,
         sender: 'bot',
         text: result.text,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: TIME_FORMAT.format(new Date()),
         movies: result.recommendedMovies,
         followUps: result.followUps,
         structuredIntent: result.structuredIntent,
@@ -189,7 +181,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         id: `bot-err-${Date.now()}`,
         sender: 'bot',
         text: err?.message || 'Không thể kết nối CineBot. Vui lòng thử lại.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: TIME_FORMAT.format(new Date()),
       };
       setMessages((prev) => [...prev.filter((item) => item.id !== botId), errorMsg]);
     } finally {
@@ -255,7 +247,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               aria-label="Làm mới cuộc trò chuyện"
               className={BTN_HEAD}
             >
-              <RotateCcw size={16} />
+              Làm mới
             </button>
             <button
               onClick={onClose}
@@ -263,7 +255,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               aria-label="Đóng CineBot"
               className={BTN_HEAD}
             >
-              <X size={20} />
+              Đóng
             </button>
           </div>
         </div>
@@ -306,38 +298,28 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                         className="flex gap-3 rounded-lg border border-surface-border bg-surface-muted p-2.5 transition-colors hover:border-ink/30"
                       >
 
-                        <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-surface-border bg-surface">
-                          {hasPoster ? (
-                            <img
-                              src={movie.poster}
-                              alt={movie.title}
-                              loading="lazy" referrerPolicy="no-referrer"
-                              className="absolute inset-0 h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-mint text-muted">
-                              <Film size={20} />
-                            </div>
-                          )}
-                        </div>
-
-
+                        {hasPoster && (
+                          <img
+                            src={movie.poster}
+                            alt={movie.title}
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="h-20 w-14 shrink-0 rounded border border-surface-border object-cover"
+                          />
+                        )}
                         <div className="flex flex-col justify-between flex-1 min-w-0">
                           <div>
                             <div className="flex items-center justify-between gap-1">
                               <Link
                                 to={mediaHref}
                                 onClick={onClose}
-                                className="truncate text-xs sm:text-sm font-semibold text-ink hover:text-brand-dark transition-colors"
+                                className="line-clamp-2 break-words text-sm font-semibold text-ink hover:text-brand-dark"
                               >
-                                {movie.title}
+                                {chatTitle(movie.title)}
                               </Link>
-                              <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-400 shrink-0">
-                                <Star size={11} className="fill-amber-400" /> {movie.rating}
-                              </span>
                             </div>
-                            <p className="text-[11px] text-muted mt-0.5">
-                              {movie.year} · {formatRuntime(movie.runtime)} · {movie.genres.map(genreLabel).join(', ')}
+                            <p className="mt-1 text-xs text-muted">
+                              {[movie.year || '', formatRuntime(movie.runtime), chatGenres(movie.genres)].filter(Boolean).join(' · ')}
                             </p>
                           </div>
 
@@ -346,22 +328,18 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                             <Link
                               to={mediaHref}
                               onClick={onClose}
-                              className="inline-flex items-center gap-1 rounded bg-brand px-2 py-0.5 text-[10px] font-bold text-zinc-950 hover:bg-brand-hover shadow-brand-sm cursor-pointer"
+                              className="inline-flex min-h-10 items-center rounded bg-brand px-3 text-xs font-bold text-ink hover:bg-brand-hover"
                             >
-                              <Play size={10} className="fill-current" /> Xem chi tiết
+                              {movie.episodeId || movie.episode_id ? 'Xem tập' : 'Xem phim'}
                             </Link>
 
                             <button
                               onClick={() => toggleWatchlist(movie.id, movie.title)}
-                              className="inline-flex items-center gap-1 rounded border border-ink/30 bg-surface-elevated px-2 py-0.5 text-[10px] font-medium text-ink hover:border-zinc-500 hover:text-ink cursor-pointer"
+                              type="button"
+                              aria-pressed={inWatchlist}
+                              className="inline-flex min-h-10 items-center rounded border border-ink/30 px-3 text-xs font-medium text-ink hover:bg-surface-elevated cursor-pointer"
                             >
-                              {inWatchlist ? (
-                                <>
-                                  <Check size={10} className="text-brand-dark" /> Đã lưu
-                                </>
-                              ) : (
-                                'Lưu phim'
-                              )}
+                              {inWatchlist ? 'Đã lưu' : 'Lưu phim'}
                             </button>
                           </div>
                         </div>
@@ -391,13 +369,8 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
 
           {isTyping && (
-            <div className="flex items-center gap-2 text-xs text-muted bg-surface-muted border border-brand/40 rounded-md px-3 py-1.5 w-fit">
-              <span className="flex gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce" style={{ animationDelay: '300ms' }} />
-              </span>
-              <span>CineBot đang trả lời...</span>
+            <div role="status" className="text-xs text-muted bg-surface-muted border border-brand/40 rounded-md px-3 py-1.5 w-fit">
+              Đang trả lời…
             </div>
           )}
 
@@ -416,16 +389,16 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               disabled={isTyping}
               onChange={(e) => { setInput(e.target.value); setInputError(''); }}
               onKeyDown={handleKeyDown}
-              placeholder={isTyping ? "CineBot đang phản hồi..." : "Nhập câu hỏi..."}
+              placeholder="Nhập câu hỏi…"
               className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-60"
             />
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isTyping}
-              className="grid h-11 w-11 shrink-0 place-items-center border border-ink bg-brand text-ink transition hover:bg-brand-hover shadow-brand-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="h-11 shrink-0 rounded border border-ink bg-brand px-4 text-xs font-semibold text-ink hover:bg-brand-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               aria-label="Gửi tin nhắn"
             >
-              <Send size={13} />
+              Gửi
             </button>
           </div>
           {inputError && <p role="alert" className="mt-2 text-xs text-red-500">{inputError}</p>}

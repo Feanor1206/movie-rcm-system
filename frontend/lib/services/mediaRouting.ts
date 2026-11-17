@@ -28,6 +28,7 @@ export interface MediaNavigationContext {
   mediaAssetId?: string;
   timeline?: string;
   timescale?: string;
+  evidence?: Movie['evidence'];
   [key: string]: any;
 }
 
@@ -252,8 +253,19 @@ export function buildMediaItemHref(item: Partial<Movie> | MediaNavigationContext
     if (seriesId && targetEpisodeId) {
       const params = new URLSearchParams();
       params.set('episode', targetEpisodeId);
-      if (assetId) {
-        params.set('asset', assetId);
+      const match = Array.isArray(item.evidence) ? item.evidence[0] : undefined;
+      const timedMatch = match && ['segment', 'scene', 'dialogue'].includes(match.itemType);
+      const offset = timedMatch && match.timeline === 'episode' ? match.startMs
+        : timedMatch && match.timeline === 'file' && match.mediaAssetId ? match.sourceStartMs : null;
+      const canSeek = typeof offset === 'number' && Number.isSafeInteger(offset) && offset >= 0;
+      if (canSeek && match?.itemType === 'segment' && match.documentId) {
+        params.set('segment', match.documentId);
+      }
+      const playbackAsset = canSeek && match?.mediaAssetId ? match.mediaAssetId : assetId;
+      if (playbackAsset) params.set('asset', playbackAsset);
+      if (canSeek) {
+        params.set('t', String(offset));
+        if (match?.timeline === 'file') params.set('timeline', 'file');
       }
       return `/series/${encodeURIComponent(seriesId)}?${params.toString()}`;
     }

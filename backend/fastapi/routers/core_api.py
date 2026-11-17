@@ -5,6 +5,7 @@ import logging
 import math
 import os
 from pathlib import Path
+import re
 import secrets
 from stat import FILE_ATTRIBUTE_REPARSE_POINT, S_ISDIR, S_ISLNK, S_ISREG
 
@@ -520,6 +521,27 @@ def _asset_allowed(asset: CatalogMediaAsset, user: User | None) -> bool:
     return False
 
 
+def _youtube_source(episode: CatalogEpisode) -> dict[str, str | bool] | None:
+    try:
+        external_ids = json.loads(episode.raw_json or "{}").get("external_ids")
+    except (ValueError, TypeError, AttributeError):
+        return None
+    if not isinstance(external_ids, list):
+        return None
+    watch_id = None
+    for item in external_ids:
+        if not isinstance(item, dict):
+            continue
+        value = item.get("value")
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{11}", value):
+            continue
+        if item.get("namespace") == "youtube_playback":
+            return {"videoId": value, "canEmbed": True}
+        if item.get("namespace") == "youtube_watch" and watch_id is None:
+            watch_id = value
+    return {"videoId": watch_id, "canEmbed": False} if watch_id else None
+
+
 @router.get("/api/catalog/episodes/{episode_id}")
 def get_catalog_episode_detail(episode_id: str, request: Request, authorization: str | None = Header(default=None)):
     with get_db(request) as db:
@@ -549,7 +571,8 @@ def get_catalog_episode_detail(episode_id: str, request: Request, authorization:
             if (is_admin or is_published(sc.record_json))
             and (is_admin or not sc.media_asset_id or sc.media_asset_id in allowed_asset_ids)
         ]
-        return JSONResponse({"episode": ep.to_dict(), "segments": segments, "mediaAssets": assets, "scenes": scenes})
+        return JSONResponse({"episode": ep.to_dict(), "segments": segments, "mediaAssets": assets,
+                             "scenes": scenes, "youtube": _youtube_source(ep)})
 
 
 @router.get("/api/catalog/search")

@@ -17,6 +17,11 @@ _CHITCHAT_RE = re.compile(r"(?:xin chao|chao|hi|hello|cam on|thanks|ban la ai)[.
 _EXCLUDE_PREFIX_RE = re.compile(r"(?:khong|tranh|bo|loai|tru|without|exclude)[^,.!?;]{0,32}$")
 _RECOMMEND_HINT_RE = re.compile(r"goi y|recommend")
 _MOMENT_HINT_RE = re.compile(r"\b(?:canh|doan|scene|moment)\b")
+_MOOD_RE = re.compile(r"\b(?:vui|buon|hai huoc|giai tri|thu gian|stress|cang thang|cheerful|funny|sad)\b")
+_EXACT_EPISODE_RE = re.compile(r"\b(?:(?:tap|ep|episode|mua|phan|season)\s*#?\s*\d+|s\d+e\d+)\b")
+_SERIES_COUNT_RE = re.compile(r"\b(?:bao nhieu|may|so luong)\s+(tap|mua|phan)\b")
+_SERIES_OVERVIEW_RE = re.compile(r"\b(?:la (?:phim |bo phim )?gi|noi ve (?:gi|cai gi)|gioi thieu|noi dung cua)\b")
+_SERIES_CHARACTERS_RE = re.compile(r"\bnhan vat chinh\b|\bnhan vat\b.*\b(?:la ai|gom ai|co ai|nhung ai)\b")
 
 GENRE_ALIASES = {
     "animation": ["hoat hinh", "animation", "cartoon"],
@@ -82,21 +87,40 @@ def deterministic_intent(query, history=None):
         else:
             constraints["year_min"] = constraints["year_max"] = year
     current = " ".join(fold_text(query).split())
+    series_info = None
+    moment = bool(_MOMENT_HINT_RE.search(folded))
+    exact_episode = bool(_EXACT_EPISODE_RE.search(folded))
+    recommend = bool(_RECOMMEND_HINT_RE.search(folded))
+    if not (moment or exact_episode or recommend):
+        series_count = _SERIES_COUNT_RE.search(current)
+        if series_count:
+            series_info = "episodes" if series_count[1] == "tap" else "seasons"
+        elif _SERIES_CHARACTERS_RE.search(current):
+            series_info = "characters"
+        elif _SERIES_OVERVIEW_RE.search(current):
+            series_info = "summary"
+    if series_info:
+        constraints["series_only"] = True
     chitchat = bool(_CHITCHAT_RE.fullmatch(current))
-    mode = "chitchat" if chitchat else "recommend" if _RECOMMEND_HINT_RE.search(folded) else "find_moment"
+    mood = bool(_MOOD_RE.search(folded))
+    mood_discovery = mood and not (series_info or moment or exact_episode or re.search(r"\b(?:ten|tua de)\b", folded))
+    mode = "chitchat" if chitchat else "recommend" if recommend or mood_discovery else "find_moment"
     count = _COUNT_RE.search(current)
     if count:
         amount = count.group(1) or count.group(2)
         requested = 1 if amount == "mot" else max(1, min(100, int(amount)))
     else:
-        requested = 8 if mode == "recommend" or _LIST_HINT_RE.search(current) else 1
+        requested = 8 if recommend or _LIST_HINT_RE.search(current) else 1
     return {
         "intent_type": "CONVERSATIONAL_PATCH" if patch else "NO_OP" if chitchat else "DISCOVERY",
         "mode": mode,
-        "scope": "scene" if _MOMENT_HINT_RE.search(folded) else "episode",
+        "scope": "series" if series_info else "scene" if moment else "episode",
         "semantic_query": semantic,
         "constraints": constraints,
         "requested_k": requested,
+        "series_info": series_info,
         "include_genres": include,
         "exclude_genres": exclude,
+        "mood_recommendation": mood_discovery and mode == "recommend",
+        "mood_target": "sad" if re.search(r"\b(?:phim|tap|bo phim)\s+buon\b", folded) else "cheerful",
     }

@@ -68,6 +68,32 @@ def test_catalog_import_rejects_older_packages_and_records_atomically(catalog_cl
         assert db.query(CatalogSnapshot).count() == 1
 
 
+def test_catalog_episode_exposes_only_selected_youtube_sources(catalog_client):
+    client, headers, _ = catalog_client
+    package = {
+        "package": {"id": "youtube-series", "revision": 1},
+        "series": [{"id": "series-yt", "title": "Bộ phim thử nghiệm"}],
+        "episodes": [
+            {"id": "episode-yt", "series_id": "series-yt", "title": "Tập trên YouTube",
+             "external_ids": [{"namespace": "youtube_playback", "value": "9aFcot7_7Q4"}]},
+            {"id": "episode-old", "series_id": "series-yt", "title": "Tập cũ",
+             "external_ids": [{"namespace": "youtube_video_id", "value": "05tt7sqaNk0"}]},
+            {"id": "episode-link", "series_id": "series-yt", "title": "Tập mở trên YouTube",
+             "external_ids": [{"namespace": "youtube_watch", "value": "iScbpLPRG9A"}]},
+            {"id": "episode-invalid", "series_id": "series-yt", "title": "Tập có mã sai",
+             "external_ids": [{"namespace": "youtube_playback", "value": "https://example.com/video"}]},
+            {"id": "episode-draft", "series_id": "series-yt", "title": "Tập nháp", "record": {"status": "draft"},
+             "external_ids": [{"namespace": "youtube_playback", "value": "05tt7sqaNk0"}]},
+        ],
+    }
+    assert client.post("/api/admin/catalog/import", json=package, headers=headers).status_code == 200
+    assert client.get("/api/catalog/episodes/episode-yt").json()["youtube"] == {"videoId": "9aFcot7_7Q4", "canEmbed": True}
+    assert client.get("/api/catalog/episodes/episode-link").json()["youtube"] == {"videoId": "iScbpLPRG9A", "canEmbed": False}
+    assert client.get("/api/catalog/episodes/episode-old").json()["youtube"] is None
+    assert client.get("/api/catalog/episodes/episode-invalid").json()["youtube"] is None
+    assert client.get("/api/catalog/episodes/episode-draft").status_code == 404
+
+
 def test_parallel_catalog_imports_cannot_commit_the_same_revision(catalog_client):
     client, headers, database = catalog_client
     barrier = Barrier(2)

@@ -9,6 +9,8 @@ import { getRecommendations } from '@/lib/services/recommendationService';
 import coverArt from '@/assets/dippie-cover.svg';
 
 const quickTopics = [
+  { label: 'Larva', href: '/search?q=Larva' },
+  { label: 'Công chúa Ori', href: '/search?q=Công chúa Ori' },
   { label: 'Gia đình', href: '/search?genre=Family' },
   { label: 'Phiêu lưu', href: '/search?genre=Adventure' },
   { label: 'Hài', href: '/search?genre=Comedy' },

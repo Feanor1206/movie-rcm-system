@@ -28,6 +28,10 @@ Trang chủ gợi ý tập chưa xem từ lịch sử, phim yêu thích và đi�
 
 Để bật DeepSeek, dừng bản đang chạy, nhập khóa qua `& './scripts/configure_llm.ps1'` rồi khởi động với `-ModelMode cloud`. [Cấu hình DeepSeek](backend/fastapi/README.md#deepseek)
 
+## Danh mục phim
+
+Đăng nhập quản trị và nhập từng gói ở [trang Nhập dữ liệu](http://localhost:3000/admin/import). Jadoo phát từ tệp hoặc Google Drive. Larva và Ori dùng trình phát YouTube, kèm liên kết mở video gốc. [Danh mục và nguồn](data/README.md)
+
 ## Kiểm thử
 
 ```powershell

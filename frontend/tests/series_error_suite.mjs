@@ -71,7 +71,7 @@ test('Episode playback defaults to video and honors an explicitly selected asset
     { id: 'video', contentType: 'video', role: 'feature', storageProvider: 'drive' },
     { id: 'alternate', contentType: 'video', role: 'feature', storageProvider: 'drive' },
   ];
-  async function selectedAsset(query, mediaAssets = assets) {
+  async function selectedAsset(query, mediaAssets = assets, youtube = null) {
     let slots = [], index = 0, effects = [];
     const react = {
       useState(initial) { const i = index++; if (!(i in slots)) slots[i] = { value: typeof initial === 'function' ? initial() : initial }; return [slots[i].value, (v) => { slots[i].value = typeof v === 'function' ? v(slots[i].value) : v; }]; },
@@ -85,7 +85,7 @@ test('Episode playback defaults to video and honors an explicitly selected asset
         if (name === '@/lib/labels') return labels;
         if (name === 'react') return react;
         if (name === 'react-router') return { Link: 'route-link', useParams: () => ({ id: 'series1' }), useSearchParams: () => [new URLSearchParams(query)] };
-        if (name.includes('catalogService')) return { getCatalogSeriesDetail: async () => ({ series: { title: 'Series' }, seasons: [{ id: 'season1', number: 1 }], episodes: [episode] }), getCatalogEpisodeDetail: async () => ({ episode, mediaAssets, scenes: [], segments: [] }) };
+        if (name.includes('catalogService')) return { getCatalogSeriesDetail: async () => ({ series: { title: 'Series' }, seasons: [{ id: 'season1', number: 1 }], episodes: [episode] }), getCatalogEpisodeDetail: async () => ({ episode, mediaAssets, scenes: [], segments: [], youtube }) };
         if (name.includes('episodeNavigation')) return { sortCatalogSeasons: (seasons) => seasons, getInitialSeasonId: () => 'season1', getInitialEpisode: () => episode, getEpisodesForSeason: (episodes) => episodes, getAdjacentEpisode: () => null };
         if (name.includes('mediaService')) return { resolveStreamUrl: (url) => url, getStoredAuthToken: () => null };
         if (name.includes('mediaRouting')) return { resolveMediaSeekSeconds: () => null };
@@ -98,9 +98,16 @@ test('Episode playback defaults to video and honors an explicitly selected asset
     let tree;
     for (let i = 0; i < 6; i++) { tree = render(); await new Promise(setImmediate); }
     tree = render();
-    return find(tree, (n) => n.type === 'video')?.props.src ?? null;
+    return find(tree, (n) => n.type === 'video' || n.props?.['data-testid'] === 'series-youtube-player')?.props.src
+      ?? find(tree, (n) => n.type === 'a' && n.props?.href?.startsWith('https://www.youtube.com/watch'))?.props.href
+      ?? null;
   }
   assert.equal(await selectedAsset('episode=ep1'), '/api/media/stream/video');
   assert.equal(await selectedAsset('episode=ep1&asset=alternate'), '/api/media/stream/alternate');
   assert.equal(await selectedAsset('episode=ep1', [assets[0]]), null);
+  const youtube = { videoId: '9aFcot7_7Q4', canEmbed: true };
+  assert.equal(await selectedAsset('episode=ep1&t=42000', [], youtube), 'https://www.youtube-nocookie.com/embed/9aFcot7_7Q4?start=42');
+  assert.equal(await selectedAsset('episode=ep1&t=42000', [], { ...youtube, canEmbed: false }), 'https://www.youtube.com/watch?v=9aFcot7_7Q4&t=42');
+  assert.equal(await selectedAsset('episode=ep1', [assets[1]], youtube), '/api/media/stream/video');
+  assert.equal(await selectedAsset('episode=ep1', [], { videoId: 'https://example.com/video', canEmbed: false }), null);
 });
