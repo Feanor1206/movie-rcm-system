@@ -7,6 +7,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { AlertCircle, ChevronLeft, ChevronRight, Film, RefreshCw, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { browseCatalog } from '@/lib/services/catalogService';
+import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import type { Movie } from '@/types/movie';
 
 type SearchSnapshot = {
@@ -136,7 +137,7 @@ export function SearchExperience() {
     <main className="page-shell min-h-[75vh] py-8 sm:py-12">
       <header>
         <h1 className="comic-heading text-3xl font-bold tracking-tight text-ink sm:text-4xl">Tìm một phim.</h1>
-        <p className="mt-1.5 text-sm text-muted">Tìm phim hoạt hình lẻ trong kho.</p>
+        <p className="mt-1.5 text-sm text-muted">Tìm phim hoạt hình trong kho.</p>
       </header>
 
       <div className="mt-6">
@@ -196,10 +197,10 @@ export function SearchExperience() {
               {currentResults.map((movie) => (
                 <Link
                   key={movie.id}
-                  href={`/movies/${encodeURIComponent(movie.id)}`}
+                  href={buildMediaItemHref(movie)}
                   data-testid="search-result-card"
                   data-result-id={movie.id}
-                  data-result-type="movie"
+                  data-result-type={movie.item_type || 'movie'}
                   className="comic-card flex min-h-36 flex-col justify-between p-4 transition-colors hover:bg-mint"
                 >
                   <div>

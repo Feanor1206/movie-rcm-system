@@ -509,6 +509,25 @@ test('6. Catalog list: renders standalone films and asks the server for the URL 
   assert.equal(getText(h.tree).includes('Điểm cao nhất'), false, 'Sort controls stay off this screen');
 });
 
+test('Catalog search opens imported series and episodes on their playback routes', async () => {
+  const h = createSearchHarness('q=jadoo', {
+    browse: async () => ({
+      items: [
+        sampleMovie({ id: 'ser_jadoo', item_type: 'series', series_id: 'ser_jadoo' }),
+        sampleMovie({ id: 'ep_jadoo_s01_0001', item_type: 'episode', series_id: 'ser_jadoo', episode_id: 'ep_jadoo_s01_0001' }),
+      ],
+      page: 0, size: 12, totalElements: 2, totalPages: 1, hasNext: false, hasPrevious: false,
+    }),
+  });
+  h.render();
+  await h.settle();
+  const cards = findNodes(h.tree, (node) => node.props?.['data-testid'] === 'search-result-card');
+  assert.equal(cards[0].props.href, '/series/ser_jadoo');
+  assert.equal(cards[1].props.href, '/series/ser_jadoo?episode=ep_jadoo_s01_0001');
+  assert.equal(cards[0].props['data-result-type'], 'series');
+  assert.equal(cards[1].props['data-result-type'], 'episode');
+});
+
 test('7. Catalog search: API failure stays an error and retry can recover', async () => {
   let shouldFail = true;
   const h = createSearchHarness('q=jadoo', {

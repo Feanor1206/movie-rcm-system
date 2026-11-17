@@ -247,6 +247,18 @@ test('5. C2: Malformed paginated payload (data={} or missing items) throws 502',
   );
 });
 
+test('Catalog navigation keeps series and episode identity', () => {
+  const { api } = loadService(async () => {});
+  const movie = { id: 'episode-id', title: 'Jadoo', year: 2026, rating: 0,
+    item_type: 'episode', series_id: 'series-id', episode_id: 'episode-id' };
+  const normalized = api.normalizeCatalogMovie(movie);
+  assert.equal(normalized.item_type, 'episode');
+  assert.equal(normalized.series_id, 'series-id');
+  assert.equal(normalized.episode_id, 'episode-id');
+  const series = api.normalizeCatalogMovie({ ...movie, id: 'series-id', item_type: 'series' });
+  assert.equal(series.item_type, 'series');
+});
+
 test('6. C2: normalizeCatalogMovie rejects missing required fields and never fabricates phantom zeros', () => {
   const { api } = loadService(async () => {});
 

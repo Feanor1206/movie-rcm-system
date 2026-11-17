@@ -315,7 +315,7 @@ export default function SeriesDetailPage() {
             }
           }
           if (!assetToSelect && detail.mediaAssets && detail.mediaAssets.length > 0) {
-            assetToSelect = detail.mediaAssets[0];
+            assetToSelect = detail.mediaAssets.find((a) => a.contentType === 'video') || null;
           }
           setSelectedAsset(assetToSelect);
           if (isUrlEpisode && !initialDeepLinkHandledRef.current && assetToSelect) {
