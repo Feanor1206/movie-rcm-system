@@ -18,6 +18,8 @@ const movieDetailCompFilePath = path.join(root, 'features/movies/components/Movi
 const profileOverviewFilePath = path.join(root, 'features/profile/components/ProfileOverview.tsx');
 const editorialHeroCompFilePath = path.join(root, 'features/home/components/EditorialHero.tsx');
 const watchlistProviderFilePath = path.join(root, 'lib/context/WatchlistContext.tsx');
+const filmShelfFilePath = path.join(root, 'features/movies/components/FilmShelf.tsx');
+const mediaRoutingFilePath = path.join(root, 'lib/services/mediaRouting.ts');
 
 const transpileOptions = {
   compilerOptions: {
@@ -34,6 +36,11 @@ const movieDetailCompTranspiled = ts.transpileModule(fs.readFileSync(movieDetail
 const profileOverviewTranspiled = ts.transpileModule(fs.readFileSync(profileOverviewFilePath, 'utf8'), transpileOptions).outputText;
 const editorialHeroTranspiled = ts.transpileModule(fs.readFileSync(editorialHeroCompFilePath, 'utf8'), transpileOptions).outputText;
 const watchlistProviderTranspiled = ts.transpileModule(fs.readFileSync(watchlistProviderFilePath, 'utf8'), transpileOptions).outputText;
+const filmShelfTranspiled = ts.transpileModule(fs.readFileSync(filmShelfFilePath, 'utf8'), transpileOptions).outputText;
+const mediaRoutingTranspiled = ts.transpileModule(fs.readFileSync(mediaRoutingFilePath, 'utf8'), transpileOptions).outputText;
+const mediaRoutingContext = { exports: {}, module: { exports: {} }, URLSearchParams, encodeURIComponent, decodeURIComponent, String, Number, Boolean, console };
+vm.runInNewContext(mediaRoutingTranspiled, mediaRoutingContext);
+const mediaRouting = mediaRoutingContext.module.exports.buildMediaItemHref ? mediaRoutingContext.module.exports : mediaRoutingContext.exports;
 
 const moviesFilePath = path.join(root, 'lib/data/movies.ts');
 const moviesTranspiled = ts.transpileModule(fs.readFileSync(moviesFilePath, 'utf8'), transpileOptions).outputText;
@@ -1338,3 +1345,81 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   assert.ok(finalAddBtn, 'Hero must return to "+ Thêm vào danh sách xem"');
 });
 
+function renderFilmShelf(movies, options = {}) {
+  const moduleObj = { exports: {} };
+  const context = {
+    module: moduleObj,
+    exports: moduleObj.exports,
+    console,
+    require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
+      if (mod === 'react') return {
+        createElement: (type, props, ...children) => {
+          const flatChildren = children.flat().filter((c) => c !== null && c !== undefined && c !== false);
+          return { type, props: { ...props, children: flatChildren.length === 1 ? flatChildren[0] : flatChildren } };
+        },
+      };
+      if (mod === 'next/link') return { default: (props) => ({ type: 'next/link', props }), __esModule: true };
+      if (mod.includes('mediaRouting')) return mediaRouting;
+      return {};
+    },
+  };
+  vm.runInNewContext(filmShelfTranspiled, context, { filename: filmShelfFilePath });
+  return moduleObj.exports.FilmShelf({ movies, ...options });
+}
+
+test('Home film shelf opens films, series and episodes on the correct routes', async () => {
+  const standaloneMovie = sampleMovie({
+    id: 'totoro',
+    title: 'My Neighbor Totoro',
+    year: 1988,
+    item_type: 'movie',
+  });
+  const seriesItem = sampleMovie({
+    id: 'ser_jadoo',
+    title: 'Xin Chào Jadoo',
+    item_type: 'series',
+  });
+  const episodeItem = sampleMovie({
+    id: 'ep_jadoo_s01_0001',
+    title: 'Tập 1 - Jadoo',
+    item_type: 'episode',
+    series_id: 'ser_jadoo',
+    primary_media_asset_id: 'asset_jadoo_v1',
+  });
+
+  const shelfNode = renderFilmShelf([standaloneMovie, seriesItem, episodeItem]);
+  const cards = findNodes(shelfNode, (n) => n.props?.['data-testid'] === 'film-card');
+  assert.equal(cards.length, 3, 'Film shelf must render 3 film cards');
+
+  assert.equal(cards[0].props.href, '/movies/totoro', 'Standalone film routes to /movies/[id]');
+  assert.equal(cards[0].props['data-movie-id'], 'totoro');
+
+  assert.equal(cards[1].props.href, '/series/ser_jadoo', 'Series item routes to /series/[id]');
+  assert.equal(cards[1].props['data-movie-id'], 'ser_jadoo');
+
+  assert.equal(
+    cards[2].props.href,
+    '/series/ser_jadoo?episode=ep_jadoo_s01_0001&asset=asset_jadoo_v1',
+    'Episode item routes to /series/[seriesId]?episode=[episodeId]&asset=[assetId]'
+  );
+  assert.equal(cards[2].props['data-movie-id'], 'ep_jadoo_s01_0001');
+
+  const home = createHomeHarness(async () => [episodeItem]);
+  home.render();
+  await home.settle();
+
+  const homeShelf = findNodes(home.tree, (n) => n.type === 'FilmShelf')[0];
+  assert.ok(homeShelf, 'Home renders FilmShelf with catalog items');
+  assert.equal(homeShelf.props.movies[0].id, 'ep_jadoo_s01_0001');
+
+  const renderedHomeCards = findNodes(
+    renderFilmShelf(homeShelf.props.movies),
+    (n) => n.props?.['data-testid'] === 'film-card'
+  );
+  assert.equal(
+    renderedHomeCards[0].props.href,
+    '/series/ser_jadoo?episode=ep_jadoo_s01_0001&asset=asset_jadoo_v1',
+    'Episode on home page links directly to episode playback URL'
+  );
+});

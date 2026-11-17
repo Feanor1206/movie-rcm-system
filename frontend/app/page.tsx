@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { FilmShelf } from '@/features/movies/components/FilmShelf';
@@ -52,7 +51,7 @@ export default function HomePage() {
       <main className="comic-book">
         <section className="cover-grid" aria-labelledby="cover-title">
           <div className="cover-copy">
-            <h1 id="cover-title">Kho phim<br /><em>hoạt hình</em></h1>
+            <h1 id="cover-title">Kho phim hoạt hình</h1>
 
             <div className="hero-cta-group">
               <Link href="/search" className="cover-cta">Tìm phim</Link>
@@ -85,10 +84,10 @@ export default function HomePage() {
             <p>Đang tải phim…</p>
           </div>
         ) : error ? (
-          <div className="comic-loading" role="alert">
-            <p>Không thể tải phim. Vui lòng thử lại.</p>
+          <div className="comic-loading flex-col gap-3 py-12" role="alert">
+            <p className="text-red-800 font-medium">Không thể tải phim. Vui lòng thử lại.</p>
             <button className="btn-secondary" onClick={() => setRetry((n) => n + 1)}>
-              <RefreshCw size={15} /> Thử lại
+              Thử lại
             </button>
           </div>
         ) : (

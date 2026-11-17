@@ -6,22 +6,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import {
-  Film,
-  Play,
-  Clock,
-  Calendar,
-  Layers,
-  ChevronRight,
-  ArrowLeft,
-  Volume2,
-  VolumeX,
-  Maximize2,
-  RotateCcw,
-  AlertCircle,
-  Tag,
-  Users,
-} from 'lucide-react';
-import {
   getCatalogSeriesDetail,
   getCatalogEpisodeDetail,
   CatalogSeriesResponse,
@@ -569,12 +553,10 @@ export default function SeriesDetailPage() {
   if (error || !seriesData) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <AlertCircle size={40} className="mx-auto text-red-400" />
         <h2 className="mt-4 text-xl font-bold text-ink">Lỗi hiển thị bộ phim</h2>
         <p className="mt-2 text-sm text-muted">{error || 'Không tìm thấy dữ liệu bộ phim.'}</p>
         <button onClick={() => setSeriesRetry((value) => value + 1)} className="btn-secondary mt-6 inline-flex items-center gap-2 text-xs">Thử tải lại</button>
         <Link href="/search" className="btn-secondary mt-6 ml-2 inline-flex items-center gap-2 text-xs">
-          <ArrowLeft size={14} />
           <span>Quay lại kho phim</span>
         </Link>
       </div>
@@ -586,76 +568,41 @@ export default function SeriesDetailPage() {
   return (
     <main className="series-page mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
 
-      <div className="mb-6 flex items-center gap-2 text-xs text-muted">
-        <Link href="/" className="hover:text-ink transition-colors">Trang chủ</Link>
-        <ChevronRight size={12} />
-        <Link href="/search" className="hover:text-ink transition-colors">Kho phim</Link>
-        <ChevronRight size={12} />
-        <span className="text-ink font-medium">{series.title}</span>
-      </div>
-
-      <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-md mb-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand border border-brand/20">
-                Loạt phim hoạt hình
-              </span>
-              {series.releaseYearStart && (
-                <span className="rounded bg-surface-elevated px-2 py-0.5 text-xs text-muted border border-surface-border">
-                  Năm {series.releaseYearStart}
-                  {series.releaseYearEnd ? ` - ${series.releaseYearEnd}` : ''}
-                </span>
-              )}
-            </div>
-
-            <h1 className="mt-2 text-2xl font-extrabold text-ink sm:text-3xl">
-              {series.title}
-            </h1>
-            {series.originalTitle && (
-              <p className="text-xs text-muted italic">Tên gốc: {series.originalTitle}</p>
-            )}
-
-            {series.synopsis && (
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted">
-                {series.synopsis}
-              </p>
-            )}
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {series.genreIds && (
-                <div className="flex items-center gap-1.5 text-xs text-muted">
-                  <Tag size={12} className="text-brand" />
-                  <span>Thể loại:</span>
-                  <span className="text-ink font-medium">{series.genreIds.split(',').map((genre) => genreLabel(genre.trim())).join(', ')}</span>
-                </div>
-              )}
-              {series.studios && (
-                <div className="ml-4 flex items-center gap-1.5 text-xs text-muted">
-                  <span>Studio:</span>
-                  <span className="text-ink font-medium">{series.studios}</span>
-                </div>
-              )}
-            </div>
-          </div>
+      <header className="mb-5">
+        <Link href="/search" className="text-sm font-medium text-muted hover:text-ink">Kho phim</Link>
+        <h1 className="mt-2 break-words text-2xl font-bold text-ink sm:text-3xl">{series.title}</h1>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+          {series.releaseYearStart && (
+            <span>
+              {series.releaseYearStart}{series.releaseYearEnd ? ` - ${series.releaseYearEnd}` : ''}
+            </span>
+          )}
+          {series.genreIds && <span>{series.genreIds.split(',').map((genre) => genreLabel(genre.trim())).join(', ')}</span>}
         </div>
-      </div>
+        {(series.synopsis || series.originalTitle || series.studios) && (
+          <details className="mt-3 max-w-3xl text-sm text-muted">
+            <summary className="w-fit cursor-pointer font-medium text-ink">Giới thiệu bộ phim</summary>
+            {series.synopsis && <p className="mt-2">{series.synopsis}</p>}
+            {series.originalTitle && <p className="mt-2">Tên gốc: {series.originalTitle}</p>}
+            {series.studios && <p className="mt-1">Hãng phim: {series.studios}</p>}
+          </details>
+        )}
+      </header>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
 
-        <div className="lg:col-span-2 space-y-6">
+        <div className="min-w-0 lg:col-span-2 space-y-4">
 
           {playbackWarning && (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900">
               <div className="flex items-center gap-2">
-                <AlertCircle size={16} className="text-amber-400 shrink-0" />
                 <span>{playbackWarning}</span>
               </div>
               <button
                 onClick={() => setPlaybackWarning(null)}
-                className="text-muted hover:text-ink"
+                className="min-h-11 shrink-0 px-2 text-muted hover:text-ink"
               >
-                ✕
+                Đóng
               </button>
             </div>
           )}
@@ -690,32 +637,33 @@ export default function SeriesDetailPage() {
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-center p-6 text-zinc-200">
-                <Film size={36} className="mb-2 text-zinc-400" />
                 <p className="text-xs">{selectedAsset ? 'Không thể mở nguồn video này.' : 'Tập này chưa có video được cấu hình.'}</p>
               </div>
             )}
           </div>
 
-          {offerResume && savedProgress && <div className="comic-card flex flex-wrap items-center gap-3 p-3" data-testid="resume-choice">
-            <span className="text-sm">Bạn đang xem dở ở {formatDuration(savedProgress.positionMs)}.</span>
-            <button className="btn-primary text-xs" onClick={() => {
-              const video = videoRef.current;
-              if (video && Number.isFinite(video.duration) && savedProgress.positionMs < video.duration * 1000) {
-                setDismissedResume(progressIdentity); video.currentTime = savedProgress.positionMs / 1000; void video.play().catch(() => {});
-              }
-            }}>Xem tiếp</button>
-            <button className="text-xs underline" onClick={() => {
-              setDismissedResume(progressIdentity);
-              if (videoRef.current) { videoRef.current.currentTime = 0; void videoRef.current.play().catch(() => {}); }
-            }}>Xem từ đầu</button>
+          {offerResume && savedProgress && <div className="rounded-xl border border-brand/30 bg-brand/10 flex flex-wrap items-center justify-between gap-3 p-4" data-testid="resume-choice">
+            <span className="text-xs sm:text-sm text-foreground">Bạn đang xem dở ở <strong className="font-mono text-brand-dark">{formatDuration(savedProgress.positionMs)}</strong>.</span>
+            <div className="flex items-center gap-2">
+              <button className="btn-primary text-xs py-1.5 px-3" onClick={() => {
+                const video = videoRef.current;
+                if (video && Number.isFinite(video.duration) && savedProgress.positionMs < video.duration * 1000) {
+                  setDismissedResume(progressIdentity); video.currentTime = savedProgress.positionMs / 1000; void video.play().catch(() => {});
+                }
+              }}>Xem tiếp</button>
+              <button className="min-h-11 text-xs text-muted hover:text-ink underline cursor-pointer" onClick={() => {
+                setDismissedResume(progressIdentity);
+                if (videoRef.current) { videoRef.current.currentTime = 0; void videoRef.current.play().catch(() => {}); }
+              }}>Xem từ đầu</button>
+            </div>
           </div>}
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <label className="inline-flex min-h-10 items-center gap-2"><input type="checkbox" checked={autoNext} onChange={event => {
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
+            <label className="inline-flex min-h-10 items-center gap-2 cursor-pointer hover:text-ink"><input type="checkbox" className="rounded border-surface-border bg-surface accent-brand" checked={autoNext} onChange={event => {
               setAutoNext(event.target.checked); writeAutoNextPreference(event.target.checked); setNextCountdown(null);
             }} />Tự chuyển tập trong mùa</label>
-            {nextCountdown !== null && nextEpisode && <div role="status" className="comic-card flex items-center gap-3 p-3" data-testid="next-countdown">
-              Tập tiếp theo sau {nextCountdown} giây
-              <button className="underline" onClick={() => setNextCountdown(null)}>Hủy</button>
+            {nextCountdown !== null && nextEpisode && <div role="status" className="rounded-xl border border-surface-border bg-surface-elevated flex items-center gap-3 px-3 py-2 text-xs text-ink" data-testid="next-countdown">
+              Tập tiếp theo sau <strong className="text-brand-dark font-mono">{nextCountdown}</strong> giây
+              <button className="underline text-muted hover:text-ink cursor-pointer ml-1" onClick={() => setNextCountdown(null)}>Hủy</button>
             </div>}
           </div>
           {progress.error && <p role="status" className="text-xs text-muted">{progress.error}</p>}
@@ -723,14 +671,13 @@ export default function SeriesDetailPage() {
             <div className="rounded-xl border border-surface-border bg-surface p-5">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-border pb-3">
                 <div>
-                  <span className="text-xs font-bold text-brand">
+                  <span className="text-xs font-bold text-brand-dark">
                     Tập {selectedEpisode.number ?? selectedEpisode.episodeNumber}
                   </span>
                   <h2 className="text-lg font-bold text-ink">{selectedEpisode.title}</h2>
                 </div>
                 {selectedEpisode.durationMs && (
                   <span className="flex items-center gap-1 rounded bg-surface-elevated px-2 py-1 text-xs text-muted border border-surface-border">
-                    <Clock size={12} />
                     {formatDuration(selectedEpisode.durationMs)}
                   </span>
                 )}
@@ -743,7 +690,7 @@ export default function SeriesDetailPage() {
               )}
 
               {episodeDetail?.mediaAssets && episodeDetail.mediaAssets.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-surface-border flex items-center gap-2 text-xs">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-surface-border pt-3 text-xs">
                   <span className="text-muted">Nguồn phát:</span>
                   {episodeDetail.mediaAssets.map((asset) => (
                     <button
@@ -752,13 +699,13 @@ export default function SeriesDetailPage() {
                       data-asset-id={asset.id}
                       aria-pressed={selectedAsset?.id === asset.id}
                       onClick={() => setSelectedAsset(asset)}
-                      className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer border ${
+                      className={`min-h-11 max-w-full break-words rounded px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer border ${
                         selectedAsset?.id === asset.id
-                          ? 'border-brand bg-brand/10 text-brand'
+                          ? 'border-brand bg-brand/10 text-brand-dark'
                           : 'border-surface-border bg-surface-elevated text-muted hover:text-ink'
                       }`}
                     >
-                      {asset.storageProvider === 'drive' ? 'Google Drive' : 'Tệp cục bộ'} [{asset.id}]
+                      {asset.editionLabel || (asset.storageProvider === 'drive' ? 'Google Drive' : 'Tệp cục bộ')}
                     </button>
                   ))}
                 </div>
@@ -770,7 +717,6 @@ export default function SeriesDetailPage() {
             <div className="rounded-xl border border-surface-border bg-surface p-5">
               <div className="flex items-center justify-between border-b border-surface-border pb-3">
                 <div className="flex items-center gap-2">
-                  <Layers size={16} className="text-brand" />
                   <h3 className="text-sm font-bold text-ink">
                     Phân đoạn ({episodeDetail.segments.length})
                   </h3>
@@ -806,7 +752,7 @@ export default function SeriesDetailPage() {
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-brand">
+                          <span className="font-mono text-xs font-bold text-brand-dark">
                             {timeLabel}
                           </span>
                           <span className="text-xs font-bold text-ink">
@@ -821,7 +767,6 @@ export default function SeriesDetailPage() {
                       </div>
 
                       <span className="btn-secondary flex items-center gap-1 text-[11px] font-semibold shrink-0 py-1 px-2.5 pointer-events-none">
-                        <Play size={11} className="text-brand" />
                         <span>Tua tới</span>
                       </span>
                     </div>
@@ -867,7 +812,7 @@ export default function SeriesDetailPage() {
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-brand">
+                          <span className="font-mono text-xs font-bold text-brand-dark">
                             {timeLabel}
                           </span>
                           <span className="text-xs font-bold text-ink">
@@ -889,7 +834,6 @@ export default function SeriesDetailPage() {
                       <span
                         className="btn-secondary flex items-center gap-1 text-[11px] font-semibold shrink-0 py-1 px-2.5 pointer-events-none"
                       >
-                        <Play size={11} className="text-brand" />
                         <span>Tua tới</span>
                       </span>
                     </div>
@@ -904,7 +848,6 @@ export default function SeriesDetailPage() {
           <div className="rounded-xl border border-surface-border bg-surface p-5">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
-                <Layers size={16} className="text-brand" />
                 <h3 className="text-sm font-bold text-ink">
                     Danh sách tập ({seasonEpisodes.length})
                 </h3>
@@ -991,7 +934,7 @@ export default function SeriesDetailPage() {
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="grid h-5 w-5 place-items-center rounded bg-surface text-[10px] font-bold text-brand border border-surface-border">
+                        <span className="grid h-5 w-5 place-items-center rounded bg-surface text-[10px] font-bold text-brand-dark border border-surface-border">
                           {ep.number ?? ep.episodeNumber}
                         </span>
                         <strong className="text-xs font-semibold">{ep.title}</strong>

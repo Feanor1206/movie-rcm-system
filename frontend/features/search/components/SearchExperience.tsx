@@ -4,7 +4,6 @@ import { genreLabel, movieSynopsis } from '@/lib/labels';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { AlertCircle, ChevronLeft, ChevronRight, Film, RefreshCw, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { browseCatalog } from '@/lib/services/catalogService';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
@@ -135,14 +134,13 @@ export function SearchExperience() {
 
   return (
     <main className="page-shell min-h-[75vh] py-8 sm:py-12">
-      <header>
-        <h1 className="comic-heading text-3xl font-bold tracking-tight text-ink sm:text-4xl">Tìm một phim.</h1>
-        <p className="mt-1.5 text-sm text-muted">Tìm phim hoạt hình trong kho.</p>
+      <header className="catalog-cover">
+        <h1 className="comic-heading text-3xl font-bold text-ink sm:text-5xl">Kho phim hoạt hình</h1>
+        <div className="catalog-cover-art" aria-hidden="true" />
       </header>
 
       <div className="mt-6">
-        <div className="relative flex max-w-2xl items-center border-2 border-ink bg-surface px-3.5 py-3 shadow-brand-sm focus-within:bg-mint/30">
-          <Search className="shrink-0 text-muted" size={18} />
+        <div className="flex max-w-2xl items-center rounded-lg border border-surface-border bg-surface px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30">
           <input
             data-testid="search-query-input"
             aria-label="Tìm phim hoạt hình"
@@ -150,50 +148,57 @@ export function SearchExperience() {
             type="text"
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
-            placeholder="Tên phim hoạt hình…"
-            className="w-full bg-transparent px-3 text-sm text-ink placeholder:text-muted focus:outline-none"
+            placeholder="Tìm theo tên hoặc nội dung"
+            className="min-h-12 min-w-0 flex-1 bg-transparent px-1 text-base text-ink placeholder:text-muted focus:outline-none focus-visible:shadow-none"
           />
           {inputValue && (
             <button
               onClick={clearQuery}
-              className="cursor-pointer rounded p-1 text-muted hover:bg-surface-elevated hover:text-ink"
+              className="min-h-[44px] min-w-[44px] cursor-pointer rounded-md px-2 text-sm text-muted hover:bg-surface-elevated hover:text-ink"
               aria-label="Xóa từ khóa"
             >
-              <X size={15} />
+              Xóa
             </button>
           )}
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-y border-surface-border py-3 text-xs text-muted">
-        <div className="flex items-center gap-2"><Film size={14} /><span>{urlQuery ? `Kết quả cho “${urlQuery}”` : 'Phim hoạt hình trong kho'}{genre ? ` · Thể loại: ${genreLabel(genre)}` : ''}</span></div>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-ink/20 py-3 text-sm text-muted">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 break-words">
+          {urlQuery && <span className="min-w-0">Kết quả cho “{urlQuery}”</span>}
+          {genre && <span>Thể loại {genreLabel(genre)}</span>}
+        </div>
         <div className="flex items-center gap-2">
-          {loading && snapshot && <span className="flex items-center gap-1 text-brand"><RefreshCw size={11} className="animate-spin" />Đang cập nhật…</span>}
-          {isCurrentSnapshot && !loading && <span>{totalElements} phim</span>}
+          {loading && snapshot && (
+            <span className="text-brand-dark">Đang cập nhật…</span>
+          )}
+          {isCurrentSnapshot && !loading && <span className="font-medium text-ink">{totalElements} phim</span>}
         </div>
       </div>
 
       <section className="mt-6" aria-live="polite">
         {error && isCurrentSnapshot ? (
-          <div role="alert" className="flex flex-col items-center rounded-lg border border-red-500/30 bg-red-950/10 px-6 py-12 text-center">
-            <AlertCircle size={24} className="text-red-400" />
+          <div role="alert" className="flex flex-col items-center rounded-xl border border-red-500/30 bg-red-950/10 px-6 py-12 text-center">
             <h2 className="mt-3 font-bold text-ink">Không thể tải kho phim</h2>
             <p className="mt-1 max-w-md text-sm text-muted">{error}</p>
             <button type="button" onClick={() => setRetryTrigger((value) => value + 1)} className="btn-primary mt-5 flex items-center gap-2 text-xs">
-              <RefreshCw size={13} /> Thử lại
+              Thử lại
             </button>
           </div>
         ) : !isCurrentSnapshot ? (
-          <div data-testid="catalog-skeleton" role="status" className="rounded-lg border border-surface-border bg-surface p-8 text-center text-sm text-muted">Đang tải kho phim…</div>
+          <div data-testid="catalog-skeleton" role="status" className="rounded-xl border border-surface-border bg-surface p-12 text-center text-sm text-muted animate-pulse">
+            Đang tải kho phim…
+          </div>
         ) : isCurrentSnapshot && currentResults.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-surface-border bg-surface px-6 py-16 text-center">
-            <Search size={22} className="mx-auto text-muted" />
-            <h2 className="mt-3 font-bold text-ink">Không tìm thấy phim phù hợp</h2>
-            <p className="mt-1 text-sm text-muted">{urlQuery ? `Không có phim hoạt hình khớp với “${urlQuery}”.` : genre ? `Không có phim hoạt hình thuộc thể loại ${genreLabel(genre)}.` : 'Kho hiện chưa có phim hoạt hình nào.'}</p>
+          <div className="rounded-xl border border-dashed border-surface-border bg-surface px-6 py-16 text-center">
+            <h2 className="mt-2 font-bold text-ink text-base">Không tìm thấy phim phù hợp</h2>
+            <p className="mt-1 text-sm text-muted max-w-md mx-auto">
+              {urlQuery ? `Không có phim hoạt hình khớp với “${urlQuery}”.` : genre ? `Không có phim hoạt hình thuộc thể loại ${genreLabel(genre)}.` : 'Kho hiện chưa có phim hoạt hình nào.'}
+            </p>
           </div>
         ) : isCurrentSnapshot ? (
           <>
-            <div data-testid="catalog-results" className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
+            <div data-testid="catalog-results" className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
               {currentResults.map((movie) => (
                 <Link
                   key={movie.id}
@@ -201,26 +206,45 @@ export function SearchExperience() {
                   data-testid="search-result-card"
                   data-result-id={movie.id}
                   data-result-type={movie.item_type || 'movie'}
-                  className="comic-card flex min-h-36 flex-col justify-between p-4 transition-colors hover:bg-mint"
+                  className="comic-card group flex flex-col justify-between p-4 sm:p-5 hover:border-brand/40 hover:bg-surface-elevated"
                 >
                   <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="border border-ink/30 bg-mint px-1.5 py-0.5 text-[10px] font-bold text-ink">Phim hoạt hình</span>
-                      {movie.year ? <span className="text-xs text-muted">{movie.year}</span> : null}
-                    </div>
-                    <h2 className="comic-heading mt-2 line-clamp-2 text-base font-bold text-ink">{movie.title}</h2>
-                    {movie.description && <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted">{movieSynopsis(movie.description)}</p>}
+                    <h2 className="comic-heading line-clamp-2 break-words text-base font-bold text-ink group-hover:text-brand-dark transition-colors">
+                      {movie.title}
+                    </h2>
+                    {movie.description && (
+                      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted">
+                        {movieSynopsis(movie.description)}
+                      </p>
+                    )}
                   </div>
-                  <span className="mt-3 text-right text-xs font-semibold text-brand-dark">Xem phim →</span>
+                  <div className="mt-4 flex items-center justify-between gap-3 text-xs">
+                    <span className="text-muted">{movie.year || ''}</span>
+                    <span className="font-semibold text-brand-dark">{movie.item_type === 'series' ? 'Chọn tập' : 'Xem phim'}</span>
+                  </div>
                 </Link>
               ))}
             </div>
             {totalPages > 1 && (
-              <nav aria-label="Phân trang kho phim" className="mt-6 flex items-center justify-between rounded-lg border border-surface-border bg-surface px-4 py-3 text-xs text-muted">
+              <nav aria-label="Phân trang kho phim" className="mt-8 flex items-center justify-between rounded-xl border border-surface-border bg-surface px-5 py-3 text-xs text-muted">
                 <span>Trang {safePage + 1} / {totalPages}</span>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => updateUrl({ page: Math.max(0, safePage - 1) })} disabled={safePage === 0 || loading} className="btn-secondary flex items-center gap-1 text-xs disabled:opacity-40"><ChevronLeft size={14} />Trước</button>
-                  <button type="button" onClick={() => updateUrl({ page: Math.min(totalPages - 1, safePage + 1) })} disabled={safePage >= totalPages - 1 || loading} className="btn-secondary flex items-center gap-1 text-xs disabled:opacity-40">Sau<ChevronRight size={14} /></button>
+                  <button
+                    type="button"
+                    onClick={() => updateUrl({ page: Math.max(0, safePage - 1) })}
+                    disabled={safePage === 0 || loading}
+                    className="btn-secondary flex items-center gap-1 text-xs py-1.5 px-3 disabled:opacity-40"
+                  >
+                    Trước
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateUrl({ page: Math.min(totalPages - 1, safePage + 1) })}
+                    disabled={safePage >= totalPages - 1 || loading}
+                    className="btn-secondary flex items-center gap-1 text-xs py-1.5 px-3 disabled:opacity-40"
+                  >
+                    Sau
+                  </button>
                 </div>
               </nav>
             )}

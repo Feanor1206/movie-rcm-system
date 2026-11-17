@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 
@@ -118,37 +117,32 @@ export function AuthModal() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-surface-border bg-surface p-6 sm:p-8 shadow-2xl">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-surface-border bg-surface p-6 sm:p-8 shadow-2xl">
 
         <button
           type="button"
           onClick={closeAuthModal}
           disabled={isSubmitting}
-          className="absolute right-3 top-3 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-muted hover:bg-surface-elevated hover:text-ink transition-colors cursor-pointer disabled:opacity-50"
+          className="absolute right-3.5 top-3.5 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-3 text-xs font-semibold text-muted hover:bg-surface-elevated hover:text-ink cursor-pointer disabled:opacity-50"
           aria-label="Đóng cửa sổ"
         >
-          <X size={20} />
+          Đóng
         </button>
 
 
         <div className="mb-6">
           <div className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-ink">
-            <span className="tracking-tighter font-extrabold text-2xl">DIPPIE</span>
+            <span className="tracking-tight font-extrabold text-2xl text-brand-dark">Dippie</span>
           </div>
           <h2 id="auth-modal-title" className="mt-2 text-xl font-bold tracking-tight text-ink">
-            {isLogin ? 'Đăng nhập tài khoản' : 'Tạo tài khoản mới'}
+            {isLogin ? 'Đăng nhập' : 'Đăng ký'}
           </h2>
-          <p className="mt-1 text-xs text-muted">
-            {isLogin
-              ? 'Lưu danh sách xem và điểm đánh giá.'
-              : 'Tạo tài khoản để lưu danh sách và điểm đánh giá.'}
-          </p>
         </div>
 
 
-        <div className="grid grid-cols-2 gap-1 rounded-lg border border-surface-border bg-surface-muted p-1 mb-6">
+        <div className="grid grid-cols-2 gap-1 rounded-xl border border-surface-border bg-surface-muted p-1 mb-6">
           <button
             type="button"
             disabled={isSubmitting}
@@ -156,8 +150,8 @@ export function AuthModal() {
               setError(null);
               openAuthModal('login');
             }}
-            className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-60 ${
-              isLogin ? 'bg-surface-elevated text-ink font-bold' : 'text-muted hover:text-ink'
+            className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer disabled:opacity-60 ${
+              isLogin ? 'bg-surface-elevated text-ink font-bold shadow-sm' : 'text-muted hover:text-ink'
             }`}
           >
             Đăng nhập
@@ -169,8 +163,8 @@ export function AuthModal() {
               setError(null);
               openAuthModal('register');
             }}
-            className={`rounded-md py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-60 ${
-              !isLogin ? 'bg-surface-elevated text-ink font-bold' : 'text-muted hover:text-ink'
+            className={`rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer disabled:opacity-60 ${
+              !isLogin ? 'bg-surface-elevated text-ink font-bold shadow-sm' : 'text-muted hover:text-ink'
             }`}
           >
             Đăng ký
@@ -179,7 +173,7 @@ export function AuthModal() {
 
 
         {error && (
-          <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-400 leading-relaxed">
+          <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-800 leading-relaxed">
             {error}
           </div>
         )}
@@ -191,7 +185,7 @@ export function AuthModal() {
               <label htmlFor="auth-full-name" className="block text-xs font-medium text-muted mb-1.5">
                 Họ và tên
               </label>
-              <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+              <div className="relative flex items-center rounded-lg border border-surface-border bg-surface-muted px-3 py-2.5 focus-within:border-brand focus-within:ring-1 focus-within:ring-brand">
 
                 <input
                   id="auth-full-name"
@@ -201,7 +195,7 @@ export function AuthModal() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Nguyễn Văn A"
-                  className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-50"
+                  className="w-full bg-transparent text-base sm:text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:shadow-none disabled:opacity-50"
                 />
               </div>
             </div>
@@ -211,7 +205,7 @@ export function AuthModal() {
             <label htmlFor="auth-username" className="block text-xs font-medium text-muted mb-1.5">
               {isLogin ? 'Tên đăng nhập hoặc Email' : 'Tên đăng nhập'}
             </label>
-            <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+            <div className="relative flex items-center rounded-lg border border-surface-border bg-surface-muted px-3 py-2.5 focus-within:border-brand focus-within:ring-1 focus-within:ring-brand">
 
               <input
                 id="auth-username"
@@ -224,7 +218,7 @@ export function AuthModal() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={isLogin ? 'Nhập tên đăng nhập hoặc email' : 'tentaikhoan'}
                 autoComplete={isLogin ? 'username' : 'new-username'}
-                className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-50"
+                className="w-full bg-transparent text-base sm:text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:shadow-none disabled:opacity-50"
               />
             </div>
           </div>
@@ -234,7 +228,7 @@ export function AuthModal() {
               <label htmlFor="auth-email" className="block text-xs font-medium text-muted mb-1.5">
                 Email
               </label>
-              <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+              <div className="relative flex items-center rounded-lg border border-surface-border bg-surface-muted px-3 py-2.5 focus-within:border-brand focus-within:ring-1 focus-within:ring-brand">
 
                 <input
                   id="auth-email"
@@ -245,7 +239,7 @@ export function AuthModal() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="email@vidu.com"
                   autoComplete="email"
-                  className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-50"
+                  className="w-full bg-transparent text-base sm:text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:shadow-none disabled:opacity-50"
                 />
               </div>
             </div>
@@ -255,7 +249,7 @@ export function AuthModal() {
             <label htmlFor="auth-password" className="block text-xs font-medium text-muted mb-1.5">
               Mật khẩu
             </label>
-            <div className="relative flex items-center rounded-md border border-surface-border bg-surface-muted px-3 py-2 focus-within:border-brand">
+            <div className="relative flex items-center rounded-lg border border-surface-border bg-surface-muted px-3 py-2.5 focus-within:border-brand focus-within:ring-1 focus-within:ring-brand">
 
               <input
                 id="auth-password"
@@ -267,7 +261,7 @@ export function AuthModal() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
-                className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-muted focus:outline-none disabled:opacity-50"
+                className="w-full bg-transparent text-base sm:text-sm text-ink placeholder:text-muted focus:outline-none focus-visible:shadow-none disabled:opacity-50"
               />
             </div>
           </div>
@@ -281,7 +275,7 @@ export function AuthModal() {
 
             {isSubmitting ? (
               <span className="flex items-center gap-2">
-                <Loader2 size={15} className="animate-spin" /> Đang xử lý...
+                Đang xử lý…
               </span>
             ) : isLogin ? (
               <span className="flex items-center gap-1.5">

@@ -460,6 +460,7 @@ export interface CatalogScene {
 export interface CatalogMediaAsset {
   id: string;
   contentType: string;
+  editionLabel?: string | null;
   role: string;
   storageProvider: string;
   storageKey?: string;

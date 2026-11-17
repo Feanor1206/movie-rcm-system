@@ -280,10 +280,10 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             >
 
               <div
-                className={`max-w-[90%] rounded-[16px_16px_16px_2px] px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
+                className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm ${
                   msg.sender === 'user'
-                    ? 'bg-mint text-ink border border-ink font-medium shadow-brand-sm !rounded-[16px_16px_2px_16px]'
-                    : 'bg-surface-muted text-ink border border-surface-border'
+                    ? 'bg-brand text-zinc-950 font-medium rounded-br-sm'
+                    : 'bg-surface-elevated text-ink border border-surface-border rounded-bl-sm'
                 }`}
               >
                 <p>{msg.text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part)}</p>
@@ -332,7 +332,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                               <Link
                                 href={mediaHref}
                                 onClick={onClose}
-                                className="truncate text-xs sm:text-sm font-semibold text-ink hover:text-brand transition-colors"
+                                className="truncate text-xs sm:text-sm font-semibold text-ink hover:text-brand-dark transition-colors"
                               >
                                 {movie.title}
                               </Link>
@@ -361,7 +361,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                             >
                               {inWatchlist ? (
                                 <>
-                                  <Check size={10} className="text-brand" /> Đã lưu
+                                  <Check size={10} className="text-brand-dark" /> Đã lưu
                                 </>
                               ) : (
                                 'Lưu phim'

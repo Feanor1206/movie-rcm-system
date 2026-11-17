@@ -18,30 +18,30 @@ import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { getMediaDescriptor, MediaDescriptor, resolveStreamUrl } from '@/lib/services/mediaService';
 import * as movieProgress from '@/lib/services/movieProgress';
 
-const BTN_ACT = 'min-h-[44px] inline-flex items-center justify-center rounded border cursor-pointer disabled:opacity-60';
-const BTN_PLAY = 'min-h-[44px] px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer';
+const BTN_ACT = 'min-h-[44px] inline-flex items-center justify-center rounded-lg border cursor-pointer disabled:opacity-60 transition-all';
+const BTN_PLAY = 'min-h-[44px] px-4 py-2 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer';
 const BTN_FEAT = `btn-primary ${BTN_PLAY}`;
 const BTN_PRI = `btn-primary min-h-[44px] ${BTN_PLAY}`;
 const BTN_SEC = `btn-secondary text-muted ${BTN_PLAY}`;
-const BTN_SQ = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded cursor-pointer';
-const BTN_ICON = `${BTN_SQ} text-muted hover:text-ink`;
-const BTN_PLAY_PAUSE = `${BTN_SQ} bg-brand text-zinc-950 font-bold`;
-const UNCONF_CLS = 'border-amber-400 bg-amber-400/20 text-amber-300';
-const ALERT_BOX = 'mt-4 flex items-center justify-between gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200';
-const ALERT_BTN = 'flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-xs font-bold text-amber-300 cursor-pointer shrink-0';
-const SLIDER_CLS = 'h-2 rounded cursor-pointer bg-zinc-700 accent-emerald-500 min-h-[44px]';
+const BTN_SQ = 'flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-lg cursor-pointer transition-colors';
+const BTN_ICON = `${BTN_SQ} text-zinc-300 hover:text-white hover:bg-white/10`;
+const BTN_PLAY_PAUSE = `${BTN_SQ} bg-brand text-zinc-950 font-bold hover:bg-brand-hover`;
+const UNCONF_CLS = 'border-amber-400 bg-amber-400/20 text-amber-900';
+const ALERT_BOX = 'mt-4 flex items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900';
+const ALERT_BTN = 'flex items-center gap-1 rounded bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-900 cursor-pointer shrink-0';
+const SLIDER_CLS = 'h-2 rounded cursor-pointer bg-zinc-700 accent-amber-500 min-h-[44px]';
 const FOCUS_SEL = 'button:not([disabled]), input:not([disabled]), video, [tabindex]:not([tabindex="-1"])';
 const STARS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const STAR_BASE = 'flex h-9 w-9 items-center justify-center rounded text-xs font-bold cursor-pointer disabled:opacity-60';
-const STAR_ACT = `${STAR_BASE} bg-amber-400 text-black`;
-const STAR_INACT = `${STAR_BASE} border border-surface-border bg-surface-muted text-muted`;
-const BTN_WATCH = `${BTN_ACT} px-4 py-2 text-sm font-semibold`;
-const WATCH_CONF = `${BTN_WATCH} btn-secondary text-ink`;
+const STAR_BASE = 'flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold cursor-pointer disabled:opacity-60 transition-colors';
+const STAR_ACT = `${STAR_BASE} bg-amber-400 text-black shadow-sm`;
+const STAR_INACT = `${STAR_BASE} border border-surface-border bg-surface-muted text-muted hover:bg-surface-elevated hover:text-ink`;
+const BTN_WATCH = `${BTN_ACT} px-4 py-2 text-xs font-semibold`;
+const WATCH_CONF = `${BTN_WATCH} btn-secondary text-brand-dark border-brand/50 bg-brand/10`;
 const WATCH_DEF = `${BTN_WATCH} btn-secondary text-muted`;
 const WATCH_UNCONF = `${BTN_WATCH} ${UNCONF_CLS}`;
 const BTN_FAV_BASE = `${BTN_ACT} min-w-[44px] p-2`;
 const FAV_CONF = `${BTN_FAV_BASE} border-brand bg-brand/15 text-brand`;
-const FAV_DEF = `${BTN_FAV_BASE} border-ink/30 bg-surface text-muted hover:text-ink`;
+const FAV_DEF = `${BTN_FAV_BASE} border-surface-border bg-surface text-muted hover:bg-surface-elevated hover:text-ink`;
 const FAV_UNCONF = `${BTN_FAV_BASE} ${UNCONF_CLS}`;
 const pad = (n: number) => (n < 10 ? '0' : '') + (n | 0);
 const formatTime = (s: number) => s > 0 ? `${pad(s / 60)}:${pad(s % 60)}` : '00:00';
@@ -752,7 +752,7 @@ export function MovieDetail({
 
               {!isRatingUnconfirmed && currentRating && (
                 <div className="mt-3 flex items-center justify-between text-xs">
-                  <p className="text-amber-400 font-medium">✓ Đã chấm {currentRating}/10 sao.</p>
+                  <p className="text-amber-900 font-medium">Đã chấm {currentRating}/10.</p>
                   <button
                     disabled={isRatingPending}
                     onClick={() => removeRating(mid, movie.title)}

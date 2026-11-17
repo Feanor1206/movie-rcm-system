@@ -24,19 +24,18 @@ export function ContinueWatching() {
   if (!records.length) return null;
 
   return (
-    <section className="my-8" aria-labelledby="continue-title" data-testid="continue-watching">
-      <h2 id="continue-title" className="comic-heading text-2xl font-bold">Phim còn dang dở</h2>
-      <p className="mt-1 text-sm text-muted">Mốc xem lưu trên thiết bị này, theo từng phim.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="my-10" aria-labelledby="continue-title" data-testid="continue-watching">
+      <h2 id="continue-title" className="section-title mb-4">Xem tiếp</h2>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {records.map((record) => (
           <Link
             key={record.movieId}
             href={buildMovieProgressHref(record)}
             data-testid="continue-card"
-            className="comic-card p-4 hover:bg-mint"
+            className="comic-card group px-4 py-3 hover:border-brand/40 hover:bg-surface-elevated"
           >
-            <h3 className="font-bold">{record.title}</h3>
-            <p className="mt-3 text-sm text-brand-dark">Xem tiếp từ {formatMark(record.positionMs)} →</p>
+            <h3 className="line-clamp-2 font-semibold text-ink group-hover:text-brand">{record.title}</h3>
+            <p className="mt-1 text-sm text-muted">Xem tiếp từ {formatMark(record.positionMs)}</p>
           </Link>
         ))}
       </div>

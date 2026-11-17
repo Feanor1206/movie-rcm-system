@@ -155,12 +155,12 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
     <div className="rounded-xl border border-surface-border bg-surface-elevated p-6 shadow-2xl">
       <div className="flex items-center justify-between border-b border-surface-border pb-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-brand/10 text-brand">
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-brand/10 text-brand-dark">
             <Database size={22} />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Nhập tệp JSON</h2>
-            <p className="text-xs text-zinc-400">
+            <h2 className="text-lg font-bold text-ink">Nhập tệp JSON</h2>
+            <p className="text-xs text-muted">
               Kiểm tra và xem trước thay đổi trước khi nhập.
             </p>
           </div>
@@ -169,7 +169,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
           <button
             aria-label="Đóng"
             onClick={onClose}
-            className="rounded-lg p-2 text-zinc-400 hover:bg-surface-hover hover:text-white"
+            className="rounded-lg p-2 text-muted hover:bg-surface-hover hover:text-ink"
           >
             ✕
           </button>
@@ -194,15 +194,15 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
             className="hidden"
           />
           {fileName && (
-            <span className="flex items-center gap-1.5 rounded bg-surface px-2.5 py-1 text-xs text-zinc-300 border border-surface-border">
-              <FileCode size={13} className="text-brand" />
+            <span className="flex items-center gap-1.5 rounded bg-surface px-2.5 py-1 text-xs text-muted border border-surface-border">
+              <FileCode size={13} className="text-brand-dark" />
               {fileName}
             </span>
           )}
         </div>
 
         <div>
-          <label htmlFor="catalog-json" className="mb-1 block text-xs font-medium text-zinc-400">
+          <label htmlFor="catalog-json" className="mb-1 block text-xs font-medium text-muted">
             Nội dung tệp JSON:
           </label>
           <textarea
@@ -218,12 +218,12 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
             placeholder='Dán nội dung JSON theo mẫu dippie.catalog.v1...'
             rows={8}
             data-testid="catalog-json-textarea"
-            className="w-full rounded-lg border border-surface-border bg-surface p-3 font-mono text-xs text-zinc-200 placeholder-zinc-500 focus:border-brand focus:outline-none"
+            className="w-full rounded-lg border border-surface-border bg-surface p-3 font-mono text-xs text-ink placeholder-zinc-500 focus:border-brand focus:outline-none"
           />
         </div>
 
         {parsingError && (
-          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-900">
             <XCircle size={16} className="shrink-0" />
             <span>{parsingError}</span>
           </div>
@@ -239,12 +239,12 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
           >
             {isValidating ? (
               <>
-                <Loader2 size={14} className="animate-spin text-brand" />
+                <Loader2 size={14} className="animate-spin text-brand-dark" />
                 <span>Đang kiểm tra...</span>
               </>
             ) : (
               <>
-                <FileCheck size={14} className="text-brand" />
+                <FileCheck size={14} className="text-brand-dark" />
                 <span>Kiểm tra & Xem trước</span>
               </>
             )}
@@ -279,24 +279,24 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
         {validationResult && (
           <div data-testid="catalog-validation-panel" className="mt-4 rounded-xl border border-surface-border bg-surface p-4">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {validationResult.valid ? (
-                  <span data-testid="catalog-validation-status" className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                  <span data-testid="catalog-validation-status" className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-900 border border-emerald-500/30">
                     <CheckCircle2 size={14} /> Gói hợp lệ
                   </span>
                 ) : (
-                  <span data-testid="catalog-validation-status" className="flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-400 border border-red-500/30">
+                  <span data-testid="catalog-validation-status" className="flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-900 border border-red-500/30">
                     <XCircle size={14} /> Gói không hợp lệ ({validationResult.errors.length} lỗi)
                   </span>
                 )}
                 {validationResult.packageId && (
-                  <span className="text-xs text-zinc-400">
-                    Mã gói: <strong className="text-white">{validationResult.packageId}</strong> (Phiên bản {validationResult.revision})
+                  <span className="max-w-full break-words text-xs text-muted">
+                    Mã gói: <strong className="text-ink">{validationResult.packageId}</strong> (Phiên bản {validationResult.revision})
                   </span>
                 )}
               </div>
               {validationResult.contentHash && (
-                <span className="font-mono text-[11px] text-zinc-500" title={validationResult.contentHash}>
+                <span className="font-mono text-[11px] text-muted" title={validationResult.contentHash}>
                   SHA-256: {validationResult.contentHash.slice(0, 12)}...
                 </span>
               )}
@@ -304,20 +304,20 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-lg bg-surface-elevated p-2.5 border border-surface-border">
-                <span className="text-[11px] text-zinc-400">Tạo mới</span>
-                <p className="text-base font-bold text-emerald-400">+{validationResult.toCreate}</p>
+                <span className="text-[11px] text-muted">Tạo mới</span>
+                <p className="text-base font-bold text-emerald-900">+{validationResult.toCreate}</p>
               </div>
               <div className="rounded-lg bg-surface-elevated p-2.5 border border-surface-border">
-                <span className="text-[11px] text-zinc-400">Cập nhật</span>
-                <p className="text-base font-bold text-amber-400">~{validationResult.toUpdate}</p>
+                <span className="text-[11px] text-muted">Cập nhật</span>
+                <p className="text-base font-bold text-amber-900">~{validationResult.toUpdate}</p>
               </div>
               <div className="rounded-lg bg-surface-elevated p-2.5 border border-surface-border">
-                <span className="text-[11px] text-zinc-400">Không đổi</span>
-                <p className="text-base font-bold text-zinc-300">{validationResult.unchanged}</p>
+                <span className="text-[11px] text-muted">Không đổi</span>
+                <p className="text-base font-bold text-muted">{validationResult.unchanged}</p>
               </div>
               <div className="rounded-lg bg-surface-elevated p-2.5 border border-surface-border">
-                <span className="text-[11px] text-zinc-400">Xung đột</span>
-                <p className={`text-base font-bold ${validationResult.conflicts > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                <span className="text-[11px] text-muted">Xung đột</span>
+                <p className={`text-base font-bold ${validationResult.conflicts > 0 ? 'text-red-900' : 'text-muted'}`}>
                   {validationResult.conflicts}
                 </p>
               </div>
@@ -325,10 +325,10 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
             {validationResult.errors && validationResult.errors.length > 0 && (
               <div className="mt-4">
-                <h4 className="mb-2 text-xs font-semibold text-red-400">Chi tiết lỗi:</h4>
+                <h4 className="mb-2 text-xs font-semibold text-red-900">Chi tiết lỗi:</h4>
                 <div className="max-h-56 overflow-y-auto rounded-lg border border-red-500/20 bg-surface-elevated text-xs">
                   <table className="w-full text-left">
-                    <thead className="border-b border-surface-border bg-surface text-zinc-400">
+                    <thead className="border-b border-surface-border bg-surface text-muted">
                       <tr>
                         <th className="p-2">Vị trí</th>
                         <th className="p-2">Mã lỗi</th>
@@ -338,9 +338,9 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
                     <tbody className="divide-y divide-surface-border font-mono text-[11px]">
                       {validationResult.errors.map((err, idx) => (
                         <tr key={idx} className="hover:bg-red-500/5">
-                          <td className="p-2 text-amber-300">{err.path}</td>
-                          <td className="p-2 text-zinc-400">{err.code}</td>
-                          <td className="p-2 font-sans text-zinc-200">{err.message}</td>
+                          <td className="p-2 text-amber-900">{err.path}</td>
+                          <td className="p-2 text-muted">{err.code}</td>
+                          <td className="p-2 font-sans text-ink">{err.message}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -352,7 +352,7 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
         )}
 
         {importError && (
-          <div data-testid="catalog-import-error" className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+          <div data-testid="catalog-import-error" className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-900">
             <XCircle size={16} className="shrink-0" />
             <span>{importError}</span>
           </div>
@@ -360,25 +360,25 @@ export function CatalogImportModal({ onClose, onImportSuccess }: CatalogImportMo
 
         {importResult && (
           <div data-testid="catalog-import-success-panel" className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-            <div className="flex items-center gap-2 text-emerald-400">
+            <div className="flex items-center gap-2 text-emerald-900">
 
               <CheckCircle2 size={18} />
               <h3 className="text-sm font-bold">Nhập dữ liệu thành công!</h3>
             </div>
-            <p className="mt-1 text-xs text-zinc-300">{importMessages[importResult.message] || importResult.message}</p>
+            <p className="mt-1 text-xs text-muted">{importMessages[importResult.message] || importResult.message}</p>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-zinc-300 sm:grid-cols-4">
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted sm:grid-cols-4">
               {importResult.counts &&
                 Object.entries(importResult.counts).map(([entity, count]) => (
                   <div key={entity} className="rounded bg-surface p-2 border border-surface-border">
-                    <span className="text-[11px] text-zinc-400 capitalize">{entityLabels[entity] || entity}:</span>
-                    <strong className="ml-1 text-white">{count}</strong>
+                    <span className="text-[11px] text-muted capitalize">{entityLabels[entity] || entity}:</span>
+                    <strong className="ml-1 text-ink">{count}</strong>
                   </div>
                 ))}
             </div>
 
-            <div className="mt-3 flex items-center justify-between border-t border-emerald-500/20 pt-2 text-[11px] text-zinc-400">
-              <span>Mã lần nhập: <code className="text-emerald-300">{importResult.importId}</code></span>
+            <div className="mt-3 flex items-center justify-between border-t border-emerald-500/20 pt-2 text-[11px] text-muted">
+              <span>Mã lần nhập: <code className="text-emerald-900">{importResult.importId}</code></span>
               <span>Trạng thái chỉ mục: {indexStatusLabels[importResult.indexStatus || ''] || importResult.indexStatus || 'Chưa xác định'}</span>
             </div>
           </div>

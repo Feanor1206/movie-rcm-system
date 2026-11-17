@@ -96,7 +96,13 @@ h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Ccircle cx='2' cy='2' r='.7' fill='%2318241e' fill-opacity='.24'/%3E%3C/svg%3E");
   }
 
-  .comic-card { border: 1.5px solid var(--ink); background: var(--paper-white); box-shadow: 3px 3px 0 var(--ink); }
+  .comic-card {
+    border: 1px solid var(--ink);
+    border-radius: 5px;
+    background: var(--paper-white);
+    box-shadow: 2px 2px 0 var(--sage);
+    transition: background-color .15s, border-color .15s;
+  }
 }
 
 .player-dark {
@@ -105,14 +111,13 @@ h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
   background-color: #101713;
 }
 
-.comic-wordmark { font: italic 800 43px/1 Georgia, serif; letter-spacing: -3px; }
+.comic-wordmark { font: italic 800 36px/1 Georgia, serif; letter-spacing: -2px; }
 .comic-navbar a, .comic-navbar button { text-underline-offset: 6px; }
 .comic-navbar nav > div > div a[aria-current="page"] { text-decoration: underline; }
 .comic-book { max-width: 1280px; margin: auto; padding: 24px 32px 32px; }
-.cover-grid { display: grid; grid-template-columns: .91fr 1.09fr; border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); background: var(--paper-white); }
-.cover-copy { padding: 39px 36px 28px; }
-.cover-copy h1 { margin: 24px 0 26px; font: 700 clamp(42px,4.9vw,67px)/1.06 Georgia, serif; letter-spacing: -3px; }
-.cover-copy h1 em { color: #52704a; }
+.cover-grid { display: grid; grid-template-columns: .91fr 1.09fr; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); background: var(--paper-white); }
+.cover-copy { display: flex; flex-direction: column; justify-content: center; padding: 32px 36px; }
+.cover-copy h1 { font: 700 clamp(38px,4.8vw,62px)/1.06 Georgia, serif; letter-spacing: -0.035em; }
 .cover-cta { display: inline-flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 20px; border: 1.5px solid var(--ink); background: var(--mint); box-shadow: 3px 3px 0 var(--ink); font-size: 13px; font-weight: 700; transition: transform .15s, box-shadow .15s; }
 .cover-cta:hover { transform: translate(-1.5px,-2px); box-shadow: 4.5px 4.5px 0 var(--ink); }
 .hero-cta-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
@@ -123,12 +128,24 @@ h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
 .topic-chip { display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid var(--ink); background: var(--paper-white); font: 11px/1.4 monospace; color: var(--ink); box-shadow: 1.5px 1.5px 0 var(--ink); transition: transform .15s, background .15s; }
 .topic-chip:hover { background: var(--mint); transform: translate(-1px, -1px); }
 .cover-art-panel { display: flex; flex-direction: column; min-width: 0; border-left: 2px solid var(--ink); background: #dce7cc; overflow: hidden; }
-.cover-art-panel > img { flex: 1; width: 100%; min-height: 350px; object-fit: cover; transition: transform .35s ease; }
-.cover-art-panel:hover > img { transform: scale(1.02); }
+.cover-art-panel > img { width: 100%; height: 100%; max-height: 390px; object-fit: cover; object-position: center 60%; }
+.catalog-cover {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(130px, 35vw, 400px);
+  min-height: clamp(110px, 13vw, 168px);
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  background: var(--paper-white);
+}
+.catalog-cover h1 { align-self: center; padding: clamp(14px, 4vw, 36px); }
+.catalog-cover-art {
+  border-left: 1px solid var(--ink);
+  background: var(--mint) url('/illustrations/dippie-cover.svg') center 68% / cover no-repeat;
+}
 .comic-loading { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
 .comic-bot-trigger { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); border-radius: 16px 16px 2px 16px; }
 .comic-footer { border-top: 2px solid var(--ink); background: var(--mint); }
-.series-page .rounded-xl { border-radius: 0; border-width: 1.5px; box-shadow: 3px 3px 0 var(--ink); }
+.series-page .rounded-xl { border-radius: 5px; border-width: 1px; }
 .series-page [data-episode-id] { border-radius: 0; background: var(--paper-white); }
 .series-page [data-episode-id][aria-pressed="true"] { background: var(--mint); border-color: var(--ink); }
 @media (max-width: 1000px) {
@@ -138,13 +155,13 @@ h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
 }
 @media (max-width: 700px) {
   .comic-navbar nav { height: 72px; }
-  .comic-wordmark { font-size: 38px; }
+  .comic-wordmark { font-size: 32px; }
   .comic-book { padding: 18px 20px 28px; }
   .cover-grid { grid-template-columns: 1fr; box-shadow: 4px 4px 0 var(--ink); }
   .cover-copy { padding: 28px 25px 23px; }
-  .cover-copy h1 { font-size: 42px; letter-spacing: -2px; margin-top: 22px; }
+  .cover-copy h1 { font-size: 38px; }
   .cover-art-panel { border-left: 0; border-top: 2px solid var(--ink); }
-  .cover-art-panel > img { min-height: 0; height: auto; flex: none; object-fit: contain; }
+  .cover-art-panel > img { max-height: 225px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
