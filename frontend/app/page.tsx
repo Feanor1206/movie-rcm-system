@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { listMovieProgress } from '@/lib/services/movieProgress';
 import { getGuestWatchProgress } from '@/lib/services/watchProgressService';
 import { getRecommendations } from '@/lib/services/recommendationService';
+import coverArt from '@/assets/dippie-cover.svg';
 
 const quickTopics = [
   { label: 'Gia đình', href: '/search?genre=Family' },
@@ -62,7 +63,7 @@ export default function HomePage() {
 
         <div className="cover-art-panel">
           <img
-            src="/illustrations/dippie-cover.svg"
+            src={coverArt}
             alt="Bạn nhỏ và thỏ đi đến rạp chiếu phim trong rừng"
             width="760"
             height="580"

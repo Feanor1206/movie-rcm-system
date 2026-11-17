@@ -1369,7 +1369,7 @@ test('Home film shelf opens films, series and episodes on the correct routes', a
   });
   const episodeItem = sampleMovie({
     id: 'ep_jadoo_s01_0001',
-    title: 'Tập 1 - Jadoo',
+    title: 'vì sức khỏe cả nhà',
     item_type: 'episode',
     series_id: 'ser_jadoo',
     primary_media_asset_id: 'asset_jadoo_v1',
@@ -1391,6 +1391,7 @@ test('Home film shelf opens films, series and episodes on the correct routes', a
     'Episode item routes to /series/[seriesId]?episode=[episodeId]&asset=[assetId]'
   );
   assert.equal(cards[2].props['data-movie-id'], 'ep_jadoo_s01_0001');
+  assert.equal(findNodes(cards[2], (node) => node.type === 'h3')[0].props.children, 'Vì sức khỏe cả nhà');
 
   const home = createHomeHarness(async () => [episodeItem]);
   home.render();

@@ -114,7 +114,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); }
 .home-page { padding-block: clamp(18px, 3vw, 38px) 52px; }
 .cover-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr) min(47%, 466px);
   border: 1px solid var(--ink);
   border-radius: 10px;
   background: var(--paper-white);
@@ -140,12 +140,12 @@ h1, h2, h3, h4 { font-family: var(--font-display); }
 .topic-chip:hover { text-decoration: underline; color: var(--ink); }
 .cover-art-panel {
   display: grid;
-  place-items: center;
+  align-items: end;
   overflow: hidden;
   border-radius: 0 9px 9px 0;
-  background: #dce7cc;
+  background: #d7e7cb;
 }
-.cover-art-panel > img { width: 100%; height: clamp(230px, 31vw, 355px); object-fit: contain; }
+.cover-art-panel > img { display: block; width: 100%; height: auto; }
 .shelf-section { margin-top: clamp(24px, 3vw, 36px); }
 .shelf-heading { display: flex; align-items: start; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
 .shelf-link { flex-shrink: 0; color: #36563c; font-size: 14px; font-weight: 650; text-underline-offset: 4px; }
@@ -182,7 +182,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); }
 }
 .catalog-cover h1 { align-self: center; padding: clamp(16px, 3vw, 32px); }
 .catalog-cover-art {
-  background: #dce7cc url('/illustrations/dippie-cover.svg') center 66% / cover no-repeat;
+  background: #dce7cc url('../assets/dippie-cover.svg') center 66% / cover no-repeat;
 }
 .catalog-search { display: flex; align-items: center; margin-top: 16px; padding-inline: 9px; border: 1px solid #a6b4a4; border-radius: 8px; background: var(--paper-white); }
 .catalog-search:focus-within { border-color: var(--ink); }
@@ -206,7 +206,6 @@ h1, h2, h3, h4 { font-family: var(--font-display); }
   .cover-copy { gap: 10px; }
   .cover-copy h1 { max-width: none; }
   .cover-art-panel { border-radius: 0 0 9px 9px; }
-  .cover-art-panel > img { height: clamp(165px, 49vw, 222px); }
 }
 @media (max-width: 580px) {
   .film-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; }

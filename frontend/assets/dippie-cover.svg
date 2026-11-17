@@ -24,5 +24,9 @@
 </g>
 <g stroke="#21372a" stroke-width="2.5" stroke-linecap="round"><path d="m32 552 6-18m0 18 9-9m657 0 5-22m-4 23 17-13m-119 29 4-19m0 20 12-11M170 565l4-21m0 21 11-12"/><path d="m116 145 12-8 11 7m-13-7 1-8m419 188 10-6 9 6"/></g>
 <path d="M95 59h205l-9 65H154l-25 20 3-20H85Z" fill="#fbf9f2" stroke="#21372a" stroke-width="2.5"/><text x="191" y="87" text-anchor="middle" fill="#21372a" font-family="Cambria, Times New Roman, Noto Serif, serif" font-size="20" font-style="italic">Một câu chuyện hay</text><text x="191" y="111" text-anchor="middle" fill="#21372a" font-family="Cambria, Times New Roman, Noto Serif, serif" font-size="20" font-style="italic">đang chờ bạn!</text>
-<rect x="577" y="449" width="144" height="68" fill="#fbf9f2" stroke="#21372a" stroke-width="2" transform="rotate(-6 577 449)"/><text x="649" y="470" fill="#21372a" font-family="monospace" text-anchor="middle" font-size="12" transform="rotate(-6 649 470)">ĐI THÔI, TỚ SẴN SÀNG!</text><text x="649" y="493" fill="#21372a" font-family="Cambria, Times New Roman, Noto Serif, serif" text-anchor="middle" font-size="20" font-style="italic" transform="rotate(-6 649 493)">Cùng xem nhé →</text>
+<g id="cover-sign" transform="translate(576 448) rotate(-6)" fill="#21372a" text-anchor="middle" font-family="Cambria, Times New Roman, Noto Serif, serif">
+  <rect width="156" height="68" fill="#fbf9f2" stroke="#21372a" stroke-width="2"/>
+  <text x="78" y="25" font-size="15">Đi thôi, tớ sẵn sàng!</text>
+  <text x="78" y="50" font-size="20" font-style="italic">Cùng xem nhé →</text>
+</g>
 </svg>

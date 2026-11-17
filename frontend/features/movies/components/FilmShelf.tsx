@@ -24,6 +24,7 @@ export function FilmGrid({ movies, search = false, loading = false }: {
       {movies.map((movie) => {
         const type = movie.item_type || 'movie';
         const label = filmLabel(movie, type);
+        const title = movie.title.charAt(0).toLocaleUpperCase('vi') + movie.title.slice(1);
         return (
           <Link
             key={movie.id}
@@ -35,7 +36,7 @@ export function FilmGrid({ movies, search = false, loading = false }: {
             className="film-tile"
           >
             {label && <span className="film-label">{label}</span>}
-            <Title>{movie.title}</Title>
+            <Title>{title}</Title>
             {movie.description && <p className="film-summary">{movieSynopsis(movie.description)}</p>}
             <span className="film-action">{type === 'series' ? 'Chọn tập' : 'Xem phim'}</span>
           </Link>
