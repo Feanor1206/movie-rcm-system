@@ -213,3 +213,8 @@ test('Chat client sends the session, cancellation signal, and bounded recent his
   assert.equal(sent.body.messages.length, 20);
   assert.equal(sent.body.messages[0].content, 'message 10');
 });
+
+test('Chat labels clean filenames and multilingual genre duplicates', () => {
+  assert.equal(labels.chatTitle('Xin Chào Jadoo [kS3zyuaG4q0].mp4'), 'Xin Chào Jadoo');
+  assert.equal(labels.chatGenres(['Hoạt hình', 'Animation', '애니메이션', 'Hài hước', 'Comedy', '코미디', 'Gia đình', 'Family', '가족']), 'Hoạt hình, Hài hước, Gia đình');
+});

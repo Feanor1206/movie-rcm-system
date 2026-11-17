@@ -55,9 +55,6 @@ Write-Host "==========================================================" -Foregro
 Write-Host " RUNNING GOOGLE DRIVE WINDOWS TOOLING TEST SUITE (DRIVE-01)" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# -------------------------------------------------------------
-# TEST 1: Preflight Read-Only Behavior & Schema Verification
-# -------------------------------------------------------------
 Write-Host "`nTest Suite 1: Preflight Read-Only & JSON Schema" -ForegroundColor Yellow
 
 $preSnapshotFiles = (Get-ChildItem -Path $scriptDir -Recurse | Select-Object -ExpandProperty FullName)
@@ -105,9 +102,6 @@ $testResults += Assert-Condition -TestName "Preflight is strictly read-only (zer
     -Condition $noFileSystemChange `
     -FailureMessage "Preflight created or modified files in scripts dir"
 
-# -------------------------------------------------------------
-# TEST 2: Mount Drive WhatIf / Dry-Run Baseline Flags
-# -------------------------------------------------------------
 Write-Host "`nTest Suite 2: Mount Drive Baseline Flags & Dry-Run" -ForegroundColor Yellow
 
 $mountPlan = & $mountPath -WhatIf -Remote "cinema-gdrive:" -RemoteSubpath "DippieMedia" -MountPoint "M:"
@@ -140,20 +134,15 @@ if ($mountPlan) {
         -FailureMessage "Remote target or mount point mismatched in command: $cmd"
 }
 
-# Verify default invocation without -Execute is also dry-run
 $defaultPlan = & $mountPath
 $testResults += Assert-Condition -TestName "mount_drive defaults to dry-run when -Execute is omitted" `
     -Condition ($defaultPlan -and $defaultPlan.Mode -eq "DRY_RUN") `
     -FailureMessage "Omitting -Execute did not default to dry-run"
 
-# -------------------------------------------------------------
-# TEST 3: Stop Drive PID Identity Verification (PID Reuse Protection)
-# -------------------------------------------------------------
 Write-Host "`nTest Suite 3: Stop Drive PID Reuse & Identity Protection" -ForegroundColor Yellow
 
 $tempStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "test-drive-mount-state-$([Guid]::NewGuid().ToString('N')).json"
 
-# Create a state file containing the current PowerShell process PID, but claiming to be rclone with a mismatched start time
 $currentProc = Get-Process -Id $PID
 $fakeState = [PSCustomObject]@{
     pid            = $currentProc.Id
@@ -172,20 +161,15 @@ $testResults += Assert-Condition -TestName "stop_drive refuses to kill process w
     -Condition $refusedKill `
     -FailureMessage "stop_drive did not reject mismatched PID (Result: $($stopResult.Status))"
 
-# Verify current process was indeed NOT killed and is continuing execution
 $currentStillAlive = (Get-Process -Id $PID -ErrorAction SilentlyContinue) -ne $null
 $testResults += Assert-Condition -TestName "Current process remained alive and protected from accidental termination" `
     -Condition $currentStillAlive `
     -FailureMessage "Current process was unexpectedly terminated"
 
-# Clean up temp state file
 if (Test-Path -Path $tempStateFile) {
     Remove-Item -Path $tempStateFile -Force -ErrorAction SilentlyContinue
 }
 
-# -------------------------------------------------------------
-# TEST 4: Status Drive Verification
-# -------------------------------------------------------------
 Write-Host "`nTest Suite 4: Status Drive States (MOUNTED, NOT_MOUNTED, DEGRADED)" -ForegroundColor Yellow
 
 $nonExistentState = Join-Path ([System.IO.Path]::GetTempPath()) "nonexistent-state-$([Guid]::NewGuid().ToString('N')).json"
@@ -194,7 +178,6 @@ $testResults += Assert-Condition -TestName "status_drive reports NOT_MOUNTED whe
     -Condition ($statusResult -and $statusResult.Status -eq "NOT_MOUNTED") `
     -FailureMessage "Status was $($statusResult.Status), expected NOT_MOUNTED"
 
-# Test dead PID state
 $deadPidStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "deadpid-state-$([Guid]::NewGuid().ToString('N')).json"
 $deadState = [PSCustomObject]@{
     pid            = 999998
@@ -214,9 +197,6 @@ if (Test-Path -Path $deadPidStateFile) {
     Remove-Item -Path $deadPidStateFile -Force -ErrorAction SilentlyContinue
 }
 
-# -------------------------------------------------------------
-# TEST 5: Secret and Token Hygiene
-# -------------------------------------------------------------
 Write-Host "`nTest Suite 5: Secret and Token Leakage Prevention" -ForegroundColor Yellow
 
 $dummySecretToken   = "ya29.MOCK_SECRET_ACCESS_TOKEN_XYZ_1234567890"
@@ -251,9 +231,6 @@ if (Test-Path -Path $dummyConfigFile) {
     Remove-Item -Path $dummyConfigFile -Force -ErrorAction SilentlyContinue
 }
 
-# -------------------------------------------------------------
-# SUMMARY REPORT
-# -------------------------------------------------------------
 Write-Host "`n==========================================================" -ForegroundColor Cyan
 Write-Host " TEST EXECUTION SUMMARY" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan

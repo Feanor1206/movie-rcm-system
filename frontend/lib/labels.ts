@@ -24,6 +24,21 @@ export function genreLabel(genre: string): string {
   return Object.prototype.hasOwnProperty.call(GENRE_LABELS, key) ? GENRE_LABELS[key] : genre;
 }
 
+export function chatTitle(title: string): string {
+  return title.replace(/\s*\[[^\]]+\](?=\.(?:mp4|mkv|webm)$)/i, '').replace(/\.(?:mp4|mkv|webm)$/i, '').trim();
+}
+
+export function chatGenres(genres: string[]): string {
+  const aliases: Record<string, string> = {
+    animation: 'Hoạt hình', '애니메이션': 'Hoạt hình',
+    comedy: 'Hài hước', 'hài': 'Hài hước', '코미디': 'Hài hước',
+    family: 'Gia đình', '가족': 'Gia đình',
+    'slice of life': 'Đời thường', '일상': 'Đời thường',
+    school: 'Học đường', '학원': 'Học đường',
+  };
+  return [...new Set(genres.map((genre) => aliases[genre.trim().toLowerCase()] ?? genre.trim()).filter(Boolean))].join(', ');
+}
+
 export function formatRuntime(runtime = ''): string {
   const match = runtime.trim().match(/^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?$/i);
   if (!match || !match.slice(1).some(Boolean)) return runtime;

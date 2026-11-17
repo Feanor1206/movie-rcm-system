@@ -4,20 +4,6 @@ const path = require('path');
 const os = require('os');
 const WebSocket = globalThis.WebSocket || require('ws');
 
-/**
- * DRIVE-01-F09 CineBot Browser Verification Harness
- * 
- * Verifies end-to-end AI interaction through the ordinary browser UI:
- * 1. Launches real headless Chrome and navigates to Dippie homepage (http://127.0.0.1:3000).
- * 2. Clicks the "Hỏi CineBot" trigger button in the Navbar.
- * 3. Asserts the CineBot modal dialog (role="dialog") opens with input and header.
- * 4. Inputs query: "Gợi ý cho tôi một bộ phim anime phiêu lưu hay" into the chat input.
- * 5. Dispatches Send via UI send button (aria-label="Gửi tin nhắn").
- * 6. Waits for Qwen fine-tuned model inference through FastAPI (:8000) and Next.js /api/chat.
- * 7. Asserts the assistant message is rendered in the DOM, including structured intent badges
- *    and embedded interactive movie recommendation cards.
- * 8. Captures full screenshot and writes structured evidence JSON.
- */
 
 async function runCineBotVerification() {
   const port = 9226;
@@ -47,7 +33,6 @@ async function runCineBotVerification() {
   ]);
 
   try {
-    // Wait for CDP port to open
     let page = null;
     const deadlineConnect = Date.now() + 15000;
     while (Date.now() < deadlineConnect) {
@@ -124,7 +109,6 @@ async function runCineBotVerification() {
     }
     console.log('[CineBotVerification-F09] Homepage hydrated. CineBot trigger button found.');
 
-    // Step 1: Open CineBot modal
     console.log('[CineBotVerification-F09] Clicking "Hỏi CineBot" button...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -136,7 +120,6 @@ async function runCineBotVerification() {
 
     await new Promise(r => setTimeout(r, 1000));
 
-    // Verify modal dialog opened
     const dialogCheck = await send('Runtime.evaluate', {
       expression: `(() => {
         const dialog = document.querySelector('div[role="dialog"]');
@@ -158,7 +141,6 @@ async function runCineBotVerification() {
       throw new Error('CRITICAL: CineBot dialog modal failed to open upon clicking trigger!');
     }
 
-    // Step 2: Input query into the chat input
     const userQuery = 'Gợi ý cho tôi một bộ phim anime phiêu lưu hay';
     console.log(`[CineBotVerification-F09] Typing query into chat input: "${userQuery}"...`);
 
@@ -179,7 +161,6 @@ async function runCineBotVerification() {
 
     await new Promise(r => setTimeout(r, 500));
 
-    // Step 3: Click Send button
     console.log('[CineBotVerification-F09] Disagreeing fallback: Clicking send button to dispatch query to Qwen model...');
     const tQueryStart = Date.now();
     await send('Runtime.evaluate', {
@@ -189,7 +170,6 @@ async function runCineBotVerification() {
       })()`
     });
 
-    // Step 4: Poll for Qwen AI response
     console.log('[CineBotVerification-F09] Awaiting Qwen model response (timeout: 120s)...');
     let inferenceFinished = false;
     let botResponse = null;
@@ -257,7 +237,6 @@ async function runCineBotVerification() {
     console.log(`  Movie Cards rendered: ${botResponse.movieCards.length}`);
     console.log(`  Badges rendered: ${botResponse.badges.join(' | ')}`);
 
-    // Strict assertions on response
     if (botResponse.replyText.includes('⚠️ [Lỗi kết nối AI Gateway]')) {
       throw new Error(`CRITICAL: CineBot received AI Gateway error: ${botResponse.replyText}`);
     }
@@ -265,7 +244,6 @@ async function runCineBotVerification() {
       throw new Error('CRITICAL: CineBot response did not render any movie recommendation cards in DOM!');
     }
 
-    // Step 5: Capture full screenshot of CineBot modal with recommendations
     const scrCinebot = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_cinebot_recommendation_f09.png', Buffer.from(scrCinebot.data, 'base64'));
 

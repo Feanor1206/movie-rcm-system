@@ -48,7 +48,7 @@ export class CatalogApiError extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = 7000;
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
+const API = '/api';
 
 export function normalizeCatalogMovie(raw: any): Movie {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -94,6 +94,13 @@ export function normalizeCatalogMovie(raw: any): Movie {
   const poster = typeof raw.poster === 'string' && raw.poster.trim() ? raw.poster.trim() : '';
   const backdrop = typeof raw.backdrop === 'string' && raw.backdrop.trim() ? raw.backdrop.trim() : '';
   const videoUrl = typeof raw.videoUrl === 'string' && raw.videoUrl.trim() ? raw.videoUrl.trim() : undefined;
+  const navigation: Partial<Movie> = {};
+  if (raw.item_type === 'series' || raw.item_type === 'episode') {
+    navigation.item_type = raw.item_type;
+    if (typeof raw.series_id === 'string' && raw.series_id.trim()) navigation.series_id = raw.series_id.trim();
+    if (typeof raw.episode_id === 'string' && raw.episode_id.trim()) navigation.episode_id = raw.episode_id.trim();
+    if (Number.isSafeInteger(raw.episode_number) && raw.episode_number > 0) navigation.episode_number = raw.episode_number;
+  }
 
   return {
     id,
@@ -106,6 +113,7 @@ export function normalizeCatalogMovie(raw: any): Movie {
     poster,
     backdrop,
     videoUrl,
+    ...navigation,
   };
 }
 
@@ -172,7 +180,7 @@ async function executeWithLifecycle<T>(
 
 export async function browseCatalog(
   options: CatalogBrowseOptions = {},
-  baseUrl = SPRINGBOOT_API
+  baseUrl = API
 ): Promise<PageResponse<Movie>> {
   const params = new URLSearchParams();
 
@@ -294,7 +302,7 @@ export async function browseCatalog(
 export async function getCatalogMovieById(
   id: string,
   options: { signal?: AbortSignal; timeoutMs?: number } = {},
-  baseUrl = SPRINGBOOT_API
+  baseUrl = API
 ): Promise<Movie | null> {
   const cleanId = typeof id === 'string' ? id.trim() : '';
   if (!cleanId) {
@@ -453,6 +461,7 @@ export interface CatalogScene {
 export interface CatalogMediaAsset {
   id: string;
   contentType: string;
+  editionLabel?: string | null;
   role: string;
   storageProvider: string;
   storageKey?: string;
@@ -488,6 +497,7 @@ export interface CatalogEpisodeResponse {
   segments: CatalogSegment[];
   mediaAssets: CatalogMediaAsset[];
   scenes: CatalogScene[];
+  youtube?: { videoId: string; canEmbed: boolean } | null;
 }
 
 export interface CatalogSearchResult {
@@ -516,7 +526,7 @@ function getAuthHeader(): Record<string, string> {
 
 export async function validateCatalogPackage(
   payload: any,
-  baseUrl = SPRINGBOOT_API
+  baseUrl = API
 ): Promise<CatalogValidationResult> {
   const url = `${baseUrl}/admin/catalog/validate`;
   const res = await fetch(url, {
@@ -538,7 +548,7 @@ export async function validateCatalogPackage(
 
 export async function importCatalogPackage(
   payload: any,
-  baseUrl = SPRINGBOOT_API
+  baseUrl = API
 ): Promise<CatalogImportResponse> {
   const url = `${baseUrl}/admin/catalog/import`;
   const res = await fetch(url, {
@@ -567,7 +577,7 @@ export async function importCatalogPackage(
 }
 
 export async function getImportHistory(
-  baseUrl = SPRINGBOOT_API,
+  baseUrl = API,
   signal?: AbortSignal,
   timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<any[]> {
@@ -582,7 +592,7 @@ export async function getImportHistory(
 }
 
 export async function getCatalogSnapshots(
-  baseUrl = SPRINGBOOT_API,
+  baseUrl = API,
   signal?: AbortSignal,
   timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<CatalogSnapshot[]> {
@@ -598,7 +608,7 @@ export async function getCatalogSnapshots(
 
 export async function retryCatalogSnapshot(
   snapshotId: string,
-  baseUrl = SPRINGBOOT_API
+  baseUrl = API
 ): Promise<CatalogSnapshot> {
   const url = `${baseUrl}/admin/catalog/snapshots/${encodeURIComponent(snapshotId)}/retry`;
   const res = await fetch(url, {
@@ -615,7 +625,7 @@ export async function retryCatalogSnapshot(
 }
 
 export async function getCatalogSeriesList(
-  baseUrl = SPRINGBOOT_API,
+  baseUrl = API,
   signal?: AbortSignal,
   timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<CatalogSeriesSummary[]> {
@@ -664,7 +674,7 @@ function normalizeCatalogSeriesSummary(raw: any): CatalogSeriesSummary {
 
 export async function getCatalogSeriesDetail(
   id: string,
-  baseUrl = SPRINGBOOT_API,
+  baseUrl = API,
   signal?: AbortSignal
 ): Promise<CatalogSeriesResponse | null> {
   const url = `${baseUrl}/catalog/series/${encodeURIComponent(id)}`;
@@ -685,7 +695,7 @@ export async function getCatalogSeriesDetail(
 
 export async function getCatalogEpisodeDetail(
   id: string,
-  baseUrl = SPRINGBOOT_API,
+  baseUrl = API,
   signal?: AbortSignal
 ): Promise<CatalogEpisodeResponse | null> {
   const url = `${baseUrl}/catalog/episodes/${encodeURIComponent(id)}`;
@@ -706,7 +716,7 @@ export async function getCatalogEpisodeDetail(
 
 export async function searchAnimationCatalog(
   q: string,
-  baseUrl = SPRINGBOOT_API,
+  baseUrl = API,
   signal?: AbortSignal,
   timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<CatalogSearchResult[]> {

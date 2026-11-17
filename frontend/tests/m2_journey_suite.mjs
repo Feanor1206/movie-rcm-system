@@ -18,6 +18,8 @@ const movieDetailCompFilePath = path.join(root, 'features/movies/components/Movi
 const profileOverviewFilePath = path.join(root, 'features/profile/components/ProfileOverview.tsx');
 const editorialHeroCompFilePath = path.join(root, 'features/home/components/EditorialHero.tsx');
 const watchlistProviderFilePath = path.join(root, 'lib/context/WatchlistContext.tsx');
+const filmShelfFilePath = path.join(root, 'features/movies/components/FilmShelf.tsx');
+const mediaRoutingFilePath = path.join(root, 'lib/services/mediaRouting.ts');
 
 const transpileOptions = {
   compilerOptions: {
@@ -34,6 +36,11 @@ const movieDetailCompTranspiled = ts.transpileModule(fs.readFileSync(movieDetail
 const profileOverviewTranspiled = ts.transpileModule(fs.readFileSync(profileOverviewFilePath, 'utf8'), transpileOptions).outputText;
 const editorialHeroTranspiled = ts.transpileModule(fs.readFileSync(editorialHeroCompFilePath, 'utf8'), transpileOptions).outputText;
 const watchlistProviderTranspiled = ts.transpileModule(fs.readFileSync(watchlistProviderFilePath, 'utf8'), transpileOptions).outputText;
+const filmShelfTranspiled = ts.transpileModule(fs.readFileSync(filmShelfFilePath, 'utf8'), transpileOptions).outputText;
+const mediaRoutingTranspiled = ts.transpileModule(fs.readFileSync(mediaRoutingFilePath, 'utf8'), transpileOptions).outputText;
+const mediaRoutingContext = { exports: {}, module: { exports: {} }, URLSearchParams, encodeURIComponent, decodeURIComponent, String, Number, Boolean, console };
+vm.runInNewContext(mediaRoutingTranspiled, mediaRoutingContext);
+const mediaRouting = mediaRoutingContext.module.exports.buildMediaItemHref ? mediaRoutingContext.module.exports : mediaRoutingContext.exports;
 
 const moviesFilePath = path.join(root, 'lib/data/movies.ts');
 const moviesTranspiled = ts.transpileModule(fs.readFileSync(moviesFilePath, 'utf8'), transpileOptions).outputText;
@@ -89,7 +96,7 @@ function getText(node) {
   return collect(node).replace(/\s+/g, ' ').trim();
 }
 
-function createHomeHarness(moviesMock) {
+function createHomeHarness(moviesMock, auth = { status: 'guest', token: null }) {
   let slots = [];
   let hookIndex = 0;
   let effects = [];
@@ -148,8 +155,8 @@ function createHomeHarness(moviesMock) {
     require: (mod) => {
       if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (mod === 'next/link') return { default: 'next/link', __esModule: true };
-      if (mod === 'next/image') return { default: 'next/image', __esModule: true };
+      if (mod === 'react-router') return { Link: 'route-link' };
+
       if (mod === 'lucide-react') return new Proxy({}, { get: (_, k) => k });
       if (mod.includes('Navbar') || mod.includes('Footer')) {
         return { Navbar: () => ({ type: 'Navbar' }), Footer: () => ({ type: 'Footer' }) };
@@ -159,35 +166,21 @@ function createHomeHarness(moviesMock) {
           EditorialHero: 'EditorialHero',
         };
       }
-      if (mod.includes('MovieSection')) {
-        return {
-          MovieSection: 'MovieSection',
-        };
-      }
       if (mod.includes('FilmShelf')) {
         return { FilmShelf: 'FilmShelf' };
       }
-      if (mod.includes('catalogService')) {
-        return {
-          browseCatalog: async () => {
-            const value = await moviesMock();
-            if (value && Array.isArray(value.items)) return value;
-            const items = Array.isArray(value) ? value : [];
-            return {
-              items,
-              page: 0,
-              size: 24,
-              totalElements: items.length,
-              totalPages: items.length ? 1 : 0,
-              hasNext: false,
-              hasPrevious: false,
-            };
-          },
-        };
+      if (mod.includes('movieProgress')) {
+        return { listMovieProgress: () => [{ movieId: 'local-film', positionMs: 1000 }] };
       }
-      if (mod.includes('WatchlistContext')) {
-        return { useWatchlist: () => ({ openChat: () => {}, watchlist: ['totoro'] }) };
+      if (mod.includes('watchProgressService')) {
+        return { getGuestWatchProgress: () => [{ episodeId: 'local-episode', positionMs: 2000 }] };
       }
+      if (mod.includes('recommendationService')) {
+        return { getRecommendations: async (...args) => ({
+          movies: await moviesMock(...args), reasoning: 'Gợi ý từ kho phim.',
+        }) };
+      }
+      if (mod.includes('AuthContext')) return { useAuth: () => auth };
       return {};
     },
   };
@@ -274,15 +267,8 @@ function createDetailHarness(requestedId, getCatalogMovieByIdMock, browseCatalog
     require: (mod) => {
       if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (mod === 'next/navigation') {
-        return {
-          useParams: () => ({ id: requestedId }),
-          useRouter: () => ({ push: () => {} }),
-          usePathname: () => `/movies/${requestedId}`,
-        };
-      }
-      if (mod === 'next/link') return { default: 'next/link', __esModule: true };
-      if (mod === 'next/image') return { default: 'next/image', __esModule: true };
+      if (mod === 'react-router') return { Link: 'route-link', useParams: () => ({ id: requestedId }) };
+
       if (mod === 'lucide-react') return new Proxy({}, { get: (_, k) => k });
       if (mod.includes('Navbar') || mod.includes('Footer')) {
         return { Navbar: () => ({ type: 'Navbar' }), Footer: () => ({ type: 'Footer' }) };
@@ -371,11 +357,10 @@ function renderMovieDetail(movie, similarMovies = [], watchlistContext = {}) {
     require: (mod) => {
       if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (mod === 'next/image') return { default: 'next/image', __esModule: true };
-      if (mod === 'next/link') return { default: 'next/link', __esModule: true };
+
+      if (mod === 'react-router') return { Link: 'route-link' };
       if (mod === 'lucide-react') return new Proxy({}, { get: (_, k) => k });
       if (mod.includes('WatchlistContext')) return { useWatchlist: () => defaultWatchlist };
-      if (mod.includes('MovieSection')) return { MovieSection: 'MovieSection' };
       return {};
     },
   };
@@ -424,8 +409,8 @@ function renderEditorialHero(movie, watchlistContext = {}) {
     require: (mod) => {
       if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (mod === 'next/image') return { default: 'next/image', __esModule: true };
-      if (mod === 'next/link') return { default: 'next/link', __esModule: true };
+
+      if (mod === 'react-router') return { Link: 'route-link' };
       if (mod === 'lucide-react') return new Proxy({}, { get: (_, k) => k });
       if (mod.includes('WatchlistContext')) return { useWatchlist: () => defaultWatchlist };
       return {};
@@ -525,8 +510,8 @@ function createProfileHarness(initialLibrary, getCatalogMovieByIdMock, customClo
     require: (mod) => {
       if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (mod === 'next/link') return { default: 'next/link', __esModule: true };
-      if (mod === 'next/image') return { default: 'next/image', __esModule: true };
+      if (mod === 'react-router') return { Link: 'route-link' };
+
       if (mod === 'lucide-react') return new Proxy({}, { get: (_, k) => k });
       if (mod.includes('MovieCard')) return { MovieCard: 'MovieCard' };
       if (mod.includes('WatchlistContext')) return { useWatchlist: () => currentLibrary };
@@ -655,8 +640,8 @@ function mountProductionProvider(fetcher, customAuth = {}) {
     clearTimeout: (id) => clearTimeout(id),
     require: (name) => {
       if (name === '@/lib/labels') return labels;
-      if (name === 'next/dynamic') return { __esModule: true, default: () => () => null };
-      if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
+
+      if (name === 'react') return { __esModule: true, default: hooks, ...hooks, lazy: () => () => null };
       if (name.includes('AuthContext')) {
         return {
           useAuth: () => stableAuth,
@@ -695,7 +680,7 @@ function mountProductionProvider(fetcher, customAuth = {}) {
 }
 
 
-test('1. Home: Loads standalone films once and preserves loading, empty, error, retry, and cover states', async () => {
+test('1. Home: Loads suggestions once and preserves loading, empty, error, retry, and cover states', async () => {
   let listCalls = 0;
   const jadooFilm = {
     id: 'jadoo',
@@ -703,11 +688,16 @@ test('1. Home: Loads standalone films once and preserves loading, empty, error, 
     description: 'A real catalog synopsis.',
     year: 2000,
   };
-  const h = createHomeHarness(async () => { listCalls++; return [jadooFilm]; });
+  const h = createHomeHarness(async (token, _signal, watched) => {
+    listCalls++;
+    assert.equal(token, null);
+    assert.deepEqual(Array.from(watched), ['local-film', 'local-episode']);
+    return [jadooFilm];
+  });
   h.render();
   await h.settle();
 
-  assert.equal(listCalls, 1, 'Home asks the movie catalog once');
+  assert.equal(listCalls, 1, 'Home requests suggestions once');
   const shelf = findNodes(h.tree, (n) => n.type === 'FilmShelf')[0];
   assert.ok(shelf, 'Home renders the film shelf');
   assert.equal(shelf.props.movies[0].id, 'jadoo');
@@ -733,13 +723,15 @@ test('1. Home: Loads standalone films once and preserves loading, empty, error, 
   errorHarness.render();
   await errorHarness.settle();
 
-  const errorText = getText(errorHarness.tree);
+  const errorShelf = findNodes(errorHarness.tree, (n) => n.type === 'FilmShelf')[0];
+  const errorTree = renderFilmShelf(errorShelf.props.movies, errorShelf.props);
+  const errorText = getText(errorTree);
   assert.ok(
-    errorText.includes('Không thể tải phim. Vui lòng thử lại.'),
-    'Must render error state when catalog service is down'
+    errorText.includes('Không thể tải gợi ý.'),
+    'Must render error state when the recommendation service is down'
   );
 
-  const retryBtn = findNodes(errorHarness.tree, (n) => n.type === 'button' && getText(n).includes('Thử lại'))[0];
+  const retryBtn = findNodes(errorTree, (n) => n.type === 'button' && getText(n).includes('Thử lại'))[0];
   assert.ok(retryBtn, 'Retry button must be provided');
   retryTriggered = true;
   retryBtn.props.onClick();
@@ -847,8 +839,8 @@ test('3. MovieDetail: Safe media fallbacks (missing backdrop, missing poster, an
 
   const nodeMinimal = renderMovieDetail(minimalMovie);
 
-  const images = findNodes(nodeMinimal, (n) => n.type === 'next/image');
-  assert.equal(images.length, 0, 'Must NOT render next/image with empty poster or backdrop');
+  const images = findNodes(nodeMinimal, (n) => n.type === 'img');
+  assert.equal(images.length, 0, 'Must not render an image with empty poster or backdrop');
 
   const filmIcons = findNodes(nodeMinimal, (n) => n.type === 'Film');
   assert.ok(filmIcons.length > 0, 'Must render Film placeholder icon when poster is empty');
@@ -865,7 +857,7 @@ test('3. MovieDetail: Safe media fallbacks (missing backdrop, missing poster, an
   });
 
   const nodeFull = renderMovieDetail(fullMovie);
-  const fullImages = findNodes(nodeFull, (n) => n.type === 'next/image');
+  const fullImages = findNodes(nodeFull, (n) => n.type === 'img');
   assert.equal(fullImages.length, 2, 'Must render backdrop and poster images when valid');
   assert.equal(fullImages[0].props.src, 'https://img.com/backdrop.jpg');
   assert.equal(fullImages[1].props.src, 'https://img.com/poster.jpg');
@@ -984,7 +976,7 @@ test('5. Profile: Enforces 5-min TTL, clears stale IDs on library update, and pr
   assert.ok(getText(p.tree).includes('Thử tải lại'), 'Network error provides retry button');
 });
 
-test('6. Home uses the standalone film catalog while detail and Profile keep canonical IDs', async () => {
+test('6. Browsing, recommendations and profile preserve canonical film IDs', async () => {
   const canonicalMovie = sampleMovie({
     id: 'totoro',
     title: 'My Neighbor Totoro',
@@ -1338,3 +1330,84 @@ test('8. Hero uncertain ADD/DELETE retry integration with production provider (c
   assert.ok(finalAddBtn, 'Hero must return to "+ Thêm vào danh sách xem"');
 });
 
+function renderFilmShelf(movies, options = {}) {
+  const moduleObj = { exports: {} };
+  const react = {
+    createElement(type, props, ...children) {
+      if (type === moduleObj.exports.FilmGrid) return type(props);
+      const flat = children.flat().filter((c) => c != null && c !== false);
+      return { type, props: { ...props, children: flat.length === 1 ? flat[0] : flat } };
+    },
+  };
+  const context = {
+    module: moduleObj,
+    exports: moduleObj.exports,
+    console,
+    React: react,
+    require: (mod) => {
+      if (mod === '@/lib/labels') return labels;
+      if (mod === 'react-router') return { Link: 'route-link' };
+      if (mod.includes('mediaRouting')) return mediaRouting;
+      return {};
+    },
+  };
+  vm.runInNewContext(filmShelfTranspiled, context, { filename: filmShelfFilePath });
+  return moduleObj.exports.FilmShelf({ movies, ...options });
+}
+
+test('Home film shelf opens films, series and episodes on the correct routes', async () => {
+  const standaloneMovie = sampleMovie({
+    id: 'totoro',
+    title: 'My Neighbor Totoro',
+    year: 1988,
+    item_type: 'movie',
+  });
+  const seriesItem = sampleMovie({
+    id: 'ser_jadoo',
+    title: 'Xin Chào Jadoo',
+    item_type: 'series',
+  });
+  const episodeItem = sampleMovie({
+    id: 'ep_jadoo_s01_0001',
+    title: 'vì sức khỏe cả nhà',
+    item_type: 'episode',
+    series_id: 'ser_jadoo',
+    primary_media_asset_id: 'asset_jadoo_v1',
+  });
+
+  const shelfNode = renderFilmShelf([standaloneMovie, seriesItem, episodeItem]);
+  const cards = findNodes(shelfNode, (n) => n.props?.['data-testid'] === 'film-card');
+  assert.equal(cards.length, 3, 'Film shelf must render 3 film cards');
+
+  assert.equal(cards[0].props.to, '/movies/totoro', 'Standalone film routes to /movies/[id]');
+  assert.equal(cards[0].props['data-movie-id'], 'totoro');
+
+  assert.equal(cards[1].props.to, '/series/ser_jadoo', 'Series item routes to /series/[id]');
+  assert.equal(cards[1].props['data-movie-id'], 'ser_jadoo');
+
+  assert.equal(
+    cards[2].props.to,
+    '/series/ser_jadoo?episode=ep_jadoo_s01_0001&asset=asset_jadoo_v1',
+    'Episode item routes to /series/[seriesId]?episode=[episodeId]&asset=[assetId]'
+  );
+  assert.equal(cards[2].props['data-movie-id'], 'ep_jadoo_s01_0001');
+  assert.equal(findNodes(cards[2], (node) => node.type === 'h3')[0].props.children, 'Vì sức khỏe cả nhà');
+
+  const home = createHomeHarness(async () => [episodeItem]);
+  home.render();
+  await home.settle();
+
+  const homeShelf = findNodes(home.tree, (n) => n.type === 'FilmShelf')[0];
+  assert.ok(homeShelf, 'Home renders FilmShelf with catalog items');
+  assert.equal(homeShelf.props.movies[0].id, 'ep_jadoo_s01_0001');
+
+  const renderedHomeCards = findNodes(
+    renderFilmShelf(homeShelf.props.movies),
+    (n) => n.props?.['data-testid'] === 'film-card'
+  );
+  assert.equal(
+    renderedHomeCards[0].props.to,
+    '/series/ser_jadoo?episode=ep_jadoo_s01_0001&asset=asset_jadoo_v1',
+    'Episode on home page links directly to episode playback URL'
+  );
+});

@@ -26,7 +26,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Ensure UTF-8 output encoding across Windows PowerShell 5.1 and PowerShell 7
 try {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 } catch {}
@@ -51,7 +50,6 @@ if (-not $EvidencePath) {
     }
 }
 
-# Verify toolkit scripts exist
 $missingFiles = @()
 foreach ($f in @($preflightPath, $mountPath, $statusPath, $stopPath)) {
     if (-not (Test-Path -Path $f -PathType Leaf)) {
@@ -112,16 +110,11 @@ Write-Host " Target Toolkit : $toolkitDir" -ForegroundColor Cyan
 Write-Host " Target Evidence: $EvidencePath" -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
 
-# ==============================================================================
-# SUITE 1: Parameter Handling - Whitespace, Unicode & Complex Paths
-# ==============================================================================
 Write-Host "`n--- [SUITE 1] Parameter Robustness: Whitespace, Unicode & Complex Paths ---" -ForegroundColor Yellow
 
-# Test 1.1: Remote with spaces and Vietnamese Unicode subpath
 $t1Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $remoteWithSpace = "cinema gdrive:"
-    # UTF-8 encoded bytes for Vietnamese Unicode subpath: "Kho Phim Viet/1080p - Ban Ro & Day Du [2026]"
     $unicodeSubpath = [System.Text.Encoding]::UTF8.GetString([byte[]]@(75,104,111,32,80,104,105,109,32,86,105,225,187,135,116,47,49,48,56,48,112,32,45,32,66,225,186,163,110,32,82,195,181,32,38,32,196,144,225,186,167,121,32,196,144,225,187,167,32,91,50,48,50,54,93))
     $plan1 = & $mountPath -WhatIf -Remote $remoteWithSpace -RemoteSubpath $unicodeSubpath -MountPoint "M:"
     $t1Sw.Stop()
@@ -146,11 +139,9 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t1Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 1.2: Remote without trailing colon and Japanese/CJK Unicode subpath
 $t2Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $remoteNoColon = "anime-gdrive"
-    # UTF-8 encoded bytes for Japanese CJK subpath: "Studio Ghibli / Totoro"
     $cjkSubpath = [System.Text.Encoding]::UTF8.GetString([byte[]]@(227,130,185,227,130,191,227,130,184,227,130,170,227,130,184,227,131,150,227,131,170,47,230,152,160,231,148,187,47,227,129,168,227,129,170,227,130,138,227,129,174,227,131,136,227,131,136,227,131,173,32,40,49,57,56,56,41,32,91,66,68,45,82,105,112,93))
     $plan2 = & $mountPath -WhatIf -Remote $remoteNoColon -RemoteSubpath $cjkSubpath -MountPoint "M:"
     $t2Sw.Stop()
@@ -174,7 +165,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t2Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 1.3: Empty Remote defaults to cinema-gdrive: and empty RemoteSubpath
 $t3Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $plan3 = & $mountPath -WhatIf -Remote "" -RemoteSubpath "" -MountPoint "M:"
@@ -199,10 +189,8 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t3Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 1.4: ConfigPath with spaces, unicode and symbols
 $t4Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
-    # UTF-8 encoded bytes for Vietnamese Unicode config path: "C:\Users\Admin\Duong Dan Cau Hinh (Rclone)\rclone test [safe].conf"
     $complexConfigPath = [System.Text.Encoding]::UTF8.GetString([byte[]]@(67,58,92,85,115,101,114,115,92,65,100,109,105,110,92,196,144,198,176,225,187,157,110,103,32,68,225,186,171,110,32,67,225,186,165,117,32,72,195,172,110,104,32,40,82,99,108,111,110,101,41,92,114,99,108,111,110,101,32,116,101,115,116,32,91,115,97,102,101,93,46,99,111,110,102))
     $plan4 = & $mountPath -WhatIf -ConfigPath $complexConfigPath -MountPoint "M:"
     $t4Sw.Stop()
@@ -226,7 +214,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t4Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 1.5: MountPoint drive letter variations (case insensitivity and slash variations)
 $t5Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $planLower = & $mountPath -WhatIf -MountPoint "m:"
@@ -248,12 +235,8 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t5Sw.Elapsed.TotalMilliseconds
 }
 
-# ==============================================================================
-# SUITE 2: Dry-Run Mode & State Non-Persistence Verification
-# ==============================================================================
 Write-Host "`n--- [SUITE 2] Dry-Run Mode & State Non-Persistence ---" -ForegroundColor Yellow
 
-# Test 2.1: Default invocation without -Execute is Dry-Run
 $t6Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $defaultPlan = & $mountPath
@@ -274,7 +257,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t6Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 2.2: Explicit -WhatIf sets Dry-Run mode
 $t7Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $whatIfPlan = & $mountPath -WhatIf -Remote "cinema-gdrive:"
@@ -295,7 +277,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t7Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 2.3: -WhatIf takes precedence over -Execute
 $t8Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $conflictPlan = & $mountPath -WhatIf -Execute -Remote "cinema-gdrive:"
@@ -315,7 +296,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t8Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 2.4: Zero processes spawned during Dry-Run
 $t9Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $rcloneProcsBefore = @(Get-Process -Name "rclone" -ErrorAction SilentlyContinue)
@@ -338,7 +318,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t9Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 2.5: Zero state files written to disk during Dry-Run
 $t10Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $testStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "test-dryrun-state-$([Guid]::NewGuid().ToString('N')).json"
@@ -365,7 +344,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t10Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 2.6: -AsJson switch produces valid JSON schema in Dry-Run
 $t11Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $jsonOutput = & $mountPath -WhatIf -AsJson -Remote "cinema-gdrive:"
@@ -394,12 +372,8 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t11Sw.Elapsed.TotalMilliseconds
 }
 
-# ==============================================================================
-# SUITE 3: Occupied Mount Target (Collision Detection)
-# ==============================================================================
 Write-Host "`n--- [SUITE 3] Mount Target Collision Detection ---" -ForegroundColor Yellow
 
-# Test 3.1: Occupied system drive letter C:
 $t12Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $preflightC = & $preflightPath -MountPoint "C:" | ConvertFrom-Json
@@ -426,7 +400,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t12Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 3.2: Occupied drive letter with trailing slash C:\
 $t13Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $preflightCSlash = & $preflightPath -MountPoint "C:\" | ConvertFrom-Json
@@ -447,7 +420,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t13Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 3.3: Available unused drive letter detection (e.g. searching Z..E)
 $t14Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $usedLetters = (Get-PSDrive -PSProvider FileSystem | Select-Object -ExpandProperty Name)
@@ -481,12 +453,10 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t14Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 3.4: Occupied directory collision (non-empty directory)
 $t15Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $tempOccupiedDir = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-collision-dir-$([Guid]::NewGuid().ToString('N'))"
 try {
     New-Item -ItemType Directory -Path $tempOccupiedDir -Force | Out-Null
-    # Create multiple files to ensure collection count is robust in StrictMode
     Set-Content -Path (Join-Path $tempOccupiedDir "file1.txt") -Value "payload1"
     Set-Content -Path (Join-Path $tempOccupiedDir "file2.txt") -Value "payload2"
 
@@ -517,7 +487,6 @@ try {
     }
 }
 
-# Test 3.5: Regular file passed as mount target
 $t16Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $tempTargetFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-file-target-$([Guid]::NewGuid().ToString('N')).txt"
 try {
@@ -549,7 +518,6 @@ try {
     }
 }
 
-# Test 3.6: Mount collision surfaced in mount_drive dry-run blockers
 $t17Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $mountPlanC = & $mountPath -WhatIf -MountPoint "C:"
@@ -575,9 +543,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t17Sw.Elapsed.TotalMilliseconds
 }
 
-# ==============================================================================
-# SUITE 4: Standard Baseline Streaming Flags Verification
-# ==============================================================================
 Write-Host "`n--- [SUITE 4] Baseline Streaming Flags Verification ---" -ForegroundColor Yellow
 
 $t18Sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -589,7 +554,6 @@ try {
     $cmdStr    = [string]$planFlags.ExpectedCommand
     $flagStr   = [string]$planFlags.BaselineFlagsString
 
-    # 1. --read-only
     $hasReadOnly = ($flagsList -contains "--read-only") -and ($cmdStr -match "--read-only")
     Register-TestResult -TestId "TC-FLAGS-01" -Category "StreamingFlags" `
         -Name "Enforce --read-only baseline flag" `
@@ -597,7 +561,6 @@ try {
         -Passed $hasReadOnly -FailureMessage "Missing --read-only flag" `
         -Expected "--read-only" -Actual $hasReadOnly -DurationMs 1
 
-    # 2. --vfs-cache-mode off
     $vfsCacheIdx = [array]::IndexOf($flagsList, "--vfs-cache-mode")
     $hasVfsOff = ($vfsCacheIdx -ge 0) -and ($flagsList[$vfsCacheIdx + 1] -eq "off") -and ($cmdStr -match "--vfs-cache-mode\s+off")
     Register-TestResult -TestId "TC-FLAGS-02" -Category "StreamingFlags" `
@@ -606,7 +569,6 @@ try {
         -Passed $hasVfsOff -FailureMessage "Missing or incorrect --vfs-cache-mode off" `
         -Expected "--vfs-cache-mode off" -Actual $hasVfsOff -DurationMs 1
 
-    # 3. --buffer-size 32M
     $bufIdx = [array]::IndexOf($flagsList, "--buffer-size")
     $hasBuf32M = ($bufIdx -ge 0) -and ($flagsList[$bufIdx + 1] -eq "32M") -and ($cmdStr -match "--buffer-size\s+32M")
     Register-TestResult -TestId "TC-FLAGS-03" -Category "StreamingFlags" `
@@ -615,7 +577,6 @@ try {
         -Passed $hasBuf32M -FailureMessage "Missing or incorrect --buffer-size 32M" `
         -Expected "--buffer-size 32M" -Actual $hasBuf32M -DurationMs 1
 
-    # 4. --vfs-read-chunk-size 8M
     $chunkIdx = [array]::IndexOf($flagsList, "--vfs-read-chunk-size")
     $hasChunk8M = ($chunkIdx -ge 0) -and ($flagsList[$chunkIdx + 1] -eq "8M") -and ($cmdStr -match "--vfs-read-chunk-size\s+8M")
     Register-TestResult -TestId "TC-FLAGS-04" -Category "StreamingFlags" `
@@ -624,7 +585,6 @@ try {
         -Passed $hasChunk8M -FailureMessage "Missing or incorrect --vfs-read-chunk-size 8M" `
         -Expected "--vfs-read-chunk-size 8M" -Actual $hasChunk8M -DurationMs 1
 
-    # 5. --vfs-read-chunk-size-limit 32M
     $limitIdx = [array]::IndexOf($flagsList, "--vfs-read-chunk-size-limit")
     $hasLimit32M = ($limitIdx -ge 0) -and ($flagsList[$limitIdx + 1] -eq "32M") -and ($cmdStr -match "--vfs-read-chunk-size-limit\s+32M")
     Register-TestResult -TestId "TC-FLAGS-05" -Category "StreamingFlags" `
@@ -633,7 +593,6 @@ try {
         -Passed $hasLimit32M -FailureMessage "Missing or incorrect --vfs-read-chunk-size-limit 32M" `
         -Expected "--vfs-read-chunk-size-limit 32M" -Actual $hasLimit32M -DurationMs 1
 
-    # 6. --vfs-read-chunk-streams 0
     $streamIdx = [array]::IndexOf($flagsList, "--vfs-read-chunk-streams")
     $hasStreams0 = ($streamIdx -ge 0) -and ($flagsList[$streamIdx + 1] -eq "0") -and ($cmdStr -match "--vfs-read-chunk-streams\s+0")
     Register-TestResult -TestId "TC-FLAGS-06" -Category "StreamingFlags" `
@@ -642,7 +601,6 @@ try {
         -Passed $hasStreams0 -FailureMessage "Missing or incorrect --vfs-read-chunk-streams 0" `
         -Expected "--vfs-read-chunk-streams 0" -Actual $hasStreams0 -DurationMs 1
 
-    # 7. Auxiliary metadata performance flags
     $hasDirCache = ($cmdStr -match "--dir-cache-time\s+72h")
     $hasPollInt  = ($cmdStr -match "--poll-interval\s+15s")
     $hasAttrTime = ($cmdStr -match "--attr-timeout\s+1s")
@@ -660,12 +618,8 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $t18Sw.Elapsed.TotalMilliseconds
 }
 
-# ==============================================================================
-# SUITE 5: Native Argument Preservation & Bounded Readiness Timeout (D3 & D4)
-# ==============================================================================
 Write-Host "`n--- [SUITE 5] Native Argument Preservation & Bounded Mount Readiness (D3 & D4) ---" -ForegroundColor Yellow
 
-# Test 5.1: TC-D3-01 Dry-run ExpectedCommand correctly quotes arguments with spaces
 $tD3_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     $remoteWithSpace = "fixture"
@@ -694,7 +648,6 @@ try {
         -Passed $false -FailureMessage $_.Exception.Message -DurationMs $tD3_1Sw.Elapsed.TotalMilliseconds
 }
 
-# Test 5.2: TC-D3-02 Native child argv preservation via Node argv recorder
 $tD3_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $d3TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d3-test-$([Guid]::NewGuid().ToString('N'))"
 try {
@@ -727,7 +680,6 @@ try {
         -MountPoint $missingMountTarget -ConfigPath $configWithSpace2 -StateFile $stateFileD3 `
         -ReadinessTimeoutSeconds 1 -ReadinessIntervalMs 50
 
-    # Launch native Node.js argv recorder with the captured arguments
     $recorderCjs = Join-Path $d3TempDir "argv_recorder.cjs"
     $recorderBody = 'console.log(JSON.stringify(process.argv.slice(2)))'
     Set-Content -LiteralPath $recorderCjs -Value $recorderBody -Encoding UTF8
@@ -761,7 +713,6 @@ try {
     }
 }
 
-# Test 5.3: TC-D4-01 Bounded readiness verification reports TIMEOUT on missing/unmounted target
 $tD4_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $d4TempDir1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d4-timeout-$([Guid]::NewGuid().ToString('N'))"
 try {
@@ -815,7 +766,6 @@ try {
     }
 }
 
-# Test 5.4: TC-D4-02 Premature process exit during mount readiness loop reports FAILED
 $tD4_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $d4TempDir2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d4-fail-$([Guid]::NewGuid().ToString('N'))"
 try {
@@ -870,9 +820,6 @@ try {
     }
 }
 
-# ==============================================================================
-# EVIDENCE EXPORT & SUMMARY
-# ==============================================================================
 $suiteStopwatch.Stop()
 $totalCount  = $results.Count
 $passedCount = @($results | Where-Object { $_.Passed }).Count
@@ -887,7 +834,6 @@ Write-Host " Failed      : $failedCount" -ForegroundColor $(if ($failedCount -eq
 Write-Host " Duration    : $durationSec seconds"
 Write-Host "================================================================================" -ForegroundColor Cyan
 
-# Update or create shared evidence JSON
 try {
     $evidenceDir = Split-Path -Path $EvidencePath -Parent
     if (-not (Test-Path -Path $evidenceDir -PathType Container)) {
@@ -925,7 +871,6 @@ try {
         }
     }
 
-    # Attach this suite results
     $suiteObj = [PSCustomObject]@{
         suite_name       = "Comprehensive Toolkit Verification"
         script           = "scripts/drive-tests/test_drive_toolkit_comprehensive.ps1"
@@ -942,7 +887,6 @@ try {
     }
     $evidenceDoc.suites | Add-Member -MemberType NoteProperty -Name "comprehensive_toolkit" -Value $suiteObj -Force
 
-    # Recalculate summary across all recorded suites
     $allTotal = 0
     $allPassed = 0
     $allFailed = 0

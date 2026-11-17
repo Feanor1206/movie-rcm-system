@@ -214,6 +214,31 @@ def test_chat_patch_uses_request_history_without_global_sessions():
     assert intent["requested_k"] == 2
 
 
+@pytest.mark.parametrize(("query", "expected"), [
+    ("Học tập trải nghiệm thú vị", 1),
+    ("Tìm 1 tập Jadoo", 1),
+    ("Tìm tập 4 phim Jadoo", 1),
+    ("Tìm mùa 2 tập 4 Jadoo", 1),
+    ("Cảnh Jadoo đi cắm trại ở tập nào?", 1),
+    ("Tìm tập có nhiều cảnh dã ngoại", 1),
+    ("Gợi ý một tập Jadoo", 1),
+    ("Gợi ý 3 tập Jadoo", 3),
+    ("Tìm các tập Jadoo đi cắm trại", 8),
+    ("Liệt kê các tập Jadoo đi cắm trại", 8),
+    ("Gợi ý phim hoạt hình", 8),
+])
+def test_chat_uses_requested_result_count(query, expected):
+    assert deterministic_intent(query)["requested_k"] == expected
+
+
+def test_catalog_reply_removes_filename_and_repeated_title():
+    from services.rag import catalog_reply
+
+    title = "Bộ sưu tập Jadoo [kS3zyuaG4q0].mp4"
+    result = {"title": title, "evidence": [{"text": f"Tập phim {title} của bộ hoạt hình Xin Chào Jadoo."}]}
+    assert catalog_reply([result], "find_moment") == "Có vẻ bạn đang tìm Bộ sưu tập Jadoo."
+
+
 def test_chat_provider_error_falls_back_without_exposing_details(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": MOVIE["title"], "startMs": MOVIE["startMs"], "evidence": ["Chi làm vỡ bình hoa."]}])
@@ -368,15 +393,15 @@ def test_cloud_requires_explicit_model_before_request(monkeypatch):
     asyncio.run(run())
 
 
-def test_pilot_intent_receives_only_enums_and_catalog_and_rejects_mismatch(monkeypatch):
+def test_cloud_sends_only_intent_labels_and_approved_catalog(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
     requests = []
     class FakeLLM:
         async def parse_intent(self, messages):
-            requests.extend(messages)
-            return {"intent_type": "NO_OP", "mode": "chitchat", "scope": "series", "semantic_query": "invented"}
+            pytest.fail("local routing must not call the provider")
         async def stream(self, messages):
+            requests.extend(messages)
             yield "Chi làm vỡ bình hoa."
     async def run():
         events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("PRIVATE QUERY", history=[{"role": "user", "content": "PRIVATE HISTORY"}])]
@@ -384,40 +409,116 @@ def test_pilot_intent_receives_only_enums_and_catalog_and_rejects_mismatch(monke
         assert intent["intent_type"] == "DISCOVERY"
         assert intent["semantic_query"] == "PRIVATE QUERY"
     asyncio.run(run())
-    assert requests
+    assert len(requests) == 2
+    body = json.loads(requests[1]["content"])
+    assert body["intent"] == {"intent_type": "DISCOVERY", "mode": "find_moment", "scope": "episode"}
+    assert body["sources"][0]["evidence"] == ["Chi làm vỡ bình hoa."]
     assert "PRIVATE" not in json.dumps(requests)
     assert "Chi làm vỡ bình hoa" in json.dumps(requests, ensure_ascii=False)
 
 
-def test_intent_provider_outage_uses_template_without_second_call(monkeypatch):
+def test_provider_outage_uses_template_without_retrying(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
+    attempts = []
     class FakeLLM:
-        async def parse_intent(self, messages):
-            raise LLMUnavailableError("private detail")
         async def stream(self, messages):
-            pytest.fail("should not retry after outage")
+            attempts.append(messages)
+            raise LLMUnavailableError("private detail")
             yield
     async def run():
         events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("bình hoa")]
         assert "chưa sẵn sàng" in events[-1][1]["text"]
         assert "private detail" not in events[-1][1]["text"]
+        assert "Chi làm vỡ bình hoa." in events[-1][1]["text"]
+        assert events[-1][1]["pipelineStages"]["conversation"] == "template"
     asyncio.run(run())
+    assert len(attempts) == 1
 
 
-def test_valid_pilot_intent_refines_scope_but_keeps_local_followup(monkeypatch):
+def test_cloud_followup_keeps_local_scope_and_constraints(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
     class FakeLLM:
         async def parse_intent(self, messages):
-            return {"intent_type": "CONVERSATIONAL_PATCH", "mode": "find_moment", "scope": "scene", "semantic_query": "wrong", "requested_k": 100}
+            pytest.fail("local routing must not call the provider")
         async def stream(self, messages):
+            assert json.loads(messages[1]["content"])["intent"]["scope"] == "episode"
             yield "Chi làm vỡ bình hoa."
     async def run():
         events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("không, tập khác", history=[{"role": "user", "content": "bình hoa"}])]
         intent = events[-1][1]["structuredIntent"]
         assert intent["intent_type"] == "CONVERSATIONAL_PATCH"
-        assert intent["scope"] == "scene"
+        assert intent["scope"] == "episode"
         assert intent["semantic_query"] == "bình hoa không, tập khác"
-        assert intent["requested_k"] == 8
+        assert intent["requested_k"] == 1
+    asyncio.run(run())
+
+@pytest.mark.parametrize(("query", "mode", "count"), [
+    ("tập nào vui nhất nhỉ, tôi đang buồn", "recommend", 1),
+    ("tôi buồn, cho tôi 3 tập vui", "recommend", 3),
+    ("gợi ý một tập vui", "recommend", 1),
+    ("cảnh Jadoo vui khi đi học", "find_moment", 1),
+    ("tập 4 vui nhộn", "find_moment", 1),
+    ("tìm tập tên Ngày vui", "find_moment", 1),
+])
+def test_mood_intent_respects_scene_and_count(query, mode, count):
+    intent = deterministic_intent(query)
+    assert (intent["mode"], intent["requested_k"]) == (mode, count)
+
+
+def test_mood_chat_ranks_grounded_metadata_and_ignores_filename():
+    calls = []
+    filename = {"id": "file", "title": "Tập vui nhộn [abc].mp4", "description": "Tập phim Tập vui nhộn [abc].mp4 của Jadoo."}
+    grounded = {"id": "good", "title": "Jadoo đi học", "keywords": ["hài hước"], "emotions": ["vui vẻ"]}
+    def search(snapshot, query, limit=8, constraints=None):
+        calls.append((query, limit))
+        return [filename, grounded]
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("light"), search).stream("tập nào vui nhất nhỉ, tôi đang buồn")]
+        done = events[-1][1]
+        assert [item["id"] for item in done["recommendedMovies"]] == ["good"]
+        assert done["followUps"] == []
+        assert done["text"] == "Bạn thử tập này nhé."
+        assert "Có vẻ bạn đang tìm" not in done["text"]
+        assert ".mp4" not in done["text"]
+    asyncio.run(run())
+    assert calls[0][1] > 1
+
+
+def test_sad_film_request_uses_sad_evidence():
+    sad = {"id": "sad", "title": "Một ngày", "emotions": ["buồn"]}
+    happy = {"id": "happy", "title": "Một tập khác", "keywords": ["hài hước"]}
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("light"), lambda *a, **k: [happy, sad]).stream("gợi ý phim buồn")]
+        assert [item["id"] for item in events[-1][1]["recommendedMovies"]] == ["sad"]
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('question,answer', [
+    ('Larva là gì?', 'Red và Yellow sống dưới cống.'),
+    ('Larva có mấy tập?', 'Danh mục hiện có 104 tập Larva.'),
+    ('Larva có mấy mùa?', 'Danh mục hiện có 1 mùa Larva.'),
+    ('Nhân vật trong Larva là ai?', 'Nhân vật trong Larva gồm Red, Yellow.'),
+])
+def test_chat_answers_series_information_from_catalog(question, answer):
+    source = {"id": "ser_larva", "title": "Larva", "item_type": "series", "synopsis": "Red và Yellow sống dưới cống.",
+              "episode_count": 104, "season_count": 1, "characters": ["Red", "Yellow"]}
+    def search(snapshot, query, limit, constraints):
+        assert constraints['series_only'] is True
+        return [source]
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry('light'), search).stream(question)]
+        assert events[-1][0] == 'done'
+        assert events[-1][1]['text'] == answer
+    asyncio.run(run())
+
+
+def test_mood_episode_prefers_episode_length_to_long_compilation():
+    series = {"id": "series", "title": "Bộ phim", "item_type": "series", "genres": ["hài hước"], "keywords": ["vui vẻ"]}
+    compilation = {"id": "long", "title": "Tổng hợp", "runtime": "119m", "keywords": ["hài hước"]}
+    episode = {"id": "short", "title": "Một tập", "runtime": "22m", "keywords": ["hài hước"]}
+    async def run():
+        events = [item async for item in ChatService(ModelRegistry("light"), lambda *a, **k: [series, compilation, episode]).stream("tập nào vui nhất")]
+        assert [item["id"] for item in events[-1][1]["recommendedMovies"]] == ["short"]
     asyncio.run(run())

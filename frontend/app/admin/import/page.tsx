@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import {
   Database,
   Film,
@@ -93,7 +91,7 @@ export default function AdminImportPage() {
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-surface-border pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-dark">
             <Database size={14} />
             <span>Quản trị danh mục</span>
           </div>
@@ -114,7 +112,7 @@ export default function AdminImportPage() {
             <span>Làm mới</span>
           </button>
           <Link
-            href="/search"
+            to="/search"
             className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-muted"
           >
             <Film size={14} />
@@ -124,13 +122,13 @@ export default function AdminImportPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-8">
+        <div className="min-w-0 lg:col-span-2 space-y-8">
           <CatalogImportModal onImportSuccess={handleImportSuccess} />
 
           <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-sm">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
-                <Film size={18} className="text-brand" />
+                <Film size={18} className="text-brand-dark" />
                 <h2 className="text-base font-bold text-ink">
                   Các bộ hoạt hình đã nhập ({seriesList.length})
                 </h2>
@@ -140,7 +138,7 @@ export default function AdminImportPage() {
 
             {isLoading ? (
               <div className="flex items-center justify-center py-10 text-xs text-muted">
-                <RefreshCw size={16} className="animate-spin text-brand mr-2" />
+                <RefreshCw size={16} className="animate-spin text-brand-dark mr-2" />
                 <span>Đang tải danh sách bộ phim...</span>
               </div>
             ) : loadErrors.series ? (
@@ -156,11 +154,11 @@ export default function AdminImportPage() {
                     key={ser.id}
                     className="flex flex-wrap items-center justify-between gap-4 py-3.5 transition-colors hover:bg-surface-hover/50 rounded-lg px-2"
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          href={`/series/${encodeURIComponent(ser.id)}`}
-                          className="text-sm font-bold text-ink hover:text-brand transition-colors"
+                          to={`/series/${encodeURIComponent(ser.id)}`}
+                          className="text-sm font-bold text-ink hover:text-brand-dark transition-colors"
                         >
                           {ser.title}
                         </Link>
@@ -169,7 +167,7 @@ export default function AdminImportPage() {
                             {ser.releaseYearStart}
                           </span>
                         )}
-                        <span className="font-mono text-[11px] text-muted">
+                        <span className="max-w-full break-all font-mono text-[11px] text-muted">
                           [{ser.id}]
                         </span>
                       </div>
@@ -181,7 +179,7 @@ export default function AdminImportPage() {
                     </div>
 
                     <Link
-                      href={`/series/${encodeURIComponent(ser.id)}`}
+                      to={`/series/${encodeURIComponent(ser.id)}`}
                       className="btn-secondary flex items-center gap-1.5 text-xs font-semibold shrink-0"
                     >
                       <span>Xem tập & cảnh</span>
@@ -197,15 +195,15 @@ export default function AdminImportPage() {
             <div
               className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-xs ${
                 actionMessage.type === 'success'
-                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                  : 'border-red-500/30 bg-red-500/10 text-red-300'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-900'
+                  : 'border-red-500/30 bg-red-500/10 text-red-900'
               }`}
             >
               <div className="flex items-center gap-2">
                 {actionMessage.type === 'success' ? (
-                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <CheckCircle2 size={16} className="text-emerald-900 shrink-0" />
                 ) : (
-                  <XCircle size={16} className="text-red-400 shrink-0" />
+                  <XCircle size={16} className="text-red-900 shrink-0" />
                 )}
                 <span>{actionMessage.text}</span>
               </div>
@@ -222,7 +220,7 @@ export default function AdminImportPage() {
           <div className="rounded-xl border border-surface-border bg-surface p-6 shadow-sm">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div className="flex items-center gap-2">
-                <Activity size={18} className="text-brand" />
+                <Activity size={18} className="text-brand-dark" />
                 <h2 className="text-base font-bold text-ink">
                   Đồng bộ dữ liệu tìm kiếm ({snapshots.length})
                 </h2>
@@ -232,7 +230,7 @@ export default function AdminImportPage() {
 
             {isLoading ? (
               <div className="flex items-center justify-center py-8 text-xs text-muted">
-                <RefreshCw size={16} className="animate-spin text-brand mr-2" />
+                <RefreshCw size={16} className="animate-spin text-brand-dark mr-2" />
                 <span>Đang tải trạng thái đồng bộ...</span>
               </div>
             ) : loadErrors.snapshots ? (
@@ -252,38 +250,38 @@ export default function AdminImportPage() {
                       className="rounded-lg border border-surface-border bg-surface-elevated p-3.5 text-xs space-y-2"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-brand">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="font-mono font-bold text-brand-dark">
                             Thế hệ {snap.snapshotVersion}
                           </span>
-                          <span className="font-mono text-muted">[{snap.id}]</span>
+                          <span className="max-w-full break-all font-mono text-muted">[{snap.id}]</span>
                           <span className="text-muted">({snap.totalItems} mục)</span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           {snap.status === 'READY' && (
-                            <span className="flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/30">
+                            <span className="flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-900 border border-emerald-500/30">
                               <CheckCircle2 size={12} /> Đã đồng bộ
                             </span>
                           )}
-                          {snap.status === 'SYNCING' && (
-                            <span className="flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[11px] font-bold text-blue-400 border border-blue-500/30 animate-pulse">
+                          {(snap.status === 'SYNCING' || snap.status === 'BUILDING') && (
+                            <span className="flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[11px] font-bold text-blue-900 border border-blue-500/30 animate-pulse">
                               <RefreshCw size={12} className="animate-spin" /> Đang đồng bộ
                             </span>
                           )}
                           {snap.status === 'PENDING' && (
-                            <span className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-amber-500/30">
+                            <span className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-900 border border-amber-500/30">
                               <Clock size={12} /> Chờ xử lý
                             </span>
                           )}
                           {snap.status === 'BLOCKED' && (
-                            <span className="flex items-center gap-1 rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-bold text-orange-400 border border-orange-500/30">
+                            <span className="flex items-center gap-1 rounded bg-orange-500/10 px-2 py-0.5 text-[11px] font-bold text-orange-900 border border-orange-500/30">
                               <AlertTriangle size={12} /> {snap.errorMessage?.startsWith('CACHE_REQUIRED')
                                 ? 'Tạm dừng: thiếu dữ liệu chỉ mục' : 'Tạm dừng: thiếu mã truy cập'}
                             </span>
                           )}
                           {snap.status === 'SYNC_FAILED' && (
-                            <span className="flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-400 border border-red-500/30">
+                            <span className="flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-900 border border-red-500/30">
                               <XCircle size={12} /> Lỗi đồng bộ
                             </span>
                           )}
@@ -293,7 +291,7 @@ export default function AdminImportPage() {
                               type="button"
                               onClick={() => handleRetrySnapshot(snap.id)}
                               disabled={isRetrying}
-                              className="btn-secondary flex items-center gap-1 text-[11px] py-1 px-2.5 font-semibold text-brand hover:text-ink disabled:opacity-50"
+                              className="btn-secondary flex items-center gap-1 text-[11px] py-1 px-2.5 font-semibold text-brand-dark hover:text-ink disabled:opacity-50"
                             >
                               <RotateCcw size={11} className={isRetrying ? 'animate-spin' : ''} />
                               <span>{isRetrying ? 'Đang gửi...' : 'Thử lại'}</span>
@@ -303,12 +301,12 @@ export default function AdminImportPage() {
                       </div>
 
                       {snap.errorMessage && (
-                        <p className="whitespace-pre-wrap break-words rounded bg-red-500/10 p-2 font-mono text-[11px] text-red-400 border border-red-500/20">
+                        <p className="whitespace-pre-wrap break-words rounded bg-red-500/10 p-2 font-mono text-[11px] text-red-900 border border-red-500/20">
                           {snap.errorMessage}
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between text-[10px] text-muted font-mono">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted font-mono">
                         <span title={snap.contentHash}>SHA-256: {snap.contentHash.slice(0, 16)}...</span>
                         {snap.retryCount !== undefined && snap.retryCount > 0 && (
                           <span>Số lần thử lại: {snap.retryCount}</span>
@@ -322,10 +320,10 @@ export default function AdminImportPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div className="rounded-xl border border-surface-border bg-surface p-5">
             <div className="flex items-center gap-2 border-b border-surface-border pb-3">
-              <Clock size={16} className="text-brand" />
+              <Clock size={16} className="text-brand-dark" />
               <h3 className="text-sm font-bold text-ink">Lịch sử gói nhập</h3>
             </div>
 
@@ -340,9 +338,9 @@ export default function AdminImportPage() {
                     key={pkg.id}
                     className="rounded-lg border border-surface-border bg-surface-elevated p-3 text-xs"
                   >
-                    <div className="flex items-center justify-between">
-                      <strong className="text-ink font-mono">{pkg.id}</strong>
-                      <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand border border-brand/20">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <strong className="max-w-full break-all text-ink font-mono">{pkg.id}</strong>
+                      <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand-dark border border-brand/20">
                         Phiên bản {pkg.revision}
                       </span>
                     </div>
@@ -369,5 +367,5 @@ export default function AdminImportPage() {
 }
 
 function LoadError({ label, onRetry }: { label: string; onRetry: () => void }) {
-  return <p role="alert" className="mt-3 text-xs text-red-400">Không thể tải {label}. <button className="underline" onClick={onRetry}>Thử lại</button></p>;
+  return <p role="alert" className="mt-3 text-xs text-red-900">Không thể tải {label}. <button className="underline" onClick={onRetry}>Thử lại</button></p>;
 }

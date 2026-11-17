@@ -44,7 +44,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Ensure UTF-8 output encoding across Windows PowerShell 5.1 and PowerShell 7
 try {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 } catch {}
@@ -69,7 +68,6 @@ if (-not $EvidencePath) {
     }
 }
 
-# Verify toolkit scripts exist
 $missingFiles = @()
 foreach ($f in @($preflightPath, $mountPath, $statusPath, $stopPath)) {
     if (-not (Test-Path -Path $f -PathType Leaf)) {
@@ -124,7 +122,6 @@ function Register-TestResult {
     }
 }
 
-# Helper to recursively inspect object graph for forbidden secret strings
 function Test-ObjectContainsSecrets {
     param(
         [object]$TargetObject,
@@ -134,7 +131,6 @@ function Test-ObjectContainsSecrets {
 
     if ($TargetObject -eq $null -or $Depth -gt 20) { return $false }
 
-    # If string
     if ($TargetObject -is [string]) {
         foreach ($sec in $SecretList) {
             if ($TargetObject.Contains($sec)) {
@@ -144,12 +140,10 @@ function Test-ObjectContainsSecrets {
         return $false
     }
 
-    # ValueTypes (int, bool, double, DateTime, etc.) cannot contain secret strings
     if ($TargetObject -is [System.ValueType]) {
         return $false
     }
 
-    # If array or collection
     if ($TargetObject -is [System.Collections.IEnumerable] -and -not ($TargetObject -is [hashtable])) {
         foreach ($item in $TargetObject) {
             if (Test-ObjectContainsSecrets -TargetObject $item -SecretList $SecretList -Depth ($Depth + 1)) {
@@ -159,7 +153,6 @@ function Test-ObjectContainsSecrets {
         return $false
     }
 
-    # If PSCustomObject or object with properties
     if ($TargetObject.PSObject -and $TargetObject.PSObject.Properties) {
         foreach ($prop in $TargetObject.PSObject.Properties) {
             if ($prop.Value) {
@@ -179,9 +172,6 @@ Write-Host " Target Toolkit : $toolkitDir" -ForegroundColor Cyan
 Write-Host " Target Evidence: $EvidencePath" -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
 
-# ==============================================================================
-# SUITE 1: Secret Hygiene & Credential Protection
-# ==============================================================================
 Write-Host "`n--- [SUITE 1] Secret Hygiene: Zero Credential Exposure ---" -ForegroundColor Yellow
 
 $mockAccessToken   = "ya29.a0AfH6SM_SEAM_TEST_ACCESS_TOKEN_XYZ987654321_SUPER_SECRET"
@@ -215,7 +205,6 @@ team_drive = 0ABCdef123456789
 Set-Content -Path $tempConfigPath -Value $mockConfigContent -Encoding UTF8
 
 try {
-    # Test 1.1: preflight_drive.ps1 raw output stream scanning
     $t1Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $preflightRawOut = & $preflightPath -ConfigPath $tempConfigPath | Out-String
     $t1Sw.Stop()
@@ -236,7 +225,6 @@ try {
         -Expected "Zero occurrences" -Actual "$($leakedInPreflightString.Count) occurrences" `
         -DurationMs $t1Sw.Elapsed.TotalMilliseconds
 
-    # Test 1.2: preflight_drive.ps1 object graph deep inspection
     $t2Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $preflightObj = $preflightRawOut | ConvertFrom-Json
     $hasSecretInObject = Test-ObjectContainsSecrets -TargetObject $preflightObj -SecretList $allSecrets
@@ -256,7 +244,6 @@ try {
         -Actual "SecretsInObject=$hasSecretInObject, ConfigSafe=$configSafe" `
         -DurationMs $t2Sw.Elapsed.TotalMilliseconds
 
-    # Test 1.3: mount_drive.ps1 -WhatIf output scanning
     $t3Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $mountPlan = & $mountPath -WhatIf -ConfigPath $tempConfigPath -Remote "cinema-gdrive:"
     $mountPlanString = $mountPlan | Out-String
@@ -278,7 +265,6 @@ try {
         -Actual "SecretsInObject=$hasSecretInMountObj, SecretsInString=$hasSecretInMountStr" `
         -DurationMs $t3Sw.Elapsed.TotalMilliseconds
 
-    # Test 1.4: mount_drive.ps1 -AsJson serialization scanning
     $t4Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $mountJsonRaw = & $mountPath -WhatIf -AsJson -ConfigPath $tempConfigPath -Remote "cinema-gdrive:"
     $t4Sw.Stop()
@@ -299,7 +285,6 @@ try {
         -Expected "Zero occurrences" -Actual "$($leakedInMountJson.Count) occurrences" `
         -DurationMs $t4Sw.Elapsed.TotalMilliseconds
 
-    # Test 1.5: Error stream leakage protection
     $t5Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $nonExistentConfig = "C:\NonExistent\rclone-secret-$mockAccessToken.conf"
     $preflightErrOutput = & $preflightPath -ConfigPath $nonExistentConfig 2>&1 | Out-String
@@ -321,18 +306,13 @@ try {
     }
 }
 
-# ==============================================================================
-# SUITE 2: PID Reuse Safety & Process Identity Verification
-# ==============================================================================
 Write-Host "`n--- [SUITE 2] PID Reuse Safety & Process Identity Verification ---" -ForegroundColor Yellow
 
 $currentProcess = Get-Process -Id $PID
 
-# Test 2.1: PID Reuse - Refuse to kill active PowerShell / system process (ProcessName mismatch)
 $t6Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $pidMismatchStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-pid-mismatch-$([Guid]::NewGuid().ToString('N')).json"
 try {
-    # Create fake state recording current PowerShell process, but with actual process name powershell/pwsh
     $fakeState = [PSCustomObject]@{
         pid            = $currentProcess.Id
         processName    = "rclone"
@@ -366,11 +346,9 @@ try {
     }
 }
 
-# Test 2.2: PID Reuse - Refuse to kill when claimed processName is 'rclone' but actual process is NOT rclone
 $t7Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $claimedRcloneStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-claimed-rclone-$([Guid]::NewGuid().ToString('N')).json"
 try {
-    # State file claims processName is rclone, but PID points to current PowerShell/pwsh process
     $fakeClaimedState = [PSCustomObject]@{
         pid            = $currentProcess.Id
         processName    = "rclone"
@@ -403,15 +381,9 @@ try {
     }
 }
 
-# Test 2.3: PID Reuse - Refuse to kill when StartTime does not match recorded state
 $t8Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $timeMismatchStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-time-mismatch-$([Guid]::NewGuid().ToString('N')).json"
 try {
-    # Look for another process or simulate start time mismatch
-    # In stop_drive.ps1: ProcessName must be rclone before checking StartTime.
-    # To test StartTime verification branch logic safely:
-    # If a real rclone process were running with different start time, it rejects.
-    # Let's verify stop_drive logic handles start time calculation safely:
     $stExpected = [DateTimeOffset]::UtcNow.AddDays(-2).ToString("o")
     $fakeTimeState = [PSCustomObject]@{
         pid            = $currentProcess.Id
@@ -426,7 +398,6 @@ try {
     $stopRes3 = & $stopPath -StateFile $timeMismatchStateFile
     $t8Sw.Stop()
 
-    # Rejection occurs on ProcessName first (or StartTime), both yielding PID_REUSE_REJECTED
     $rejected3 = ($stopRes3.Success -eq $false) -and ($stopRes3.Status -eq "PID_REUSE_REJECTED")
 
     Register-TestResult -TestId "TC-PID-03" -Category "PIDSafety" `
@@ -441,7 +412,6 @@ try {
     }
 }
 
-# Test 2.4: status_drive reports DEGRADED when PID reuse is detected
 $t9Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $degradedStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-status-degraded-$([Guid]::NewGuid().ToString('N')).json"
 try {
@@ -476,11 +446,9 @@ try {
     }
 }
 
-# Test 2.5: Inactive / non-existent PID cleanup in stop_drive
 $t10Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $deadPidStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-dead-pid-$([Guid]::NewGuid().ToString('N')).json"
 try {
-    # Find a PID guaranteed not to exist
     $deadPid = 999991
     while (Get-Process -Id $deadPid -ErrorAction SilentlyContinue) {
         $deadPid++
@@ -516,7 +484,6 @@ try {
     }
 }
 
-# Test 2.6: status_drive reports NOT_MOUNTED for inactive PID
 $t11Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $deadStatusStateFile = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-dead-status-$([Guid]::NewGuid().ToString('N')).json"
 try {
@@ -554,7 +521,6 @@ try {
     }
 }
 
-# Test 2.7: Missing state file handled gracefully by stop_drive
 $t12Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $missingStatePath = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-missing-$([Guid]::NewGuid().ToString('N')).json"
 $stopMissingRes = & $stopPath -StateFile $missingStatePath
@@ -569,11 +535,9 @@ Register-TestResult -TestId "TC-PID-07" -Category "PIDSafety" `
     -Actual "Status=$($stopMissingRes.Status), Success=$($stopMissingRes.Success)" `
     -DurationMs $t12Sw.Elapsed.TotalMilliseconds
 
-# Test 2.8: Empty or invalid state file rejected and preserved (Fail Closed)
 $t13Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $emptyStatePath = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-empty-$([Guid]::NewGuid().ToString('N')).json"
 try {
-    # Create empty state file (0 bytes)
     New-Item -ItemType File -Path $emptyStatePath -Force | Out-Null
 
     $stopEmptyRes = & $stopPath -StateFile $emptyStatePath
@@ -596,7 +560,6 @@ try {
     }
 }
 
-# Test 2.9: Idempotent stop_drive invocations
 $t14Sw = [System.Diagnostics.Stopwatch]::StartNew()
 $idempotentStatePath = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-idempotent-$([Guid]::NewGuid().ToString('N')).json"
 try {
@@ -610,9 +573,7 @@ try {
     }
     $fakeState3 | ConvertTo-Json | Set-Content -Path $idempotentStatePath -Encoding UTF8
 
-    # First call: cleans up file and returns ALREADY_STOPPED
     $call1 = & $stopPath -StateFile $idempotentStatePath
-    # Second call: detects file gone and returns NOT_FOUND
     $call2 = & $stopPath -StateFile $idempotentStatePath
     $t14Sw.Stop()
 
@@ -630,9 +591,6 @@ try {
     }
 }
 
-# ==============================================================================
-# SUITE 3: Strict Process Identity Verification & Fail-Closed Seams (Finding D2)
-# ==============================================================================
 Write-Host "`n--- [SUITE 3] Strict Process Identity & Fail-Closed Verification (Finding D2) ---" -ForegroundColor Yellow
 
 $global:MockProcessMap = @{}
@@ -697,7 +655,6 @@ function global:Stop-Process {
 }
 
 try {
-    # Test 3.1: TC-D2-01 ExecutablePath mismatch fails closed
     $tD2_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d2State1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-exepath-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -743,7 +700,6 @@ try {
         if (Test-Path -Path $d2State1) { Remove-Item -Path $d2State1 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 3.2: TC-D2-02 StartTime mismatch (delta >= 500ms) fails closed
     $tD2_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d2State2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-starttime-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -789,7 +745,6 @@ try {
         if (Test-Path -Path $d2State2) { Remove-Item -Path $d2State2 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 3.3: TC-D2-03 Missing startTime in state fails closed
     $tD2_3Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d2State3 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-nostart-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -834,7 +789,6 @@ try {
         if (Test-Path -Path $d2State3) { Remove-Item -Path $d2State3 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 3.4: TC-D2-04 Missing executablePath in state fails closed
     $tD2_4Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d2State4 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-noexe-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -879,7 +833,6 @@ try {
         if (Test-Path -Path $d2State4) { Remove-Item -Path $d2State4 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 3.5: TC-D2-05 SessionId mismatch fails closed
     $tD2_5Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d2State5 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-session-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -925,7 +878,6 @@ try {
         if (Test-Path -Path $d2State5) { Remove-Item -Path $d2State5 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 3.6: TC-D2-06 Fully verified process terminated cleanly and state file removed
     $tD2_6Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d2State6 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-d2-success-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -971,12 +923,8 @@ try {
         if (Test-Path -Path $d2State6) { Remove-Item -Path $d2State6 -Force -ErrorAction SilentlyContinue }
     }
 
-    # ==============================================================================
-    # SUITE 4: Comprehensive Process Identity Schema & Reviewer Repro (Finding F2)
-    # ==============================================================================
     Write-Host "`n--- [SUITE 4] Strict Identity Schema & Reviewer Repro (Finding F2) ---" -ForegroundColor Yellow
 
-    # Test 4.1: TC-F2-01 Missing processName in state fails closed (Status: VERIFICATION_FAILED)
     $tF2_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $f2State1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-noprocname-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -990,7 +938,6 @@ try {
         }
         $stateContentF2_1 = [PSCustomObject]@{
             pid            = 881001
-            # Missing processName - must not fallback to rclone
             executablePath = "C:\Expected\rclone.exe"
             startTime      = $stF2_1.ToString("o")
             sessionId      = 1
@@ -1022,7 +969,6 @@ try {
         if (Test-Path -Path $f2State1) { Remove-Item -Path $f2State1 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.2: TC-F2-02 Missing sessionId in state fails closed (Status: VERIFICATION_FAILED)
     $tF2_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $f2State2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nosession-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1039,7 +985,6 @@ try {
             processName    = "rclone"
             executablePath = "C:\Expected\rclone.exe"
             startTime      = $stF2_2.ToString("o")
-            # Missing sessionId
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
             arguments      = @("mount", "cinema-gdrive:Media", "Z:")
@@ -1068,7 +1013,6 @@ try {
         if (Test-Path -Path $f2State2) { Remove-Item -Path $f2State2 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.3: TC-F2-03 Missing mountPoint in state fails closed (Status: VERIFICATION_FAILED)
     $tF2_3Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $f2State3 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nomount-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1086,7 +1030,6 @@ try {
             executablePath = "C:\Expected\rclone.exe"
             startTime      = $stF2_3.ToString("o")
             sessionId      = 1
-            # Missing mountPoint
             remoteTarget   = "cinema-gdrive:Media"
             arguments      = @("mount", "cinema-gdrive:Media", "Z:")
             status         = "MOUNTED"
@@ -1114,7 +1057,6 @@ try {
         if (Test-Path -Path $f2State3) { Remove-Item -Path $f2State3 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.4: TC-F2-04 Missing remoteTarget in state fails closed (Status: VERIFICATION_FAILED)
     $tF2_4Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $f2State4 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-noremote-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1133,7 +1075,6 @@ try {
             startTime      = $stF2_4.ToString("o")
             sessionId      = 1
             mountPoint     = "Z:"
-            # Missing remoteTarget
             arguments      = @("mount", "cinema-gdrive:Media", "Z:")
             status         = "MOUNTED"
         }
@@ -1160,7 +1101,6 @@ try {
         if (Test-Path -Path $f2State4) { Remove-Item -Path $f2State4 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.5: TC-F2-05 Missing arguments in state fails closed (Status: VERIFICATION_FAILED)
     $tF2_5Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $f2State5 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-noargs-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1180,7 +1120,6 @@ try {
             sessionId      = 1
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
-            # Missing arguments
             status         = "MOUNTED"
         }
         $stateContentF2_5 | ConvertTo-Json | Set-Content -Path $f2State5 -Encoding UTF8
@@ -1206,7 +1145,6 @@ try {
         if (Test-Path -Path $f2State5) { Remove-Item -Path $f2State5 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.6: TC-F2-06 Missing status in state fails closed (Status: VERIFICATION_FAILED)
     $tF2_6Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $f2State6 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nostatus-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1227,7 +1165,6 @@ try {
             mountPoint     = "Z:"
             remoteTarget   = "cinema-gdrive:Media"
             arguments      = @("mount", "cinema-gdrive:Media", "Z:")
-            # Missing status
         }
         $stateContentF2_6 | ConvertTo-Json | Set-Content -Path $f2State6 -Encoding UTF8
 
@@ -1252,13 +1189,11 @@ try {
         if (Test-Path -Path $f2State6) { Remove-Item -Path $f2State6 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.7: TC-F2-07 Missing or invalid pid in state fails closed (Status: VERIFICATION_FAILED)
     $tF2_7Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $f2State7 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-nopid-$([Guid]::NewGuid().ToString('N')).json"
     try {
         $stF2_7 = [DateTime]::UtcNow
         $stateContentF2_7 = [PSCustomObject]@{
-            # Missing pid
             processName    = "rclone"
             executablePath = "C:\Expected\rclone.exe"
             startTime      = $stF2_7.ToString("o")
@@ -1290,7 +1225,6 @@ try {
         if (Test-Path -Path $f2State7) { Remove-Item -Path $f2State7 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.8: TC-F2-08 Exact reproduction of reviewer DRIVE_F01_stop_missing_identity scenario
     $tF2_8Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $reproState = Join-Path ([System.IO.Path]::GetTempPath()) "regression-drive-f01-stop-test-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1303,8 +1237,6 @@ try {
             StartTime   = $reproStart
             SessionId   = 1
         }
-        # Reviewer state: contains only pid, processName, startTime, executablePath
-        # Missing sessionId, mountPoint, remoteTarget, arguments, status
         $reviewerStateObj = [PSCustomObject]@{
             pid            = $reproPid
             processName    = "rclone"
@@ -1337,7 +1269,6 @@ try {
         if (Test-Path -LiteralPath $reproState) { Remove-Item -LiteralPath $reproState -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 4.9: TC-F2-09 mount_drive timeout cleanup refuses to terminate process on identity mismatch
     $tF2_9Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d4TempDirMismatch = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-mount-mismatch-$([Guid]::NewGuid().ToString('N'))"
     try {
@@ -1348,7 +1279,6 @@ try {
 
         $mismatchChildPid = 882001
         $startM = [DateTime]::UtcNow
-        # Mock child process returned by Start-Process has mismatched SessionId
         function Start-Process {
             param($FilePath, $ArgumentList, $WindowStyle, [switch]$PassThru)
             [PSCustomObject]@{
@@ -1359,7 +1289,6 @@ try {
                 Path        = "C:\Fixture\rclone.exe"
             }
         }
-        # In MockProcessMap, live process has SessionId 999 (which does not match caller's session)
         $global:MockProcessMap[$mismatchChildPid] = [PSCustomObject]@{
             Id          = $mismatchChildPid
             ProcessName = "rclone"
@@ -1382,7 +1311,6 @@ try {
 
         $tF2_9Sw.Stop()
 
-        # Termination should NOT have occurred because SessionId did not match
         $mismatchNotKilled = ($global:MockStoppedPids -notcontains $mismatchChildPid)
         $isTimeout = ($resM.Status -eq "TIMEOUT")
 
@@ -1403,7 +1331,6 @@ try {
         }
     }
 
-    # Test 4.10: TC-F2-10 mount_drive timeout cleanup successfully terminates verified owned child process
     $tF2_10Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $d4TempDirMatch = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-f2-mount-match-$([Guid]::NewGuid().ToString('N'))"
     try {
@@ -1428,7 +1355,6 @@ try {
                 Path        = "C:\Fixture\rclone.exe"
             }
         }
-        # In MockProcessMap, live process matches all identity factors exactly
         $global:MockProcessMap[$matchChildPid] = [PSCustomObject]@{
             Id          = $matchChildPid
             ProcessName = "rclone"
@@ -1449,7 +1375,6 @@ try {
 
         $tF2_10Sw.Stop()
 
-        # Termination SHOULD have occurred because all identity factors matched
         $matchKilled = ($global:MockStoppedPids -contains $matchChildPid)
         $isTimeoutOk = ($resOk.Status -eq "TIMEOUT")
 
@@ -1470,12 +1395,8 @@ try {
         }
     }
 
-    # ==============================================================================
-    # SUITE 5: Exact Identity & Trustworthy Live Invocation Verification (Finding R2)
-    # ==============================================================================
     Write-Host "`n--- [SUITE 5] Exact Identity & Invocation Match (Finding R2) ---" -ForegroundColor Yellow
 
-    # Test 5.1: TC-R2-01 Near-time PID reuse (200ms StartTime mismatch) rejected (Status: IDENTITY_MISMATCH, Reason: StartTimeMismatch)
     $tR2_1Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $r2State1 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-200ms-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1522,7 +1443,6 @@ try {
         if (Test-Path -Path $r2State1) { Remove-Item -Path $r2State1 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 5.2: TC-R2-02 Wrong Invocation / Mount Mismatch rejected (Status: IDENTITY_MISMATCH, Reason: InvocationMismatch)
     $tR2_2Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $r2State2 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-wrongcmd-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1569,7 +1489,6 @@ try {
         if (Test-Path -Path $r2State2) { Remove-Item -Path $r2State2 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 5.3: TC-R2-03 Legitimate helper-created process terminates cleanly (Status: STOPPED)
     $tR2_3Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $r2State3 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-legit-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1615,7 +1534,6 @@ try {
         if (Test-Path -Path $r2State3) { Remove-Item -Path $r2State3 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 5.4: TC-R2-04 Unreadable Live Identity fails closed (Status: VERIFICATION_FAILED)
     $tR2_4Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $r2State4 = Join-Path ([System.IO.Path]::GetTempPath()) "movie-rcm-r2-unreadable-$([Guid]::NewGuid().ToString('N')).json"
     try {
@@ -1663,14 +1581,12 @@ try {
         if (Test-Path -Path $r2State4) { Remove-Item -Path $r2State4 -Force -ErrorAction SilentlyContinue }
     }
 
-    # Test 5.5: TC-R2-05 Reviewer Repro DRIVE_F02_stop_reused_identity Confirmation
     $tR2_5Sw = [System.Diagnostics.Stopwatch]::StartNew()
     $reproR2State = Join-Path ([System.IO.Path]::GetTempPath()) "regression-drive-f02-identity-$([Guid]::NewGuid().ToString('N')).json"
     try {
         $reproR2Start = [DateTime]::UtcNow
         $reproR2Pid = 987654
 
-        # Exact schema from DRIVE_F02_stop_reused_identity.ps1
         $reviewerR2StateObj = [PSCustomObject]@{
             pid            = $reproR2Pid
             processName    = "rclone"
@@ -1684,7 +1600,6 @@ try {
         }
         $reviewerR2StateObj | ConvertTo-Json | Set-Content -LiteralPath $reproR2State -Encoding UTF8
 
-        # Mock live process matching reviewer repro: StartTime differs by 200ms and CommandLine differs
         $global:MockProcessMap[$reproR2Pid] = [PSCustomObject]@{
             Id          = $reproR2Pid
             ProcessName = "rclone"
@@ -1723,9 +1638,6 @@ try {
     Remove-Item -Path "function:global:Stop-Process" -Force -ErrorAction SilentlyContinue
 }
 
-# ==============================================================================
-# EVIDENCE EXPORT & SUMMARY
-# ==============================================================================
 $suiteStopwatch.Stop()
 $totalCount  = $results.Count
 $passedCount = @($results | Where-Object { $_.Passed }).Count
@@ -1740,7 +1652,6 @@ Write-Host " Failed      : $failedCount" -ForegroundColor $(if ($failedCount -eq
 Write-Host " Duration    : $durationSec seconds"
 Write-Host "================================================================================" -ForegroundColor Cyan
 
-# Update shared evidence JSON
 try {
     $evidenceDir = Split-Path -Path $EvidencePath -Parent
     if (-not (Test-Path -Path $evidenceDir -PathType Container)) {
@@ -1794,7 +1705,6 @@ try {
     }
     $evidenceDoc.suites | Add-Member -MemberType NoteProperty -Name "security_seams" -Value $suiteObj -Force
 
-    # Recalculate summary across all recorded suites
     $allTotal = 0
     $allPassed = 0
     $allFailed = 0

@@ -22,7 +22,7 @@ function loadService(mockFetch) {
     exports: {},
     module: { exports: {} },
     fetch: mockFetch,
-    process: { env: { NEXT_PUBLIC_SPRINGBOOT_API_URL: 'http://test-server/api' } },
+
     URLSearchParams,
     AbortController,
     setTimeout: (fn, ms) => {
@@ -143,10 +143,8 @@ test('2. C1: External abort after headers received while body is pending aborts 
 
   const request = api.browseCatalog({ timeoutMs: 500, signal: external.signal });
 
-  // Wait for headers to be received and body to become pending
   for (let i = 0; i < 6; i++) await Promise.resolve();
 
-  // Caller intentionally aborts
   external.abort();
 
   assert.equal(requestSignal.aborted, true, 'Transport signal must be aborted');
@@ -230,7 +228,7 @@ test('5. C2: Malformed paginated payload (data={} or missing items) throws 502',
   const mockFetch = async () => ({
     ok: true,
     status: 200,
-    json: async () => ({ success: true, data: {} }), // malformed: missing items array
+    json: async () => ({ success: true, data: {} }),
   });
 
   const { api } = loadService(mockFetch);
@@ -247,10 +245,21 @@ test('5. C2: Malformed paginated payload (data={} or missing items) throws 502',
   );
 });
 
+test('Catalog navigation keeps series and episode identity', () => {
+  const { api } = loadService(async () => {});
+  const movie = { id: 'episode-id', title: 'Jadoo', year: 2026, rating: 0,
+    item_type: 'episode', series_id: 'series-id', episode_id: 'episode-id' };
+  const normalized = api.normalizeCatalogMovie(movie);
+  assert.equal(normalized.item_type, 'episode');
+  assert.equal(normalized.series_id, 'series-id');
+  assert.equal(normalized.episode_id, 'episode-id');
+  const series = api.normalizeCatalogMovie({ ...movie, id: 'series-id', item_type: 'series' });
+  assert.equal(series.item_type, 'series');
+});
+
 test('6. C2: normalizeCatalogMovie rejects missing required fields and never fabricates phantom zeros', () => {
   const { api } = loadService(async () => {});
 
-  // Missing id
   assert.throws(
     () => api.normalizeCatalogMovie({ title: 'T', year: 2020, rating: 8 }),
     (err) => {
@@ -260,7 +269,6 @@ test('6. C2: normalizeCatalogMovie rejects missing required fields and never fab
     }
   );
 
-  // Missing title
   assert.throws(
     () => api.normalizeCatalogMovie({ id: 'm1', year: 2020, rating: 8 }),
     (err) => {
@@ -270,7 +278,6 @@ test('6. C2: normalizeCatalogMovie rejects missing required fields and never fab
     }
   );
 
-  // Missing/invalid year
   assert.throws(
     () => api.normalizeCatalogMovie({ id: 'm1', title: 'T', rating: 8 }),
     (err) => {
@@ -280,7 +287,6 @@ test('6. C2: normalizeCatalogMovie rejects missing required fields and never fab
     }
   );
 
-  // Missing/invalid rating
   assert.throws(
     () => api.normalizeCatalogMovie({ id: 'm1', title: 'T', year: 2020 }),
     (err) => {
@@ -290,7 +296,6 @@ test('6. C2: normalizeCatalogMovie rejects missing required fields and never fab
     }
   );
 
-  // Valid movie normalizes cleanly
   const valid = api.normalizeCatalogMovie({
     id: 'spirited-away',
     title: 'Spirited Away',
@@ -332,7 +337,6 @@ test('7. C2: getCatalogMovieById verifies response ID matches requested canonica
     }
   );
 
-  // Literal ID verification: case difference (REQUESTED-MOVIE vs requested-movie) must be rejected
   const mockFetchCase = async () => ({
     ok: true,
     status: 200,
@@ -364,7 +368,6 @@ test('8. C2: getCatalogMovieById returns null on 404 HTML body without syntax er
   const mockFetch = async () => ({
     ok: false,
     status: 404,
-    // HTML body from Tomcat/Nginx that would throw SyntaxError if json() was called
     json: async () => {
       throw new SyntaxError('Unexpected token < in JSON at position 0');
     },
@@ -399,11 +402,9 @@ test('9. C2: Search/Query precedence: blank query falls back to search parameter
 
   const { api } = loadService(mockFetch);
 
-  // Blank query with valid search -> falls back to search
   await api.browseCatalog({ query: '   ', search: 'anime' });
   assert.ok(requestedUrl.includes('query=anime'), 'Blank query must fall back to search');
 
-  // Both present and query non-empty -> query takes precedence
   await api.browseCatalog({ query: 'spirited', search: 'anime' });
   assert.ok(requestedUrl.includes('query=spirited'), 'Non-empty query takes precedence over search');
 });
@@ -428,7 +429,7 @@ test('10. Catalog API: series list validates and maps real catalog fields', asyn
   });
 
   const result = await api.getCatalogSeriesList();
-  assert.equal(requestedUrl, 'http://test-server/api/catalog/series');
+  assert.equal(requestedUrl, '/api/catalog/series');
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 'jadoo');
   assert.equal(result[0].title, 'Jadoo');

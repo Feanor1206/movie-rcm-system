@@ -56,13 +56,11 @@ if (-not (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinu
     return
 }
 
-# 1. Read and parse state JSON
 $stateRaw = Get-Content -Path $StateFile -Raw -Encoding UTF8
 $stateData = $null
 try {
     $stateData = $stateRaw | ConvertFrom-Json
 } catch {
-    # Fail closed on corrupt state file - do not kill any process
     $res = [PSCustomObject]@{
         Success        = $false
         Status         = "VERIFICATION_FAILED"
@@ -83,7 +81,6 @@ try {
 }
 
 if (-not $stateData) {
-    # Fail closed on empty state file
     $res = [PSCustomObject]@{
         Success            = $false
         Status             = "VERIFICATION_FAILED"
@@ -105,7 +102,6 @@ if (-not $stateData) {
     return
 }
 
-# 2. Extract state schema fields
 $targetPid = $null
 if ($stateData.PSObject.Properties['pid'] -and $stateData.pid -ne $null) {
     $parsedPid = 0
@@ -141,7 +137,6 @@ $arguments = if ($stateData.PSObject.Properties['arguments'] -and $stateData.arg
              } else { $null }
 $stateStatus = if ($stateData.PSObject.Properties['status'] -and $stateData.status) { [string]$stateData.status } else { $null }
 
-# Fail closed if PID is missing or invalid
 if (-not $targetPid -or $targetPid -le 0) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -164,10 +159,8 @@ if (-not $targetPid -or $targetPid -le 0) {
     return
 }
 
-# 3. Retrieve live process
 $proc = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
 
-# If process is not running, clean up state file
 if (-not $proc) {
     Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
     $res = [PSCustomObject]@{
@@ -189,9 +182,7 @@ if (-not $proc) {
     return
 }
 
-# ================= STRICT PROCESS IDENTITY VERIFICATION (FAIL CLOSED) =================
 
-# Verification 1: Process Name match against active OS process
 if ($proc.ProcessName -ine "rclone" -or ($expectedName -and $proc.ProcessName -ine $expectedName)) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -218,7 +209,6 @@ if ($proc.ProcessName -ine "rclone" -or ($expectedName -and $proc.ProcessName -i
     return
 }
 
-# Mandatory Schema Field Check 1: processName
 if (-not $expectedName -or [string]::IsNullOrWhiteSpace($expectedName)) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -263,7 +253,6 @@ if ($expectedName -ine "rclone") {
     return
 }
 
-# Mandatory Schema Field Check 2: executablePath
 if (-not $expectedPath -or [string]::IsNullOrWhiteSpace($expectedPath)) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -286,7 +275,6 @@ if (-not $expectedPath -or [string]::IsNullOrWhiteSpace($expectedPath)) {
     return
 }
 
-# Verification 2: Executable Path match (Normalized full path, case-insensitive)
 $procPath = $null
 try {
     if ($proc.Path) {
@@ -375,7 +363,6 @@ if (-not [string]::Equals($normProcPath, $normExpectedPath, [System.StringCompar
     return
 }
 
-# Mandatory Schema Field Check 3: startTime
 $parsedExpectedStart = $null
 if ($recordedStartStr -and -not [string]::IsNullOrWhiteSpace($recordedStartStr)) {
     try {
@@ -406,7 +393,6 @@ if (-not $parsedExpectedStart) {
     return
 }
 
-# Verification 3: Process StartTime match (Exact process creation identity)
 $startTimeMatch = $false
 $diffMs = $null
 try {
@@ -446,7 +432,6 @@ if (-not $startTimeMatch) {
     return
 }
 
-# Mandatory Schema Field Check 4: sessionId
 if ($expectedSessionId -eq $null) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -469,7 +454,6 @@ if ($expectedSessionId -eq $null) {
     return
 }
 
-# Verification 4: Session ID match
 if ($proc.SessionId -ne $expectedSessionId) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -496,7 +480,6 @@ if ($proc.SessionId -ne $expectedSessionId) {
     return
 }
 
-# Mandatory Schema Field Check 5: mountPoint
 if (-not $mountPoint -or [string]::IsNullOrWhiteSpace($mountPoint)) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -519,7 +502,6 @@ if (-not $mountPoint -or [string]::IsNullOrWhiteSpace($mountPoint)) {
     return
 }
 
-# Mandatory Schema Field Check 6: remoteTarget
 if (-not $remoteTarget -or [string]::IsNullOrWhiteSpace($remoteTarget)) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -542,7 +524,6 @@ if (-not $remoteTarget -or [string]::IsNullOrWhiteSpace($remoteTarget)) {
     return
 }
 
-# Mandatory Schema Field Check 7: arguments
 $hasArgs = $false
 if ($arguments -ne $null) {
     if ($arguments -is [string] -and -not [string]::IsNullOrWhiteSpace($arguments)) {
@@ -573,7 +554,6 @@ if (-not $hasArgs) {
     return
 }
 
-# Mandatory Schema Field Check 8: status
 if (-not $stateStatus -or [string]::IsNullOrWhiteSpace($stateStatus)) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -596,9 +576,7 @@ if (-not $stateStatus -or [string]::IsNullOrWhiteSpace($stateStatus)) {
     return
 }
 
-# ================= STRICT LIVE PROCESS INVOCATION VERIFICATION (FAIL CLOSED) =================
 
-# Verification 5: Live Process Invocation & Command Line Verification (Trustworthy Live Invocation)
 $liveCmd = $null
 if ($proc.PSObject.Properties['CommandLine'] -and $proc.CommandLine) {
     $liveCmd = [string]$proc.CommandLine
@@ -622,7 +600,6 @@ if (-not $liveCmd) {
     } catch {}
 }
 
-# Fail closed if live identity / command line is unreadable
 if (-not $liveCmd -or [string]::IsNullOrWhiteSpace($liveCmd)) {
     $res = [PSCustomObject]@{
         Success            = $false
@@ -649,7 +626,6 @@ if (-not $liveCmd -or [string]::IsNullOrWhiteSpace($liveCmd)) {
     return
 }
 
-# Verify live invocation against recorded remoteTarget and mountPoint
 $cleanMount = $mountPoint.TrimEnd('\')
 $invocationMatch = $true
 
@@ -691,9 +667,7 @@ if (-not $invocationMatch) {
     return
 }
 
-# ================= TERMINATION OF STRICTLY VERIFIED PROCESS =================
 try {
-    # Re-verify process identity immediately before termination signal to prevent PID reuse race
     $preSignalProc = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
     if (-not $preSignalProc) {
         Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
@@ -754,7 +728,6 @@ try {
 
     Stop-Process -Id $targetPid -Force:$Force -ErrorAction Stop
 
-    # Wait up to 5 seconds for verified process termination
     $exited = $false
     for ($i = 0; $i -lt 10; $i++) {
         if (-not (Get-Process -Id $targetPid -ErrorAction SilentlyContinue)) {

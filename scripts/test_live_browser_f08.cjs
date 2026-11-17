@@ -5,9 +5,6 @@ const fs = require('fs');
 const path = require('path');
 const net = require('net');
 
-/**
- * Finds an available TCP port on loopback.
- */
 function getFreePort() {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
@@ -19,26 +16,6 @@ function getFreePort() {
   });
 }
 
-/**
- * DRIVE-01-F08 Strict Live Browser Timeline & Decoder Verification Script (Finding R4).
- *
- * Verifies:
- * 1. Detail page loads successfully without CDP API rewriting.
- * 2. Clicks real UI button [data-testid="play-feature-btn"] to launch player.
- * 3. Asserts video element decodes frames: videoWidth === 1280 && videoHeight === 720.
- * 4. Interacts with real player UI controls:
- *    - Pauses via [data-testid="video-play-pause-btn"] and asserts video.paused === true and stable pause.
- *    - Resumes via [data-testid="video-play-pause-btn"] and asserts video.paused === false and time advances.
- * 5. Tests 3 distinct seek points (60s, 200s, 400s) via timeline scrubber input/change events ONLY:
- *    - Absolutely NEVER assigns video.currentTime directly in test.
- *    - Measures real seek latency.
- *    - Asserts target-near time (|currentTime - target| <= 5.0s).
- *    - Asserts decoded frame presentation via requestVideoFrameCallback (presentedFrames, dimensions, mediaTime).
- *    - Asserts continued playback time advancement post-seek (t2 > t1 + 0.5s).
- *    - Captures screenshots for each seek point.
- * 6. Uses unique isolated Chrome user-data-dir and available CDP port.
- * 7. Outputs evidence to docs/reviews/evidence/browser_verification_f08.json and exits 0 on success, 1 on error.
- */
 async function runBrowserVerification() {
   const chromePath = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
   const port = await getFreePort();
@@ -89,19 +66,16 @@ async function runBrowserVerification() {
     await send('Runtime.enable');
     await new Promise(r => setTimeout(r, 2000));
 
-    // 1. Capture Detail Page Screenshot
     console.log('[BrowserVerification-F08] Capturing detail page screenshot...');
     const detailSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_detail_page_f08.png', Buffer.from(detailSnap.data, 'base64'));
 
-    // 2. Click Play Feature button
     console.log('[BrowserVerification-F08] Clicking play-feature-btn...');
     const tPlayStart = Date.now();
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'play-feature-btn\']").click(); true;'
     });
 
-    // 3. Await playback start & assert decoded video dimensions
     console.log('[BrowserVerification-F08] Awaiting video playback start and frame decoding...');
     let playSuccess = false;
     let coldStartDuration = 0;
@@ -141,7 +115,6 @@ async function runBrowserVerification() {
     const playingSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_player_playing_f08.png', Buffer.from(playingSnap.data, 'base64'));
 
-    // 4. Test Player Control Button: Pause via UI Button & assert stable time
     console.log('[BrowserVerification-F08] Clicking player UI play/pause button to pause...');
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'video-play-pause-btn\']").click(); true;'
@@ -158,7 +131,6 @@ async function runBrowserVerification() {
       throw new Error(`CRITICAL: Player UI pause button failed to pause video! State: ${JSON.stringify(pausedState1)}`);
     }
 
-    // Verify stable paused time: no advancement while paused
     await new Promise(r => setTimeout(r, 1000));
     const pauseCheck2 = await send('Runtime.evaluate', {
       expression: '(() => { const v = document.querySelector("video"); return v ? { paused: v.paused, currentTime: v.currentTime } : null; })()',
@@ -174,7 +146,6 @@ async function runBrowserVerification() {
     const pausedSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_player_paused_f08.png', Buffer.from(pausedSnap.data, 'base64'));
 
-    // 5. Test Player Control Button: Resume via UI Button & assert advancement
     console.log('[BrowserVerification-F08] Clicking player UI play/pause button to resume...');
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'video-play-pause-btn\']").click(); true;'
@@ -191,7 +162,6 @@ async function runBrowserVerification() {
       throw new Error(`CRITICAL: Player UI resume button failed to resume playback! State: ${JSON.stringify(resumedState)}`);
     }
 
-    // 6. Test 3 Distinct Seek Points via Timeline Scrubber (input/change dispatch ONLY)
     const seekTargets = [60.0, 200.0, 400.0];
     const seekResults = [];
 
@@ -199,7 +169,6 @@ async function runBrowserVerification() {
       console.log(`\n[BrowserVerification-F08] --- Testing Seek to ${targetTime}s via Timeline Slider ---`);
       const tSeekStart = Date.now();
 
-      // Dispatch slider input and change events through prototype setter ONLY (never assign video.currentTime)
       await send('Runtime.evaluate', {
         expression: `(() => {
           const slider = document.querySelector("[data-testid='video-timeline']");
@@ -212,7 +181,6 @@ async function runBrowserVerification() {
         })()`
       });
 
-      // Poll until seeking clears and target-near time is reached
       let seekSettled = false;
       let t1 = 0;
       for (let i = 0; i < 60; i++) {
@@ -239,7 +207,6 @@ async function runBrowserVerification() {
 
       const seekDuration = (Date.now() - tSeekStart) / 1000;
 
-      // Capture decoded frame presentation evidence via requestVideoFrameCallback
       console.log(`[BrowserVerification-F08] Requesting presented frame callback for seek ${targetTime}s...`);
       const frameEvidence = await send('Runtime.evaluate', {
         awaitPromise: true,
@@ -272,11 +239,9 @@ async function runBrowserVerification() {
       const frameData = frameEvidence?.result?.value;
       console.log(`[BrowserVerification-F08] Decoded frame metadata:`, frameData);
       if (!frameData || (frameData.width !== 1280 && frameData.width !== 0)) {
-        // Assert decoded frame dimensions
         console.warn(`[BrowserVerification-F08] Decoded width: ${frameData?.width}`);
       }
 
-      // Wait 1.5s and measure t2 to assert continued playback time advancement
       await new Promise(r => setTimeout(r, 1500));
       const advancePoll = await send('Runtime.evaluate', {
         expression: `(() => {

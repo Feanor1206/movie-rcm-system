@@ -39,14 +39,15 @@ def test_no_catalog_returns_unavailable_instead_of_default_movies(client):
         assert client.post(path, json=body).status_code == 503
 
 
-def test_recommend_empty_set_and_chat_sse_boundary(client):
+@pytest.mark.parametrize("query_field", ["query", "message"])
+def test_recommend_empty_set_and_chat_sse_boundary(client, query_field):
     root = Path(__file__).resolve().parents[3]
     payload = json.loads((root / "docs/fixtures/retrieval_catalog.json").read_text(encoding="utf-8"))
     assert client.post("/api/index/sync", headers={"X-Service-Token": "test-token"},
                        json={"generation": 1, "catalog": payload}).status_code == 200
     response = client.post("/api/recommend", json={"genres": ["nonexistent genre"]})
     assert response.status_code == 200 and response.json()["recommendedMovies"] == []
-    response = client.post("/api/chat", json={"query": "Bình Minh Trên Sao Hỏa"})
+    response = client.post("/api/chat", json={query_field: "Bình Minh Trên Sao Hỏa"})
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     events = [block.splitlines() for block in response.text.strip().split("\n\n")]

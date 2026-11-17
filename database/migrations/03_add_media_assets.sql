@@ -1,4 +1,3 @@
--- Migration 03: Add media_assets table for streaming and playback (MySQL 8.0)
 
 CREATE TABLE IF NOT EXISTS media_assets (
     id VARCHAR(64) PRIMARY KEY,

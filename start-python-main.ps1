@@ -1,118 +1,89 @@
 ﻿[CmdletBinding()]
 param(
-    [int]$FastApiPort = 8000,
-    [int]$FrontendPort = 3000,
+    [Alias("FrontendPort")][int]$Port = 3000,
+    [int]$FastApiPort,
     [string]$MysqlHost = $(if ($env:MYSQL_HOST) { $env:MYSQL_HOST } else { "localhost" }),
     [int]$MysqlPort = $(if ($env:MYSQL_PORT) { [int]$env:MYSQL_PORT } else { 3306 }),
     [string]$MysqlDb = $(if ($env:MYSQL_DB) { $env:MYSQL_DB } else { "movie_rcm_db" }),
     [string]$MysqlUser = $(if ($env:MYSQL_USER) { $env:MYSQL_USER } else { "root" }),
-    [string]$MysqlPassword = $(if ($env:MYSQL_PASSWORD) { $env:MYSQL_PASSWORD } else { "" }),
-    [ValidateSet("light", "cloud")]
-    [string]$ModelMode = "light",
-    [string]$StateFile,
+    [string]$MysqlPassword = $env:MYSQL_PASSWORD,
+    [ValidateSet("light", "cloud")][string]$ModelMode = "light",
+    [string]$StateFile = (Join-Path $PSScriptRoot "target\preview_stack.json"),
+    [switch]$Production,
     [switch]$Background
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+if (!$PSBoundParameters.ContainsKey("Port") -and $FastApiPort) { $Port = $FastApiPort }
 $root = $PSScriptRoot
 $fastapiDir = Join-Path $root "backend\fastapi"
-$frontendDir = Join-Path $root "frontend"
-$targetDir = Join-Path $root "target"
-if (-not $StateFile) {
-    $StateFile = Join-Path $targetDir "preview_stack.json"
+$dist = if ($env:DIPPIE_WEB_DIST) { [IO.Path]::GetFullPath($env:DIPPIE_WEB_DIST) } else { Join-Path $root "frontend\dist" }
+if (!(Test-Path -LiteralPath (Join-Path $dist "index.html") -PathType Leaf)) {
+    throw "Cần build giao diện bằng npm run build trong thư mục frontend."
 }
-$StateFile = [System.IO.Path]::GetFullPath($StateFile)
-New-Item -ItemType Directory -Path ([System.IO.Path]::GetDirectoryName($StateFile)) -Force | Out-Null
+if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) {
+    throw "Cổng $Port đang được sử dụng."
+}
+$StateFile = [IO.Path]::GetFullPath($StateFile)
+New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($StateFile)) -Force | Out-Null
+if (Test-Path -LiteralPath $StateFile) {
+    $previous = Get-Content -LiteralPath $StateFile -Raw | ConvertFrom-Json
+    foreach ($owned in $previous.Processes) {
+        if (Get-Process -Id $owned.PID -ErrorAction SilentlyContinue) {
+            throw "Tiến trình cũ vẫn đang chạy. Dùng scripts\stop_preview_stack.ps1 để dừng."
+        }
+    }
+    Remove-Item -LiteralPath $StateFile -Force
+}
 
 $env:MYSQL_HOST = $MysqlHost
 $env:MYSQL_PORT = [string]$MysqlPort
 $env:MYSQL_DB = $MysqlDb
 $env:MYSQL_USER = $MysqlUser
 $env:MYSQL_PASSWORD = $MysqlPassword
-if (-not $env:DATABASE_URL) {
-    $env:DATABASE_URL = "mysql+pymysql://${MysqlUser}:${MysqlPassword}@${MysqlHost}:${MysqlPort}/${MysqlDb}?charset=utf8mb4"
-}
-$env:BACKEND_INTERNAL_URL = "http://127.0.0.1:$FastApiPort"
-$env:SPRINGBOOT_INTERNAL_URL = "http://127.0.0.1:$FastApiPort"
-$env:MODEL_API_URL = "http://127.0.0.1:$FastApiPort/api/chat"
 $env:MODEL_MODE = $ModelMode
-if (-not $env:APP_JWT_SECRET) {
+$env:DIPPIE_WEB_DIST = $dist
+if (!$env:APP_JWT_SECRET) {
+    if ($Production) { throw "Cần đặt APP_JWT_SECRET cố định cho môi trường này." }
     $jwtBytes = New-Object byte[] 32
-    $jwtGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $jwtGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
     try { $jwtGenerator.GetBytes($jwtBytes) } finally { $jwtGenerator.Dispose() }
     $env:APP_JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
 }
-$env:PYTHONPATH = $fastapiDir
-
-Write-Host "==========================================================================" -ForegroundColor Cyan
-Write-Host " DIPPIE CINEMA — CHẾ ĐỘ PYTHON MAIN (FastAPI Full Backend + AI + MySQL 8.0)" -ForegroundColor Cyan
-Write-Host "==========================================================================" -ForegroundColor Cyan
-Write-Host " -> Database URL        : $($env:DATABASE_URL)" -ForegroundColor Gray
-Write-Host " -> Unified Backend URL : http://127.0.0.1:$FastApiPort" -ForegroundColor Gray
-Write-Host " -> Frontend Web URL    : http://localhost:$FrontendPort" -ForegroundColor Gray
 
 $pythonExe = Join-Path $root ".venv\Scripts\python.exe"
-if (-not (Test-Path $pythonExe)) {
-    $pythonExe = (Get-Command python -ErrorAction Stop).Source
+if (!(Test-Path -LiteralPath $pythonExe)) { $pythonExe = (Get-Command python).Source }
+$url = "http://127.0.0.1:$Port"
+$server = Start-Process -FilePath $pythonExe -ArgumentList @("-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "$Port", "--no-proxy-headers") -WorkingDirectory $fastapiDir -PassThru -WindowStyle Hidden -RedirectStandardOutput ($StateFile + ".api.log") -RedirectStandardError ($StateFile + ".api.err.log")
+$state = @{
+    Status = "STARTING"
+    ReleaseLevel = "python_main"
+    ModelMode = $ModelMode
+    FastApiPort = $Port
+    FrontendPort = $Port
+    DriveMounted = $false
+    Processes = @(@{ Name = "FastAPI"; PID = $server.Id; StartTime = $server.StartTime.ToString("o"); ExecutablePath = $pythonExe; Port = $Port })
 }
 
-Write-Host "`n[1/2] Khởi động FastAPI Unified Backend (Core API + AI) trên cổng $FastApiPort..." -ForegroundColor Yellow
-$faProc = Start-Process -FilePath $pythonExe -ArgumentList @("-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "$FastApiPort") -WorkingDirectory $fastapiDir -PassThru -WindowStyle Hidden
-
-Write-Host "[2/2] Khởi động Next.js Frontend trên cổng $FrontendPort..." -ForegroundColor Yellow
-$nextBin = Join-Path $frontendDir "node_modules\next\dist\bin\next"
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-if ($nodeCmd -and (Test-Path $nextBin)) {
-    $feExe = $nodeCmd.Source
-    $feProc = Start-Process -FilePath $feExe -ArgumentList @("node_modules\next\dist\bin\next", "dev", "-p", "$FrontendPort") -WorkingDirectory $frontendDir -PassThru -WindowStyle Hidden
-} else {
-    $feExe = (Get-Command npm.cmd -ErrorAction Stop).Source
-    $feProc = Start-Process -FilePath $feExe -ArgumentList @("run", "dev", "--", "-p", "$FrontendPort") -WorkingDirectory $frontendDir -PassThru -WindowStyle Hidden
-}
-
-$stackState = [PSCustomObject]@{
-    Timestamp      = [DateTime]::UtcNow.ToString("o")
-    ReleaseLevel   = "python_main"
-    Status         = "READY"
-    FastApiPort    = $FastApiPort
-    FrontendPort   = $FrontendPort
-    ModelMode      = $ModelMode
-    StateFile      = $StateFile
-    DriveMounted   = $false
-    Processes      = @(
-        @{
-            Name           = "FastAPI"
-            PID            = $faProc.Id
-            StartTime      = $faProc.StartTime.ToString("o")
-            ExecutablePath = $pythonExe
-            Port           = $FastApiPort
-        },
-        @{
-            Name           = "NextFrontend"
-            PID            = $feProc.Id
-            StartTime      = $feProc.StartTime.ToString("o")
-            ExecutablePath = $feExe
-            Port           = $FrontendPort
-        }
-    )
-}
-$jsonState = $stackState | ConvertTo-Json -Depth 5
-[System.IO.File]::WriteAllText($StateFile, $jsonState, [System.Text.UTF8Encoding]::new($false))
-
-if ($Background) {
-    Write-Host "`nĐã khởi động chế độ PYTHON MAIN ở chế độ nền (-Background)." -ForegroundColor Green
-    Write-Host "Để dừng toàn bộ dịch vụ, chạy lệnh: .\scripts\stop_preview_stack.ps1" -ForegroundColor Yellow
-} else {
-    try {
-        Write-Host "`nĐang chạy chế độ PYTHON MAIN. Nhấn Ctrl+C để dừng..." -ForegroundColor Green
-        while (-not $faProc.HasExited -and -not $feProc.HasExited) {
-            Start-Sleep -Seconds 2
-        }
-    } finally {
-        if ($faProc -and -not $faProc.HasExited) { Stop-Process -Id $faProc.Id -Force -ErrorAction SilentlyContinue }
-        if ($feProc -and -not $feProc.HasExited) { Stop-Process -Id $feProc.Id -Force -ErrorAction SilentlyContinue }
-        Remove-Item -Path $StateFile -Force -ErrorAction SilentlyContinue
+try {
+    [IO.File]::WriteAllText($StateFile, ($state | ConvertTo-Json -Depth 4))
+    $deadline = [DateTime]::UtcNow.AddSeconds(45)
+    do {
+        if ($server.HasExited) { throw "FastAPI đã dừng. Xem log cạnh tệp trạng thái." }
+        try {
+            $ready = (Invoke-WebRequest -UseBasicParsing -Uri "$url/api/health" -TimeoutSec 2).StatusCode -eq 200
+        } catch { $ready = $false }
+        if (!$ready) { Start-Sleep -Milliseconds 250 }
+    } until ($ready -or [DateTime]::UtcNow -gt $deadline)
+    if (!$ready) { throw "Dippie chưa sẵn sàng. Kiểm tra kết nối MySQL và log FastAPI." }
+    $state.Status = "READY"
+    [IO.File]::WriteAllText($StateFile, ($state | ConvertTo-Json -Depth 4))
+    Write-Host "Dippie đang chạy tại http://localhost:$Port"
+    if (!$Background) { Wait-Process -Id $server.Id }
+} finally {
+    if (!$Background -or $state.Status -ne "READY") {
+        & (Join-Path $root "scripts\stop_preview_stack.ps1") -StateFile $StateFile
     }
 }

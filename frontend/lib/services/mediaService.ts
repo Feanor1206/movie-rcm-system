@@ -18,16 +18,14 @@ export interface MediaDescriptor {
 }
 
 const DEFAULT_TIMEOUT_MS = 6000;
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
+const API = '/api';
 
 export function resolveStreamUrl(streamUrl: string): string {
   if (!streamUrl) return '';
-  if (streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) {
+  if (streamUrl.startsWith('/') || streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) {
     return streamUrl;
   }
-  const baseHost = SPRINGBOOT_API.replace(/\/api\/?$/, '');
-  const cleanPath = streamUrl.startsWith('/') ? streamUrl : `/${streamUrl}`;
-  return `${baseHost}${cleanPath}`;
+  return `/${streamUrl}`;
 }
 
 function createDOMException(message: string, name: string): DOMException {
@@ -81,7 +79,7 @@ export async function getMediaDescriptor(
       }
     }, timeoutMs);
 
-    const url = `${SPRINGBOOT_API}/movies/${encodeURIComponent(movieId)}/media-descriptor`;
+    const url = `${API}/movies/${encodeURIComponent(movieId)}/media-descriptor`;
     const response = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
@@ -174,7 +172,7 @@ export async function requestPlaybackGrant(
   if (!assetId) return null;
   const token = getStoredAuthToken();
   try {
-    const res = await fetch(`${SPRINGBOOT_API}/media/grant/${assetId}`, {
+    const res = await fetch(`${API}/media/grant/${assetId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       signal,

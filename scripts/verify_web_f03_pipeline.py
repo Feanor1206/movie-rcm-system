@@ -103,7 +103,6 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
     rec_ids = [m.get("id") for m in recs]
     top_item = recs[0] if recs else {}
 
-    # Case 1: Exact title match
     if tc.get("expected_top_id"):
         exp_id = tc["expected_top_id"]
         if not recs:
@@ -113,7 +112,6 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
         if tc.get("expected_type") and top_item.get("item_type") != tc["expected_type"]:
             return False, f"Top item type={top_item.get('item_type')}, expected {tc['expected_type']}"
 
-    # Case 2: Foreign franchise abstention
     if tc.get("expected_empty"):
         if recs:
             return False, f"Expected empty recommendations for foreign franchise, got {rec_ids}"
@@ -122,7 +120,6 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
                 if did in rec_ids:
                     return False, f"Disallowed item {did} was returned"
 
-    # Case 3: Conflict episode number preserved
     if tc.get("expected_episode_num"):
         exp_ep = tc["expected_episode_num"]
         if tc.get("disallowed_ids"):
@@ -132,7 +129,6 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
         if recs and top_item.get("episode_number") != exp_ep:
             return False, f"Top item episode_number={top_item.get('episode_number')}, expected {exp_ep}"
 
-    # Case 4: Negation scope
     if tc.get("disallowed_episode_num"):
         bad_ep = tc["disallowed_episode_num"]
         if recs and top_item.get("episode_number") == bad_ep:
@@ -142,7 +138,6 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
                 if recs and top_item.get("id") == did:
                     return False, f"Disallowed item {did} returned from negated query"
 
-    # Case 8: Required text phrase for unverified condition
     if tc.get("required_text_phrase"):
         req_phrase = tc["required_text_phrase"]
         if req_phrase.lower() not in explanation.lower():

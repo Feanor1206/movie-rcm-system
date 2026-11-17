@@ -9,6 +9,7 @@ from services.text_index import TextIndex
 
 PILOT_EPISODES = frozenset({"ep_jadoo_s01_0022", "ep_jadoo_s04_0021"})
 PILOT_SOURCES = (ROOT / "ai/artifacts/pilot-published.json", ROOT / "data/catalog.jadoo_all.json")
+EXPANSION_SOURCES = (ROOT / "data/catalog.larva.json", ROOT / "data/catalog.ori.json")
 
 
 def _allowed_episodes(package, is_published_package):
@@ -22,6 +23,19 @@ def _allowed_episodes(package, is_published_package):
 def _read_documents(path, _version, full_grounding=False):
     with path.open(encoding="utf-8-sig") as stream:
         package = json.load(stream)
+    if path in EXPANSION_SOURCES:
+        documents = {}
+        for episode in package.get("episodes", []):
+            record = episode.get("record") or {}
+            provenance = record.get("provenance") or {}
+            synopsis = episode.get("synopsis")
+            if (record.get("status") == "ready" and provenance.get("source_ids")
+                    and provenance.get("verification") in {"source_verified", "human_verified"}
+                    and isinstance(synopsis, str) and synopsis.strip()):
+                documents[episode["id"]] = {
+                    "id": episode["id"], "title": episode["title"], "item_type": "episode", "synopsis": synopsis,
+                }
+        return documents
     manager = CatalogSyncManager()
     manager.load_from_payload(package, include_draft=False, include_private=False)
     is_published = path == PILOT_SOURCES[0]
@@ -41,12 +55,12 @@ def evidence_for_results(results):
     allowed_base = PILOT_EPISODES | extra
     published_ids = set()
     sources = []
-    for path in PILOT_SOURCES:
+    for path in (*PILOT_SOURCES, *EXPANSION_SOURCES):
         try:
             stat = path.stat()
             docs = _read_documents(path, (stat.st_mtime_ns, stat.st_size), full_grounding)
             sources.append(docs)
-            if path == PILOT_SOURCES[0]:
+            if path == PILOT_SOURCES[0] or path in EXPANSION_SOURCES:
                 published_ids.update(doc["id"] for doc in docs.values() if doc.get("item_type") == "episode")
         except (CatalogSyncError, OSError, ValueError, TypeError, KeyError, AttributeError):
             continue
@@ -68,7 +82,7 @@ def evidence_for_results(results):
             document = documents.get(document_id)
             if not episode or not document or document.get("episode_id", document["id"]) != episode_id:
                 continue
-            if document.get("item_type") not in {"episode", "scene", "dialogue"}:
+            if document.get("item_type") not in {"episode", "segment", "scene", "dialogue"}:
                 continue
             start = document.get("_episode_start_ms", document.get("start_ms"))
             if start != result.get("startMs") or start is not None and type(start) is not int:

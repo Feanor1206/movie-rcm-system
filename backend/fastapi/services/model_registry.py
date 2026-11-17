@@ -116,7 +116,7 @@ class ModelRegistry:
 
     def health(self):
         backend = "deepseek" if self.mode == "cloud" else "template"
-        model_name = (os.getenv("DEEPSEEK_MODEL") or "deepseek") if self.mode == "cloud" else "catalog-template"
+        model_name = (os.getenv("LLM_MODEL") or os.getenv("DEEPSEEK_MODEL") or "deepseek") if self.mode == "cloud" else "catalog-template"
         return {
             "status": "healthy" if self.mode == "light" or self.llm_ready else "degraded",
             "modelLoaded": self.llm_ready,

@@ -1,10 +1,7 @@
-'use client';
-
 import { formatRuntime, genreLabel, movieSynopsis } from '@/lib/labels';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import { Check, Play, Star, RefreshCw, Loader2 } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
@@ -43,14 +40,13 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
 
       <div className="absolute inset-0 z-0 h-full w-full">
         {hasBackdrop ? (
-          <Image
-            priority
+          <img
+            fetchPriority="high"
             src={movie.backdrop as string}
             alt={movie.title}
-            fill
+            referrerPolicy="no-referrer"
             onError={() => setBackdropError(true)}
-            sizes="100vw"
-            className="object-cover object-center sm:object-right opacity-70 sm:opacity-85"
+            className="absolute inset-0 h-full w-full object-cover object-center sm:object-right opacity-70 sm:opacity-85"
           />
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-zinc-900 via-zinc-950 to-black flex items-center justify-center">
@@ -91,7 +87,7 @@ export function EditorialHero({ movie }: { movie: Movie | null }) {
 
           <div className="mt-6 flex flex-wrap items-center gap-2.5 sm:gap-3">
             <Link
-              href={`/movies/${movie.id}`}
+              to={`/movies/${movie.id}`}
               className="btn-primary px-5 py-2.5 text-xs sm:text-sm font-bold shadow-brand-sm"
             >
               Xem chi tiết

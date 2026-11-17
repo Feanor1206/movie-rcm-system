@@ -97,7 +97,7 @@ class CdpClient {
   }
 
   close() {
-    try { this.ws?.close(); } catch { /* best-effort transport cleanup */ }
+    try { this.ws?.close(); } catch {   }
   }
 }
 
@@ -298,7 +298,6 @@ async function main() {
     await selectEpisode(EPISODES[1]);
     await screenshot('episode-2-playing');
     if (options.phase === 'before') {
-      // Real decoder seeks, including the end of the Drive file; no synthetic video fixtures.
       const seekTargets = [60, 240, Math.max(1, (await playerState()).duration - 20)];
       for (const seconds of seekTargets) {
         await evaluate(`(() => { const v=document.querySelector('video'); v.currentTime=${seconds}; v.play().catch(()=>{}); })()`);
@@ -364,16 +363,16 @@ async function main() {
     evidence.status = 'FAILED';
     evidence.error = safeError(error);
     if (cdp && pageSessionId) {
-      try { await screenshot('failure'); } catch { /* page may already be closed */ }
+      try { await screenshot('failure'); } catch {   }
     }
   } finally {
     evidence.finishedAt = new Date().toISOString();
     try {
       if (targetId) await cdp.request('Target.closeTarget', { targetId });
-    } catch { /* only the harness-owned target is closed */ }
+    } catch {   }
     try {
       if (browserContextId) await cdp.request('Target.disposeBrowserContext', { browserContextId });
-    } catch { /* only the harness-owned context is disposed */ }
+    } catch {   }
     cdp?.close();
     fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
     console.log(`Preview restart ${options.phase}: ${evidence.status}`);

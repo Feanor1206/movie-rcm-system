@@ -152,7 +152,6 @@ def run_http_benchmark(
         retrieved_items = resp_json.get("recommendedMovies") or []
         parsed_intent = resp_json.get("structuredIntent") or {}
 
-        # Fill in timing fields
         gen_ms = timings.get("generation_ms", 0.0)
         ret_ms = timings.get("retrieval_ms", 0.0)
         timings["total_http_ms"] = client_ms
@@ -186,7 +185,6 @@ def run_http_benchmark(
             "error": call_res["error"]
         })
 
-    # Steady-state warm repeat runs (3 iterations on 3 queries)
     print(f"\n[*] Running steady-state warm repeats (3 iterations across 3 representative queries)...")
     warm_runs = []
     for w_qid, w_qtext in warm_queries_map.items():
@@ -214,7 +212,6 @@ def run_http_benchmark(
         })
         print(f"    Warm {w_qid}: median HTTP {statistics.median(w_latencies):.1f}ms, median gen {statistics.median(w_gen_latencies):.1f}ms, avg TPS {statistics.mean(w_tps):.1f}")
 
-    # Compute overall summary
     all_http_latencies = [r["timings_ms"]["total_http_ms"] for r in results if r["timings_ms"].get("total_http_ms")]
     all_gen_latencies = [r["timings_ms"]["generation_ms"] for r in results if r["timings_ms"].get("generation_ms")]
     all_ret_latencies = [r["timings_ms"]["retrieval_ms"] for r in results if r["timings_ms"].get("retrieval_ms")]

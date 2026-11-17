@@ -87,7 +87,6 @@ function Test-MountReadiness {
 
     try {
         if ($Target -match "^[A-Za-z]:?\\?$") {
-            # Drive letter target (e.g. "M:" or "M:\")
             $letter = $Target.Substring(0, 1).ToUpper()
             $driveRoot = "$($letter):\"
 
@@ -104,12 +103,10 @@ function Test-MountReadiness {
             $null = [System.IO.Directory]::GetFileSystemEntries($driveRoot)
             return $true
         } else {
-            # Directory target path
             if (-not (Test-Path -LiteralPath $Target -PathType Container -ErrorAction SilentlyContinue)) {
                 return $false
             }
 
-            # WinFsp directory mounts on Windows are NTFS reparse points
             $item = Get-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue
             if (-not $item -or -not ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
                 return $false
@@ -123,16 +120,13 @@ function Test-MountReadiness {
     }
 }
 
-# Resolve state file location
 if (-not $StateFile) {
     $tempDir = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
     $StateFile = Join-Path $tempDir "movie-rcm-drive-mount.json"
 }
 
-# Resolve remote target path
 $effectiveRemote = $Remote
 if (-not $effectiveRemote) {
-    # Default placeholder for preview / dry-run mode
     $effectiveRemote = "cinema-gdrive:"
 }
 
@@ -155,7 +149,6 @@ if ($effectiveRemote.EndsWith(":")) {
     }
 }
 
-# Baseline streaming flags (RFC 9110 HTTP Range compliant, RAM buffer 32M, cache-off)
 $baselineFlags = @(
     "--read-only",
     "--vfs-cache-mode", "off",
@@ -168,26 +161,21 @@ $baselineFlags = @(
     "--attr-timeout", "1s"
 )
 
-# Baseline flags string representation
 $baselineFlagsString = "--read-only --vfs-cache-mode off --buffer-size 32M --vfs-read-chunk-size 8M --vfs-read-chunk-size-limit 32M --vfs-read-chunk-streams 0 --dir-cache-time 72h --poll-interval 15s --attr-timeout 1s"
 
-# Locate preflight script
 $preflightScript = Join-Path $PSScriptRoot "preflight_drive.ps1"
 if (-not (Test-Path -Path $preflightScript -PathType Leaf -ErrorAction SilentlyContinue)) {
     throw "Preflight script not found at expected path: $preflightScript"
 }
 
-# Determine execution mode (Dry-run by default unless -Execute is specified AND -WhatIf is not)
 $isDryRun = (-not $Execute) -or $WhatIf
 
 if ($isDryRun) {
-    # Perform preflight evaluation in dry-run mode
     $preflightJsonRaw = & $preflightScript -MountPoint $MountPoint -RclonePath $RclonePath -ConfigPath $ConfigPath
     $preflightObj = $null
     try {
         $preflightObj = $preflightJsonRaw | ConvertFrom-Json
     } catch {
-        # Fallback if json parse fails
     }
 
     $rcloneCmd = "rclone"
@@ -236,19 +224,16 @@ if ($isDryRun) {
     if ($AsJson) {
         $plan | ConvertTo-Json -Depth 6
     } else {
-        # Return structured object to pipeline
         $plan
     }
     return
 }
 
-# ================= EXECUTION MODE (-Execute) =================
 
 if (-not $Remote) {
     throw "Parameter -Remote is required when running with -Execute. Example: -Remote 'cinema-gdrive:'"
 }
 
-# 1. Run Preflight verification
 $preflightJsonRaw = & $preflightScript -MountPoint $MountPoint -RclonePath $RclonePath -ConfigPath $ConfigPath
 $preflightObj = $preflightJsonRaw | ConvertFrom-Json
 
@@ -262,7 +247,6 @@ if (-not $rcloneExe) {
     throw "Rclone executable not resolved by preflight check."
 }
 
-# 2. Check existing state file for running mount
 if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
     try {
         $existingState = Get-Content -Path $StateFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -283,7 +267,6 @@ if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
                     }
                 }
 
-                # Verify live invocation / command line
                 $cmdMatch = $true
                 $existingCmd = $null
                 if ($existingProc.PSObject.Properties['CommandLine'] -and $existingProc.CommandLine) {
@@ -317,11 +300,9 @@ if (Test-Path -Path $StateFile -PathType Leaf -ErrorAction SilentlyContinue) {
             }
         }
     } catch [System.Management.Automation.ItemNotFoundException] {
-        # File disappeared, proceed
     }
 }
 
-# 3. Assemble arguments for rclone mount
 $rawMountArgs = @(
     "mount"
 )
@@ -351,10 +332,8 @@ if ($LogFile) {
 
 $formattedMountArgs = @($rawMountArgs | ForEach-Object { Format-NativeArgument $_ })
 
-# 4. Launch hidden background rclone process
 $stateDir = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($StateFile))
 New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
-# Detached mounts must not inherit the launcher's stdout/stderr pipes.
 $proc = Start-Process -FilePath $rcloneExe -ArgumentList $formattedMountArgs -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput ($StateFile + ".stdout.log") -RedirectStandardError ($StateFile + ".stderr.log")
 
@@ -362,7 +341,6 @@ if (-not $proc) {
     throw "Failed to start rclone process."
 }
 
-# 5. Save process state to JSON immediately with STARTING status
 $currentProc = Get-Process -Id $PID
 $startTimeIso = try { $proc.StartTime.ToString("o") } catch { [DateTime]::UtcNow.ToString("o") }
 $procName = try { $proc.ProcessName } catch { "rclone" }
@@ -393,13 +371,11 @@ if ($stateDir -and -not (Test-Path -LiteralPath $stateDir -PathType Container)) 
 }
 $stateRecord | ConvertTo-Json -Depth 6 | Set-Content -Path $StateFile -Encoding UTF8
 
-# 6. Bounded readiness verification loop
 $isReady = $false
 $elapsedMs = 0
 $timeoutMs = $ReadinessTimeoutSeconds * 1000
 
 while ($elapsedMs -lt $timeoutMs) {
-    # Check if process exited early
     $hasExited = $false
     try {
         $hasExited = $proc.HasExited
@@ -441,17 +417,13 @@ while ($elapsedMs -lt $timeoutMs) {
     $elapsedMs += $ReadinessIntervalMs
 }
 
-# 7. Evaluate readiness outcome
 if (-not $isReady) {
-    # Timeout reached without mount becoming readable. Clean up only strictly verified owned child process.
     $liveProc = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
     if ($liveProc -and -not $liveProc.HasExited) {
         $isOwned = $false
         try {
-            # 1. Process Name match
             $nameMatches = ($liveProc.ProcessName -ieq "rclone") -and ($liveProc.ProcessName -ieq $procName)
 
-            # 2. Executable Path match
             $liveProcPath = $null
             try {
                 if ($liveProc.Path) { $liveProcPath = $liveProc.Path }
@@ -468,7 +440,6 @@ if (-not $isReady) {
                 $pathMatches = [string]::Equals($normLivePath, $normExpectedPath, [System.StringComparison]::OrdinalIgnoreCase)
             }
 
-            # 3. StartTime match (Exact process creation identity, preserved precision, <1ms delta)
             $startMatches = $false
             try {
                 $expectedStart = [DateTimeOffset]::Parse($startTimeIso)
@@ -479,10 +450,8 @@ if (-not $isReady) {
                 }
             } catch {}
 
-            # 4. SessionId match
             $sessionMatches = ($liveProc.SessionId -eq $currentProc.SessionId)
 
-            # 5. Live Process Invocation & Command Line Verification
             $cmdMatches = $false
             $liveCmd = $null
             if ($liveProc.PSObject.Properties['CommandLine'] -and $liveProc.CommandLine) {
@@ -521,7 +490,6 @@ if (-not $isReady) {
         } catch {}
 
         if ($isOwned) {
-            # Re-verify process identity immediately before termination signal to prevent PID reuse race
             $preCheck = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
             if ($preCheck) {
                 try {
@@ -556,7 +524,6 @@ if (-not $isReady) {
     return
 }
 
-# 8. Succeeded and verified ready
 $stateRecord.status = "MOUNTED"
 $stateRecord | ConvertTo-Json -Depth 6 | Set-Content -Path $StateFile -Encoding UTF8
 

@@ -1,5 +1,3 @@
-'use client';
-
 import React, {
   createContext,
   useContext,
@@ -41,7 +39,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
+const API = '/api';
 const REQUEST_TIMEOUT_MS = 8000;
 
 function validateAuthPayload(data: any, fallbackToken?: string): { user: AuthUser; token: string } | null {
@@ -121,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
 
-        const res = await fetch(`${SPRINGBOOT_API}/auth/me`, {
+        const res = await fetch(`${API}/auth/me`, {
           headers: {
             Authorization: `Bearer ${authToken}`,
             Accept: 'application/json',
@@ -288,7 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
 
-      const res = await fetch(`${SPRINGBOOT_API}/auth/login`, {
+      const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -389,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       timeoutId = setTimeout(() => abortCtrl.abort(), REQUEST_TIMEOUT_MS);
 
-      const res = await fetch(`${SPRINGBOOT_API}/auth/register`, {
+      const res = await fetch(`${API}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

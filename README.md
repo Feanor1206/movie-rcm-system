@@ -1,91 +1,45 @@
 # Dippie
 
-Dippie là web xem phim hoạt hình, có danh mục phim, danh sách đã lưu, đánh giá và lịch sử xem. Video được phát từ thư mục cục bộ hoặc Google Drive đã gắn vào máy. Phần tìm kiếm hỗ trợ văn bản, ảnh chụp cảnh phim và hội thoại qua CineBot.
+Dippie là web xem phim hoạt hình. FastAPI phục vụ giao diện, tài khoản, kho phim, phát video, gợi ý và CineBot. Node.js chỉ cần khi build hoặc sửa giao diện.
 
-## Yêu cầu
+## Chạy trên Windows
 
-- Node.js 20 và Python 3.11.
-- MySQL 8.0; có thể chạy bằng Docker Compose.
-- JDK 17 trở lên nếu chạy bản Java.
-
-## Cài đặt
-
-Chạy các lệnh từ thư mục gốc của dự án trên PowerShell:
+Cần Python 3.11, MySQL 8.0 và Node.js 22.12 trở lên để build. Chạy từ thư mục gốc.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r backend/fastapi/requirements.txt
-cd frontend
-npm ci
-cd ..
+npm.cmd --prefix frontend ci
+npm.cmd --prefix frontend run build
 ```
 
-Tạo khóa JWT và đặt mật khẩu MySQL trước khi chạy dịch vụ:
+Cấu hình MySQL và `APP_JWT_SECRET`, rồi khởi động Dippie. [Biến môi trường](backend/fastapi/README.md#2-cấu-hình-biến-môi-trường)
 
 ```powershell
-$env:APP_JWT_SECRET = python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
-$env:MYSQL_PASSWORD = "mat-khau-mysql-cua-ban"
-cd infrastructure
-docker compose up -d mysql
-cd ..
+.\start-python-main.ps1 -Production -Background
 ```
 
-Dùng cùng khóa JWT cho hai backend. Thay mật khẩu mẫu bằng mật khẩu MySQL của bạn. Xem [cấu hình tài khoản và mô hình](backend/fastapi/README.md#2-cấu-hình-biến-môi-trường) trước khi dùng dữ liệu thật.
+Mở [Dippie](http://localhost:3000/). Để dùng cổng khác, truyền `-Port`. Log và trạng thái mặc định nằm trong `target/`.
 
-## Chạy ứng dụng
+## Gợi ý và CineBot
 
-Chọn một trong hai bản:
+Trang chủ gợi ý tập chưa xem từ lịch sử, phim yêu thích và điểm đánh giá. Khách dùng lịch sử trên thiết bị. CineBot tìm trong danh mục và dẫn đến tập hoặc cảnh phù hợp.
 
-| Bản | Backend chính | Tìm kiếm và hội thoại |
-| --- | --- | --- |
-| Java | Spring Boot tại cổng 8080 | FastAPI tại cổng 8000 |
-| Python | FastAPI tại cổng 8000 | Cùng dịch vụ FastAPI |
+Để bật DeepSeek, dừng bản đang chạy, nhập khóa qua `& './scripts/configure_llm.ps1'` rồi khởi động với `-ModelMode cloud`. [Cấu hình DeepSeek](backend/fastapi/README.md#deepseek)
 
-Bản Java:
+## Danh mục phim
 
-```powershell
-.\start-java-main.ps1 -Background
-```
-
-Bản Python:
-
-```powershell
-.\start-python-main.ps1 -Background
-```
-
-Mở [localhost:3000](http://localhost:3000). Script Java bật tài khoản demo có mật khẩu công khai `password123`, chỉ dùng trong môi trường thử nghiệm riêng. Với bản Python, đặt `APP_DEMO_MODE=true` khi cần tài khoản demo, hoặc dùng các biến bootstrap trong hướng dẫn backend để tạo quản trị viên.
-
-Python có thể chuyển sang SQLite tại `data/python_main.db` tính từ thư mục chạy backend nếu kết nối MySQL thất bại. Java có profile `test` dùng H2 để kiểm thử.
-
-Để phát từ Google Drive, đặt `APP_MEDIA_DRIVE_MOUNT` trỏ tới thư mục hoặc ổ đĩa đã gắn Drive.
-
-Dừng dịch vụ:
-
-```powershell
-.\scripts\stop_preview_stack.ps1
-```
+Đăng nhập quản trị và nhập từng gói ở [trang Nhập dữ liệu](http://localhost:3000/admin/import). Jadoo phát từ tệp hoặc Google Drive. Larva và Ori dùng trình phát YouTube, kèm liên kết mở video gốc. [Danh mục và nguồn](data/README.md)
 
 ## Kiểm thử
 
-Chạy từ thư mục gốc:
-
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests backend/fastapi/tests -q
-cd backend/springboot
-.\mvnw.cmd test "-Dspring.profiles.active=test"
-cd ../../frontend
-npm test
-npm run typecheck
-npm run build
+npm.cmd --prefix frontend test
+npm.cmd --prefix frontend run typecheck
+npm.cmd --prefix frontend run build
+node scripts/compute_build_bytes.cjs
 ```
 
-## Tài liệu
-
-- [Spring Boot](https://github.com/Feanor1206/movie-rcm-system/tree/java-main/backend/springboot): API tài khoản, danh mục, thư viện và phát video.
-- [FastAPI](backend/fastapi/README.md): cấu hình, API nghiệp vụ và tìm kiếm.
-- [Giao diện](frontend/README.md): chạy và kiểm tra Next.js.
-- [Docker và Nginx](infrastructure/README.md): cấu hình dịch vụ.
-- [Xử lý dữ liệu phim](ai/README.md): tạo chỉ mục và đánh giá tìm kiếm.
-
-Các nhánh `main`, `dev` và `java-main` chứa cả hai bản. Nhánh `python-main` lược bỏ `backend/springboot`; bỏ qua các lệnh chạy và kiểm thử Java khi dùng nhánh này.
+Dừng Dippie bằng `.\scripts\stop_preview_stack.ps1`. Xem thêm [chạy với Docker](infrastructure/README.md), [sửa giao diện](frontend/README.md) và [xử lý dữ liệu phim](ai/README.md).

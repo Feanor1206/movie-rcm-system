@@ -1,11 +1,5 @@
 from typing import List, Optional, Any, Dict, Annotated
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-
-class ChatMessageItem(BaseModel):
-    role: str = Field(default="user", description="user or assistant or system")
-    content: Optional[str] = None
-    text: Optional[str] = None
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class MovieItem(BaseModel):
@@ -77,7 +71,7 @@ class CacheRequiredResponse(IndexSyncResponse):
 
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    query: Optional[str] = Field(default=None, max_length=4000)
+    query: Optional[str] = Field(default=None, max_length=4000, validation_alias=AliasChoices("query", "message"))
     messages: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=40)
     sessionId: Optional[str] = Field(default="default", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
@@ -131,9 +125,9 @@ class DiscoverResponse(BaseModel):
 
 
 class RecommendRequest(BaseModel):
-    genres: Optional[List[str]] = None
-    likedMovieIds: Optional[List[str]] = None
-    mood: Optional[str] = None
+    genres: Optional[List[Annotated[str, Field(max_length=100)]]] = Field(default=None, max_length=20)
+    likedMovieIds: Optional[List[Annotated[str, Field(max_length=100)]]] = Field(default=None, max_length=100)
+    mood: Optional[str] = Field(default=None, max_length=500)
     limit: int = Field(default=4, ge=1, le=100)
 
 

@@ -1,5 +1,3 @@
-'use client';
-
 import React, {
   createContext,
   useContext,
@@ -7,13 +5,14 @@ import React, {
   useState,
   useRef,
   useCallback,
+  lazy,
+  Suspense,
   ReactNode,
 } from 'react';
-import { CineBotFloatingTrigger } from '@/features/chat/components/CineBotFloatingTrigger';
-import dynamic from 'next/dynamic';
-const CineBot = dynamic(() => import('@/features/chat/components/CineBot').then(module => module.CineBot), { ssr: false });
-const AuthModal = dynamic(() => import('@/features/auth/components/AuthModal').then(module => module.AuthModal), { ssr: false });
 import { useAuth } from './AuthContext';
+
+const CineBot = lazy(() => import('@/features/chat/components/CineBot').then(({ CineBot }) => ({ default: CineBot })));
+const AuthModal = lazy(() => import('@/features/auth/components/AuthModal').then(({ AuthModal }) => ({ default: AuthModal })));
 
 export type Toast = {
   id: string;
@@ -51,7 +50,7 @@ type WatchlistContextType = {
 
 const WatchlistContext = createContext<WatchlistContextType | undefined>(undefined);
 
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
+const API = '/api';
 const GUEST_STORAGE_KEY = 'dippie_guest_library_v1';
 const REQUEST_TIMEOUT_MS = 7000;
 
@@ -282,9 +281,9 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
         };
 
         const [resWatchlist, resFavorites, resRatings] = await Promise.all([
-          fetch(`${SPRINGBOOT_API}/users/watchlist`, { headers, signal: abortCtrl.signal }),
-          fetch(`${SPRINGBOOT_API}/users/favorites`, { headers, signal: abortCtrl.signal }),
-          fetch(`${SPRINGBOOT_API}/users/ratings`, { headers, signal: abortCtrl.signal }),
+          fetch(`${API}/users/watchlist`, { headers, signal: abortCtrl.signal }),
+          fetch(`${API}/users/favorites`, { headers, signal: abortCtrl.signal }),
+          fetch(`${API}/users/ratings`, { headers, signal: abortCtrl.signal }),
         ]);
         if (resWatchlist.status === 401 || resFavorites.status === 401 || resRatings.status === 401) {
           if (sessionGenRef.current === thisSessionGen && lastKnownActorKeyRef.current === thisActorKey) {
@@ -701,7 +700,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
     try {
       const res = alreadyInList
-        ? await fetch(`${SPRINGBOOT_API}/users/${listKey}/${encodeURIComponent(id)}`, {
+        ? await fetch(`${API}/users/${listKey}/${encodeURIComponent(id)}`, {
             method: 'DELETE',
             headers: {
               Authorization: `Bearer ${token}`,
@@ -709,7 +708,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
             },
             signal: abortCtrl.signal,
           })
-        : await fetch(`${SPRINGBOOT_API}/users/${listKey}`, {
+        : await fetch(`${API}/users/${listKey}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -907,7 +906,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     }, REQUEST_TIMEOUT_MS);
 
     try {
-      const res = await fetch(`${SPRINGBOOT_API}/users/ratings`, {
+      const res = await fetch(`${API}/users/ratings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1089,7 +1088,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     }, REQUEST_TIMEOUT_MS);
 
     try {
-      const res = await fetch(`${SPRINGBOOT_API}/users/ratings/${encodeURIComponent(id)}`, {
+      const res = await fetch(`${API}/users/ratings/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1214,19 +1213,14 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-
-
-      {isAuthModalOpen && <AuthModal />}
-
-
-      {!isChatOpen && <CineBotFloatingTrigger onClick={openChat} />}
-      {hasOpenedChat && <CineBot isOpen={isChatOpen} onClose={closeChat} />}
-
-
+      <Suspense fallback={null}>
+        {isAuthModalOpen && <AuthModal />}
+        {hasOpenedChat && <CineBot isOpen={isChatOpen} onClose={closeChat} />}
+      </Suspense>
       <div
         role="region"
         aria-label="Thông báo hệ thống"
-        className="fixed bottom-20 right-6 z-50 flex flex-col gap-2 pointer-events-none sm:bottom-6 sm:right-36"
+        className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"
       >
         {toasts.map((toast) => (
           <div

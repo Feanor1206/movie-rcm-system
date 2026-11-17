@@ -1,10 +1,7 @@
-'use client';
-
 import { formatRuntime, genreLabel } from '@/lib/labels';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import { Bookmark, Check, Loader2, Star, RefreshCw, Film } from 'lucide-react';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import type { Movie } from '@/types/movie';
@@ -54,24 +51,18 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
         fluid ? 'w-full' : 'w-[155px] shrink-0 sm:w-[185px] md:w-[205px]'
       }`}
     >
-      <article className="comic-card overflow-hidden transition-all duration-200 group-hover:shadow-card-hover">
-
+      <article className="comic-card overflow-hidden rounded-xl border border-surface-border bg-surface transition-all duration-200 hover:border-brand/40 group-hover:shadow-card-hover">
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-elevated">
           {hasPoster ? (
-            <Image
+            <img
               src={movie.poster}
               alt={movie.title}
-              fill
+              loading="lazy" referrerPolicy="no-referrer"
               onError={() => setPosterError(true)}
-              sizes={
-                fluid
-                  ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw'
-                  : '(max-width: 640px) 155px, (max-width: 1024px) 185px, 205px'
-              }
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-mint text-muted">
+            <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-surface-elevated text-muted">
               <Film size={28} className="mb-2 text-muted" />
               <span className="text-[11px] font-medium leading-tight line-clamp-2 text-muted">
                 {movie.title}
@@ -79,10 +70,8 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
             </div>
           )}
 
-          <div className="absolute inset-0 comic-halftone pointer-events-none opacity-20" />
-
-          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-2 py-0.5 text-[11px] font-bold text-ink border border-surface-border backdrop-blur-md">
-            <Star size={11} className="fill-mint" />
+          <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-black/70 px-2 py-0.5 text-[11px] font-bold text-amber-300 border border-white/10 backdrop-blur-md">
+            <Star size={11} className="fill-amber-400 text-amber-400" />
             {movie.rating}
           </span>
 
@@ -97,11 +86,11 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
           )}
 
           <Link
-            href={buildMediaItemHref(movie)}
+            to={buildMediaItemHref(movie)}
             aria-label={`Xem chi tiết ${movie.title}`}
-            className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
+            className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
           >
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-xs font-bold text-zinc-950 shadow-brand-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 hover:bg-brand-hover">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-bold text-zinc-950 shadow-brand-sm backdrop-blur-sm transition-transform duration-150 hover:scale-105 hover:bg-brand-hover">
               Xem chi tiết
             </span>
           </Link>
@@ -121,7 +110,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
                 ? 'bg-amber-400 text-zinc-950 shadow-md border border-amber-300 hover:bg-amber-300 ring-2 ring-amber-400/40'
                 : inWatchlist
                 ? 'bg-brand text-zinc-950 shadow-brand-sm'
-                : 'bg-surface/85 text-muted border border-surface-border hover:bg-brand hover:text-zinc-950 hover:border-brand'
+                : 'bg-black/60 text-muted border border-white/10 hover:bg-brand hover:text-zinc-950 hover:border-brand'
             }`}
           >
             {isPending ? (
@@ -136,10 +125,10 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
           </button>
         </div>
 
-        <div className="border-t-2 border-ink p-3">
+        <div className="border-t border-surface-border p-3">
           <Link
-            href={buildMediaItemHref(movie)}
-            className="block truncate text-sm font-semibold text-ink transition-colors hover:text-brand focus-visible:outline-none focus-visible:text-brand"
+            to={buildMediaItemHref(movie)}
+            className="block truncate text-sm font-semibold text-ink transition-colors hover:text-brand-dark focus-visible:outline-none focus-visible:text-brand-dark"
           >
             {movie.title}
           </Link>

@@ -68,6 +68,32 @@ def test_catalog_import_rejects_older_packages_and_records_atomically(catalog_cl
         assert db.query(CatalogSnapshot).count() == 1
 
 
+def test_catalog_episode_exposes_only_selected_youtube_sources(catalog_client):
+    client, headers, _ = catalog_client
+    package = {
+        "package": {"id": "youtube-series", "revision": 1},
+        "series": [{"id": "series-yt", "title": "Bộ phim thử nghiệm"}],
+        "episodes": [
+            {"id": "episode-yt", "series_id": "series-yt", "title": "Tập trên YouTube",
+             "external_ids": [{"namespace": "youtube_playback", "value": "9aFcot7_7Q4"}]},
+            {"id": "episode-old", "series_id": "series-yt", "title": "Tập cũ",
+             "external_ids": [{"namespace": "youtube_video_id", "value": "05tt7sqaNk0"}]},
+            {"id": "episode-link", "series_id": "series-yt", "title": "Tập mở trên YouTube",
+             "external_ids": [{"namespace": "youtube_watch", "value": "iScbpLPRG9A"}]},
+            {"id": "episode-invalid", "series_id": "series-yt", "title": "Tập có mã sai",
+             "external_ids": [{"namespace": "youtube_playback", "value": "https://example.com/video"}]},
+            {"id": "episode-draft", "series_id": "series-yt", "title": "Tập nháp", "record": {"status": "draft"},
+             "external_ids": [{"namespace": "youtube_playback", "value": "05tt7sqaNk0"}]},
+        ],
+    }
+    assert client.post("/api/admin/catalog/import", json=package, headers=headers).status_code == 200
+    assert client.get("/api/catalog/episodes/episode-yt").json()["youtube"] == {"videoId": "9aFcot7_7Q4", "canEmbed": True}
+    assert client.get("/api/catalog/episodes/episode-link").json()["youtube"] == {"videoId": "iScbpLPRG9A", "canEmbed": False}
+    assert client.get("/api/catalog/episodes/episode-old").json()["youtube"] is None
+    assert client.get("/api/catalog/episodes/episode-invalid").json()["youtube"] is None
+    assert client.get("/api/catalog/episodes/episode-draft").status_code == 404
+
+
 def test_parallel_catalog_imports_cannot_commit_the_same_revision(catalog_client):
     client, headers, database = catalog_client
     barrier = Barrier(2)
@@ -535,3 +561,209 @@ def test_python_main_catalog_import_search_and_watch_progress(tmp_path):
         ai_search2 = client2.post("/v1/search", json={"query": "siêu thị", "limit": 5})
         assert ai_search2.status_code == 200
         assert any(h.get("id") == "ep_shin_1" for h in (ai_search2.json().get("results") or []))
+
+
+def test_catalog_publication_failure_is_recorded_and_retry_can_recover(catalog_client, monkeypatch):
+    client, headers, database = catalog_client
+    runtime = client.app.state.runtime
+    sync = runtime.sync
+    monkeypatch.setattr(runtime, "sync", lambda request: (_ for _ in ()).throw(RuntimeError("index failed")))
+    package = {"package": {"id": "publication", "revision": 1}}
+    imported = client.post("/api/admin/catalog/import", json=package, headers=headers).json()
+    assert imported["indexStatus"] == "SYNC_FAILED"
+    snapshot_id = imported["importId"]
+    assert client.post("/api/admin/catalog/import", json=package, headers=headers).json()["indexStatus"] == "SYNC_FAILED"
+    retry = client.post(f"/api/admin/catalog/snapshots/{snapshot_id}/retry", headers=headers)
+    assert retry.json()["status"] == "SYNC_FAILED"
+    assert retry.json()["retryCount"] == 1
+    monkeypatch.setattr(runtime, "sync", sync)
+    assert client.post(f"/api/admin/catalog/snapshots/{snapshot_id}/retry", headers=headers).json()["status"] == "READY"
+
+
+def test_retry_rejects_old_snapshot_instead_of_publishing_current_catalog(catalog_client):
+    client, headers, _ = catalog_client
+    first = client.post("/api/admin/catalog/import", headers=headers,
+                        json={"package": {"id": "publication", "revision": 1}}).json()
+    second = client.post("/api/admin/catalog/import", headers=headers,
+                         json={"package": {"id": "publication", "revision": 2}}).json()
+    assert second["snapshotVersion"] > first["snapshotVersion"]
+    response = client.post(f"/api/admin/catalog/snapshots/{first['importId']}/retry", headers=headers)
+    assert response.status_code == 409
+
+
+def test_catalog_validation_and_publication_run_outside_event_loop(catalog_client, monkeypatch):
+    import asyncio
+
+    client, headers, database = catalog_client
+    runtime = client.app.state.runtime
+    validate, sync = core_api.validate_catalog_input, runtime.sync
+    calls = []
+
+    def check_thread():
+        with pytest.raises(RuntimeError, match="no running event loop"):
+            asyncio.get_running_loop()
+        calls.append(True)
+
+    def checked_validate(body):
+        check_thread()
+        return validate(body)
+
+    def checked_sync(request):
+        check_thread()
+        with database.session() as db:
+            assert db.query(CatalogSnapshot).one().status == "PENDING"
+        return sync(request)
+
+    monkeypatch.setattr(core_api, "validate_catalog_input", checked_validate)
+    monkeypatch.setattr(runtime, "sync", checked_sync)
+    package = {"package": {"id": "worker", "revision": 1}}
+    assert client.post("/api/admin/catalog/validate", json=package, headers=headers).status_code == 200
+    assert client.post("/api/admin/catalog/import", json=package, headers=headers).json()["indexStatus"] == "READY"
+    assert len(calls) >= 2
+
+
+def test_catalog_skipped_generation_is_not_reported_ready(catalog_client, monkeypatch):
+    client, headers, database = catalog_client
+    monkeypatch.setattr(client.app.state.runtime, "sync", lambda request: (
+        {"status": "SKIPPED", "generation": request.generation + 1, "index_ready": True}, 200,
+    ))
+    imported = client.post("/api/admin/catalog/import", headers=headers,
+                           json={"package": {"id": "skipped", "revision": 1}}).json()
+    assert imported["indexStatus"] == "SYNC_FAILED"
+    with database.session() as db:
+        assert db.get(CatalogSnapshot, imported["importId"]).status == "SYNC_FAILED"
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_background_catalog_publication_finishes_snapshot(catalog_client, failed):
+    import json
+    import time
+    from threading import Event
+    import numpy as np
+
+    client, headers, database = catalog_client
+    runtime = client.app.state.runtime
+    release = Event()
+
+    class Encoder:
+        model_id = "local-test"
+
+        def encode_documents(self, texts):
+            assert release.wait(5)
+            if failed:
+                raise RuntimeError("Encoder unavailable")
+            return np.ones((len(texts), 2), dtype=np.float32)
+
+    runtime.registry.models["embedder"] = Encoder()
+    runtime.max_delta_documents = 10000
+    package = json.loads((ROOT / "docs/fixtures/rehearsal_catalog.json").read_text(encoding="utf-8"))
+    try:
+        imported = client.post("/api/admin/catalog/import", json=package, headers=headers).json()
+        assert imported["indexStatus"] == "BUILDING"
+    finally:
+        release.set()
+    expected = "SYNC_FAILED" if failed else "READY"
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        with database.session() as db:
+            snapshot = db.get(CatalogSnapshot, imported["importId"])
+            if snapshot.status == expected:
+                assert bool(snapshot.completed_at) is not failed
+                return
+        time.sleep(0.02)
+    pytest.fail("Background publication did not finish the catalog snapshot")
+
+
+def test_catalog_cache_requirement_is_retryable(catalog_client, monkeypatch):
+    client, headers, _ = catalog_client
+    monkeypatch.setattr(client.app.state.runtime, "sync", lambda request: (
+        {"status": "CACHE_REQUIRED", "generation": request.generation, "index_ready": False}, 503,
+    ))
+    package = {"package": {"id": "cache", "revision": 1}}
+    imported = client.post("/api/admin/catalog/import", json=package, headers=headers).json()
+    assert imported["indexStatus"] == "BLOCKED"
+    snapshots = client.get("/api/admin/catalog/snapshots", headers=headers).json()
+    assert snapshots[0]["status"] == "BLOCKED"
+
+
+def test_interrupted_catalog_build_can_be_retried_after_restart(catalog_client, monkeypatch, tmp_path):
+    client, headers, database = catalog_client
+    monkeypatch.setattr(client.app.state.runtime, "sync", lambda request: (
+        {"status": "BUILDING", "generation": request.generation, "index_ready": False}, 202,
+    ))
+    imported = client.post("/api/admin/catalog/import", headers=headers,
+                           json={"package": {"id": "interrupted", "revision": 1}}).json()
+    restarted = create_app(database_url=database.database_url, sync_path=tmp_path / "restarted.json",
+                           cache_dir=tmp_path / "new-cache", load_default=False, model_mode="light")
+    with TestClient(restarted) as restored:
+        status = restored.get("/api/admin/catalog/snapshots", headers=headers).json()[0]["status"]
+        assert status == "SYNC_FAILED"
+        retry = restored.post(f"/api/admin/catalog/snapshots/{imported['importId']}/retry", headers=headers)
+        assert retry.json()["status"] == "READY"
+
+
+def test_catalog_drafts_stay_hidden_until_published_and_titles_update(catalog_client):
+    import copy
+
+    client, headers, _ = catalog_client
+    package = {
+        "package": {"id": "publication-flow", "revision": 1},
+        "series": [{"id": "series-flow", "title": "Bộ phim", "record": {"status": "ready", "revision": 1}}],
+        "episodes": [{"id": "episode-flow", "series_id": "series-flow", "title": "Bản nháp",
+                      "kind": "regular", "number": 1, "duration_ms": 1000,
+                      "record": {"status": "draft", "revision": 1}}],
+        "media_assets": [{"id": "asset-flow", "role": "feature", "access_policy": "public",
+                          "enabled": True, "size_bytes": 6, "duration_ms": 1000,
+                          "storage": {"provider": "local", "relative_path": "inside.mp4"},
+                          "coverage": [{"episode_id": "episode-flow", "scope": "full_episode"}],
+                          "record": {"status": "draft", "revision": 1}}],
+    }
+    assert client.post("/api/admin/catalog/import", json=package, headers=headers).status_code == 200
+    assert client.get("/api/movies/episode-flow").status_code == 404
+    assert "episode-flow" not in {movie["id"] for movie in client.get("/api/movies").json()["data"]}
+    assert "episode-flow" not in {movie["id"] for movie in client.get("/api/movies/browse?query=Bản").json()["data"]["items"]}
+    assert client.post("/api/media/grant/asset-flow").status_code == 404
+    assert client.get("/api/media/stream/asset-flow").status_code == 404
+    published = copy.deepcopy(package)
+    published["package"]["revision"] = 2
+    for collection in ("series", "episodes", "media_assets"):
+        published[collection][0]["record"] = {"status": "ready", "revision": 2}
+    published["episodes"][0]["title"] = "Tập đã công bố"
+    assert client.post("/api/admin/catalog/import", json=published, headers=headers).status_code == 200
+    assert client.get("/api/movies/episode-flow").json()["data"]["title"] == "Tập đã công bố"
+    movie = client.get("/api/movies/episode-flow").json()["data"]
+    assert (movie["item_type"], movie["series_id"], movie["episode_id"]) == ("episode", "series-flow", "episode-flow")
+    series = client.get("/api/movies/series-flow").json()["data"]
+    assert (series["item_type"], series["series_id"]) == ("series", "series-flow")
+    assert client.get("/api/media/stream/asset-flow").content == b"inside"
+
+
+def test_import_preserves_audio_type_and_stream_mime(catalog_client, tmp_path):
+    from services.database import CatalogMediaAsset
+
+    client, headers, database = catalog_client
+    (tmp_path / "media" / "voice.mp3").write_bytes(b"audio")
+    package = {"package": {"id": "media-types", "revision": 1}, "media_assets": [
+        {"id": "voice", "content_type": "audio", "role": "dub", "size_bytes": 5,
+         "storage": {"provider": "local", "relative_path": "voice.mp3"}},
+    ]}
+    assert client.post("/api/admin/catalog/import", json=package, headers=headers).status_code == 200
+    with database.session() as db:
+        assert db.get(CatalogMediaAsset, "voice").content_type == "audio"
+        assert db.get(MediaAsset, "voice").mime_type == "audio/mpeg"
+    response = client.get("/api/media/stream/voice")
+    assert response.content == b"audio"
+    assert response.headers["content-type"] == "audio/mpeg"
+
+
+@pytest.mark.parametrize("invalid", [[], {}, "image"])
+def test_catalog_rejects_invalid_media_type(catalog_client, invalid):
+    client, headers, database = catalog_client
+    package = {"package": {"id": "invalid-media-type", "revision": 1}, "media_assets": [
+        {"id": "invalid-media", "content_type": invalid,
+         "storage": {"provider": "local", "relative_path": "inside.mp4"}},
+    ]}
+    for endpoint in ("validate", "import"):
+        assert client.post(f"/api/admin/catalog/{endpoint}", json=package, headers=headers).status_code == 400
+    with database.session() as db:
+        assert db.get(MediaAsset, "invalid-media") is None

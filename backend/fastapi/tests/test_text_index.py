@@ -237,3 +237,17 @@ def test_scene_grouped_episode_time_maps_from_source_coverage(tmp_path, catalog)
     assert result["startMs"] == 20_000
     assert result["start_ms"] == 520_000
     assert result["evidence"][0]["sourceStartMs"] == 520_000
+
+
+def test_series_alias_filters_episode_numbers_and_respects_exclusion(tmp_path):
+    catalog = [
+        {"id": "ser_larva", "title": "Ấu trùng tinh nghịch (Larva)", "aliases": ["Larva", "Lava"], "item_type": "series"},
+        {"id": "ser_ori", "title": "Công chúa Ori", "item_type": "series"},
+        {"id": "larva46", "title": "Lò xo", "series_id": "ser_larva", "season_number": 1,
+         "episode_number": 46, "item_type": "episode", "description": "Tập hài về lò xo"},
+        {"id": "ori46", "title": "Tập 46", "series_id": "ser_ori", "season_number": 1,
+         "episode_number": 46, "item_type": "episode", "description": "Tập hài trong cung"},
+    ]
+    index = TextIndex.build(catalog, cache_dir=tmp_path)
+    assert [item["episodeId"] for item in index.search("Lava mùa 1 tập 46")] == ["larva46"]
+    assert [item["episodeId"] for item in index.search("tập hài, trừ Larva")] == ["ori46"]

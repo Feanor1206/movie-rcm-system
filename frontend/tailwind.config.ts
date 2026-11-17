@@ -11,20 +11,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: '#18241e',
-        paper: '#f4f0e5',
-        'paper-white': '#fbf9f2',
-        muted: '#59665a',
+        ink: '#203328',
+        paper: '#f7f3e9',
+        'paper-white': '#fffdf6',
+        muted: '#516359',
         sage: '#8dad86',
         mint: '#c9ddbd',
-        background: '#f4f0e5',
-        foreground: '#18241e',
+        background: '#f7f3e9',
+        foreground: '#203328',
         surface: {
-          DEFAULT: '#fbf9f2',
-          elevated: '#e7e1d2',
+          DEFAULT: '#fffdf6',
+          elevated: '#e9e4d7',
           muted: '#f1eddf',
           hover: '#dce8d4',
-          border: '#18241e',
+          border: '#203328',
         },
         brand: {
           DEFAULT: '#8dad86',
@@ -45,7 +45,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        display: ['Georgia', 'Cambria', '"Times New Roman"', 'serif'],
+        display: ['var(--font-display)'],
       },
       boxShadow: {
         'brand-sm': '3px 3px 0 #18241e',

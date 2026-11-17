@@ -5,6 +5,7 @@ import shlex
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -31,6 +32,7 @@ class Runtime:
         self.db = DatabaseManager(database_url=database_url)
         self.snapshot = None
         self.publish_lock = threading.RLock()
+        self.catalog_lock = threading.RLock()
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="index-delta")
         self.pending = None
         self.max_delta_documents = max_delta_documents
@@ -129,24 +131,37 @@ class Runtime:
             self.snapshot = snapshot
             return self.acknowledgement()
 
-    def prepare_delta(self, manager, generation, payload):
+    def prepare_delta(self, manager, generation, payload, snapshot_id=None):
         encoder = self.registry.get("embedder")
+        status = "SYNC_FAILED"
         try:
             prepare_embeddings(manager.get_flattened_catalog(), cache_dir=self.cache_dir,
                 encoder=encoder, model_id=encoder.model_id, payload=payload)
             index = self.build_index(manager, payload=payload)
-            self.publish(manager, index, generation, payload)
+            ack = self.publish(manager, index, generation, payload)
+            if ack.get("generation") == generation and ack.get("index_ready"):
+                status = "READY"
         except Exception:
             logger.exception("Background index preparation failed")
             with self.publish_lock:
                 if self.pending is not None:
                     self.pending["error"] = "Không thể chuẩn bị chỉ mục."
         finally:
-            with self.publish_lock:
-                if self.pending is not None:
-                    self.pending["finished"] = True
+            try:
+                if snapshot_id:
+                    with self.catalog_lock, self.db.session() as db:
+                        snapshot = db.get(CatalogSnapshot, snapshot_id)
+                        if snapshot:
+                            snapshot.status = status
+                            snapshot.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                            snapshot.completed_at = snapshot.updated_at if status == "READY" else None
+                            db.commit()
+            finally:
+                with self.publish_lock:
+                    if self.pending is not None:
+                        self.pending["finished"] = True
 
-    def queue_delta(self, manager, index, generation, payload):
+    def queue_delta(self, manager, index, generation, payload, snapshot_id=None):
         if index.missing_embeddings > self.max_delta_documents:
             return self.cache_required(manager, generation, payload, index.missing_embeddings)
         with self.publish_lock:
@@ -166,7 +181,7 @@ class Runtime:
                     raise HTTPException(429, "Một chỉ mục khác đang được chuẩn bị.", headers={"Retry-After": "2"})
             else:
                 self.pending = dict(generation=generation, content_hash=manager.content_hash, finished=False, error=None)
-                self.executor.submit(self.prepare_delta, manager, generation, payload)
+                self.executor.submit(self.prepare_delta, manager, generation, payload, snapshot_id)
             return dict(status="BUILDING", message="Đang chuẩn bị embedding mới trong nền.", generation=generation,
                         content_hash=manager.content_hash, item_counts=manager.item_counts, index_ready=False), 202
 
@@ -214,8 +229,10 @@ class Runtime:
                 self.pending = None
         index = self.build_index(manager, payload=payload)
         if self.registry.get("embedder") is not None and index.missing_embeddings:
-            return self.queue_delta(manager, index, generation, payload)
+            return self.queue_delta(manager, index, generation, payload, getattr(request, "snapshot_id", None))
         return self.publish(manager, index, generation, payload), 200
 
     def close(self):
         self.executor.shutdown(wait=True, cancel_futures=True)
+        if self.db.engine is not None:
+            self.db.engine.dispose()

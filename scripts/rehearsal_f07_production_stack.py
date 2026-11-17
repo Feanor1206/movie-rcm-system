@@ -128,7 +128,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
     print("STARTING CATALOG-01-F07 FULL PRODUCTION-STACK REHEARSAL")
     print("=" * 78)
 
-    # 1. Preflight port checks
     for p, name in [(FASTAPI_PORT, "FastAPI"), (SPRING_PORT, "Spring Boot"), (FRONTEND_PORT, "Frontend"), (CDP_PORT, "Chrome CDP")]:
         if is_port_in_use(p):
             raise RuntimeError(f"Preflight error: Port {p} ({name}) is already in use by another process!")
@@ -177,9 +176,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
     }
 
     try:
-        # ---------------------------------------------------------------------
-        # Step 1: Launch FastAPI (Port 8008)
-        # ---------------------------------------------------------------------
         print(f"\n[Step 1] Launching FastAPI on port {FASTAPI_PORT}...")
         fa_env = os.environ.copy()
         fa_env["PORT"] = str(FASTAPI_PORT)
@@ -200,9 +196,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
             raise RuntimeError("FastAPI health check failed on port 8008")
         print("  FastAPI service is HEALTHY (200 OK).")
 
-        # ---------------------------------------------------------------------
-        # Step 2: Launch Spring Boot (Port 8088)
-        # ---------------------------------------------------------------------
         print(f"\n[Step 2] Launching Spring Boot on port {SPRING_PORT}...")
         java_home = os.environ.get("JAVA_HOME", "C:\\Program Files\\Java\\jdk-25.0.3")
         java_bin = Path(java_home) / "bin/java.exe" if os.name == "nt" else Path(java_home) / "bin/java"
@@ -231,9 +224,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
             raise RuntimeError("Spring Boot health check failed on port 8088")
         print("  Spring Boot service is HEALTHY (200 OK).")
 
-        # ---------------------------------------------------------------------
-        # Step 3: Launch Next.js Frontend (Port 3008)
-        # ---------------------------------------------------------------------
         print(f"\n[Step 3] Launching Next.js frontend on port {FRONTEND_PORT}...")
         fe_env = os.environ.copy()
         fe_env["PORT"] = str(FRONTEND_PORT)
@@ -242,7 +232,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         fe_env["NEXT_PUBLIC_MODEL_API_URL"] = f"http://127.0.0.1:{FASTAPI_PORT}/api/chat"
 
         fe_log = open(temp_dir / "frontend.log", "w", encoding="utf-8")
-        # Run next dev on isolated port
         frontend_proc = subprocess.Popen(
             ["npx.cmd" if os.name == "nt" else "npx", "next", "dev", "-p", str(FRONTEND_PORT)],
             cwd=str(ROOT / "frontend"),
@@ -257,9 +246,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
             raise RuntimeError(f"Frontend failed to respond on port {FRONTEND_PORT}")
         print("  Frontend service is HEALTHY (200 OK).")
 
-        # ---------------------------------------------------------------------
-        # Step 4: Admin Authentication
-        # ---------------------------------------------------------------------
         print("\n[Step 4] Authenticating as admin (admin@dippie.com / password123)...")
         status, body, _ = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/auth/login",
@@ -273,9 +259,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         print(f"  Admin login SUCCESS (JWT acquired, len={len(admin_jwt)}).")
         results["gates"]["admin_login"] = "PASS"
 
-        # ---------------------------------------------------------------------
-        # Step 5: Validate Package
-        # ---------------------------------------------------------------------
         print("\n[Step 5] Validating catalog package (/api/admin/catalog/validate)...")
         status, body, _ = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/admin/catalog/validate",
@@ -287,9 +270,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         print(f"  Catalog validation SUCCESS (valid: true, item_counts: {body.get('itemCounts')}).")
         results["gates"]["catalog_validation"] = "PASS"
 
-        # ---------------------------------------------------------------------
-        # Step 6: Import Package
-        # ---------------------------------------------------------------------
         print("\n[Step 6] Importing catalog package (/api/admin/catalog/import)...")
         status, body, _ = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/admin/catalog/import",
@@ -301,9 +281,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         print(f"  Catalog import SUCCESS (package: {body.get('packageId')}, revision: {body.get('revision')}).")
         results["gates"]["catalog_import"] = "PASS"
 
-        # ---------------------------------------------------------------------
-        # Step 7: Worker HTTP Sync & Outbox READY
-        # ---------------------------------------------------------------------
         print("\n[Step 7] Awaiting CatalogSyncWorker HTTP sync to FastAPI...")
         ready_snapshot = None
         deadline = time.time() + 90.0
@@ -324,9 +301,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         results["gates"]["outbox_sync_ready"] = "PASS"
         results["evidence"]["snapshot"] = ready_snapshot
 
-        # ---------------------------------------------------------------------
-        # Step 8: Catalog Discovery & Search
-        # ---------------------------------------------------------------------
         print("\n[Step 8] Verifying catalog search and discovery...")
         status, series_list, _ = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/catalog/series")
         assert status == 200 and len(series_list) >= 2, f"Expected >= 2 series, got: {len(series_list)}"
@@ -343,28 +317,21 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         print(f"  FastAPI /v1/discover returned {len(disc_body.get('results', []))} results for 'Bảo Thần Tốc'.")
         results["gates"]["catalog_search"] = "PASS"
 
-        # ---------------------------------------------------------------------
-        # Step 9: Media Streaming & Access Security Matrix
-        # ---------------------------------------------------------------------
         print("\n[Step 9] Verifying Media Streaming Security Matrix (Gates R1, R2, R3, R4)...")
         expected_feature_len = (ROOT / "media/synthetic/feature_test.mp4").stat().st_size
 
-        # 9a. Public stream
         status, _, raw = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/media/stream/asset_feature_01")
         assert status == 200 and len(raw) == expected_feature_len
         print(f"  9a. Public asset stream: 200 OK ({len(raw)} bytes).")
 
-        # 9b. Protected asset 02 anonymous access denied
         status, _, _ = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/media/stream/asset_feature_02")
         assert status in (401, 403, 404), f"Protected asset 02 must deny anonymous, got {status}"
         print(f"  9b. Protected asset 02 anonymous denied (HTTP {status} fail-closed).")
 
-        # 9c. Protected asset 03 anonymous access denied
         status, _, _ = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/media/stream/asset_feature_03")
         assert status in (401, 403, 404), f"Protected asset 03 must deny anonymous, got {status}"
         print(f"  9c. Protected asset 03 anonymous denied (HTTP {status} fail-closed).")
 
-        # 9d. Issue Playback Grant for asset 02
         status, grant_body, _ = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/media/grant/asset_feature_02",
             method="POST",
@@ -374,12 +341,10 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         grant_02 = grant_body["grant"]
         print("  9d. Playback grant token issued for asset_feature_02.")
 
-        # 9e. Stream asset 02 with valid grant
         status, _, raw = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/media/stream/asset_feature_02?grant={grant_02}")
         assert status == 200 and len(raw) == expected_feature_len
         print(f"  9e. Protected asset 02 stream with grant: 200 OK ({len(raw)} bytes).")
 
-        # 9f. Gate R1: Grant token cannot be used as Bearer auth
         status, _, _ = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/admin/catalog/snapshots",
             headers={"Authorization": f"Bearer {grant_02}"}
@@ -387,12 +352,10 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         assert status in (401, 403), f"Grant token must NOT act as Bearer token! Got: {status}"
         print("  9f. Gate R1: Playback grant rejected as Bearer token (HTTP 401/403).")
 
-        # 9g. Gate R2: Grant token for asset 02 rejected on REAL EXISTING protected asset 03
         status, _, _ = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/media/stream/asset_feature_03?grant={grant_02}")
         assert status in (401, 403, 404), f"Grant 02 must be rejected on asset 03! Got: {status}"
         print("  9g. Gate R2: Playback grant strictly bound (rejected on existing protected asset_feature_03).")
 
-        # 9h. HTTP Range request
         status, _, raw = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/media/stream/asset_feature_01",
             headers={"Range": "bytes=10000-20000"}
@@ -401,9 +364,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         print("  9h. HTTP Range bytes=10000-20000: 206 Partial Content (10,001 bytes).")
         results["gates"]["streaming_security_matrix"] = "PASS"
 
-        # ---------------------------------------------------------------------
-        # Step 10: Real Browser Automation (CDP Chrome Headless)
-        # ---------------------------------------------------------------------
         print("\n[Step 10] Running real browser automation via Chrome CDP (Finding F2)...")
         browser_script = ROOT / "scripts/rehearsal_browser_f07.cjs"
         browser_res = subprocess.run(
@@ -421,13 +381,9 @@ def run_rehearsal_f07() -> Dict[str, Any]:
             print(browser_res.stderr)
             raise RuntimeError(f"Browser automation failed with exit code {browser_res.returncode}")
 
-        # Parse browser assertions from output
         results["gates"]["browser_video_playback_and_seek"] = "PASS"
         print("  Browser assertions passed: Decoded frames, Pause/Resume, Scene seek 15s (F2), 3 seeks, Protected grant stream!")
 
-        # ---------------------------------------------------------------------
-        # Step 11: Real Google Drive Gate
-        # ---------------------------------------------------------------------
         print("\n[Step 11] Testing Google Drive Gate (Remote cinema-drive, read-only mount to X:)...")
         drive_status = "NOT_RUN"
         drive_details = {}
@@ -456,7 +412,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
             if mounted:
                 items = [p.name for p in Path("X:/").iterdir()]
                 print(f"  Drive X: mounted successfully! Subfolders: {items}")
-                # Test reading a chunk from a real Jadoo video
                 test_video_folder = Path("X:/jadooss1")
                 if test_video_folder.exists():
                     videos = list(test_video_folder.glob("*.mp4"))
@@ -487,11 +442,7 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         results["evidence"]["google_drive"] = drive_details
         print(f"  Google Drive Gate result: {drive_status} ({drive_details})")
 
-        # ---------------------------------------------------------------------
-        # Step 12: First Service Restart Recovery (Finding F3 & D)
-        # ---------------------------------------------------------------------
         print("\n[Step 12] Testing Service Restart Recovery (Restarting Spring Boot & FastAPI)...")
-        # Terminate running instances
         fastapi_proc.terminate()
         try:
             fastapi_proc.wait(timeout=10.0)
@@ -507,51 +458,41 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         spring_proc = None
         print("  FastAPI and Spring Boot processes terminated cleanly.")
 
-        # Wait until ports are fully released by OS TCP stack
         for _ in range(20):
             if not is_port_in_use(FASTAPI_PORT) and not is_port_in_use(SPRING_PORT):
                 break
             time.sleep(0.5)
         time.sleep(1.5)
 
-        # Assert state file persisted on disk
         assert fastapi_state_file.exists(), "FastAPI state file missing after shutdown"
         state_data = json.loads(fastapi_state_file.read_text(encoding="utf-8"))
         assert state_data.get("generation") == committed_gen, "State generation mismatch"
 
-        # Restart FastAPI
         print("  Restarting FastAPI service...")
         fa_r1_log = open(temp_dir / "fastapi_restart1.log", "w", encoding="utf-8")
         fastapi_proc = subprocess.Popen(fa_cmd, cwd=str(ROOT / "backend/fastapi"), env=fa_env, stdout=fa_r1_log, stderr=subprocess.STDOUT)
         tracked_pids.append(fastapi_proc.pid)
         assert wait_for_service_ok(f"http://127.0.0.1:{FASTAPI_PORT}/health", max_wait_sec=35.0)
 
-        # Restart Spring Boot
         print("  Restarting Spring Boot service...")
         sb_r1_log = open(temp_dir / "spring_boot_restart1.log", "w", encoding="utf-8")
         spring_proc = subprocess.Popen(spring_args, cwd=str(ROOT / "backend/springboot"), stdout=sb_r1_log, stderr=subprocess.STDOUT)
         tracked_pids.append(spring_proc.pid)
         assert wait_for_service_ok(f"http://127.0.0.1:{SPRING_PORT}/api/health", max_wait_sec=55.0)
 
-        # Verify discovery works immediately after restart without requiring new sync
         status, disc_after, _ = http_request(f"http://127.0.0.1:{FASTAPI_PORT}/v1/discover", method="POST", data={"query": "Bảo Thần Tốc"})
         assert status == 200 and len(disc_after.get("results", [])) > 0
         print("  FastAPI restored accepted catalog and responds to discovery after restart!")
 
-        # Verify Spring Boot catalog queries
         status, series_after, _ = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/catalog/series")
         assert status == 200 and len(series_after) >= 2
         print("  Spring Boot restored DB state and responds to series query after restart!")
 
-        # Verify media streaming after restart
         status, _, raw = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/media/stream/asset_feature_01")
         assert status == 200 and len(raw) == expected_feature_len
         print("  Continuous media playback after restart verified: 200 OK.")
         results["gates"]["restart_recovery_1"] = "PASS"
 
-        # ---------------------------------------------------------------------
-        # Step 13: Second Restart (Finding D & F3)
-        # ---------------------------------------------------------------------
         print("\n[Step 13] Testing Second Restart to catch single-restart regressions...")
         fastapi_proc.terminate()
         try:
@@ -567,20 +508,17 @@ def run_rehearsal_f07() -> Dict[str, Any]:
             spring_proc.kill()
         spring_proc = None
 
-        # Wait until ports are released by OS TCP stack
         for _ in range(20):
             if not is_port_in_use(FASTAPI_PORT) and not is_port_in_use(SPRING_PORT):
                 break
             time.sleep(0.5)
         time.sleep(1.5)
 
-        # Restart FastAPI
         fa_r2_log = open(temp_dir / "fastapi_restart2.log", "w", encoding="utf-8")
         fastapi_proc = subprocess.Popen(fa_cmd, cwd=str(ROOT / "backend/fastapi"), env=fa_env, stdout=fa_r2_log, stderr=subprocess.STDOUT)
         tracked_pids.append(fastapi_proc.pid)
         assert wait_for_service_ok(f"http://127.0.0.1:{FASTAPI_PORT}/health", max_wait_sec=35.0)
 
-        # Restart Spring Boot
         sb_r2_log = open(temp_dir / "spring_boot_restart2.log", "w", encoding="utf-8")
         spring_proc = subprocess.Popen(spring_args, cwd=str(ROOT / "backend/springboot"), stdout=sb_r2_log, stderr=subprocess.STDOUT)
         tracked_pids.append(spring_proc.pid)
@@ -597,7 +535,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
         print("=" * 78)
 
     finally:
-        # Teardown tracked processes strictly by PID (Constraint B.9)
         print("\n[Teardown] Cleaning up processes by verified PID...")
         for proc in [frontend_proc, fastapi_proc, spring_proc, rclone_proc]:
             if proc is not None:
@@ -610,7 +547,6 @@ def run_rehearsal_f07() -> Dict[str, Any]:
                     except Exception:
                         pass
 
-        # Cleanup temp directory
         try:
             shutil.rmtree(temp_dir, ignore_errors=True)
             print(f"  Cleaned temporary directory: {temp_dir}")

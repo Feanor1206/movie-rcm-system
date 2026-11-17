@@ -107,7 +107,6 @@ def score_evidence(evidence_path: Path, eval_benchmark_path: Path) -> Dict[str, 
         if is_unans:
             unanswerable_count += 1
             if has_http_error:
-                # Lỗi HTTP (500, timeout) là FAILURE, không được tính là từ chối hợp lệ
                 unanswerable_false_accept += 1
                 rejected = False
             elif len(retrieved_ids) == 0:
@@ -119,7 +118,6 @@ def score_evidence(evidence_path: Path, eval_benchmark_path: Path) -> Dict[str, 
         else:
             answerable_count += 1
             if has_http_error:
-                # Lỗi HTTP trên answerable query
                 rejected = False
             else:
                 if top1_id in expected_ids:
@@ -145,7 +143,6 @@ def score_evidence(evidence_path: Path, eval_benchmark_path: Path) -> Dict[str, 
                         holdout_hits_3 += 1
                     holdout_rr_sum += rr
 
-                # Type conformance check
                 if retrieved:
                     top_obj = retrieved[0] if isinstance(retrieved[0], dict) else {}
                     actual_type = top_obj.get("item_type")
@@ -153,7 +150,6 @@ def score_evidence(evidence_path: Path, eval_benchmark_path: Path) -> Dict[str, 
                         type_match = True
                         type_match_count += 1
 
-                # Segment vs Parent Episode distinction
                 if expected_type == "segment":
                     prim_seg = q_ref.get("primary_expected_id")
                     parent_ep = q_ref.get("parent_episode_id")
@@ -162,7 +158,6 @@ def score_evidence(evidence_path: Path, eval_benchmark_path: Path) -> Dict[str, 
                     elif top1_id == parent_ep:
                         parent_episode_hits += 1
 
-                # Check constraint violations (e.g. year range)
                 exp_cons = q_ref.get("expected_constraints", {})
                 req_min_yr = exp_cons.get("year_min")
                 req_max_yr = exp_cons.get("year_max")

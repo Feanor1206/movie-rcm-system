@@ -110,7 +110,6 @@ def run_smoke_test() -> Dict[str, Any]:
     print("STARTING SNAPSHOT-01 USABLE PREVIEW SMOKE TEST")
     print("=" * 78)
 
-    # 1. Port checks
     for p, name in [(FASTAPI_PORT, "FastAPI"), (SPRING_PORT, "Spring Boot"), (FRONTEND_PORT, "Frontend"), (CDP_PORT, "Chrome CDP")]:
         if is_port_in_use(p):
             raise RuntimeError(f"Port {p} ({name}) is already in use!")
@@ -150,7 +149,6 @@ def run_smoke_test() -> Dict[str, Any]:
     }
 
     try:
-        # Step 1: Mount Google Drive
         print("\n[Step 1] Mounting Google Drive to X: via rclone...")
         rclone_cmd = [
             "rclone", "mount",
@@ -178,7 +176,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print("  Drive X: mounted successfully (folder jadooss1 verified).")
         results["gates"]["google_drive_mount"] = "PASS"
 
-        # Step 2: FastAPI
         print(f"\n[Step 2] Launching FastAPI AI on port {FASTAPI_PORT}...")
         fa_env = os.environ.copy()
         fa_env["PORT"] = str(FASTAPI_PORT)
@@ -202,7 +199,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print("  FastAPI HEALTHY (200 OK).")
         results["gates"]["fastapi_ready"] = "PASS"
 
-        # Step 3: Spring Boot
         print(f"\n[Step 3] Launching Spring Boot on port {SPRING_PORT}...")
         java_home = os.environ.get("JAVA_HOME", "C:\\Program Files\\Java\\jdk-25.0.3")
         java_bin = str(Path(java_home) / "bin/java.exe" if os.name == "nt" else Path(java_home) / "bin/java")
@@ -232,7 +228,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print("  Spring Boot HEALTHY (200 OK).")
         results["gates"]["spring_boot_ready"] = "PASS"
 
-        # Step 4: Next.js Web Frontend (Production build)
         print(f"\n[Step 4] Launching Next.js Production Build on port {FRONTEND_PORT}...")
         fe_env = os.environ.copy()
         fe_env["PORT"] = str(FRONTEND_PORT)
@@ -254,7 +249,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print("  Next.js Frontend HEALTHY (200 OK).")
         results["gates"]["frontend_ready"] = "PASS"
 
-        # Step 5: Admin Login
         print("\n[Step 5] Admin Login (HTTP)...")
         status, body, _ = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/auth/login",
@@ -268,7 +262,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print("  Admin Login SUCCESS.")
         results["gates"]["admin_login"] = "PASS"
 
-        # Step 6: Validate & Import
         print("\n[Step 6] Validating & Importing catalog package...")
         status, val_body, _ = http_request(
             f"http://127.0.0.1:{SPRING_PORT}/api/admin/catalog/validate",
@@ -289,7 +282,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print(f"  Import SUCCESS (package: {imp_body.get('packageId')}, rev: {imp_body.get('revision')}).")
         results["gates"]["catalog_import"] = "PASS"
 
-        # Step 7: Outbox Sync READY
         print("\n[Step 7] Polling CatalogSyncWorker outbox sync -> READY...")
         ready_snap = None
         deadline = time.time() + 60.0
@@ -305,7 +297,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print(f"  Outbox sync READY (generation: {ready_snap.get('snapshotVersion')}, hash: {ready_snap.get('contentHash', '')[:16]}...).")
         results["gates"]["outbox_sync_ready"] = "PASS"
 
-        # Step 8: Search
         print("\n[Step 8] Verifying catalog search...")
         status, search_res, _ = http_request(f"http://127.0.0.1:{SPRING_PORT}/api/catalog/search?q=B%E1%BA%A3o")
         assert status == 200 and len(search_res) > 0 and search_res[0].get("id") == "ser_rehearsal_01"
@@ -316,7 +307,6 @@ def run_smoke_test() -> Dict[str, Any]:
         print(f"  FastAPI discover matched {len(disc_res.get('results', []))} results.")
         results["gates"]["catalog_search"] = "PASS"
 
-        # Step 9: Browser Drive Video Playback & Seek via CDP
         print("\n[Step 9] Real Google Drive Video Playback & Seek in Headless Chrome...")
         chrome_exe = "C:/Program Files/Google/Chrome/Application/chrome.exe"
         profile_dir = Path(tempfile.mkdtemp(prefix="chrome_smoke_preview_"))
@@ -333,7 +323,6 @@ def run_smoke_test() -> Dict[str, Any]:
         ])
         tracked_pids.append(chrome_proc.pid)
 
-        # Connect to CDP
         cdp_page = None
         cdp_deadline = time.time() + 20.0
         while time.time() < cdp_deadline:
@@ -348,7 +337,6 @@ def run_smoke_test() -> Dict[str, Any]:
             time.sleep(0.5)
         assert cdp_page is not None, "Failed to connect to Chrome CDP"
 
-        # Simple CDP client using websockets or Node runner
         print("  Running browser interaction runner for Drive playback and seeks...")
         runner_js = f"""
         const {{ spawn }} = require('child_process');

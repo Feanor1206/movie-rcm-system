@@ -3,25 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// Keep temporary playback credentials out of saved evidence and console logs.
 const redactStreamUrl = (value) => String(value).replace(/([?&]grant=)[^&\s]+/g, '$1[REDACTED]');
 
-/**
- * SNAPSHOT-02-F01 End-to-End Real Web Browser Verification Harness
- * 
- * Verifies User Journey on Live UI:
- * 1. Log in via UI / API and store auth token.
- * 2. Search "Jadoo" on Web UI (/search).
- * 3. Click search result card to navigate to /series/...
- * 4. Verify Episode 1 (ep_jadoo_s01_0001) selection and asset mapping (asset_jadoo_s01_v0001).
- * 5. Verify <video> player src contains production stream endpoint with valid grant.
- * 6. Verify real decoded video frame dimensions (videoWidth > 0, videoHeight > 0).
- * 7. Verify playback advancement (currentTime advancing over time).
- * 8. Perform seek to 60.0s, confirm seek completion, and verify playback continues advancing post-seek.
- * 9. Switch to Episode 2 (ep_jadoo_s01_0002) via episode selector, verify asset update to asset_jadoo_s01_v0002 and video decoding.
- * 10. Cross-verify episode IDs, asset IDs, and file sizes with catalog.jadoo_all.json and Drive mount X:\.
- * 11. Capture screenshots and write structured JSON evidence.
- */
 
 async function runJadooWebVerification() {
   const evidence = {
@@ -66,7 +49,6 @@ async function runJadooWebVerification() {
   let ws = null;
 
   try {
-    // 1. Connect to CDP
     let page = null;
     const deadlineConnect = Date.now() + 15000;
     while (Date.now() < deadlineConnect) {
@@ -121,7 +103,6 @@ async function runJadooWebVerification() {
     const ensureDir = (p) => { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); };
     ensureDir('docs/reviews/evidence');
 
-    // 2. Perform authentication and set tokens
     console.log('[JadooVerification] Step 1: Authenticating as admin to obtain access token...');
     const loginRes = await fetch('http://127.0.0.1:8080/api/auth/login', {
       method: 'POST',
@@ -140,7 +121,6 @@ async function runJadooWebVerification() {
     };
     console.log('[JadooVerification] Admin authenticated successfully.');
 
-    // Navigate to base URL and set tokens in localStorage
     await send('Page.navigate', { url: 'http://localhost:3000/' });
     await new Promise(r => setTimeout(r, 2000));
     await send('Runtime.evaluate', {
@@ -152,12 +132,10 @@ async function runJadooWebVerification() {
       })()`
     });
 
-    // 3. Search Journey: Navigate to /search and query "Jadoo"
     console.log('[JadooVerification] Step 2: Navigating to Search page and searching "Jadoo"...');
     await send('Page.navigate', { url: 'http://localhost:3000/search?q=Jadoo' });
     await new Promise(r => setTimeout(r, 3000));
 
-    // Wait for search result cards
     let searchResultFound = false;
     let cardInfo = null;
     for (let i = 0; i < 20; i++) {
@@ -200,7 +178,6 @@ async function runJadooWebVerification() {
     fs.writeFileSync(searchSnapPath, Buffer.from(searchSnap.data, 'base64'));
     evidence.screenshots.search_results = searchSnapPath;
 
-    // 4. Click the search result card to navigate to Series Detail Page
     console.log('[JadooVerification] Step 3: Clicking search result card to navigate to series detail...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -210,7 +187,6 @@ async function runJadooWebVerification() {
       })()`
     });
 
-    // Wait for Series Detail page to load
     let seriesLoaded = false;
     let pageState = null;
     for (let i = 0; i < 30; i++) {
@@ -244,9 +220,7 @@ async function runJadooWebVerification() {
     console.log('[JadooVerification] Series page loaded. H1:', pageState.h1, 'Episodes:', pageState.epCount);
     console.log('[JadooVerification] Initial video src:', redactStreamUrl(pageState.videoSrc));
 
-    // 5. Episode 1 Verification: Playing and Frame Advancement
     console.log('[JadooVerification] Step 4: Verifying Episode 1 playback and decoding...');
-    // Ensure video is playing
     await send('Runtime.evaluate', {
       expression: `(() => {
         const v = document.querySelector("[data-testid='series-video-player']");
@@ -285,7 +259,6 @@ async function runJadooWebVerification() {
       if (s && s.videoWidth > 0 && s.videoHeight > 0 && s.currentTime > 0.2 && !s.paused) {
         t0 = s.currentTime;
         ep1VideoData = s;
-        // Wait 1.5s to verify advancement
         await new Promise(r => setTimeout(r, 1500));
         const advRes = await send('Runtime.evaluate', {
           expression: `(() => {
@@ -327,7 +300,6 @@ async function runJadooWebVerification() {
     fs.writeFileSync(ep1PlaySnapPath, Buffer.from(ep1PlaySnap.data, 'base64'));
     evidence.screenshots.episode_1_playing = ep1PlaySnapPath;
 
-    // 6. Seek verification on Episode 1
     console.log('[JadooVerification] Step 5: Testing seek to 60.0s on Episode 1...');
     const targetSeekSec = 60.0;
     await send('Runtime.evaluate', {
@@ -362,7 +334,6 @@ async function runJadooWebVerification() {
       const s = sRes?.result?.value;
       if (s && !s.seeking && Math.abs(s.currentTime - targetSeekSec) <= 5.0 && !s.paused) {
         t2 = s.currentTime;
-        // Wait 1.5s to verify playback continues after seek
         await new Promise(r => setTimeout(r, 1500));
         const postSeekRes = await send('Runtime.evaluate', {
           expression: `(() => {
@@ -397,7 +368,6 @@ async function runJadooWebVerification() {
     fs.writeFileSync(ep1SeekSnapPath, Buffer.from(ep1SeekSnap.data, 'base64'));
     evidence.screenshots.episode_1_seek = ep1SeekSnapPath;
 
-    // 7. Switch to Episode 2 (ep_jadoo_s01_0002) to verify mapping
     console.log('[JadooVerification] Step 6: Switching to Episode 2 (ep_jadoo_s01_0002)...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -436,7 +406,6 @@ async function runJadooWebVerification() {
       });
       const s = vRes?.result?.value;
       if (s && s.currentSrc.includes('asset_jadoo_s01_v0002')) {
-        // Trigger play for episode 2
         await send('Runtime.evaluate', {
           expression: `(() => {
             const v = document.querySelector("[data-testid='series-video-player']");
@@ -490,7 +459,6 @@ async function runJadooWebVerification() {
     fs.writeFileSync(ep2PlaySnapPath, Buffer.from(ep2PlaySnap.data, 'base64'));
     evidence.screenshots.episode_2_playing = ep2PlaySnapPath;
 
-    // 8. Cross-reference verification with catalog.jadoo_all.json and Drive mount X:\
     console.log('[JadooVerification] Step 7: Cross-referencing assets against catalog.jadoo_all.json and X:\\...');
     const catData = JSON.parse(fs.readFileSync('data/catalog.jadoo_all.json', 'utf8'));
     const ep1Asset = catData.media_assets.find(a => a.id === 'asset_jadoo_s01_v0001');

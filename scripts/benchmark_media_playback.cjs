@@ -1,20 +1,3 @@
-/**
- * Milestone M4: Media Playback & Local Storage Benchmark Script
- * (Node RAM Transport Simulation Benchmark - Historical Baseline)
- *
- * NOTE: This script is an in-memory Node Buffer simulation benchmark used for
- * baseline protocol validation. It does NOT replace the real Spring Boot HTTP
- * streaming benchmark executed in scripts/run_m4_media_walkthrough.cjs.
- *
- * Measures:
- *   1. Startup latency (time to initial frame/chunk, cold vs warm)
- *   2. Seek latency across multiple positions (min, avg, p95, max)
- *   3. Buffer stalls / underruns simulation
- *   4. Concurrent streaming throughput & latency (1, 3, 5 parallel streams)
- *
- * Outputs:
- *   docs/reports/media_benchmark_results.json (historical simulation)
- */
 
 const http = require('node:http');
 const fs = require('node:fs');
@@ -29,7 +12,6 @@ const FEATURE_FILE = path.join(SYNTHETIC_DIR, 'feature_test.mp4');
 const TRAILER_FILE = path.join(SYNTHETIC_DIR, 'trailer_test.mp4');
 const RESULTS_FILE = path.join(PROJECT_ROOT, 'docs', 'reports', 'media_benchmark_results.json');
 
-// Helper to compute stats
 function computeStats(arr) {
   if (!arr || arr.length === 0) return { min: 0, avg: 0, p95: 0, max: 0, count: 0 };
   const sorted = [...arr].sort((a, b) => a - b);
@@ -48,7 +30,6 @@ function computeStats(arr) {
   };
 }
 
-// Start embedded RFC 9110 ranged media server for deterministic benchmark
 function createBenchmarkServer(featureBuffer, trailerBuffer) {
   return http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -207,7 +188,6 @@ async function runBenchmark() {
   console.log(`- Benchmark streaming server listening on 127.0.0.1:${port}`);
 
   try {
-    // 1. Startup Latency Benchmark (Cold vs Warm)
     console.log('\n[1/4] Measuring Startup Latency (Initial Chunk 0-65535)...');
     const coldRes = await makeRangedRequest(port, '/api/media/stream/ast-orbit-feat', 'bytes=0-65535');
     assert.equal(coldRes.statusCode, 206);
@@ -223,7 +203,6 @@ async function runBenchmark() {
     console.log(`  - Cold startup: ${coldStartupMs} ms`);
     console.log(`  - Warm startup: min=${warmStats.min}ms, avg=${warmStats.avg}ms, p95=${warmStats.p95}ms, max=${warmStats.max}ms`);
 
-    // 2. Seek Latency Benchmark
     console.log('\n[2/4] Measuring Seek Latency Across Key Timeline Positions...');
     const totalBytes = featureBuffer.length;
     const seekPoints = [
@@ -248,13 +227,11 @@ async function runBenchmark() {
     const seekStats = computeStats(seekSamples);
     console.log(`  - Seek Latency (${seekSamples.length} samples): min=${seekStats.min}ms, avg=${seekStats.avg}ms, p95=${seekStats.p95}ms, max=${seekStats.max}ms`);
 
-    // 3. Stalls / Buffer Underrun Measurement
     console.log('\n[3/4] Measuring Buffer Stalls & Underruns during Real-Time Delivery Simulation...');
     let stallCount = 0;
     let totalChunkDeliveryMs = 0;
-    const chunkSize = 32768; // 32 KiB chunks
+    const chunkSize = 32768;
     const chunkCount = Math.ceil(totalBytes / chunkSize);
-    // 10s video of ~138KB -> average bitrate ~13.8 KB/s -> 32KB represents ~2.3 seconds of playback time
     const simulatedPlaybackTimePerChunkMs = 2300;
 
     for (let c = 0; c < chunkCount; c++) {
@@ -263,7 +240,6 @@ async function runBenchmark() {
       const res = await makeRangedRequest(port, '/api/media/stream/ast-orbit-feat', `bytes=${start}-${end}`);
       assert.equal(res.statusCode, 206);
       totalChunkDeliveryMs += res.duration;
-      // If delivery time exceeds buffered video duration, stall occurs
       if (res.duration > simulatedPlaybackTimePerChunkMs) {
         stallCount++;
       }
@@ -272,7 +248,6 @@ async function runBenchmark() {
     console.log(`  - Total delivery duration: ${totalChunkDeliveryMs.toFixed(2)} ms for 10.0s video`);
     console.log(`  - Playback buffer underruns / stalls: ${stallCount} (0 expected)`);
 
-    // 4. Concurrent Streams Benchmark (1, 3, 5 Streams)
     console.log('\n[4/4] Measuring Concurrent Stream Performance (1, 3, 5 streams)...');
     const concurrencyLevels = [1, 3, 5];
     const concurrencyResults = {};
@@ -288,7 +263,6 @@ async function runBenchmark() {
         clientPromises.push(
           (async () => {
             for (let reqIdx = 0; reqIdx < requestsPerClient; reqIdx++) {
-              // Alternate between feature and trailer range chunks
               const isFeat = reqIdx % 2 === 0;
               const path = isFeat ? '/api/media/stream/ast-orbit-feat' : '/api/media/stream/ast-orbit-trl';
               const range = isFeat ? 'bytes=1000-33767' : 'bytes=500-16883';

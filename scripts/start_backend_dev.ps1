@@ -15,7 +15,6 @@ $cpFile = Join-Path $backendDir "target\cp.txt"
 $jarFile = Join-Path $backendDir "target\moviercm-backend-0.0.1-SNAPSHOT.jar"
 $stateFile = Join-Path $backendDir "target\backend_dev.json"
 
-# Resolve java home (process-scoped only, do not change OS environment)
 if (-not $env:JAVA_HOME) {
     if (Test-Path "C:\Program Files\Java\jdk-25.0.3") {
         $env:JAVA_HOME = "C:\Program Files\Java\jdk-25.0.3"
@@ -56,7 +55,6 @@ if ($Jar) {
     $cp = "$classes;$dependencies"
 }
 
-# Resolve java executable
 $java = if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME "bin\java.exe"))) {
     Join-Path $env:JAVA_HOME "bin\java.exe"
 } elseif (Test-Path "C:\Program Files\Java\jdk-25.0.3\bin\java.exe") {
@@ -65,7 +63,6 @@ $java = if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME "bin\java.e
     (Get-Command java -ErrorAction Stop).Source
 }
 
-# Check port availability
 $portConn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($portConn) {
     throw "Port $Port is already in use by PID $($portConn.OwningProcess). Please stop that process before starting backend."
@@ -95,7 +92,6 @@ $argsList = if ($Jar) {
     )
 }
 
-# Start process and track PID / StartTime
 $proc = Start-Process -FilePath $java -ArgumentList $argsList -PassThru -NoNewWindow
 $startTime = $proc.StartTime
 
@@ -112,7 +108,6 @@ $state = [PSCustomObject]@{
 $state | ConvertTo-Json -Depth 3 | Set-Content -Path $stateFile -Encoding UTF8
 Write-Host "[start_backend_dev] Backend process spawned with PID $($proc.Id). Polling readiness endpoint..."
 
-# R2 Fix: Poll real readiness endpoint with finite deadline (35 seconds)
 $ready = $false
 $deadline = [DateTime]::UtcNow.AddSeconds(35)
 $readinessUrl = "http://127.0.0.1:$Port/api/movies"
@@ -130,7 +125,6 @@ while ([DateTime]::UtcNow -lt $deadline) {
             break
         }
     } catch {
-        # Backend still starting up, wait and retry
         Start-Sleep -Milliseconds 600
     }
 }

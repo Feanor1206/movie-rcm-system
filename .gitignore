@@ -1,4 +1,3 @@
-# Environment and secrets
 .env
 .env.*
 !.env.example
@@ -7,14 +6,12 @@
 *.env.test.local
 *.env.production.local
 
-# IDEs & OS
 .idea/
 .vscode/
 *.iml
 .DS_Store
 Thumbs.db
 
-# Frontend (Next.js / Node)
 node_modules/
 frontend/node_modules/
 .next/
@@ -30,7 +27,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Java / Spring Boot
 target/
 backend/springboot/target/
 *.class
@@ -42,7 +38,6 @@ backend/springboot/.gradle/
 !.mvn/wrapper/maven-wrapper.jar
 !.mvn/wrapper/maven-wrapper.properties
 
-# Python / FastAPI / AI
 __pycache__/
 */__pycache__/
 */*/__pycache__/
@@ -61,7 +56,6 @@ dist/
 .coverage
 htmlcov/
 
-# AI Model Checkpoints & Large Binary Weights (>50MB)
 *.bin
 *.onnx
 *.safetensors
@@ -81,7 +75,6 @@ ai/datasets/processed/*
 distillation/checkpoints/
 data/raw/
 
-# Docker & Database
 pgdata/
 mysql_data/
 backend/springboot/data/
@@ -92,10 +85,8 @@ data/python_main.db
 *.mv.db
 *.trace.db
 
-# Local analysis and disposable experiments
 .pytest_tmp/
 
-# Large Media & Video Files (>100MB)
 *.mp4
 *.mkv
 *.mov
@@ -104,18 +95,15 @@ storage/videos/
 frontend/public/videos/*
 !frontend/public/videos/.gitkeep
 
-# Local review baselines and generated model runtime artifacts
 /.f*_snapshot/
 /.round*_snapshot/
 /ai/phase23_package/best_adapter/
 
-# Local analysis and disposable experiments
 /graphify-out/
 /scratch/
 /artifacts/
 /ai/artifacts/
 
-# Rebuilt search indexes and fresh review/benchmark output
 /data/indices/
 /docs/reports/*
 !/docs/reports/.gitkeep

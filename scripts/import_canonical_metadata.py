@@ -10,7 +10,6 @@ import sys
 import argparse
 from pathlib import Path
 
-# Add backend/fastapi to sys.path
 backend_fastapi_dir = Path(__file__).resolve().parent.parent / "backend" / "fastapi"
 sys.path.insert(0, str(backend_fastapi_dir))
 

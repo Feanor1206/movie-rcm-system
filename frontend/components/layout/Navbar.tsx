@@ -1,9 +1,6 @@
-'use client';
-
 import React, { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Menu, Search, User, X, LogOut, Bookmark, UserCheck } from 'lucide-react';
+import { Link, useLocation } from 'react-router';
+
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { useAuth } from '@/lib/context/AuthContext';
 
@@ -11,7 +8,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const { watchlist, openChat } = useWatchlist();
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
 
@@ -19,8 +16,9 @@ export function Navbar() {
     { name: 'Trang chủ', href: '/' },
     { name: 'Kho phim', href: '/search' },
     { name: 'Danh sách xem', href: '/profile', count: watchlist.length },
-    { name: 'Nhập dữ liệu', href: '/admin/import' },
   ];
+  if (user?.role === 'ROLE_ADMIN') navLinks.push({ name: 'Nhập dữ liệu', href: '/admin/import' });
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -39,34 +37,32 @@ export function Navbar() {
   };
 
   return (
-    <header className="comic-navbar sticky top-0 z-40 border-b-2 border-ink bg-paper-white">
-      <nav className="mx-auto flex h-[86px] max-w-[1280px] items-center justify-between px-5 sm:px-8">
-
+    <header className="comic-navbar sticky top-0 z-40 border-b border-surface-border/25 bg-background">
+      <nav aria-label="Điều hướng chính" className="page-shell flex h-[68px] items-center justify-between">
         <div className="flex items-center gap-8">
           <Link
-            href="/"
-            className="flex items-center gap-1.5 font-bold tracking-tight text-xl text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
+            to="/"
+            className="flex items-center gap-2 text-xl font-bold tracking-tight text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
           >
             <span className="comic-wordmark">Dippie</span>
           </Link>
 
-
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden lg:flex items-center gap-6">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link
                   key={link.name}
-                  href={link.href}
+                  to={link.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={`text-sm font-medium transition-colors ${
-                    isActive ? 'text-ink font-semibold' : 'text-muted hover:text-ink'
+                    isActive ? 'text-brand-dark font-semibold' : 'text-muted hover:text-ink'
                   }`}
                 >
                   {link.name}
                   {link.count !== undefined && link.count > 0 && (
-                    <span className="ml-1 text-xs text-muted font-normal">
-                      ({link.count})
+                    <span className="ml-1 rounded-full bg-surface-elevated px-1.5 py-0.5 text-[11px] font-semibold text-brand-dark">
+                      {link.count}
                     </span>
                   )}
                 </Link>
@@ -75,26 +71,13 @@ export function Navbar() {
           </div>
         </div>
 
-
-        <div className="hidden md:flex items-center gap-3">
-
+        <div className="hidden lg:flex items-center gap-3">
           <button
             onClick={openChat}
-            className="rounded-md border border-surface-border bg-surface-elevated px-3.5 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-brand hover:text-ink cursor-pointer"
+            className="min-h-[44px] min-w-[44px] rounded-lg border border-surface-border/50 bg-surface px-3.5 text-sm font-semibold text-ink hover:bg-surface-elevated cursor-pointer"
           >
             Hỏi CineBot
           </button>
-
-
-          <Link
-            href="/search"
-            aria-label="Tìm kiếm phim"
-            className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-3 py-1.5 text-xs text-muted transition-colors hover:border-ink hover:text-ink cursor-pointer"
-          >
-            <Search size={14} />
-            <span>Tìm kiếm</span>
-          </Link>
-
 
           {isAuthenticated && user ? (
             <div className="relative" ref={dropdownRef}>
@@ -102,9 +85,9 @@ export function Navbar() {
                 data-testid="nav-user-dropdown-button"
                 aria-expanded={userDropdownOpen}
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1 text-xs text-ink hover:border-ink hover:text-ink transition-colors cursor-pointer"
+                className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface px-2.5 py-1 text-xs text-ink hover:border-zinc-500 transition-colors cursor-pointer"
               >
-                <div className="grid h-6 w-6 place-items-center rounded bg-brand text-[11px] font-bold text-zinc-950 shadow-brand-sm">
+                <div className="grid h-6 w-6 place-items-center rounded bg-brand text-[11px] font-bold text-zinc-950 shadow-sm">
                   {getInitials(user.fullName || user.username)}
                 </div>
                 <span className="font-medium max-w-[100px] truncate">
@@ -112,10 +95,8 @@ export function Navbar() {
                 </span>
               </button>
 
-
-
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-52 rounded-lg border border-surface-border bg-surface-elevated p-2 shadow-2xl animate-fade-in z-50">
+                <div className="absolute right-0 mt-2 w-52 rounded-xl border border-surface-border bg-surface-elevated p-2 shadow-2xl animate-fade-in z-50">
                   <div className="px-2.5 py-2 border-b border-surface-border">
                     <p className="text-xs font-bold text-ink truncate">{user.fullName || user.username}</p>
                     <p className="text-[11px] text-muted truncate">{user.email}</p>
@@ -123,18 +104,11 @@ export function Navbar() {
 
                   <div className="mt-1.5 space-y-0.5">
                     <Link
-                      href="/profile"
+                      to="/profile"
                       onClick={() => setUserDropdownOpen(false)}
                       className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted hover:bg-surface-hover hover:text-ink transition-colors"
                     >
-                      <UserCheck size={14} /> Hồ sơ cá nhân
-                    </Link>
-                    <Link
-                      href="/profile"
-                      onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted hover:bg-surface-hover hover:text-ink transition-colors"
-                    >
-                      <Bookmark size={14} /> Danh sách xem ({watchlist.length})
+                      Hồ sơ cá nhân
                     </Link>
                   </div>
 
@@ -144,9 +118,9 @@ export function Navbar() {
                         setUserDropdownOpen(false);
                         logout();
                       }}
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-red-800 hover:bg-red-500/10 transition-colors cursor-pointer"
                     >
-                      <LogOut size={14} /> Đăng xuất
+                      Đăng xuất
                     </button>
                   </div>
                 </div>
@@ -156,28 +130,26 @@ export function Navbar() {
             <button
               data-testid="nav-login-button"
               onClick={() => openAuthModal('login')}
-              className="rounded-md bg-surface border border-surface-border px-3 py-1.5 text-xs font-semibold text-ink hover:border-brand hover:bg-brand hover:text-zinc-950 transition-all cursor-pointer shadow-sm hover:shadow-brand-sm"
+              className="min-h-[44px] rounded-lg bg-brand px-3.5 text-sm font-bold text-ink hover:bg-brand-hover active:bg-brand-active cursor-pointer"
             >
               Đăng nhập
             </button>
-
           )}
         </div>
 
-
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex items-center gap-2 lg:hidden">
           {isAuthenticated ? (
             <Link
-              href="/profile"
+              to="/profile"
               aria-label="Hồ sơ cá nhân"
-              className="grid h-8 w-8 place-items-center rounded bg-brand text-xs font-bold text-zinc-950 shadow-brand-sm"
+              className="grid h-11 w-11 place-items-center rounded-lg bg-brand text-xs font-bold text-zinc-950 shadow-sm"
             >
               {getInitials(user?.fullName || user?.username)}
             </Link>
           ) : (
             <button
               onClick={() => openAuthModal('login')}
-              className="min-h-[44px] rounded bg-brand px-2.5 py-1 text-xs font-bold text-zinc-950 hover:bg-brand-hover active:bg-brand-active cursor-pointer shadow-brand-sm"
+              className="min-h-[44px] rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-zinc-950 hover:bg-brand-hover active:bg-brand-active cursor-pointer shadow-sm"
             >
               Đăng nhập
             </button>
@@ -188,31 +160,31 @@ export function Navbar() {
             aria-expanded={open}
             aria-controls="mobile-navigation"
             onClick={() => setOpen(!open)}
-            className="min-h-[44px] min-w-[44px] rounded-md border border-surface-border bg-surface p-2 text-muted hover:text-ink cursor-pointer"
+            className="min-h-[44px] rounded-lg border border-surface-border bg-surface px-3 text-xs font-semibold text-ink hover:bg-surface-elevated cursor-pointer"
           >
-            {open ? <X size={18} /> : <Menu size={18} />}
+            {open ? 'Đóng' : 'Menu'}
           </button>
         </div>
       </nav>
 
-
       {open && (
-        <div id="mobile-navigation" className="border-b border-surface-border bg-background px-5 py-5 md:hidden animate-slide-up">
+        <div id="mobile-navigation" className="border-b border-surface-border bg-surface px-5 py-5 lg:hidden animate-slide-up">
           <div className="flex flex-col gap-3">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link
                   key={link.name}
-                  href={link.href}
+                  to={link.href}
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => setOpen(false)}
-                  className={`flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium ${
-                    isActive ? 'bg-surface-elevated text-ink font-bold border border-surface-border' : 'text-muted hover:bg-surface-hover'
+                  className={`flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm font-medium ${
+                    isActive ? 'bg-surface-elevated text-brand-dark font-bold border border-surface-border' : 'text-muted hover:bg-surface-hover hover:text-ink'
                   }`}
                 >
                   <span>{link.name}</span>
                   {link.count !== undefined && link.count > 0 && (
-                    <span className="text-xs text-brand font-semibold">
+                    <span className="text-xs text-brand-dark font-semibold">
                       ({link.count})
                     </span>
                   )}
@@ -226,31 +198,23 @@ export function Navbar() {
                   setOpen(false);
                   openChat();
                 }}
-                className="btn-primary w-full justify-center text-xs"
+                className="btn-primary min-h-[44px] w-full justify-center text-sm"
               >
                 Hỏi CineBot
               </button>
-              <Link
-                href="/search"
-                onClick={() => setOpen(false)}
-                className="btn-secondary w-full justify-center text-xs"
-              >
-                Tìm phim
-              </Link>
               {isAuthenticated && (
                 <button
                   data-testid="mobile-logout"
                   onClick={() => { setOpen(false); logout(); }}
-                  className="btn-secondary w-full justify-center text-xs"
+                  className="btn-secondary w-full justify-center text-xs text-red-800 hover:text-red-800"
                 >
-                  <LogOut size={14} /> Đăng xuất
+                  Đăng xuất
                 </button>
               )}
             </div>
           </div>
         </div>
       )}
-
     </header>
   );
 }

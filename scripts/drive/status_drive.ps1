@@ -42,11 +42,9 @@ if ($stateExists) {
             $stateData = $stateRaw | ConvertFrom-Json
         }
     } catch {
-        # State file read or parse error
     }
 }
 
-# Extract complete state schema fields without permissive defaults
 $savedPid = $null
 if ($stateData -and $stateData.PSObject.Properties['pid'] -and $stateData.pid -ne $null) {
     $pVal = 0
@@ -84,7 +82,6 @@ $arguments = if ($stateData) {
              } else { $null }
 $stateStatus = if ($stateData -and $stateData.PSObject.Properties['status'] -and $stateData.status) { [string]$stateData.status } else { $null }
 
-# Helper to check if a drive or directory is accessible
 function Test-MountAccessibility {
     param([string]$Target)
 
@@ -114,7 +111,6 @@ function Test-MountAccessibility {
                     $access.ErrorMessage = $_.Exception.Message
                 }
             } else {
-                # Fallback to Test-Path
                 if (Test-Path -Path $Target -ErrorAction SilentlyContinue) {
                     $access.Exists = $true
                     $access.IsReadable = $true
@@ -123,7 +119,6 @@ function Test-MountAccessibility {
         } else {
             if (Test-Path -Path $Target -ErrorAction SilentlyContinue) {
                 $access.Exists = $true
-                # Test directory readability
                 $null = Get-ChildItem -Path $Target -ErrorAction Stop | Select-Object -First 1
                 $access.IsReadable = $true
             }
@@ -137,7 +132,6 @@ function Test-MountAccessibility {
 
 $mountAccess = Test-MountAccessibility -Target $targetMount
 
-# Scenario 1: No state file recorded or empty/corrupted state file
 if (-not $stateExists -or -not $stateData) {
     $status = "NOT_MOUNTED"
     $reason = if (-not $stateExists) { "No state file found at '$StateFile'." } else { "State file at '$StateFile' is unreadable or empty." }
@@ -169,13 +163,11 @@ if (-not $stateExists -or -not $stateData) {
     return
 }
 
-# Scenario 2: State file recorded, inspect process
 $proc = $null
 if ($savedPid -and $savedPid -gt 0) {
     $proc = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
 }
 
-# Process does not exist
 if (-not $proc) {
     $status = "NOT_MOUNTED"
     $reason = "Recorded rclone process (PID $($savedPid)) is not active."
@@ -206,9 +198,7 @@ if (-not $proc) {
     return
 }
 
-# ================= STRICT PROCESS IDENTITY VERIFICATION =================
 
-# Verification 1: ProcessName match against OS process
 if ($proc.ProcessName -ine "rclone" -or ($expectedName -and $proc.ProcessName -ine $expectedName)) {
     $res = [PSCustomObject]@{
         Timestamp      = [DateTime]::UtcNow.ToString("o")
@@ -231,7 +221,6 @@ if ($proc.ProcessName -ine "rclone" -or ($expectedName -and $proc.ProcessName -i
     return
 }
 
-# Schema completeness checks
 if (-not $expectedName -or $expectedName -ine "rclone") {
     $res = [PSCustomObject]@{
         Timestamp      = [DateTime]::UtcNow.ToString("o")
@@ -276,7 +265,6 @@ if (-not $expectedPath -or [string]::IsNullOrWhiteSpace($expectedPath)) {
     return
 }
 
-# Verification 2: Executable Path
 $procPath = $null
 try {
     if ($proc.Path) { $procPath = $proc.Path }
@@ -338,7 +326,6 @@ if (-not [string]::Equals($normProcPath, $normExpectedPath, [System.StringCompar
     return
 }
 
-# Verification 3: StartTime (<500ms precision)
 if (-not $recordedStartStr -or [string]::IsNullOrWhiteSpace($recordedStartStr)) {
     $res = [PSCustomObject]@{
         Timestamp      = [DateTime]::UtcNow.ToString("o")
@@ -395,7 +382,6 @@ if (-not $startTimeMatch) {
     return
 }
 
-# Verification 4: SessionId
 if ($expectedSessionId -eq $null) {
     $res = [PSCustomObject]@{
         Timestamp      = [DateTime]::UtcNow.ToString("o")
@@ -440,7 +426,6 @@ if ($proc.SessionId -ne $expectedSessionId) {
     return
 }
 
-# Verification 5: Live Process Invocation & Command Line Verification
 $liveCmd = $null
 if ($proc.PSObject.Properties['CommandLine'] -and $proc.CommandLine) {
     $liveCmd = [string]$proc.CommandLine
@@ -522,7 +507,6 @@ if (-not $invocationMatch) {
     return
 }
 
-# Verification 6: Mount Target, Arguments, Status presence
 if (-not $targetMount -or [string]::IsNullOrWhiteSpace($targetMount) -or
     -not $remoteTarget -or [string]::IsNullOrWhiteSpace($remoteTarget) -or
     -not $arguments -or -not $stateStatus) {
@@ -547,7 +531,6 @@ if (-not $targetMount -or [string]::IsNullOrWhiteSpace($targetMount) -or
     return
 }
 
-# Genuine rclone process confirmed running with 100% verified identity
 if ($mountAccess.IsReadable) {
     $status = "MOUNTED"
     $reason = "Verified rclone mount process (PID $($savedPid)) is running and mount target '$targetMount' is responsive."

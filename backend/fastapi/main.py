@@ -11,8 +11,9 @@ from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
 
-from routers import chat, core_api, frame, health, recommend, search, sync
+from routers import chat, core_api, frame, health, recommend, search, sync, web
 from services.database import _jwt_key
+from services.auth_limit import AuthRateLimiter
 from services.chat import ChatService
 from services.llm_client import LLMClient
 from services.model_registry import InferenceCapacityError
@@ -28,14 +29,15 @@ def _load_deepseek_config():
         for name in ("DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY",
                      "LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY"):
             if settings.get(name):
-                os.environ[name] = settings[name]
+                os.environ.setdefault(name, settings[name])
 
 
-def create_app(**options):
+def create_app(*, web_dist=None, **options):
     @asynccontextmanager
     async def lifespan(application):
         runtime = application.state.runtime
         _jwt_key()
+        await run_in_threadpool(runtime.db.ensure_initialized)
         await run_in_threadpool(runtime.db.secure_accounts)
         if runtime.registry.mode == "cloud":
             _load_deepseek_config()
@@ -63,8 +65,9 @@ def create_app(**options):
             finally:
                 await run_in_threadpool(runtime.close)
 
-    application = FastAPI(title="Dippie AI Gateway", version="3.0.0", lifespan=lifespan)
+    application = FastAPI(title="Dippie", version="3.0.0", lifespan=lifespan)
     application.state.runtime = Runtime(**options)
+    application.state.auth_limiter = AuthRateLimiter()
     @application.exception_handler(InferenceCapacityError)
     async def capacity_error(request, error):
         return JSONResponse({"detail": "GPU đang bận. Vui lòng thử lại sau."}, status_code=429,
@@ -72,6 +75,7 @@ def create_app(**options):
     origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
     application.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in origins],
                                allow_credentials=True, allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], allow_headers=["*"])
+    web.serve_web(application, web_dist or os.getenv("DIPPIE_WEB_DIST") or ROOT / "frontend/dist")
     for router in (health, sync, search, chat, frame, recommend, core_api):
         application.include_router(router.router)
     return application

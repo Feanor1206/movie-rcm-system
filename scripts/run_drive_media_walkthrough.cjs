@@ -1,23 +1,3 @@
-/**
- * DRIVE-01 Google Drive Mounted Media Streaming Walkthrough & Real Spring Boot Benchmark Harness
- *
- * Runs browser playback assertions via Chrome DevTools Protocol (CDP) against:
- *   1. Spring Boot DriveWalkthroughServer (isolated H2 in-memory DB, temp Drive mount root, observable permits)
- *   2. Next.js Standalone Production Build
- *
- * Verifies Milestone DRIVE-01 Capabilities:
- *   - Step 1: Simulated Drive unmount (mount offline) -> descriptor returns 503 -> UI displays [role="alert"]
- *             and [data-testid="descriptor-retry-btn"] -> restore mount -> click retry -> HTTP 200 and "Xem phim" appears.
- *   - Step 2: Click "Xem phim" -> video playback via HTTP 206 Partial Content (from Drive mount) -> measure
- *             initiation latency via requestVideoFrameCallback -> verify currentTime > 1.0s.
- *   - Step 3: 3 timeline scrubber seeks (including near end of video) via UI control -> measure latency and continuous playback.
- *   - Step 4: Pause and resume verification via UI play/pause button -> controlled error and retry recovery.
- *   - Step 5: Mobile 375px inspection: audit 5 touch controls (>= 44x44px target) with 0 layout collisions.
- *   - Step 6: Safe process cleanup in finally block -> save benchmark JSON and screenshots.
- *
- * Screenshots saved to: docs/reports/drive/DRIVE_01_F01/screenshots/
- * Benchmark output saved to: docs/reports/drive/DRIVE_01_F01/walkthrough_results.json
- */
 
 const http = require('node:http');
 const { spawn } = require('node:child_process');
@@ -148,10 +128,6 @@ function assertSnapshotsEqual(beforeSnapshot, afterSnapshot, contextMsg = 'Drive
   }
 }
 
-/**
- * Negative test: verifies that compareSnapshots detects and rejects a 1-byte file mutation
- * even when the file count remains identical.
- */
 function runSnapshotNegativeTest() {
   console.log('Running negative test: verifying snapshot detection of a 1-byte mutation on disk...');
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'drive-negative-snapshot-'));
@@ -163,7 +139,6 @@ function runSnapshotNegativeTest() {
     const snapBefore = snapshotDirectory(tempDir);
     assert.equal(snapBefore.length, 1, 'Baseline must track 1 file');
 
-    // Mutate exactly 1 byte in place (flip 0x5a -> 0x5b at index 50)
     const mutatedBytes = Buffer.from(originalBytes);
     mutatedBytes[50] = 0x5b;
     fs.writeFileSync(testFile, mutatedBytes);
@@ -224,9 +199,6 @@ function syncStandaloneAssets() {
   }
 }
 
-// ----------------------------------------------------------------------------
-// 1. Spring Boot Isolated Server Process
-// ----------------------------------------------------------------------------
 function startSpringBootServer() {
   return new Promise((resolve, reject) => {
     const cpPath = path.resolve(PROJECT_ROOT, 'backend/springboot/target/cp.txt');
@@ -288,9 +260,6 @@ function startSpringBootServer() {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 2. Next.js Standalone Production Server Process
-// ----------------------------------------------------------------------------
 function startNextServer(nextPort, springBootPort) {
   return new Promise((resolve, reject) => {
     syncStandaloneAssets();
@@ -336,9 +305,6 @@ function startNextServer(nextPort, springBootPort) {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 3. CDP Browser Client with Transparent Port Proxying
-// ----------------------------------------------------------------------------
 async function launchChromeWithCDP(springBootPort, cdpPort) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chrome-drive-01-'));
   const chromeArgs = [
@@ -403,7 +369,6 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
       else resolve(msg.result);
     }
 
-    // Intercept outgoing HTTP calls from browser targeting port 8080 and reroute to dynamic Spring Boot port
     if (msg.method === 'Fetch.requestPaused') {
       const { requestId, request } = msg.params;
       const originalUrl = request.url;
@@ -573,9 +538,6 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
   };
 }
 
-// ----------------------------------------------------------------------------
-// 4. HTTP Helpers & Statistical Utilities
-// ----------------------------------------------------------------------------
 function requestHttp(url, options = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -635,9 +597,6 @@ function computeStats(arr) {
   return { min, avg, p95, max, count: sorted.length };
 }
 
-// ----------------------------------------------------------------------------
-// 5. Main Execution: Browser Walkthrough & Benchmark for Google Drive Storage
-// ----------------------------------------------------------------------------
 async function main() {
   console.log('================================================================');
   console.log('  DRIVE-01 Browser Media Walkthrough & Spring Boot Benchmark     ');
@@ -651,51 +610,39 @@ async function main() {
   let nextPort = null;
   let cdpPort = null;
 
-  // Run negative test on snapshotting algorithm & filesystem detection
   runSnapshotNegativeTest();
 
-  // Ensure Drive mount media fixture exists BEFORE taking initial snapshot
   ensureDriveMountFixture();
 
   const diskBeforeSnapshot = snapshotDirectory(DRIVE_MOUNT_DIR);
   console.log(`Initial disk snapshot: ${diskBeforeSnapshot.length} files tracked in ${DRIVE_MOUNT_DIR}`);
 
   try {
-    // 0. Allocate ports
     nextPort = await findFreePort(3100);
     cdpPort = await findFreePort(9235);
 
-    // 1. Start Spring Boot DriveWalkthroughServer
     const springRes = await startSpringBootServer();
     springProcess = springRes.proc;
     springPort = springRes.port;
 
-    // Verify Spring Boot health
     const health = await requestHttp(`http://127.0.0.1:${springPort}/api/health`);
     assert.equal(health.statusCode, 200, 'Spring Boot health check must return 200');
     console.log('✔ Spring Boot health check confirmed: 200 UP');
 
-    // 2. Start Next.js Standalone
     nextProcess = await startNextServer(nextPort, springPort);
 
-    // Warm up Next.js movie route
     const movieRoute = `http://127.0.0.1:${nextPort}/movies/m4-drive-movie`;
     console.log(`Pre-warming Next.js movie route ${movieRoute}...`);
     try {
       await requestHttp(movieRoute, { timeoutMs: 15000 });
     } catch {}
 
-    // 3. Launch Chrome with CDP
     chromeSession = await launchChromeWithCDP(springPort, cdpPort);
     const { evaluate, waitForCondition, setViewport, navigate, captureScreenshot, dispatchKey, interceptedRequests } = chromeSession;
 
-    // ------------------------------------------------------------------------
-    // Part A: Desktop Playback Walkthrough for Google Drive Storage
-    // ------------------------------------------------------------------------
     console.log('\n--- Part A: Desktop Playback Walkthrough (provider=drive) ---');
     await setViewport(1280, 800, false);
 
-    // Bước 1: Simulated Drive Mount Disconnect -> [role="alert"] -> Restore -> Retry
     console.log('\n[Bước 1] Simulating Drive mount disconnect (unmount)...');
     const unmountRes = await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/unmount`, { method: 'POST' });
     assert.equal(unmountRes.statusCode, 200, 'Drive unmount diagnostic must return HTTP 200');
@@ -704,7 +651,6 @@ async function main() {
     console.log(`Navigating to movie detail page ${movieRoute}...`);
     await navigate(movieRoute);
 
-    // Verify movie title rendered
     await waitForCondition(
       `document.body.innerText.includes("Drive Walkthrough Cinema Special")`,
       'Movie title "Drive Walkthrough Cinema Special" visible on page',
@@ -712,7 +658,6 @@ async function main() {
     );
     console.log('✔ Movie title rendered on page');
 
-    // Verify descriptor failure: [role="alert"] and [data-testid="descriptor-retry-btn"]
     console.log('Verifying descriptor failure alert and retry button are visible...');
     await waitForCondition(
       `(() => {
@@ -734,7 +679,6 @@ async function main() {
       6000
     );
 
-    // Verify "Xem phim" feature button is NOT present while mount is unmounted
     const featureBtnDuringFault = await evaluate(`(() => {
       const btn = document.querySelector('button[data-testid="play-feature-btn"]') ||
                   document.querySelector('button[data-testid="watch-feature-btn"]') ||
@@ -744,23 +688,19 @@ async function main() {
     assert.equal(featureBtnDuringFault, false, 'Feature "Xem phim" button must NOT be rendered when Drive mount is disconnected');
     console.log('✔ Descriptor 503 verified: [role="alert"] visible, retry button active, "Xem phim" button absent');
 
-    // Capture Screenshot 0: Descriptor Failure State
     await captureScreenshot('00_desktop_drive_unmounted_alert.png');
 
-    // Restore Drive mount
     console.log('Restoring Drive mount via /api/test/drive/mount...');
     const mountRes = await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/mount`, { method: 'POST' });
     assert.equal(mountRes.statusCode, 200, 'Drive mount diagnostic must return HTTP 200');
     console.log('✔ Drive mount restored (adapterAvailable = true)');
 
-    // Click [data-testid="descriptor-retry-btn"]
     console.log('Clicking [data-testid="descriptor-retry-btn"] to recover descriptor...');
     await evaluate(`(() => {
       const btn = document.querySelector('button[data-testid="descriptor-retry-btn"]');
       if (btn) btn.click();
     })()`);
 
-    // Wait for [role="alert"] to be dismissed
     await waitForCondition(
       `document.querySelector('[role="alert"]') === null`,
       'Descriptor error alert dismissed after retry',
@@ -768,7 +708,6 @@ async function main() {
     );
     console.log('✔ Descriptor error alert dismissed');
 
-    // Verify "Xem phim" feature button is rendered and enabled
     await waitForCondition(
       `(() => {
         const btn = document.querySelector('button[data-testid="play-feature-btn"]') ||
@@ -781,9 +720,6 @@ async function main() {
     );
     console.log('✔ Feature "Xem phim" button active after Drive mount recovery');
 
-    // ------------------------------------------------------------------------
-    // Bước 2: Click "Xem phim" -> Video Playback via HTTP 206 Partial Content
-    // ------------------------------------------------------------------------
     console.log('\n[Bước 2] Clicking "Xem phim" to initiate Google Drive video streaming...');
     await evaluate(`(() => {
       const btn = document.querySelector('button[data-testid="play-feature-btn"]') ||
@@ -799,7 +735,6 @@ async function main() {
     );
     console.log('✔ Video element mounted in player modal');
 
-    // Check video initial state and trigger UI play if paused by browser policy
     const videoInitStatus = await evaluate(`(() => {
       const v = document.querySelector('video');
       window.__driveStalledCount = 0;
@@ -826,7 +761,6 @@ async function main() {
       })()`);
     }
 
-    // Measure presentation latency with requestVideoFrameCallback
     const frameTiming = await evaluate(`new Promise((resolve, reject) => {
       const v = document.querySelector('video');
       if (!v) return reject(new Error('HTML5 video element not found for presentation timing'));
@@ -863,7 +797,6 @@ async function main() {
     })`, 10000);
     console.log(`Browser video presentation timing: ${JSON.stringify(frameTiming)}`);
 
-    // Wait for video currentTime to advance past 1.0s (proves real frames decoding from Drive)
     console.log('Waiting for video decoding and currentTime > 1.0s...');
     await waitForCondition(
       `(() => {
@@ -876,17 +809,12 @@ async function main() {
     const initialPlayTime = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`✔ Real Google Drive video playback verified! currentTime: ${initialPlayTime.toFixed(2)}s`);
 
-    // Verify Spring Boot received HTTP stream requests
     const streamRequests = interceptedRequests.filter(r => r.originalUrl.includes('/api/media/stream/'));
     assert(streamRequests.length > 0, 'Browser must have issued stream request to Spring Boot media endpoint');
     console.log(`✔ Verified ${streamRequests.length} HTTP stream requests routed to Spring Boot`);
 
-    // Screenshot 1: Desktop Playing
     await captureScreenshot('01_desktop_drive_playback_playing.png');
 
-    // ------------------------------------------------------------------------
-    // Bước 3: 3 Timeline Scrubber Seeks (Including near end of video)
-    // ------------------------------------------------------------------------
     console.log('\n[Bước 3] Measuring 3 Browser Seeks via UI timeline scrubber control...');
     const browserSeekRuns = [];
     const targetSeekPositions = [5.0, 10.0, 15.0];
@@ -955,7 +883,6 @@ async function main() {
     const browserSeekStats = computeStats(browserSeekRuns);
     console.log(`  Drive Seek Latency Stats: min=${browserSeekStats.min}ms, avg=${browserSeekStats.avg}ms, p95=${browserSeekStats.p95}ms, max=${browserSeekStats.max}ms`);
 
-    // Continuous playback near end
     await waitForCondition(
       `(() => {
         const v = document.querySelector('video');
@@ -967,12 +894,8 @@ async function main() {
     const seekTime = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`✔ Continuous near-end playback verified! currentTime: ${seekTime.toFixed(2)}s`);
 
-    // Screenshot 2: Desktop Seek Near End
     await captureScreenshot('02_desktop_drive_seek_near_end.png');
 
-    // ------------------------------------------------------------------------
-    // Bước 4: Pause and Resume via UI Button & Error Recovery
-    // ------------------------------------------------------------------------
     console.log('\n[Bước 4] Testing Pause / Resume via UI button...');
     await evaluate(`(() => {
       const btn = document.querySelector('button[data-testid="video-play-pause-btn"]');
@@ -1002,7 +925,6 @@ async function main() {
     );
     console.log('✔ Video resumed via UI button click');
 
-    // Controlled playback error & retry recovery
     console.log('Testing controlled playback error and UI retry recovery...');
     const timeBeforeError = await evaluate(`document.querySelector('video').currentTime`);
     await evaluate(`(() => {
@@ -1035,17 +957,12 @@ async function main() {
     const recoveredTime = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`✔ Playback retry recovery verified! Restored time: ${recoveredTime.toFixed(2)}s`);
 
-    // Screenshot 3: Retry Recovery
     await captureScreenshot('03_desktop_drive_retry_recovery.png');
 
-    // Close modal via Escape
     await dispatchKey('Escape', 'Escape', 27);
     await waitForCondition(`document.querySelector('video') === null`, 'Modal closed', 4000);
     console.log('✔ Modal closed via Escape key');
 
-    // ------------------------------------------------------------------------
-    // Bước 5: Mobile Viewport 375px Inspection (5 controls >= 44x44px, 0 collisions)
-    // ------------------------------------------------------------------------
     console.log('\n[Bước 5] Mobile 375px Playback Inspection...');
     await setViewport(375, 667, true);
 
@@ -1059,7 +976,6 @@ async function main() {
 
     await waitForCondition(`Boolean(document.querySelector('video'))`, 'Mobile video player open', 5000);
 
-    // Mobile controls audit
     const mobileAudit = await evaluate(`(() => {
       function getInfo(selector, name) {
         const el = document.querySelector(selector);
@@ -1121,17 +1037,12 @@ async function main() {
     assert.equal(mobileAudit.collisions.length, 0, `Player controls must not have layout collisions (found: ${JSON.stringify(mobileAudit.collisions)})`);
     console.log('✔ All 5 mobile controls meet >= 44x44px touch target with 0 collisions');
 
-    // Screenshot 4: Mobile Playback
     await captureScreenshot('04_mobile_drive_playback_375px.png');
 
-    // Close mobile modal
     await dispatchKey('Escape', 'Escape', 27);
     await waitForCondition(`document.querySelector('video') === null`, 'Mobile modal closed', 4000);
     console.log('✔ Mobile modal closed');
 
-    // ------------------------------------------------------------------------
-    // Part C: Real Spring Boot HTTP Media Benchmark (provider=drive)
-    // ------------------------------------------------------------------------
     console.log('\n--- Part C: Spring Boot HTTP Benchmark for Google Drive Storage ---');
     const assetId = 'ast-drive-walkthrough-feat';
     const streamUrl = `http://127.0.0.1:${springPort}/api/media/stream/${assetId}`;
@@ -1140,7 +1051,6 @@ async function main() {
     const totalFileLength = fileBytes.length;
     console.log(`Drive Media Asset: ${MEDIA_FILE} (${totalFileLength} bytes, ${(totalFileLength / 1024).toFixed(1)} KiB)`);
 
-    // 1. Startup Latency (Range: bytes=0-65535, 3 runs)
     console.log('\n[Benchmark 1/5] Measuring Startup Latency (Initial 64 KiB Range Chunk, 3 runs)...');
     const startupRuns = [];
     for (let r = 1; r <= 3; r++) {
@@ -1156,7 +1066,6 @@ async function main() {
     const startupStats = computeStats(startupRuns);
     console.log(`  Drive Startup TTFB Stats: min=${startupStats.min}ms, avg=${startupStats.avg}ms, p95=${startupStats.p95}ms, max=${startupStats.max}ms`);
 
-    // 2. Mid & End Seek Latency (3 runs each)
     console.log('\n[Benchmark 2/5] Measuring Seek Chunk Latencies across positions (3 runs each)...');
     const midSeekRuns = [];
     const endSeekRuns = [];
@@ -1181,7 +1090,6 @@ async function main() {
     const midSeekStats = computeStats(midSeekRuns);
     const endSeekStats = computeStats(endSeekRuns);
 
-    // 3. Single Stream Full Playback Download Throughput (3 runs)
     console.log('\n[Benchmark 3/5] Measuring Single Stream Full Playback Throughput (3 runs)...');
     const singleThroughputRuns = [];
     for (let r = 1; r <= 3; r++) {
@@ -1197,7 +1105,6 @@ async function main() {
     }
     const singleThroughputStats = computeStats(singleThroughputRuns);
 
-    // 4. Concurrency: 3 Parallel Streams (3 runs)
     console.log('\n[Benchmark 4/5] Measuring Concurrency: 3 Parallel Streams (3 runs)...');
     const parallelRuns = [];
     for (let r = 1; r <= 3; r++) {
@@ -1231,13 +1138,11 @@ async function main() {
     const parallelAggregateStats = computeStats(parallelRuns.map(x => x.aggregateMBs));
     const parallelTtfbStats = computeStats(parallelRuns.map(x => x.avgStreamTTFB));
 
-    // 5. Observable Stream Permit Cleanup & Overload 429
     console.log('\n[Benchmark 5/5] Testing Stream Permit Cleanup & Overload HTTP 429...');
     const metricsBaseline = await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/metrics`);
     const baselineData = JSON.parse(metricsBaseline.body.toString());
     assert.equal(baselineData.activeStreams, 0, 'Baseline active stream count must be 0');
 
-    // Hold 1 stream active via test gate
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/gate/arm`, { method: 'POST' });
     let activeWhileStreaming = -1;
     let overload429Verified = false;
@@ -1259,7 +1164,6 @@ async function main() {
     }
     assert(activeWhileStreaming >= 1, 'Active stream counter must reflect active connection');
 
-    // Squeeze limit to 1 -> request 2 must get 429
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/max-concurrent-streams?limit=1`, { method: 'POST' });
     const res2 = await requestHttp(streamUrl, { headers: { Range: 'bytes=0-65535' } });
     if (res2.statusCode === 429) {
@@ -1270,7 +1174,6 @@ async function main() {
     assert(overload429Verified, 'Server must return HTTP 429 when max concurrent streams limit is exceeded');
     console.log('✔ Overload HTTP 429 verified with Retry-After: 5 and Cache-Control: no-store');
 
-    // Release gate and restore concurrency limit
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/gate/release`, { method: 'POST' });
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/drive/max-concurrent-streams?limit=10`, { method: 'POST' });
 
@@ -1287,13 +1190,11 @@ async function main() {
     assert.equal(activeAfterDisconnect, 0, 'Active stream count must return to 0 after disconnect');
     console.log('✔ Active stream counter returned to 0 after stream close');
 
-    // 6. Monitored Directory Disk Snapshot: Full Parity (Paths, Exact Byte Sizes, and SHA-256)
     const diskAfterSnapshot = snapshotDirectory(DRIVE_MOUNT_DIR);
     console.log(`Final disk snapshot: ${diskAfterSnapshot.length} files tracked in ${DRIVE_MOUNT_DIR}`);
     assertSnapshotsEqual(diskBeforeSnapshot, diskAfterSnapshot, 'Drive mount directory disk snapshot');
     console.log('✔ Drive mount directory snapshot verified: 100% path, byte size, and SHA-256 parity');
 
-    // Assemble comprehensive benchmark report
     const finalReport = {
       benchmarkVersion: '1.0',
       timestamp: new Date().toISOString(),

@@ -121,7 +121,6 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
     rec_ids = [m.get("id") for m in recs]
     top_item = recs[0] if recs else {}
 
-    # C1: Abstention must synchronize empty recommendations and rankedCount == 0
     if tc.get("expected_empty"):
         if recs:
             return False, f"C1 Failure: expected empty recommendations (abstention), but got {len(recs)} cards: {rec_ids}"
@@ -132,14 +131,12 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
                 if did in rec_ids:
                     return False, f"Disallowed item {did} returned in abstention case"
 
-    # Case: Generic descriptive queries must return candidates
     if tc.get("disallowed_empty"):
         if not recs:
             return False, "Expected non-empty recommendations for generic discovery query, got 0"
         if len(recs) < tc.get("min_results_count", 1):
             return False, f"Expected at least {tc.get('min_results_count')} results, got {len(recs)}"
 
-    # Case: Exact title match
     if tc.get("expected_top_id"):
         exp_id = tc["expected_top_id"]
         if not recs:
@@ -149,38 +146,32 @@ def evaluate_case_verdict(tc: dict, resp_json: dict, http_status: int) -> tuple[
         if tc.get("expected_type") and top_item.get("item_type") != tc["expected_type"]:
             return False, f"Top item type={top_item.get('item_type')}, expected {tc['expected_type']}"
 
-    # Case: Disallowed IDs
     if tc.get("disallowed_ids") and not tc.get("expected_empty"):
         for did in tc["disallowed_ids"]:
             if did in rec_ids:
                 return False, f"Disallowed item {did} was returned"
 
-    # Case: Forbidden text phrases in explanation
     if tc.get("forbidden_text_phrases"):
         for fphrase in tc["forbidden_text_phrases"]:
             if fphrase.lower() in explanation.lower():
                 return False, f"Forbidden phrase '{fphrase}' found in explanation"
 
-    # Case: Forbidden follow-up phrases (C1 check)
     if tc.get("forbidden_follow_ups_phrases"):
         follow_str = json.dumps(follow_ups, ensure_ascii=False).lower()
         for fphrase in tc["forbidden_follow_ups_phrases"]:
             if fphrase.lower() in follow_str:
                 return False, f"C1 Failure: Forbidden phrase '{fphrase}' found in followUps: {follow_ups}"
 
-    # Case: Required specific text phrase
     if tc.get("required_text_phrase"):
         req_phrase = tc["required_text_phrase"]
         if req_phrase.lower() not in explanation.lower():
             return False, f"Missing required phrase '{req_phrase}' in explanation"
 
-    # Case: Required ANY phrase from list
     if tc.get("required_any_phrase"):
         phrases = tc["required_any_phrase"]
         if not any(p.lower() in explanation.lower() for p in phrases):
             return False, f"Explanation did not contain any of required phrases: {phrases}"
 
-    # Case: Release year check
     if tc.get("expected_year"):
         exp_year = tc["expected_year"]
         if recs and top_item.get("release_year") != exp_year and top_item.get("year") != exp_year:
