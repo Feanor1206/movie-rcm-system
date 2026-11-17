@@ -1,23 +1,4 @@
 #!/usr/bin/env node
-/**
- * DRIVE-01 Preview & Validation Tool for Google Drive Media Mapping Manifests
- *
- * Strictly validate-only CLI tool that inspects, validates, and simulates
- * media mapping manifests before database ingestion.
- *
- * POLICIES & BOUNDARIES:
- *   - NEVER connects to, writes to, or modifies any live database or files.
- *   - Enforces strict JSON schema & type validation.
- *   - Enforces uniqueness of `assetId` and `(movieId, kind)` pairs.
- *   - Enforces strict path security: forbids absolute paths, Windows drives, UNC paths, and traversal (..).
- *   - When `--mount <path>` is provided, verifies physical file existence and exact byte length matching.
- *
- * Usage:
- *   node scripts/preview_drive_media_mapping.cjs
- *   node scripts/preview_drive_media_mapping.cjs --manifest docs/fixtures/drive_media_mapping.example.json
- *   node scripts/preview_drive_media_mapping.cjs --manifest <path> --mount M:\DippieMedia
- *   node scripts/preview_drive_media_mapping.cjs --json
- */
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -40,29 +21,24 @@ function isSafeRelativePath(relPath) {
   if (relPath.includes('\0')) {
     return { safe: false, reason: 'relativePath contains forbidden null byte' };
   }
-  // Forbid colon (prevents NTFS Alternate Data Streams, e.g. clip.mp4:secret, Windows drive prefixes, device paths)
   if (relPath.includes(':')) {
     return { safe: false, reason: 'relativePath contains forbidden colon (device path or NTFS Alternate Data Stream)' };
   }
-  // Forbid Windows drive letter prefix (e.g. C:, D:)
   if (/^[a-zA-Z]:/.test(relPath)) {
     return { safe: false, reason: 'Absolute Windows drive path is forbidden' };
   }
-  // Forbid Unix root, Windows UNC path, device namespaces
   if (relPath.startsWith('/') || relPath.startsWith('\\')) {
     return { safe: false, reason: 'Absolute or UNC path is forbidden' };
   }
   if (/^[/\\]{2}/.test(relPath) || /^[/\\]{2}[.?][/\\]/.test(relPath)) {
     return { safe: false, reason: 'Device namespace or UNC path is forbidden' };
   }
-  // Check directory traversal segments
   const segments = relPath.split(/[/\\]/);
   for (const seg of segments) {
     if (seg === '..') {
       return { safe: false, reason: 'Path traversal (..) segment is forbidden' };
     }
   }
-  // Check normalized representation
   const normalized = path.normalize(relPath).replace(/\\/g, '/');
   if (normalized.startsWith('../') || normalized === '..' || normalized.includes('/../')) {
     return { safe: false, reason: 'Path traversal escaping mount root is forbidden' };
@@ -88,28 +64,24 @@ function validateAsset(asset, index) {
     return { valid: false, errors: [`${prefix} Record must be a JSON object`] };
   }
 
-  // 1. assetId
   if (typeof asset.assetId !== 'string' || asset.assetId.trim() === '') {
     errors.push(`${prefix} "assetId" is required and must be a non-empty string`);
   } else if (!SAFE_ID_REGEX.test(asset.assetId)) {
     errors.push(`${prefix} "assetId" contains invalid characters (allowed: alphanumeric, _, -, .)`);
   }
 
-  // 2. movieId
   if (typeof asset.movieId !== 'string' || asset.movieId.trim() === '') {
     errors.push(`${prefix} "movieId" is required and must be a non-empty string`);
   } else if (!SAFE_ID_REGEX.test(asset.movieId)) {
     errors.push(`${prefix} "movieId" contains invalid characters (allowed: alphanumeric, _, -, .)`);
   }
 
-  // 3. storageProvider
   if (typeof asset.storageProvider !== 'string' || asset.storageProvider.trim() === '') {
     errors.push(`${prefix} "storageProvider" is required`);
   } else if (!ALLOWED_PROVIDERS.has(asset.storageProvider)) {
     errors.push(`${prefix} "storageProvider" must be "drive" (got: "${asset.storageProvider}")`);
   }
 
-  // 4. relativePath & path safety
   if (typeof asset.relativePath !== 'string' || asset.relativePath.trim() === '') {
     errors.push(`${prefix} "relativePath" is required and must be a non-empty string`);
   } else {
@@ -119,36 +91,30 @@ function validateAsset(asset, index) {
     }
   }
 
-  // 5. kind
   if (typeof asset.kind !== 'string' || asset.kind.trim() === '') {
     errors.push(`${prefix} "kind" is required`);
   } else if (!ALLOWED_KINDS.has(asset.kind)) {
     errors.push(`${prefix} "kind" must be one of [${Array.from(ALLOWED_KINDS).join(', ')}] (got: "${asset.kind}")`);
   }
 
-  // 6. mimeType
   if (typeof asset.mimeType !== 'string' || asset.mimeType.trim() === '') {
     errors.push(`${prefix} "mimeType" is required and must be a non-empty string`);
   } else if (!asset.mimeType.startsWith('video/') && !asset.mimeType.startsWith('audio/')) {
     errors.push(`${prefix} "mimeType" must be a valid media MIME type starting with video/ or audio/ (got: "${asset.mimeType}")`);
   }
 
-  // 7. byteLength
   if (typeof asset.byteLength !== 'number' || !Number.isInteger(asset.byteLength) || asset.byteLength <= 0) {
     errors.push(`${prefix} "byteLength" must be a positive integer greater than 0 (got: ${asset.byteLength})`);
   }
 
-  // 8. version
   if (typeof asset.version !== 'string' || asset.version.trim() === '') {
     errors.push(`${prefix} "version" is required and must be a non-empty string`);
   }
 
-  // 9. isPublic
   if (typeof asset.isPublic !== 'boolean') {
     errors.push(`${prefix} "isPublic" is required and must be a boolean (got: ${typeof asset.isPublic})`);
   }
 
-  // 10. durationSeconds (optional)
   if (asset.durationSeconds !== undefined && asset.durationSeconds !== null) {
     if (typeof asset.durationSeconds !== 'number' || Number.isNaN(asset.durationSeconds) || asset.durationSeconds < 0) {
       errors.push(`${prefix} "durationSeconds" if provided must be a non-negative number`);
@@ -226,7 +192,6 @@ function checkMountFiles(assets, mountPath) {
     if (!safety.safe) continue;
 
     const fullPath = path.resolve(normMount, asset.relativePath);
-    // Security check 1: Lexical containment
     const relToMount = path.relative(normMount, fullPath);
     if (relToMount.startsWith('..') || path.isAbsolute(relToMount)) {
       mismatches.push({
@@ -246,7 +211,6 @@ function checkMountFiles(assets, mountPath) {
       });
     } else {
       try {
-        // Security check 2: Canonical / real path containment (junction / symlink traversal)
         let realTarget;
         try {
           realTarget = fs.realpathSync(fullPath);
@@ -379,7 +343,6 @@ function validateManifest(manifestInput, options = {}) {
     };
   }
 
-  // Extract assets array
   let assets = [];
   if (Array.isArray(manifestObj)) {
     assets = manifestObj;
@@ -419,7 +382,6 @@ function validateManifest(manifestInput, options = {}) {
 
     let hasIssue = false;
 
-    // Check duplicate assetId
     if (seenAssetIds.has(asset.assetId)) {
       const prevIdx = seenAssetIds.get(asset.assetId);
       conflicts.push({
@@ -432,7 +394,6 @@ function validateManifest(manifestInput, options = {}) {
       seenAssetIds.set(asset.assetId, i + 1);
     }
 
-    // Check duplicate (movieId, kind) pair
     const movieKindKey = `${asset.movieId}::${asset.kind}`;
     if (seenMovieKinds.has(movieKindKey)) {
       const prevIdx = seenMovieKinds.get(movieKindKey);
@@ -447,7 +408,6 @@ function validateManifest(manifestInput, options = {}) {
       seenMovieKinds.set(movieKindKey, i + 1);
     }
 
-    // Check path security
     const safety = isSafeRelativePath(asset.relativePath);
     if (!safety.safe) {
       unsafePaths.push({
@@ -463,7 +423,6 @@ function validateManifest(manifestInput, options = {}) {
     }
   }
 
-  // Mount audit if requested
   const mountReport = checkMountFiles(validAssets, options.mountPath);
 
   const hasMountError = Boolean(
@@ -491,9 +450,6 @@ function validateManifest(manifestInput, options = {}) {
   };
 }
 
-/**
- * CLI Runner with user-friendly formatting and exit code handling.
- */
 function runCli() {
   const args = process.argv.slice(2);
   let manifestPath = DEFAULT_MANIFEST_PATH;

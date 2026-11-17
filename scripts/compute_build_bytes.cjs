@@ -1,10 +1,5 @@
 'use strict';
 
-/**
- * Dynamic JavaScript First Load Budget Guard and Metric Engine.
- * Recomputes actual route bundle sizes from Next.js build manifest and disk artifacts.
- * Never relies on hardcoded size constants.
- */
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,7 +7,7 @@ const zlib = require('node:zlib');
 const crypto = require('node:crypto');
 const os = require('node:os');
 
-const DEFAULT_BUDGET_BYTES = 140 * 1024; // 143,360 bytes = 140 KiB
+const DEFAULT_BUDGET_BYTES = 140 * 1024;
 
 const DEFAULT_ROUTES = {
   '/': '/page',
@@ -92,7 +87,6 @@ function computeBuildBytes(options = {}) {
       ? manifest.pages[manifestKey]
       : [];
 
-    // Deduplicate unique JavaScript chunks across layout and page
     const chunkNames = [...new Set([...layoutChunks, ...routeChunks])].filter((name) =>
       name.endsWith('.js')
     );
@@ -153,14 +147,6 @@ function computeBuildBytes(options = {}) {
   return result;
 }
 
-/**
- * Self-test suite verifying dynamic budget calculations and contract assertions:
- * - Negative test 1: Missing manifest throws error.
- * - Negative test 2: Missing route manifest entry throws error.
- * - Negative test 3: Missing chunk file on disk throws error.
- * - Negative test 4: Over-budget detection on tiny budget throws / flags underBudget: false.
- * - Positive test 5: Real build measurement verification passes.
- */
 function runBuildBytesSelfTest() {
   console.log('🧪 Starting compute_build_bytes Self-Test Suite...');
 
@@ -168,7 +154,6 @@ function runBuildBytesSelfTest() {
   fs.mkdirSync(tmpRoot, { recursive: true });
 
   try {
-    // 1. Negative Test: Missing manifest
     let threwMissingManifest = false;
     try {
       computeBuildBytes({ buildDir: path.join(tmpRoot, 'empty') });
@@ -184,7 +169,6 @@ function runBuildBytesSelfTest() {
     }
     console.log('  ✔ Negative Test 1 (Missing manifest detection): PASS');
 
-    // 2. Negative Test: Missing route manifest entry
     const fixtureDir = path.join(tmpRoot, 'fixture');
     fs.mkdirSync(fixtureDir, { recursive: true });
     fs.writeFileSync(path.join(fixtureDir, 'BUILD_ID'), 'test-build-123\n');
@@ -208,7 +192,6 @@ function runBuildBytesSelfTest() {
     }
     console.log('  ✔ Negative Test 2 (Missing route manifest entry): PASS');
 
-    // 3. Negative Test: Missing chunk file on disk
     fs.writeFileSync(
       path.join(fixtureDir, 'app-build-manifest.json'),
       JSON.stringify({
@@ -237,25 +220,22 @@ function runBuildBytesSelfTest() {
     }
     console.log('  ✔ Negative Test 3 (Missing chunk file detection): PASS');
 
-    // 4. Negative Test: Over-budget detection on tiny budget
     const chunkDir = path.join(fixtureDir, 'static', 'chunks');
     fs.mkdirSync(chunkDir, { recursive: true });
     const dummyContent = 'console.log("hello world from movie recommendation system bundle");'.repeat(20);
     fs.writeFileSync(path.join(chunkDir, 'ghost-chunk.js'), dummyContent);
     fs.writeFileSync(path.join(chunkDir, 'ghost-page.js'), dummyContent);
 
-    // 4a. Without throw: underBudget must be false
     const overResult = computeBuildBytes({
       buildDir: fixtureDir,
       routes: { '/': '/page' },
-      budgetBytes: 50, // Tiny budget (50 bytes)
+      budgetBytes: 50,
       throwOnOverBudget: false,
     });
     if (overResult.routes['/'].underBudget !== false || overResult.allUnderBudget !== false) {
       throw new Error('Self-test failed: Tiny budget must mark underBudget=false');
     }
 
-    // 4b. With throw: must throw over-budget error
     let threwOverBudget = false;
     try {
       computeBuildBytes({
@@ -276,7 +256,6 @@ function runBuildBytesSelfTest() {
     }
     console.log('  ✔ Negative Test 4 (Over-budget detection with tiny budget): PASS');
 
-    // 5. Positive Test: Real build measurement verification
     const realResult = computeBuildBytes({ throwOnOverBudget: true });
     if (!realResult || !realResult.allUnderBudget) {
       throw new Error('Self-test failed: Real build failed budget check');
@@ -304,7 +283,6 @@ function runBuildBytesSelfTest() {
   }
 }
 
-// CLI Execution Entrypoint
 if (require.main === module) {
   const isNegativeTest = process.argv.includes('--negative-test');
   if (isNegativeTest) {

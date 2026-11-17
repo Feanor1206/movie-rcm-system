@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// Redact any auth or grant tokens from URLs before recording
 const redactUrl = (url) => {
   if (!url) return '';
   return String(url)
@@ -52,7 +51,6 @@ async function runBrowserVerificationF02() {
   let ws = null;
 
   try {
-    // 1. Connect to CDP
     let page = null;
     const deadlineConnect = Date.now() + 15000;
     while (Date.now() < deadlineConnect) {
@@ -107,7 +105,6 @@ async function runBrowserVerificationF02() {
     const ensureDir = (p) => { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); };
     ensureDir('docs/reviews/evidence');
 
-    // 2. Perform admin authentication
     console.log('[USABILITY-01-F02] Step 1: Authenticating as admin to obtain access token...');
     const loginRes = await fetch('http://127.0.0.1:8080/api/auth/login', {
       method: 'POST',
@@ -126,7 +123,6 @@ async function runBrowserVerificationF02() {
     };
     console.log('[USABILITY-01-F02] Admin authenticated successfully.');
 
-    // Inject auth token into localStorage on domain
     await send('Page.navigate', { url: 'http://localhost:3000/' });
     await new Promise(r => setTimeout(r, 2000));
     await send('Runtime.evaluate', {
@@ -138,18 +134,13 @@ async function runBrowserVerificationF02() {
       })()`
     });
 
-    // -------------------------------------------------------------------------
-    // CASE 1: V1 EPISODE SWITCHING (NO SNAPBACK)
-    // -------------------------------------------------------------------------
     console.log('\n[USABILITY-01-F02] Case 1: Testing V1 Episode Switching & Snapback Immunity...');
 
-    // Step 1.1: Navigate to S1E1 deep link (simulating click from CineBot card)
     const initialUrl = 'http://localhost:3000/series/ser_jadoo?episode=ep_jadoo_s01_0001';
     console.log(`[USABILITY-01-F02] Navigating to initial deep-link: ${initialUrl}`);
     await send('Page.navigate', { url: initialUrl });
     await new Promise(r => setTimeout(r, 2500));
 
-    // Wait for S1E1 video player to initialize and load media
     console.log('[USABILITY-01-F02] Waiting for Episode 1 media to load...');
     let ep1Loaded = false;
     let ep1State = null;
@@ -189,7 +180,6 @@ async function runBrowserVerificationF02() {
       src: redactUrl(ep1State.src)
     });
 
-    // Test Episode 1 playback advancement
     await send('Runtime.evaluate', { expression: 'document.querySelector("video").play()' });
     const ep1T0 = (await send('Runtime.evaluate', { expression: 'document.querySelector("video").currentTime', returnByValue: true })).result.value;
     await new Promise(r => setTimeout(r, 2000));
@@ -198,13 +188,11 @@ async function runBrowserVerificationF02() {
     console.log(`[USABILITY-01-F02] Episode 1 playback advancing: ${ep1T0.toFixed(3)}s -> ${ep1T1.toFixed(3)}s (advancing: ${ep1Advancing})`);
     if (!ep1Advancing) throw new Error('Episode 1 playback failed to advance time');
 
-    // Capture S1E1 screenshot
     const s01e01Snap = await send('Page.captureScreenshot', { format: 'png' });
     const s01e01SnapPath = 'docs/reviews/evidence/USABILITY_01_F02_live_s01e01_playing.png';
     fs.writeFileSync(s01e01SnapPath, Buffer.from(s01e01Snap.data, 'base64'));
     evidence.screenshots.s01e01 = s01e01SnapPath;
 
-    // Step 1.2: Manually click Episode 2 (ep_jadoo_s01_0002) in sidebar
     console.log('[USABILITY-01-F02] Clicking Episode 2 button in sidebar list...');
     const clickRes = await send('Runtime.evaluate', {
       expression: `(() => {
@@ -229,11 +217,9 @@ async function runBrowserVerificationF02() {
       throw new Error('Failed to find Episode 2 button in sidebar');
     }
 
-    // Step 1.3: Wait 3 seconds for state to settle, then verify Episode 2 is maintained (NO SNAPBACK!)
     console.log('[USABILITY-01-F02] Waiting 3000ms for state and requests to settle...');
     await new Promise(r => setTimeout(r, 3000));
 
-    // Verify URL bar is updated to ep_jadoo_s01_0002
     const currentLoc = (await send('Runtime.evaluate', { expression: 'window.location.href', returnByValue: true })).result.value;
     console.log(`[USABILITY-01-F02] Post-click URL: ${currentLoc}`);
     if (!currentLoc.includes('episode=ep_jadoo_s01_0002')) {
@@ -243,7 +229,6 @@ async function runBrowserVerificationF02() {
       throw new Error(`CRITICAL V1 REGRESSION: URL still contains ep_jadoo_s01_0001: ${currentLoc}`);
     }
 
-    // Wait for Episode 2 video media to load
     console.log('[USABILITY-01-F02] Waiting for Episode 2 media to load...');
     let ep2Loaded = false;
     let ep2State = null;
@@ -284,7 +269,6 @@ async function runBrowserVerificationF02() {
       src: redactUrl(ep2State.src)
     });
 
-    // Test Episode 2 playback advancement
     await send('Runtime.evaluate', { expression: 'document.querySelector("video").play()' });
     const ep2T0 = (await send('Runtime.evaluate', { expression: 'document.querySelector("video").currentTime', returnByValue: true })).result.value;
     await new Promise(r => setTimeout(r, 2000));
@@ -293,19 +277,16 @@ async function runBrowserVerificationF02() {
     console.log(`[USABILITY-01-F02] Episode 2 playback advancing: ${ep2T0.toFixed(3)}s -> ${ep2T1.toFixed(3)}s (advancing: ${ep2Advancing})`);
     if (!ep2Advancing) throw new Error('Episode 2 playback failed to advance time');
 
-    // Confirm that after playback advancement, URL and state are STILL Episode 2 (IMMUNITY CONFIRMED)
     const finalLoc = (await send('Runtime.evaluate', { expression: 'window.location.href', returnByValue: true })).result.value;
     if (!finalLoc.includes('episode=ep_jadoo_s01_0002') || finalLoc.includes('episode=ep_jadoo_s01_0001')) {
       throw new Error(`CRITICAL V1 REGRESSION: State snapped back to ep1 during playback: ${finalLoc}`);
     }
 
-    // Capture S1E2 screenshot
     const s01e02Snap = await send('Page.captureScreenshot', { format: 'png' });
     const s01e02SnapPath = 'docs/reviews/evidence/USABILITY_01_F02_live_s01e02_playing.png';
     fs.writeFileSync(s01e02SnapPath, Buffer.from(s01e02Snap.data, 'base64'));
     evidence.screenshots.s01e02 = s01e02SnapPath;
 
-    // Step 1.4: Click back to Episode 1 to test bi-directional switching
     console.log('[USABILITY-01-F02] Clicking back to Episode 1 in sidebar...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -335,16 +316,13 @@ async function runBrowserVerificationF02() {
       status: 'PASS'
     };
 
-    // -------------------------------------------------------------------------
     // CASE 2: V2 SCENE SEEK WITH FILE TIMELINE (5.0s, NO COVERAGE SHIFT)
-    // -------------------------------------------------------------------------
     console.log('\n[USABILITY-01-F02] Case 2: Testing V2 Scene Seek with timeline=file...');
     const sceneUrl = 'http://localhost:3000/series/ser_jadoo?episode=ep_jadoo_s01_0001&scene=scene_jadoo_s01_0001_sc01&asset=asset_jadoo_s01_v0001&t=5000&timeline=file';
     console.log(`[USABILITY-01-F02] Navigating to Scene URL: ${sceneUrl}`);
     await send('Page.navigate', { url: sceneUrl });
     await new Promise(r => setTimeout(r, 3500));
 
-    // Wait for video to load and seek to ~5.0s
     let sceneLoaded = false;
     let sceneState = null;
     const sceneDeadline = Date.now() + 30000;
@@ -394,7 +372,6 @@ async function runBrowserVerificationF02() {
       throw new Error(`CRITICAL V2 REGRESSION: Scene seeked to ${sceneState.currentTime}s, expected ~5.0s (likely shifted by coverage!)`);
     }
 
-    // Capture scene screenshot
     const sceneSnap = await send('Page.captureScreenshot', { format: 'png' });
     const sceneSnapPath = 'docs/reviews/evidence/USABILITY_01_F02_live_scene_seek_5s.png';
     fs.writeFileSync(sceneSnapPath, Buffer.from(sceneSnap.data, 'base64'));
@@ -414,9 +391,6 @@ async function runBrowserVerificationF02() {
       status: 'PASS'
     };
 
-    // -------------------------------------------------------------------------
-    // CASE 3: V2 SEGMENT SEEK WITH LOGICAL TIMELINE
-    // -------------------------------------------------------------------------
     console.log('\n[USABILITY-01-F02] Case 3: Testing V2 Segment Seek with logical timeline...');
     const segUrl = 'http://localhost:3000/series/ser_jadoo?episode=ep_jadoo_s01_0008&segment=seg_jadoo_s01_008a&asset=asset_jadoo_s01_v0008&t=0';
     console.log(`[USABILITY-01-F02] Navigating to Segment URL: ${segUrl}`);
@@ -489,7 +463,6 @@ async function runBrowserVerificationF02() {
     } catch (_) {}
   }
 
-  // Write evidence JSON
   const evidencePath = 'docs/reviews/evidence/USABILITY_01_F02_BROWSER_VERIFICATION.json';
   fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf-8');
   console.log(`[USABILITY-01-F02] Saved evidence to ${evidencePath}`);

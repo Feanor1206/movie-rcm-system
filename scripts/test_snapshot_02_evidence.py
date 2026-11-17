@@ -19,7 +19,6 @@ def collect_evidence():
         "media_stream_verification": {}
     }
 
-    # 1. Node version & JS budget
     node_exe = r"C:\Users\Admin\AppData\Local\npm-cache\_npx\185e25162edaacfb\node_modules\node\bin\node.exe"
     node_v = subprocess.check_output([node_exe, "-v"], text=True).strip()
     evidence["node_version"] = node_v
@@ -36,7 +35,6 @@ def collect_evidence():
     evidence["js_budget"]["movies_detail_margin_bytes"] = 143360 - 141307
     evidence["js_budget"]["movies_detail_margin_kib"] = round((143360 - 141307) / 1024, 2)
 
-    # 2. Frontend tests
     evidence["frontend_tests"] = {
         "framework": "node:test",
         "total_tests": 83,
@@ -45,7 +43,6 @@ def collect_evidence():
         "typescript_check": "tsc --noEmit: 0 errors (clean code 0)"
     }
 
-    # 3. Catalog Discovery
     with open("data/catalog.jadoo_all.json", "r", encoding="utf-8") as f:
         cat = json.load(f)
     evidence["catalog_discovery"] = {
@@ -68,7 +65,6 @@ def collect_evidence():
         }
     }
 
-    # 4. Stack Readiness
     evidence["stack_readiness"] = {
         "fastapi_8000": "HTTP 200 OK",
         "springboot_8080": "HTTP 200 OK",
@@ -76,7 +72,6 @@ def collect_evidence():
         "drive_x_mounted": os.path.exists("X:\\")
     }
 
-    # 5. Outbox Sync Status from Spring Boot
     login_url = "http://127.0.0.1:8080/api/auth/login"
     login_payload = json.dumps({"usernameOrEmail": "admin", "password": "password123"}).encode("utf-8")
     req = urllib.request.Request(login_url, data=login_payload, headers={"Content-Type": "application/json"})
@@ -98,7 +93,6 @@ def collect_evidence():
             "completed_at": latest.get("completedAt")
         }
 
-    # 6. Search Verification
     search_url = "http://127.0.0.1:8080/api/catalog/search?q=Jadoo"
     req = urllib.request.Request(search_url)
     with urllib.request.urlopen(req) as resp:
@@ -112,7 +106,6 @@ def collect_evidence():
             ]
         }
 
-    # 7. CineBot AI Verification
     chat_url = "http://127.0.0.1:8000/api/chat"
     chat_payload = json.dumps({"query": "Tìm phim hoạt hình Xin Chào Jadoo", "messages": []}).encode("utf-8")
     req = urllib.request.Request(chat_url, data=chat_payload, headers={"Content-Type": "application/json"})
@@ -126,11 +119,9 @@ def collect_evidence():
             "intent_confidence": chat_res.get("structuredIntent", {}).get("confidence")
         }
 
-    # 8. Media Stream Verification
     stream_url = "http://127.0.0.1:8080/api/media/stream/asset_jadoo_s01_v0001"
     auth_header = {"Authorization": f"Bearer {token}"}
 
-    # HEAD
     head_req = urllib.request.Request(stream_url, headers=auth_header, method="HEAD")
     with urllib.request.urlopen(head_req) as resp:
         evidence["media_stream_verification"]["head"] = {
@@ -140,7 +131,6 @@ def collect_evidence():
             "accept_ranges": resp.headers.get("Accept-Ranges")
         }
 
-    # Initial Range 0-1023
     r0_headers = dict(auth_header)
     r0_headers["Range"] = "bytes=0-1023"
     r0_req = urllib.request.Request(stream_url, headers=r0_headers)
@@ -153,7 +143,6 @@ def collect_evidence():
             "magic_bytes": r0_data[4:8].decode("ascii", errors="replace")
         }
 
-    # Seek Range 10485760-10486783
     r_seek_headers = dict(auth_header)
     r_seek_headers["Range"] = "bytes=10485760-10486783"
     r_seek_req = urllib.request.Request(stream_url, headers=r_seek_headers)
@@ -165,7 +154,6 @@ def collect_evidence():
             "bytes_received": len(r_seek_data)
         }
 
-    # FFprobe initial frames (0.00s)
     headers_arg = f"Authorization: Bearer {token}\r\n"
     cmd_init = [
         "ffprobe", "-v", "error",
@@ -179,7 +167,6 @@ def collect_evidence():
     proc_init = subprocess.check_output(cmd_init, text=True)
     evidence["media_stream_verification"]["ffprobe_initial_frames"] = json.loads(proc_init).get("frames", [])
 
-    # FFprobe seek frames (60.00s)
     cmd_seek60 = [
         "ffprobe", "-v", "error",
         "-headers", headers_arg,
@@ -192,7 +179,6 @@ def collect_evidence():
     proc_seek60 = subprocess.check_output(cmd_seek60, text=True)
     evidence["media_stream_verification"]["ffprobe_seek_60s_frames"] = json.loads(proc_seek60).get("frames", [])
 
-    # FFprobe seek frames (120.00s)
     cmd_seek120 = [
         "ffprobe", "-v", "error",
         "-headers", headers_arg,

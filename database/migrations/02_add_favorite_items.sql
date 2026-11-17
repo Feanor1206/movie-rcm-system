@@ -1,6 +1,3 @@
--- =========================================================================
--- Dippie Cinema Database Migration: Add favorite_items Table (MySQL 8.0)
--- =========================================================================
 
 CREATE TABLE IF NOT EXISTS favorite_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

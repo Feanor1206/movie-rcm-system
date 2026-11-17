@@ -2,22 +2,6 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-/**
- * DRIVE-01-F07 Strict Live Browser Verification Script (Finding C4)
- *
- * Verifies:
- * 1. Detail page loads successfully without CDP API rewriting.
- * 2. Clicks real UI button [data-testid="play-feature-btn"] to launch player.
- * 3. Asserts video element decodes frames: videoWidth > 0 && videoHeight > 0.
- * 4. Interacts with real player UI controls:
- *    - Pauses via [data-testid="video-play-pause-btn"] and asserts video.paused === true.
- *    - Resumes via [data-testid="video-play-pause-btn"] and asserts video.paused === false.
- * 5. Performs seek to 60s and asserts:
- *    - video.seeking transitions back to false.
- *    - Initial post-seek time t1 >= 59.0s.
- *    - Post-seek frame and time advancement: after 2s, t2 > t1 + 0.5s.
- * 6. Exits with code 1 immediately on any assertion failure.
- */
 async function runBrowserVerification() {
   const chromePath = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
   const port = 9228;
@@ -63,20 +47,17 @@ async function runBrowserVerification() {
     await send('Runtime.enable');
     await new Promise(r => setTimeout(r, 2000));
 
-    // 1. Capture Detail Page Screenshot
     console.log('[BrowserVerification-F07] Capturing detail page screenshot...');
     const detailSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.mkdirSync('docs/reviews/evidence', { recursive: true });
     fs.writeFileSync('docs/reviews/evidence/live_shin_detail_page_f07.png', Buffer.from(detailSnap.data, 'base64'));
 
-    // 2. Click Play Feature button
     console.log('[BrowserVerification-F07] Clicking play-feature-btn...');
     const tPlayStart = Date.now();
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'play-feature-btn\']").click(); true;'
     });
 
-    // 3. Await playback start & assert decoded video dimensions
     console.log('[BrowserVerification-F07] Awaiting video playback start and frame decoding...');
     let playSuccess = false;
     let coldStartDuration = 0;
@@ -120,7 +101,6 @@ async function runBrowserVerification() {
     const playingSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_player_playing_f07.png', Buffer.from(playingSnap.data, 'base64'));
 
-    // 4. Test Player Control Button: Pause via UI Button
     console.log('[BrowserVerification-F07] Clicking player UI play/pause button to pause...');
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'video-play-pause-btn\']").click(); true;'
@@ -140,7 +120,6 @@ async function runBrowserVerification() {
     const pausedSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_player_paused_f07.png', Buffer.from(pausedSnap.data, 'base64'));
 
-    // 5. Test Player Control Button: Resume via UI Button
     console.log('[BrowserVerification-F07] Clicking player UI play/pause button to resume...');
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'video-play-pause-btn\']").click(); true;'
@@ -157,7 +136,6 @@ async function runBrowserVerification() {
       throw new Error(`CRITICAL: Player UI resume button failed to resume video! State: ${JSON.stringify(resumedState)}`);
     }
 
-    // 6. Test Seek to 60s via Timeline Scrubber & Assert Time Advancement
     console.log('[BrowserVerification-F07] Seeking to 60s via timeline scrubber...');
     const tSeekStart = Date.now();
     await send('Runtime.evaluate', {
@@ -174,7 +152,6 @@ async function runBrowserVerification() {
       })()`
     });
 
-    // Wait until seeking flag clears and post-seek frame arrives
     let seekSettled = false;
     let t1 = 0;
     for (let i = 0; i < 25; i++) {
@@ -199,7 +176,6 @@ async function runBrowserVerification() {
       throw new Error(`CRITICAL: Seek to 60s did not settle within 25s!`);
     }
 
-    // Wait 2 seconds and measure t2 to assert actual decoded frame advancement
     await new Promise(r => setTimeout(r, 2000));
     const advancePoll = await send('Runtime.evaluate', {
       expression: `(() => {

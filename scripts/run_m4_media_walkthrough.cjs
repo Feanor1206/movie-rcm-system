@@ -1,19 +1,3 @@
-/**
- * M4-F02 Media Streaming Walkthrough & Real Spring Boot Benchmark Harness
- *
- * Runs browser playback assertions via Chrome DevTools Protocol (CDP) against:
- *   1. Spring Boot M4WalkthroughServer (isolated H2 in-memory DB, temp media root, observable permits)
- *   2. Next.js Standalone Production Build
- *
- * Verifies Milestone M4-F02 Findings:
- *   - F1: Media descriptor error, retry button, recovery, no false catalog absence
- *   - F2: Bounded local streams, observable cleanup, HTTP 429 overload resilience
- *   - F3: Real browser controls (play/pause, timeline scrubber), >=44px mobile touch targets,
- *         before/after disk snapshots, truthful latency labeling
- *
- * Screenshots saved to: docs/reports/screenshots/M4_F03/
- * Benchmark output saved to: docs/reports/m4_f03_benchmark_results.json
- */
 
 const http = require('node:http');
 const { spawn } = require('node:child_process');
@@ -94,9 +78,6 @@ function syncStandaloneAssets() {
   }
 }
 
-// ----------------------------------------------------------------------------
-// 1. Spring Boot Isolated Server Process
-// ----------------------------------------------------------------------------
 function startSpringBootServer() {
   return new Promise((resolve, reject) => {
     const cpPath = path.resolve(PROJECT_ROOT, 'backend/springboot/target/cp.txt');
@@ -158,9 +139,6 @@ function startSpringBootServer() {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 2. Next.js Standalone Production Server Process
-// ----------------------------------------------------------------------------
 function startNextServer(nextPort, springBootPort) {
   return new Promise((resolve, reject) => {
     syncStandaloneAssets();
@@ -206,9 +184,6 @@ function startNextServer(nextPort, springBootPort) {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 3. CDP Browser Client with Transparent Port Proxying
-// ----------------------------------------------------------------------------
 async function launchChromeWithCDP(springBootPort, cdpPort) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chrome-m4-f01-'));
   const chromeArgs = [
@@ -280,13 +255,11 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
       else resolve(msg.result);
     }
 
-    // Intercept outgoing HTTP calls from browser targeting port 8080 and reroute to our isolated Spring Boot port
     if (msg.method === 'Fetch.requestPaused') {
       const { requestId, request } = msg.params;
       const originalUrl = request.url;
       let targetUrl = originalUrl;
 
-      // Simulated descriptor fault handler if active
       if (cdpDescriptorFaultActive && originalUrl.includes('/media-descriptor')) {
         console.log(`[CDP Fetch Fault Injection] Returning simulated ${cdpDescriptorFaultStatus} for ${originalUrl}`);
         try {
@@ -391,7 +364,6 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
   await cdp('Runtime.enable');
   await cdp('Network.enable');
 
-  // Enable Fetch request routing
   await cdp('Fetch.enable', {
     patterns: [
       { urlPattern: 'http://localhost:8080/*' },
@@ -477,9 +449,6 @@ async function launchChromeWithCDP(springBootPort, cdpPort) {
   };
 }
 
-// ----------------------------------------------------------------------------
-// 4. HTTP Helper for Spring Boot Endpoints
-// ----------------------------------------------------------------------------
 function requestHttp(urlStr, options = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(urlStr);
@@ -548,9 +517,6 @@ function computeStats(arr) {
   };
 }
 
-// ----------------------------------------------------------------------------
-// 5. Main Execution: Browser Walkthrough & Spring HTTP Benchmark
-// ----------------------------------------------------------------------------
 async function main() {
   console.log('================================================================');
   console.log('   M4-F02 Browser Media Walkthrough & Spring Boot Benchmark     ');
@@ -568,30 +534,24 @@ async function main() {
   console.log(`Initial disk snapshot taken: ${diskBeforeSnapshot.length} files tracked in ${testMediaDir}`);
 
   try {
-    // 0. Allocate ports
     nextPort = await findFreePort(3100);
     cdpPort = await findFreePort(9230);
 
-    // 1. Start Spring Boot Walkthrough Server
     const springRes = await startSpringBootServer();
     springProcess = springRes.proc;
     springPort = springRes.port;
 
-    // Verify Spring Boot health
     const health = await requestHttp(`http://127.0.0.1:${springPort}/api/health`);
     assert.equal(health.statusCode, 200, 'Spring Boot health check must return 200');
     console.log('✔ Spring Boot health check confirmed: 200 UP');
 
-    // 2. Start Next.js Standalone
     nextProcess = await startNextServer(nextPort, springPort);
 
-    // Warm up Next.js route before browser navigation
     console.log('Pre-warming Next.js movie route...');
     try {
       await requestHttp(`http://127.0.0.1:${nextPort}/movies/m4-walkthrough-movie`, { timeoutMs: 15000 });
     } catch {}
 
-    // 3. Launch Chrome with CDP
     chromeSession = await launchChromeWithCDP(springPort, cdpPort);
     const { evaluate, waitForCondition, setViewport, navigate, captureScreenshot, dispatchKey, interceptedRequests, setCdpDescriptorFault } = chromeSession;
 
@@ -615,22 +575,17 @@ async function main() {
       setCdpDescriptorFault(false);
     }
 
-    // ------------------------------------------------------------------------
-    // Part A: Browser Playback Assertions & Screenshot Capture
-    // ------------------------------------------------------------------------
     console.log('\n--- Part A: Desktop Playback Walkthrough ---');
     await setViewport(1280, 800, false);
 
     const movieUrl = `http://127.0.0.1:${nextPort}/movies/m4-walkthrough-movie`;
 
-    // A0. Arm descriptor fault (HTTP 503) to verify truth-in-advertising and recovery
     console.log('\n[Walkthrough Step A0] Testing Descriptor Failure & Retry Recovery...');
     await armDescriptorFault(503);
 
     console.log(`Navigating to ${movieUrl} with descriptor fault active...`);
     await navigate(movieUrl);
 
-    // A1. Verify movie title rendered
     await waitForCondition(
       `document.body.innerText.includes("Walkthrough Cinema Special")`,
       'Movie title "Walkthrough Cinema Special" visible on page',
@@ -638,7 +593,6 @@ async function main() {
     );
     console.log('✔ Movie title rendered on page');
 
-    // A1b. Verify descriptor error state: [role="alert"] and [data-testid="descriptor-retry-btn"]
     console.log('Verifying descriptor failure alert and retry button are visible...');
     await waitForCondition(
       `(() => {
@@ -660,7 +614,6 @@ async function main() {
       6000
     );
 
-    // Verify "Xem phim" feature button is NOT present while descriptor is in error state
     const featureBtnPresentDuringFault = await evaluate(`(() => {
       const btn = document.querySelector('button[data-testid="watch-feature-btn"]') ||
                   document.querySelector('button[data-testid="play-feature-btn"]') ||
@@ -671,10 +624,8 @@ async function main() {
     assert.equal(featureBtnPresentDuringFault, false, 'Feature "Xem phim" button must NOT be rendered when descriptor failed');
     console.log('✔ Descriptor error verified: [role="alert"] visible, [data-testid="descriptor-retry-btn"] active, "Xem phim" button safely absent');
 
-    // Capture Screenshot 0: Descriptor Failure State
     await captureScreenshot('00_desktop_descriptor_failure.png');
 
-    // A1c. Disarm descriptor fault and interactively click [data-testid="descriptor-retry-btn"]
     console.log('Disarming fault and clicking [data-testid="descriptor-retry-btn"] to recover descriptor...');
     await disarmDescriptorFault();
 
@@ -683,7 +634,6 @@ async function main() {
       if (btn) btn.click();
     })()`);
 
-    // Wait for [role="alert"] to be dismissed
     await waitForCondition(
       `document.querySelector('[role="alert"]') === null`,
       'Descriptor error alert dismissed after retry',
@@ -691,7 +641,6 @@ async function main() {
     );
     console.log('✔ Descriptor error alert dismissed');
 
-    // A2. Verify "Xem phim" feature button is rendered and enabled
     await waitForCondition(
       `(() => {
         const btn = document.querySelector('button[data-testid="watch-feature-btn"]') ||
@@ -705,7 +654,6 @@ async function main() {
     );
     console.log('✔ Feature "Xem phim" button active after descriptor retry recovery');
 
-    // A3. Open player modal by clicking "Xem phim"
     console.log('Clicking "Xem phim" to initiate playback modal...');
     await evaluate(`(() => {
       const btn = document.querySelector('button[data-testid="watch-feature-btn"]') ||
@@ -715,7 +663,6 @@ async function main() {
       btn.click();
     })()`);
 
-    // A4. Wait for video element and active playback progression
     await waitForCondition(
       `Boolean(document.querySelector('video'))`,
       'HTML5 video element mounted in DOM',
@@ -723,7 +670,6 @@ async function main() {
     );
     console.log('✔ Video element mounted in player modal');
 
-    // Diagnostic & play trigger via UI control if paused
     const initialStatus = await evaluate(`(() => {
       const v = document.querySelector('video');
       window.__m4StalledCount = 0;
@@ -753,7 +699,6 @@ async function main() {
       })()`);
     }
 
-    // Measure raw browser presentation timing
     const frameTiming = await evaluate(`new Promise((resolve, reject) => {
       const v = document.querySelector('video');
       if (!v) return reject(new Error('HTML5 video element not found for presentation timing'));
@@ -790,7 +735,6 @@ async function main() {
     })`, 10000);
     console.log(`Browser video presentation timing: ${JSON.stringify(frameTiming)}`);
 
-    // Wait for video currentTime to advance past 1.0s (proves real frames decoding)
     console.log('Waiting for video decoding and currentTime > 1.0s...');
     await waitForCondition(
       `(() => {
@@ -803,15 +747,12 @@ async function main() {
     const initialPlayTime = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`✔ Real video playback verified! currentTime: ${initialPlayTime.toFixed(2)}s`);
 
-    // Verify Spring Boot received HTTP 206 Range request
     const streamRequests = interceptedRequests.filter(r => r.originalUrl.includes('/api/media/stream/ast-walkthrough-feat'));
     assert(streamRequests.length > 0, 'Browser must have issued stream request to Spring Boot media endpoint');
     console.log(`✔ Verified ${streamRequests.length} HTTP stream requests routed to Spring Boot`);
 
-    // Screenshot 1: Desktop Playing
     await captureScreenshot('01_desktop_playback_playing.png');
 
-    // A5. Measure 3 Browser Seeks across positions via UI timeline
     console.log('\nMeasuring 3 Browser Seeks via UI timeline scrubber control...');
     const browserSeekRuns = [];
     const targetSeekPositions = [5.0, 10.0, 15.0];
@@ -896,7 +837,6 @@ async function main() {
     const browserSeekStats = computeStats(browserSeekRuns);
     console.log(`  Browser Seek Latency Stats: min=${browserSeekStats.min}ms, avg=${browserSeekStats.avg}ms, p95=${browserSeekStats.p95}ms, max=${browserSeekStats.max}ms`);
 
-    // Wait for continuous playback past 15.3s
     await waitForCondition(
       `(() => {
         const v = document.querySelector('video');
@@ -908,10 +848,8 @@ async function main() {
     const seekTime = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`✔ Continuous post-seek playback verified! currentTime: ${seekTime.toFixed(2)}s`);
 
-    // Screenshot 2: Desktop Seek Near End
     await captureScreenshot('02_desktop_seek_near_end.png');
 
-    // A6. Pause & Resume verification via UI button
     console.log('Testing Pause / Resume via UI button...');
     await evaluate(`(() => {
       const btn = document.querySelector('button[data-testid="video-play-pause-btn"]');
@@ -943,18 +881,15 @@ async function main() {
     );
     console.log('✔ Video resumed via UI button click');
 
-    // A7. Error & Retry Recovery
     console.log('Triggering controlled playback error to verify retry recovery...');
     const timeBeforeError = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`Current playback position before fault: ${timeBeforeError.toFixed(2)}s`);
 
-    // Setup: Dispatch controlled error event on media element (labeled fault setup)
     await evaluate(`(() => {
       const v = document.querySelector('video');
       v.dispatchEvent(new Event('error'));
     })()`);
 
-    // Verify error overlay appears with retry button
     await waitForCondition(
       `(() => {
         const retryBtn = document.querySelector('button[data-testid="video-retry-btn"]') ||
@@ -966,7 +901,6 @@ async function main() {
     );
     console.log('✔ Error state displayed with Retry button');
 
-    // Click "Thử lại"
     console.log('Clicking "Thử lại" and observing app natural recovery (NO test harness intervention)...');
     await evaluate(`(() => {
       const retryBtn = document.querySelector('button[data-testid="video-retry-btn"]') ||
@@ -974,7 +908,6 @@ async function main() {
       retryBtn.click();
     })()`);
 
-    // Strictly observational wait predicate: NO v.play() or currentTime manipulation in predicate!
     await waitForCondition(
       `(() => {
         const v = document.querySelector('video');
@@ -987,17 +920,14 @@ async function main() {
     const recoveredTime = await evaluate(`document.querySelector('video').currentTime`);
     console.log(`✔ Playback retry recovery verified! Restored time: ${recoveredTime.toFixed(2)}s`);
 
-    // Collect observed stall events
     const observedStalls = await evaluate(`(() => ({
       stalledEvents: window.__m4StalledCount || 0,
       waitingEvents: window.__m4WaitingCount || 0,
     }))()`);
     console.log(`Observed media element events: ${JSON.stringify(observedStalls)}`);
 
-    // Screenshot 3: Retry Recovery
     await captureScreenshot('03_desktop_retry_recovery.png');
 
-    // A8. Close Modal & Focus Restoration
     console.log('Testing Modal close and focus restoration via Escape key...');
     await dispatchKey('Escape', 'Escape', 27);
     await waitForCondition(`document.querySelector('video') === null`, 'Modal closed', 4000);
@@ -1005,9 +935,6 @@ async function main() {
     assert(activeBtnText.includes('Xem phim') || activeBtnText.includes('play-feature-btn') || activeBtnText.includes('watch-feature-btn'), 'Opener "Xem phim" button must receive focus after modal closes');
     console.log('✔ Modal closed and focus properly restored to opener button');
 
-    // ------------------------------------------------------------------------
-    // Part B: Mobile Viewport 375px Verification
-    // ------------------------------------------------------------------------
     console.log('\n--- Part B: Mobile 375px Playback Walkthrough ---');
     await setViewport(375, 667, true);
 
@@ -1022,7 +949,6 @@ async function main() {
 
     await waitForCondition(`Boolean(document.querySelector('video'))`, 'Mobile video player open', 5000);
 
-    // Comprehensive Mobile Touch Target & Collision Audit
     const mobileAudit = await evaluate(`(() => {
       function getInfo(selector, name) {
         const el = document.querySelector(selector);
@@ -1088,27 +1014,20 @@ async function main() {
     assert.equal(mobileAudit.collisions.length, 0, `Player controls must not have layout collisions (found: ${JSON.stringify(mobileAudit.collisions)})`);
     console.log('✔ All mobile controls satisfy >= 44x44px touch targets with 0 layout collisions');
 
-    // Screenshot 4: Mobile Playback
     await captureScreenshot('04_mobile_playback_375px.png');
 
-    // Close mobile modal
     await dispatchKey('Escape', 'Escape', 27);
     await waitForCondition(`document.querySelector('video') === null`, 'Mobile modal closed', 4000);
     console.log('✔ Mobile modal closed');
 
-    // ------------------------------------------------------------------------
-    // Part C: Real Spring Boot HTTP Range & Concurrency Benchmark
-    // ------------------------------------------------------------------------
     console.log('\n--- Part C: Real Spring Boot HTTP Media Benchmark ---');
     const assetId = 'ast-walkthrough-feat';
     const streamUrl = `http://127.0.0.1:${springPort}/api/media/stream/${assetId}`;
 
-    // Verify raw file size and byte integrity
     const fileBytes = fs.readFileSync(MEDIA_FILE);
     const totalFileLength = fileBytes.length;
     console.log(`Synthetic Media Asset: ${MEDIA_FILE} (${totalFileLength} bytes, ${(totalFileLength / 1024).toFixed(1)} KiB)`);
 
-    // 1. Startup Latency (Range: bytes=0-65535, 3 runs)
     console.log('\n[Benchmark 1/6] Measuring Startup Latency (Initial 64 KiB Range Chunk, 3 runs)...');
     const startupRuns = [];
     for (let r = 1; r <= 3; r++) {
@@ -1117,7 +1036,6 @@ async function main() {
       });
       assert.equal(res.statusCode, 206, `Run ${r} must return HTTP 206 Partial Content`);
       assert.equal(res.bytesReceived, 65536, `Run ${r} chunk length must equal 65536 bytes`);
-      // Byte integrity check: first 32 bytes match MP4 header
       assert(res.body.subarray(0, 32).equals(fileBytes.subarray(0, 32)), 'Initial bytes must match disk asset');
       startupRuns.push(res.ttfbMs);
       console.log(`  Run ${r}: TTFB = ${res.ttfbMs} ms, Duration = ${res.totalDurationMs} ms`);
@@ -1125,13 +1043,11 @@ async function main() {
     const startupStats = computeStats(startupRuns);
     console.log(`  Startup TTFB Stats: min=${startupStats.min}ms, avg=${startupStats.avg}ms, p95=${startupStats.p95}ms, max=${startupStats.max}ms`);
 
-    // 2. Mid & End Seek Latency (3 runs each)
     console.log('\n[Benchmark 2/6] Measuring Seek Chunk Latencies across positions (3 runs each)...');
     const midSeekRuns = [];
     const endSeekRuns = [];
 
     for (let r = 1; r <= 3; r++) {
-      // Mid seek: bytes=150000-215535
       const midRes = await requestHttp(streamUrl, {
         headers: { Range: 'bytes=150000-215535' },
       });
@@ -1139,7 +1055,6 @@ async function main() {
       assert(midRes.body.subarray(0, 32).equals(fileBytes.subarray(150000, 150032)));
       midSeekRuns.push(midRes.ttfbMs);
 
-      // End seek: bytes=250000- (to EOF)
       const endRes = await requestHttp(streamUrl, {
         headers: { Range: 'bytes=250000-' },
       });
@@ -1152,7 +1067,6 @@ async function main() {
     const midSeekStats = computeStats(midSeekRuns);
     const endSeekStats = computeStats(endSeekRuns);
 
-    // 3. Single Stream Full Asset Throughput (3 runs)
     console.log('\n[Benchmark 3/6] Measuring Single Stream Full Playback Throughput (3 runs)...');
     const singleThroughputRuns = [];
     for (let r = 1; r <= 3; r++) {
@@ -1168,7 +1082,6 @@ async function main() {
     }
     const singleThroughputStats = computeStats(singleThroughputRuns);
 
-    // 4. Concurrency: 3 Parallel Streams (3 runs)
     console.log('\n[Benchmark 4/6] Measuring Concurrency: 3 Parallel Streams (3 runs)...');
     const parallelRuns = [];
     for (let r = 1; r <= 3; r++) {
@@ -1202,29 +1115,24 @@ async function main() {
     const parallelAggregateStats = computeStats(parallelRuns.map(x => x.aggregateMBs));
     const parallelTtfbStats = computeStats(parallelRuns.map(x => x.avgStreamTTFB));
 
-    // 5. Client Abrupt Disconnect & Observable Stream Cleanup (F2 Counter & Overload 429)
     console.log('\n[Benchmark 5/6] Testing Client Abrupt Disconnect & Stream Permit Cleanup (F2 Observable Counter)...');
-    // 5a. Verify baseline active stream count is 0
     const metricsBaseline = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
     const baselineData = JSON.parse(metricsBaseline.body.toString());
     console.log('Baseline MediaStream metrics:', baselineData);
     assert.equal(baselineData.activeStreams, 0, 'Baseline active stream count must be 0');
 
-    // 5b. Initiate gated read to hold 1 stream active
     console.log('Arming test stream gate and initiating active stream...');
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/gate/arm`, { method: 'POST' });
 
     let activeWhileStreaming = -1;
     let overload429Verified = false;
 
-    // Start stream 1 in background (will pause at gate after acquiring permit)
     const streamReq = http.request(streamUrl, {
       headers: { Range: 'bytes=0-' },
     });
-    streamReq.on('error', () => {}); // Catch abort error on client destroy
+    streamReq.on('error', () => {});
     streamReq.end();
 
-    // Poll counter to verify activeStreams === 1
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 100));
       const m = await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/metrics`);
@@ -1237,7 +1145,6 @@ async function main() {
     console.log(`Active streams while connection is open: ${activeWhileStreaming}`);
     assert(activeWhileStreaming >= 1, 'Active stream counter must reflect active connection (>= 1)');
 
-    // 5c. Test Stream Concurrency Limit & Overload 429 while stream 1 holds permit
     console.log('Testing Stream Concurrency Limit & Overload 429 while stream 1 is active...');
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/max-concurrent-streams?limit=1`, { method: 'POST' });
     const res2 = await requestHttp(streamUrl, { headers: { Range: 'bytes=0-65535' } });
@@ -1250,15 +1157,12 @@ async function main() {
     assert(overload429Verified, 'Server must return HTTP 429 when max concurrent streams limit is exceeded');
     console.log('✔ Stream concurrency limit & HTTP 429 overload verified');
 
-    // Reset max concurrent streams back to 10
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/max-concurrent-streams?limit=10`, { method: 'POST' });
 
-    // 5d. Abruptly sever client 1 socket and release gate
     console.log('Severing stream 1 socket and releasing gate...');
     streamReq.destroy();
     await requestHttp(`http://127.0.0.1:${springPort}/api/test/media/gate/release`, { method: 'POST' });
 
-    // 5e. Poll counter to verify active streams return to 0 (finally block executed)
     console.log('Verifying active stream counter returns to baseline (0) after disconnect...');
     let activeAfterDisconnect = -1;
     for (let i = 0; i < 30; i++) {
@@ -1272,12 +1176,10 @@ async function main() {
     assert.equal(activeAfterDisconnect, 0, 'Active stream count must return to 0 after client disconnect');
     console.log('✔ Observable permit release confirmed: stream counter successfully returned to 0');
 
-    // Verify Spring Boot health immediately after disconnect
     const healthAfterDisconnect = await requestHttp(`http://127.0.0.1:${springPort}/api/health`);
     assert.equal(healthAfterDisconnect.statusCode, 200, 'Server must remain 200 UP after client disconnect and overload');
     console.log('✔ Spring Boot successfully recovered with 200 UP');
 
-    // 6. Verify Read-Only Storage Integrity via Before/After Disk Snapshot
     console.log('\n[Benchmark 6/6] Verifying Read-Only Storage Integrity via Before/After Disk Snapshot...');
     const diskAfterSnapshot = snapshotDirectory(testMediaDir);
     assert.equal(diskBeforeSnapshot.length, diskAfterSnapshot.length, 'File count in test-media root must not change');
@@ -1290,9 +1192,6 @@ async function main() {
     }
     console.log(`✔ Read-only disk integrity confirmed: 0 mutations across ${diskBeforeSnapshot.length} monitored files in test-media root`);
 
-    // ------------------------------------------------------------------------
-    // Part D: Output Benchmark Results JSON
-    // ------------------------------------------------------------------------
     const finalReport = {
       benchmarkMetadata: {
         timestamp: new Date().toISOString(),

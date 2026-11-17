@@ -5,17 +5,6 @@ const path = require('path');
 const os = require('os');
 const WebSocket = globalThis.WebSocket || require('ws');
 
-/**
- * DRIVE-01-F09 Strict Browser Verification Harness
- * 
- * Strict invariants verified:
- * 1. CDP helper strictly rejects protocol data.error and Runtime.evaluate exceptionDetails.
- * 2. Real browser decoding: videoWidth === 1920 && videoHeight === 1080 (Shin Movie).
- * 3. Strict RVFC: requestVideoFrameCallback mandatory, width 1920, height 1080, presentedFrames > 0, mediaTime near target.
- * 4. Slider-only seek without CDP API rewriting.
- * 5. Playback advancement: t2 - t1 >= 0.5s after 1.5s wait.
- * 6. Dynamic derivation of all summary assertions without hardcoding.
- */
 
 async function runBrowserVerification() {
   const port = 9225;
@@ -46,7 +35,6 @@ async function runBrowserVerification() {
   ]);
 
   try {
-    // Wait for CDP port to open
     let page = null;
     const deadlineConnect = Date.now() + 15000;
     while (Date.now() < deadlineConnect) {
@@ -67,7 +55,6 @@ async function runBrowserVerification() {
     });
 
     let id = 1;
-    // Strict CDP helper rejecting both data.error and exceptionDetails
     const send = (method, params = {}) => new Promise((resolve, reject) => {
       const cur = id++;
       const timer = setTimeout(() => reject(new Error('Timeout waiting for CDP method: ' + method)), 45000);
@@ -100,19 +87,16 @@ async function runBrowserVerification() {
     await send('Runtime.enable');
     await new Promise(r => setTimeout(r, 3000));
 
-    // 1. Capture Detail Page Screenshot
     console.log('[BrowserVerification-F09] Capturing detail page screenshot...');
     const detailSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_detail_page_f09.png', Buffer.from(detailSnap.data, 'base64'));
 
-    // 2. Click Play Feature button
     console.log('[BrowserVerification-F09] Clicking play-feature-btn...');
     const tPlayStart = Date.now();
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'play-feature-btn\']").click(); true;'
     });
 
-    // 3. Await playback start & assert decoded video dimensions
     console.log('[BrowserVerification-F09] Awaiting video playback start and frame decoding...');
     let playSuccess = false;
     let coldStartDuration = 0;
@@ -149,7 +133,6 @@ async function runBrowserVerification() {
       throw new Error('CRITICAL: Video playback failed to start or decode frames within 60s!');
     }
 
-    // Strict dimension assertion: Shin Movie is 1920x1080 Full HD
     if (vInitialState.videoWidth !== 1920 || vInitialState.videoHeight !== 1080) {
       throw new Error(`CRITICAL: Video dimension mismatch. Expected 1920x1080, got ${vInitialState.videoWidth}x${vInitialState.videoHeight}`);
     }
@@ -157,7 +140,6 @@ async function runBrowserVerification() {
     const playingSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_player_playing_f09.png', Buffer.from(playingSnap.data, 'base64'));
 
-    // 4. Test Player Control Button: Pause via UI Button & assert stable time
     console.log('[BrowserVerification-F09] Clicking player UI play/pause button to pause...');
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'video-play-pause-btn\']").click(); true;'
@@ -174,7 +156,6 @@ async function runBrowserVerification() {
       throw new Error(`CRITICAL: Player UI pause button failed to pause video! State: ${JSON.stringify(pausedState1)}`);
     }
 
-    // Verify stable paused time: no advancement while paused
     await new Promise(r => setTimeout(r, 1000));
     const pauseCheck2 = await send('Runtime.evaluate', {
       expression: '(() => { const v = document.querySelector("video"); return v ? { paused: v.paused, currentTime: v.currentTime } : null; })()',
@@ -190,7 +171,6 @@ async function runBrowserVerification() {
     const pausedSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_player_paused_f09.png', Buffer.from(pausedSnap.data, 'base64'));
 
-    // 5. Test Player Control Button: Resume via UI Button & assert advancement
     console.log('[BrowserVerification-F09] Clicking player UI play/pause button to resume...');
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'video-play-pause-btn\']").click(); true;'
@@ -207,7 +187,6 @@ async function runBrowserVerification() {
       throw new Error(`CRITICAL: Player UI resume button failed to resume playback! State: ${JSON.stringify(resumedState)}`);
     }
 
-    // 6. Test 3 Distinct Seek Points via Timeline Slider ONLY
     const seekTargets = [60.0, 200.0, 400.0];
     const seekResults = [];
 
@@ -215,7 +194,6 @@ async function runBrowserVerification() {
       console.log(`\n[BrowserVerification-F09] --- Testing Seek to ${targetTime}s via Timeline Slider ---`);
       const tSeekStart = Date.now();
 
-      // Dispatch slider input and change events through prototype setter ONLY (never assign video.currentTime directly)
       await send('Runtime.evaluate', {
         expression: `(() => {
           const slider = document.querySelector("[data-testid='video-timeline']");
@@ -228,7 +206,6 @@ async function runBrowserVerification() {
         })()`
       });
 
-      // Poll until seeking clears and target-near time is reached
       let seekSettled = false;
       let t1 = 0;
       for (let i = 0; i < 60; i++) {
@@ -255,7 +232,6 @@ async function runBrowserVerification() {
 
       const seekDuration = (Date.now() - tSeekStart) / 1000;
 
-      // Capture strict decoded frame presentation evidence via requestVideoFrameCallback
       console.log(`[BrowserVerification-F09] Requesting presented frame callback for seek ${targetTime}s...`);
       const frameEvidence = await send('Runtime.evaluate', {
         awaitPromise: true,
@@ -284,7 +260,6 @@ async function runBrowserVerification() {
       const frameData = frameEvidence?.result?.value;
       console.log(`[BrowserVerification-F09] Decoded frame metadata:`, frameData);
 
-      // Strict assertions on RVFC data
       if (!frameData || !frameData.hasRvfc) {
         throw new Error(`CRITICAL: Frame presentation callback missing for seek ${targetTime}s`);
       }
@@ -298,7 +273,6 @@ async function runBrowserVerification() {
         throw new Error(`CRITICAL: Frame mediaTime ${frameData.mediaTime} not within 5s of target ${targetTime}`);
       }
 
-      // Wait 1.5s and measure t2 to assert continued playback time advancement
       await new Promise(r => setTimeout(r, 1500));
       const advancePoll = await send('Runtime.evaluate', {
         expression: `(() => {
@@ -333,7 +307,6 @@ async function runBrowserVerification() {
       });
     }
 
-    // Dynamic assertion derivation (no hardcoded true)
     const allSeeksSettled = seekResults.length === 3 && seekResults.every(r => r.settled);
     const allRvfcValid = seekResults.every(r => r.frameData && r.frameData.hasRvfc && r.frameData.presentedFrames > 0 && r.frameData.width === 1920 && r.frameData.height === 1080 && Math.abs(r.frameData.mediaTime - r.targetTime) <= 5.0);
     const allTimeAdvanced = seekResults.every(r => r.advanced && r.advanceSeconds >= 0.5);

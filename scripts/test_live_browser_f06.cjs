@@ -47,19 +47,16 @@ async function runBrowserVerification() {
     await send('Runtime.enable');
     await new Promise(r => setTimeout(r, 2000));
 
-    // Capture Detail Page
     console.log('[BrowserVerification] Capturing detail page screenshot...');
     const detailSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_detail_page_f06.png', Buffer.from(detailSnap.data, 'base64'));
 
-    // Click Play Feature button
     console.log('[BrowserVerification] Clicking play-feature-btn...');
     const tPlayStart = Date.now();
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'play-feature-btn\']").click(); true;'
     });
 
-    // Wait for stream to start playing (Google Drive WAN cold start ~11-13s)
     console.log('[BrowserVerification] Awaiting video playback start...');
     let playSuccess = false;
     let coldStartDuration = 0;
@@ -85,13 +82,12 @@ async function runBrowserVerification() {
     const playingSnap = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync('docs/reviews/evidence/live_shin_player_playing_f06.png', Buffer.from(playingSnap.data, 'base64'));
 
-    // Test Seek 1: Seek to 60s
     console.log('[BrowserVerification] Testing Seek to 60s...');
     const tSeek1Start = Date.now();
     await send('Runtime.evaluate', {
       expression: '(() => { const v = document.querySelector("video"); if (v) v.currentTime = 60.0; return true; })()'
     });
-    await new Promise(r => setTimeout(r, 13000)); // WAN seek buffer time
+    await new Promise(r => setTimeout(r, 13000));
     const seek1Res = await send('Runtime.evaluate', {
       expression: '(() => { const v = document.querySelector("video"); return v ? { currentTime: v.currentTime, paused: v.paused } : null; })()',
       returnByValue: true
@@ -99,7 +95,6 @@ async function runBrowserVerification() {
     const seek1Duration = (Date.now() - tSeek1Start) / 1000;
     console.log(`[BrowserVerification] Seek 1 completed in ${seek1Duration}s:`, seek1Res?.result?.value);
 
-    // Test Pause
     console.log('[BrowserVerification] Testing Pause...');
     await send('Runtime.evaluate', {
       expression: '(() => { const v = document.querySelector("video"); if (v) v.pause(); return true; })()'

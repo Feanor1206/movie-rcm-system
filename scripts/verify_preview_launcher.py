@@ -172,7 +172,6 @@ test_a_passed = (start_exit == 0 and stop_exit == 0 and all_http_ok and all_proc
 
 print(f"\n=== OVERALL TEST A STATUS: {'PASS' if test_a_passed else 'FAIL'} ===")
 
-# Write evidence JSON
 evidence = {
     "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     "environment": {

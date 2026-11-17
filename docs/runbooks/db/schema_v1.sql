@@ -1,10 +1,3 @@
--- =========================================================================
--- Dippie Animation Movie Recommendation System
--- Schema Migration: Version 1.0 (Production Reviewable DDL)
--- Target: MySQL 8.0+ / H2 MySQL Mode
--- Policy: Prod uses ddl-auto: validate; this script defines initial schema
--- =========================================================================
-
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL,

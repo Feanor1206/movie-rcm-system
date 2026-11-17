@@ -1,4 +1,3 @@
--- Migration 04: Add catalog collections tables for dippie.catalog.v1 (MySQL 8.0)
 
 CREATE TABLE IF NOT EXISTS catalog_packages (
     id VARCHAR(100) PRIMARY KEY,

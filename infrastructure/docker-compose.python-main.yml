@@ -1,9 +1,3 @@
-# =========================================================================
-# Python Main Override (docker-compose.python-main.yml)
-# Runs FastAPI as the single unified main backend + AI engine with MySQL 8.0.
-# Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.python-main.yml up -d nginx frontend fastapi mysql redis
-# =========================================================================
 
 services:
   nginx:

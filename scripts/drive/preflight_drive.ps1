@@ -37,7 +37,6 @@ function Test-WinFspInstalled {
         DetectionNotes = @()
     }
 
-    # 1. Registry verification
     $regCandidates = @(
         "HKLM:\SOFTWARE\WinFsp",
         "HKLM:\SOFTWARE\WOW6432Node\WinFsp"
@@ -53,14 +52,12 @@ function Test-WinFspInstalled {
                     if ($item.Version) { $result.Version = [string]$item.Version }
                 }
             } catch {
-                # Ignore read error
             }
             $result.DetectionNotes += "Registry key verified at $regPath"
             break
         }
     }
 
-    # 2. File and DLL verification (System32 & Program Files)
     $dllCandidates = @()
     if ($env:SystemRoot) {
         $dllCandidates += (Join-Path $env:SystemRoot "System32\winfsp-x64.dll")
@@ -92,7 +89,6 @@ function Test-WinFspInstalled {
         $result.DetectionNotes += "WinFsp DLL verified: $($foundDlls -join '; ')"
     }
 
-    # 3. Filter driver verification via fltmc
     try {
         $fltCmd = Get-Command "fltmc.exe" -ErrorAction SilentlyContinue
         if ($fltCmd) {
@@ -111,7 +107,6 @@ function Test-WinFspInstalled {
         $result.DetectionNotes += "fltmc filter check skipped: $($_.Exception.Message)"
     }
 
-    # Composite decision
     if ($result.RegistryFound -or $result.DllFound -or $result.DriverLoaded) {
         $result.Installed = $true
     }
@@ -129,7 +124,6 @@ function Find-RcloneExecutable {
         return $null
     }
 
-    # Check PATH
     $cmd = Get-Command "rclone.exe" -ErrorAction SilentlyContinue
     if (-not $cmd) {
         $cmd = Get-Command "rclone" -ErrorAction SilentlyContinue
@@ -138,7 +132,6 @@ function Find-RcloneExecutable {
         return $cmd.Source
     }
 
-    # Common installation locations on Windows
     $candidates = @()
     if ($env:ProgramFiles) {
         $candidates += (Join-Path $env:ProgramFiles "Rclone\rclone.exe")
@@ -178,13 +171,11 @@ function Test-MountPointAvailable {
         FileSystem       = $null
     }
 
-    # Check if target is a drive letter (e.g. "M:" or "M:\")
     if ($Target -match "^[A-Za-z]:?\\?$") {
         $res.IsDriveLetter = $true
         $driveLetter = $Target.Substring(0, 1).ToUpper()
         $drivePrefix = "$($driveLetter):"
 
-        # Check PowerShell drives
         $psDrive = Get-PSDrive -Name $driveLetter -ErrorAction SilentlyContinue
         if ($psDrive) {
             $res.Available = $false
@@ -192,7 +183,6 @@ function Test-MountPointAvailable {
             return $res
         }
 
-        # Check Windows logical drives via .NET DriveInfo
         try {
             $drives = [System.IO.DriveInfo]::GetDrives()
             $matching = $drives | Where-Object { $_.Name.StartsWith($drivePrefix, [System.StringComparison]::OrdinalIgnoreCase) }
@@ -202,17 +192,14 @@ function Test-MountPointAvailable {
                 return $res
             }
         } catch {
-            # Ignore drive enumeration error
         }
 
         $res.Available = $true
         return $res
     }
 
-    # Otherwise treat target as an NTFS directory path
     $res.IsDirectory = $true
 
-    # Reject Alternate Data Streams (ADS) and invalid stream syntax
     $afterDrive = if ($Target -match '^[A-Za-z]:[\\/](.*)$') { $matches[1] } else { $Target }
     if ($afterDrive -match ':') {
         $res.Available = $false
@@ -229,7 +216,6 @@ function Test-MountPointAvailable {
         return $res
     }
 
-    # Check filesystem type of target volume (must be NTFS for WinFsp directory mount)
     try {
         $root = [System.IO.Path]::GetPathRoot($fullPath)
         $driveInfo = [System.IO.DriveInfo]::new($root)
@@ -240,7 +226,6 @@ function Test-MountPointAvailable {
             return $res
         }
     } catch {
-        # Fallback if DriveInfo fails
     }
 
     if (Test-Path -LiteralPath $fullPath -ErrorAction SilentlyContinue) {
@@ -251,21 +236,18 @@ function Test-MountPointAvailable {
             return $res
         }
 
-        # Check if existing directory is a reparse point (junction, symlink, or active mount)
         if ($item -and ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
             $res.Available = $false
             $res.ConflictReason = "Mount directory '$Target' is a reparse point (junction, symlink, or active mount). WinFsp directory mount requires a standard directory or will instantiate its own."
             return $res
         }
 
-        # Check if directory has ReadOnly attribute
         if ($item -and ($item.Attributes -band [System.IO.FileAttributes]::ReadOnly)) {
             $res.Available = $false
             $res.ConflictReason = "Mount directory '$Target' has the ReadOnly attribute set."
             return $res
         }
 
-        # Check if directory is empty (rclone directory mount requires empty directory)
         $children = Get-ChildItem -LiteralPath $fullPath -Force -ErrorAction SilentlyContinue
         if ($children -and $children.Count -gt 0) {
             $res.Available = $false
@@ -273,7 +255,6 @@ function Test-MountPointAvailable {
             return $res
         }
     } else {
-        # Target does not exist yet: parent directory must exist and not be a reparse point
         $parent = [System.IO.Path]::GetDirectoryName($fullPath)
         if (-not $parent -or -not (Test-Path -LiteralPath $parent -PathType Container -ErrorAction SilentlyContinue)) {
             $res.Available = $false
@@ -297,7 +278,6 @@ function Get-UserSessionInfo {
     $isElevated = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
     $currentProc = Get-Process -Id $PID
 
-    # Check EnableLinkedConnections in registry (relevant for elevated vs non-elevated drive mapping)
     $linkedConnections = $null
     $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
     if (Test-Path -Path $regPath -ErrorAction SilentlyContinue) {
@@ -329,7 +309,6 @@ function Get-SystemCapacityInfo {
             $freeRamMB = [math]::Round($os.FreePhysicalMemory / 1024, 2)
         }
     } catch {
-        # Fallback if CIM instance is restricted
     }
 
     $systemDriveFreeGB = 0
@@ -396,9 +375,7 @@ function Check-RcloneConfigSafe {
     return $result
 }
 
-# ----------------- MAIN EXECUTION -----------------
 
-# 1. OS Info
 $osCaption = "Unknown Windows"
 $osVersion = [System.Environment]::OSVersion.VersionString
 try {
@@ -416,7 +393,6 @@ $osObj = [PSCustomObject]@{
     IsWindows    = $true
 }
 
-# 2. Rclone detection
 $rcloneExe = Find-RcloneExecutable -ExplicitPath $RclonePath
 $rcloneVersion = $null
 if ($rcloneExe) {
@@ -438,22 +414,16 @@ $rcloneObj = [PSCustomObject]@{
     InstallGuideUrl = "https://rclone.org/install/"
 }
 
-# 3. WinFsp detection
 $winfspObj = Test-WinFspInstalled
 
-# 4. Mount point availability
 $mountObj = Test-MountPointAvailable -Target $MountPoint
 
-# 5. User session
 $sessionObj = Get-UserSessionInfo
 
-# 6. Capacity
 $capacityObj = Get-SystemCapacityInfo
 
-# 7. Config safety check
 $configObj = Check-RcloneConfigSafe -Path $ConfigPath
 
-# 8. Readiness assessment
 $reasons = @()
 if (-not $rcloneObj.Installed) {
     $reasons += "rclone executable is not found in PATH or standard install paths. Run 'winget install Rclone.Rclone' or download from https://rclone.org."
@@ -484,5 +454,4 @@ $report = [PSCustomObject]@{
     RcloneConfigFile   = $configObj
 }
 
-# Output strictly structured JSON
 $report | ConvertTo-Json -Depth 6

@@ -85,17 +85,14 @@ CATALOG_V1_REQUIRED_KEYS = {
 
 def test_cross_jwt_token_interoperability():
     """Verify JWT token interoperability between Spring Boot (io.jsonwebtoken) and FastAPI (PyJWT)."""
-    # 1. Base64 decoded key check
     raw_secret = os.getenv("APP_JWT_SECRET", DEFAULT_JWT_SECRET)
     decoded_key = base64.b64decode(raw_secret)
     assert len(decoded_key) >= 32, "Secret key must be at least 256 bits for HS256"
 
-    # 2. Token created by Python should have standard claims
     test_user = "dippie_cross_tester"
     py_token = create_jwt_token(test_user)
     assert py_token is not None
 
-    # Decode and verify header & claims
     unverified_header = jwt.get_unverified_header(py_token)
     assert unverified_header.get("alg") == "HS256"
 
@@ -105,7 +102,6 @@ def test_cross_jwt_token_interoperability():
     assert "exp" in claims
     assert claims["exp"] > claims["iat"]
 
-    # 3. Token structured like Java Spring Boot JwtUtils.generateToken(userDetails)
     now = int(time.time())
     java_simulated_payload = {
         "sub": "java_user_principal",
@@ -114,11 +110,9 @@ def test_cross_jwt_token_interoperability():
     }
     java_simulated_token = jwt.encode(java_simulated_payload, decoded_key, algorithm="HS256")
 
-    # FastAPI decode_jwt_token should recognize Java-generated token
     recovered_user = decode_jwt_token(java_simulated_token)
     assert recovered_user == "java_user_principal"
 
-    # 4. Playback Grant verification (Java JwtUtils.generatePlaybackGrant)
     grant_payload = {
         "sub": "streamer_01",
         "assetId": "ast-drive-videoplayback",
@@ -147,7 +141,6 @@ def test_cross_database_schema_and_types():
     missing_tables = EXPECTED_TABLES - registered_tables
     assert not missing_tables, f"SQLAlchemy models missing tables: {missing_tables}"
 
-    # Verify column consistency on core tables
     users_cols = {c.name for c in Base.metadata.tables["users"].columns}
     assert {"id", "username", "email", "password", "full_name", "role", "created_at"}.issubset(users_cols)
 
@@ -176,21 +169,17 @@ def test_cross_catalog_v1_format_and_fixtures():
     top_keys = set(catalog_data.keys())
     assert CATALOG_V1_REQUIRED_KEYS.issubset(top_keys), f"Missing keys in fixture: {CATALOG_V1_REQUIRED_KEYS - top_keys}"
 
-    # Package metadata validation
     pkg = catalog_data["package"]
     assert {"id", "revision", "created_at", "default_language", "import_mode", "reference_scope", "description"}.issubset(set(pkg.keys()))
 
-    # Episodes validation
     if catalog_data["episodes"]:
         ep = catalog_data["episodes"][0]
         assert {"id", "series_id", "title"}.issubset(set(ep.keys()))
 
-    # Media assets validation
     if catalog_data["media_assets"]:
         asset = catalog_data["media_assets"][0]
         assert {"id", "content_type", "storage", "access_policy", "duration_ms"}.issubset(set(asset.keys()))
 
-    # Scenes validation
     if catalog_data["scenes"]:
         sc = catalog_data["scenes"][0]
         assert {"id", "episode_id", "start_ms", "end_ms"}.issubset(set(sc.keys()))

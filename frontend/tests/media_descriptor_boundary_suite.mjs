@@ -40,12 +40,8 @@ function loadMediaService(mockFetch, overrides = {}) {
   return sandbox.module.exports.getMediaDescriptor ? sandbox.module.exports : sandbox.exports;
 }
 
-// -------------------------------------------------------------
-// Media Descriptor Boundary Test Suite (M4-F03)
-// -------------------------------------------------------------
 
 test('1. Payload 200 hợp lệ trả về descriptor chuẩn', async () => {
-  // Test 1a: Direct payload with relative and absolute stream URLs
   const mockFetchDirect = async (url) => {
     assert.ok(url.includes('/api/movies/m-valid-1/media-descriptor'));
     return {
@@ -92,7 +88,6 @@ test('1. Payload 200 hợp lệ trả về descriptor chuẩn', async () => {
   assert.equal(desc1.trailer.kind, 'trailer');
   assert.equal(desc1.trailer.streamUrl, 'https://cdn.example.com/trailer.mp4');
 
-  // Test 1b: Wrapped ApiResponse payload ({ data: ... })
   const mockFetchWrapped = async () => ({
     ok: true,
     status: 200,
@@ -125,7 +120,6 @@ test('1. Payload 200 hợp lệ trả về descriptor chuẩn', async () => {
 });
 
 test('2. Payload valid empty (hasFeature: false, hasTrailer: false) trả về hợp lệ', async () => {
-  // Test direct valid empty
   const mockFetchEmpty = async () => ({
     ok: true,
     status: 200,
@@ -145,7 +139,6 @@ test('2. Payload valid empty (hasFeature: false, hasTrailer: false) trả về h
   assert.equal(descEmpty.feature, null);
   assert.equal(descEmpty.trailer, null);
 
-  // Test wrapped valid empty with null feature/trailer
   const mockFetchWrappedEmpty = async () => ({
     ok: true,
     status: 200,
@@ -228,13 +221,11 @@ test('4. External abort ném AbortError và dọn dẹp timer', async () => {
     return originalRemoveListener(...args);
   };
 
-  // Case 4a: Abort while fetch is in-flight
   const promise = service.getMediaDescriptor('m-abort', {
     timeoutMs: 10000,
     signal: externalController.signal,
   });
 
-  // Trigger external abort
   externalController.abort();
 
   await assert.rejects(
@@ -251,7 +242,6 @@ test('4. External abort ném AbortError và dọn dẹp timer', async () => {
   assert.equal(timerCleared, true, 'clearTimeout must be called in finally block');
   assert.equal(listenerRemoved, true, 'removeEventListener must be called in finally block');
 
-  // Case 4b: Signal already aborted before calling getMediaDescriptor
   const preAbortedController = new AbortController();
   preAbortedController.abort();
 
@@ -286,7 +276,6 @@ test('5. Payload 200 rỗng `{}` ném lỗi validation', async () => {
     }
   );
 
-  // Also test wrapped empty object { data: {} }
   const mockFetchWrappedEmpty = async () => ({
     ok: true,
     status: 200,
@@ -331,7 +320,6 @@ test('6. Mismatched movieId ném lỗi validation', async () => {
 });
 
 test('7. hasFeature không phải boolean ném lỗi validation', async () => {
-  // Case 7a: hasFeature is string 'true'
   const mockFetchStringBoolean = async () => ({
     ok: true,
     status: 200,
@@ -353,7 +341,6 @@ test('7. hasFeature không phải boolean ném lỗi validation', async () => {
     }
   );
 
-  // Case 7b: hasFeature is undefined
   const mockFetchMissingFeature = async () => ({
     ok: true,
     status: 200,
@@ -374,7 +361,6 @@ test('7. hasFeature không phải boolean ném lỗi validation', async () => {
     }
   );
 
-  // Case 7c: hasTrailer is number 1
   const mockFetchNumberTrailer = async () => ({
     ok: true,
     status: 200,
@@ -398,7 +384,6 @@ test('7. hasFeature không phải boolean ném lỗi validation', async () => {
 });
 
 test('8. feature có streamUrl rỗng ném lỗi validation', async () => {
-  // Case 8a: feature has empty streamUrl
   const mockFetchEmptyStreamUrl = async () => ({
     ok: true,
     status: 200,
@@ -425,7 +410,6 @@ test('8. feature có streamUrl rỗng ném lỗi validation', async () => {
     }
   );
 
-  // Case 8b: feature has whitespace-only streamUrl
   const mockFetchWhitespaceStreamUrl = async () => ({
     ok: true,
     status: 200,
@@ -452,7 +436,6 @@ test('8. feature có streamUrl rỗng ném lỗi validation', async () => {
     }
   );
 
-  // Case 8c: hasFeature is true but feature is missing or null
   const mockFetchNullFeature = async () => ({
     ok: true,
     status: 200,
@@ -475,7 +458,6 @@ test('8. feature có streamUrl rỗng ném lỗi validation', async () => {
     }
   );
 
-  // Case 8d: feature has invalid kind
   const mockFetchWrongKind = async () => ({
     ok: true,
     status: 200,
@@ -504,7 +486,6 @@ test('8. feature có streamUrl rỗng ném lỗi validation', async () => {
 });
 
 test('9. Server 500/503 ném Error', async () => {
-  // Test 500 Internal Server Error
   const mockFetch500 = async () => ({
     ok: false,
     status: 500,
@@ -522,7 +503,6 @@ test('9. Server 500/503 ném Error', async () => {
     }
   );
 
-  // Test 503 Service Unavailable
   const mockFetch503 = async () => ({
     ok: false,
     status: 503,

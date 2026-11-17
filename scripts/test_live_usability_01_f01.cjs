@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// Redact any auth or grant tokens from URLs before recording
 const redactUrl = (url) => {
   if (!url) return '';
   return String(url)
@@ -52,7 +51,6 @@ async function runBrowserVerification() {
   let ws = null;
 
   try {
-    // 1. Connect to CDP
     let page = null;
     const deadlineConnect = Date.now() + 15000;
     while (Date.now() < deadlineConnect) {
@@ -107,7 +105,6 @@ async function runBrowserVerification() {
     const ensureDir = (p) => { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); };
     ensureDir('docs/reviews/evidence');
 
-    // 2. Perform admin authentication
     console.log('[USABILITY-01-F01] Step 1: Authenticating as admin to obtain access token...');
     const loginRes = await fetch('http://127.0.0.1:8080/api/auth/login', {
       method: 'POST',
@@ -126,7 +123,6 @@ async function runBrowserVerification() {
     };
     console.log('[USABILITY-01-F01] Admin authenticated successfully.');
 
-    // Navigate to homepage and inject auth token into localStorage
     await send('Page.navigate', { url: 'http://localhost:3000/' });
     await new Promise(r => setTimeout(r, 2000));
     await send('Runtime.evaluate', {
@@ -138,14 +134,10 @@ async function runBrowserVerification() {
       })()`
     });
 
-    // -------------------------------------------------------------------------
-    // TEST QUERY 1: "Xin Chào Jadoo Mùa 1 Tập 1"
-    // -------------------------------------------------------------------------
     console.log('\n[USABILITY-01-F01] Step 2: Testing CineBot Query 1: "Xin Chào Jadoo Mùa 1 Tập 1"...');
     await send('Page.navigate', { url: 'http://localhost:3000/' });
     await new Promise(r => setTimeout(r, 2500));
 
-    // Open CineBot modal
     const openBtnRes = await send('Runtime.evaluate', {
       expression: `(() => {
         const buttons = Array.from(document.querySelectorAll('button'));
@@ -160,7 +152,6 @@ async function runBrowserVerification() {
     }
     await new Promise(r => setTimeout(r, 1000));
 
-    // Type query into CineBot input
     const query1 = 'Xin Chào Jadoo Mùa 1 Tập 1';
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -178,7 +169,6 @@ async function runBrowserVerification() {
     });
     await new Promise(r => setTimeout(r, 500));
 
-    // Click Send button
     console.log('[USABILITY-01-F01] Sending Query 1 to full Qwen model...');
     const tQ1Start = Date.now();
     await send('Runtime.evaluate', {
@@ -188,7 +178,6 @@ async function runBrowserVerification() {
       })()`
     });
 
-    // Poll for AI response
     let q1Done = false;
     let q1Data = null;
     const q1Deadline = Date.now() + 120000;
@@ -241,7 +230,6 @@ async function runBrowserVerification() {
     console.log('[USABILITY-01-F01] Reply text:', q1Data.text.substring(0, 100) + '...');
     console.log('[USABILITY-01-F01] Card links found:', JSON.stringify(q1Data.cards));
 
-    // Verify card routing contracts
     const primaryCard = q1Data.cards[0] || (q1Data.allLinks.length > 0 ? {
       titleText: q1Data.allLinks[0].text,
       titleLink: q1Data.allLinks[0].href,
@@ -254,7 +242,6 @@ async function runBrowserVerification() {
 
     console.log(`[USABILITY-01-F01] Checking href for card: titleLink=${primaryCard.titleLink}, actionLink=${primaryCard.actionLink}`);
 
-    // Strict invariant: must NOT link to /movies/ep_jadoo_s01_0001
     if (primaryCard.titleLink.startsWith('/movies/ep_jadoo')) {
       throw new Error(`CRITICAL FAILURE: Card title still links to legacy movie route: ${primaryCard.titleLink}`);
     }
@@ -262,7 +249,6 @@ async function runBrowserVerification() {
       throw new Error(`CRITICAL FAILURE: Card action button still links to legacy movie route: ${primaryCard.actionLink}`);
     }
 
-    // Must link to /series/ser_jadoo?episode=ep_jadoo_s01_0001
     const expectedPrefix = '/series/ser_jadoo?episode=ep_jadoo_s01_0001';
     if (!primaryCard.titleLink.startsWith(expectedPrefix)) {
       throw new Error(`CRITICAL FAILURE: Card title link '${primaryCard.titleLink}' does not match expected '${expectedPrefix}'`);
@@ -279,7 +265,6 @@ async function runBrowserVerification() {
       no_legacy_movie_route: !primaryCard.titleLink.includes('/movies/')
     };
 
-    // Step 2.2: Click the card link in the UI to navigate
     console.log('[USABILITY-01-F01] Clicking the card link in CineBot dialog...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -290,7 +275,6 @@ async function runBrowserVerification() {
       })()`
     });
 
-    // Wait for navigation to /series/ser_jadoo
     console.log('[USABILITY-01-F01] Waiting for navigation to series page...');
     let navS01Done = false;
     const navDeadline = Date.now() + 20000;
@@ -312,7 +296,6 @@ async function runBrowserVerification() {
     }
     console.log(`[USABILITY-01-F01] Navigation verified: ${evidence.query_1_s01e01.navigated_url}`);
 
-    // Wait for series page to load episode and video
     console.log('[USABILITY-01-F01] Waiting for video element and episode metadata...');
     let videoLoaded = false;
     let videoState = null;
@@ -356,12 +339,10 @@ async function runBrowserVerification() {
       src: redactUrl(videoState.src)
     });
 
-    // Assert correct episode and asset
     if (!videoState.src.includes('asset_jadoo_s01_v0001')) {
       throw new Error(`Unexpected video src: ${redactUrl(videoState.src)}, expected asset_jadoo_s01_v0001`);
     }
 
-    // Test playback advancement
     console.log('[USABILITY-01-F01] Testing playback advance...');
     await send('Runtime.evaluate', {
       expression: 'document.querySelector("video").play()'
@@ -373,7 +354,6 @@ async function runBrowserVerification() {
     console.log(`[USABILITY-01-F01] Playback time advance: ${t0.toFixed(3)}s -> ${t1.toFixed(3)}s (advancing: ${advancing})`);
     if (!advancing) throw new Error('Video failed to advance currentTime during playback');
 
-    // Test Pause and Resume
     console.log('[USABILITY-01-F01] Testing Pause...');
     await send('Runtime.evaluate', { expression: 'document.querySelector("video").pause()' });
     await new Promise(r => setTimeout(r, 500));
@@ -390,7 +370,6 @@ async function runBrowserVerification() {
     const resumeOk = tResumed > tPause1;
     console.log(`[USABILITY-01-F01] Resume verified: time advanced to ${tResumed.toFixed(3)}s (resumeOk: ${resumeOk})`);
 
-    // Test Seek to 60.0s
     console.log('[USABILITY-01-F01] Testing Seek to 60.0s...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -403,13 +382,11 @@ async function runBrowserVerification() {
     console.log(`[USABILITY-01-F01] Post-seek currentTime: ${tSeeked.toFixed(3)}s`);
     if (tSeeked < 59.5) throw new Error(`Seek failed, currentTime ${tSeeked} < 59.5s`);
 
-    // Settle and verify post-seek advancing
     await new Promise(r => setTimeout(r, 1500));
     const tSeekAfter = (await send('Runtime.evaluate', { expression: 'document.querySelector("video").currentTime', returnByValue: true })).result.value;
     const postSeekAdvancing = tSeekAfter > tSeeked;
     console.log(`[USABILITY-01-F01] Post-seek advancing: ${tSeeked.toFixed(3)}s -> ${tSeekAfter.toFixed(3)}s (postSeekAdvancing: ${postSeekAdvancing})`);
 
-    // Capture screenshot
     const s01Snap = await send('Page.captureScreenshot', { format: 'png' });
     const s01SnapPath = 'docs/reviews/evidence/USABILITY_01_F01_live_s01e01_playing.png';
     fs.writeFileSync(s01SnapPath, Buffer.from(s01Snap.data, 'base64'));
@@ -426,14 +403,10 @@ async function runBrowserVerification() {
       seek_60s: { tSeeked, tSeekAfter, postSeekAdvancing }
     };
 
-    // -------------------------------------------------------------------------
-    // TEST QUERY 2: "Jadoo Mùa 3 Tập 1" (Cross-Season Distinct Episode Test)
-    // -------------------------------------------------------------------------
     console.log('\n[USABILITY-01-F01] Step 3: Testing CineBot Query 2: "Jadoo Mùa 3 Tập 1"...');
     await send('Page.navigate', { url: 'http://localhost:3000/' });
     await new Promise(r => setTimeout(r, 2500));
 
-    // Open CineBot modal
     await send('Runtime.evaluate', {
       expression: `(() => {
         const buttons = Array.from(document.querySelectorAll('button'));
@@ -529,7 +502,6 @@ async function runBrowserVerification() {
     }
 
     console.log(`[USABILITY-01-F01] Checking href for Query 2 card: ${cardQ2.titleLink}`);
-    // Strict invariant: must link to Season 3 Episode 1 (ep_jadoo_s03_0001), NOT ep_jadoo_s01_0001
     const expectedQ2Prefix = '/series/ser_jadoo?episode=ep_jadoo_s03_0001';
     if (!cardQ2.titleLink.startsWith(expectedQ2Prefix)) {
       throw new Error(`CRITICAL FAILURE: Card for Season 3 Ep 1 linked to '${cardQ2.titleLink}', expected '${expectedQ2Prefix}'`);
@@ -546,7 +518,6 @@ async function runBrowserVerification() {
       correct_season_3_episode_1: true
     };
 
-    // Click card to navigate
     console.log('[USABILITY-01-F01] Clicking Season 3 Episode 1 card...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -557,7 +528,6 @@ async function runBrowserVerification() {
       })()`
     });
 
-    // Wait for navigation
     let navS03Done = false;
     const navS03Deadline = Date.now() + 20000;
     while (Date.now() < navS03Deadline) {
@@ -573,7 +543,6 @@ async function runBrowserVerification() {
     if (!navS03Done) throw new Error('Failed to navigate to Season 3 Episode 1 URL');
     console.log(`[USABILITY-01-F01] Navigation verified for S3 E1: ${evidence.query_2_s03e01.navigated_url}`);
 
-    // Wait for S3 E1 video metadata
     let s03VideoLoaded = false;
     let s03VideoState = null;
     const s03Deadline = Date.now() + 30000;
@@ -614,7 +583,6 @@ async function runBrowserVerification() {
       throw new Error(`Unexpected video src for S3 E1: ${redactUrl(s03VideoState.src)}, expected asset_jadoo_s03_v0001`);
     }
 
-    // Capture S3 E1 screenshot
     const s03Snap = await send('Page.captureScreenshot', { format: 'png' });
     const s03SnapPath = 'docs/reviews/evidence/USABILITY_01_F01_live_s03e01_playing.png';
     fs.writeFileSync(s03SnapPath, Buffer.from(s03Snap.data, 'base64'));
@@ -627,15 +595,11 @@ async function runBrowserVerification() {
       stream_url_redacted: redactUrl(s03VideoState.src)
     };
 
-    // -------------------------------------------------------------------------
-    // TEST 3: SEGMENT DEEP-LINK TEST WITH REAL TIMESTAMP
-    // -------------------------------------------------------------------------
     console.log('\n[USABILITY-01-F01] Step 4: Testing Segment Deep-Link URL...');
     const segUrl = 'http://localhost:3000/series/ser_jadoo?episode=ep_jadoo_s01_0008&segment=seg_jadoo_s01_008a&t=0';
     await send('Page.navigate', { url: segUrl });
     await new Promise(r => setTimeout(r, 4000));
 
-    // Verify segment is active and highlighted
     let segVerified = false;
     let segState = null;
     const segDeadline = Date.now() + 20000;
@@ -705,7 +669,6 @@ async function runBrowserVerification() {
     } catch (_) {}
   }
 
-  // Write evidence JSON
   const evidencePath = 'docs/reviews/evidence/USABILITY_01_F01_BROWSER_VERIFICATION.json';
   fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf-8');
   console.log(`[USABILITY-01-F01] Saved evidence to ${evidencePath}`);

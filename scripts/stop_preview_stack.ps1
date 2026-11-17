@@ -94,7 +94,6 @@ for ($processIndex = $processRecords.Count - 1; $processIndex -ge 0; $processInd
         continue
     }
 
-    # Xác minh ExecutablePath
     $liveExe = [string]$cimProc.ExecutablePath
     if ([string]::IsNullOrWhiteSpace($liveExe)) {
         Write-Warning "  [TỪ CHỐI] Không đọc được ExecutablePath của live PID $targetPid. Fail-closed không gửi tín hiệu."
@@ -116,7 +115,6 @@ for ($processIndex = $processRecords.Count - 1; $processIndex -ge 0; $processInd
         continue
     }
 
-    # Xác minh StartTime / CreationDate trong dung sai 3 giây
     try {
         $liveCreationDate = ([DateTime]$cimProc.CreationDate).ToUniversalTime()
         $expectedUtc = $expectedStartTime.ToUniversalTime()
@@ -170,7 +168,6 @@ for ($processIndex = $processRecords.Count - 1; $processIndex -ge 0; $processInd
         Stop-Process -Id $targetPid -Force -ErrorAction SilentlyContinue
     } catch {}
 
-    # Chờ tiến trình thoát
     $deadline = [DateTime]::UtcNow.AddSeconds(8)
     while ([DateTime]::UtcNow -lt $deadline) {
         if (-not (Get-CimInstance Win32_Process -Filter "ProcessId = $targetPid" -ErrorAction SilentlyContinue)) {
@@ -187,7 +184,6 @@ for ($processIndex = $processRecords.Count - 1; $processIndex -ge 0; $processInd
     }
 }
 
-# Tháo gắn Google Drive nếu đã được gắn
 if ($state.DriveMounted) {
     Write-Host "`nĐang tháo gắn ổ đĩa Google Drive..." -ForegroundColor Yellow
     $stopDriveScript = Join-Path $root "scripts\drive\stop_drive.ps1"

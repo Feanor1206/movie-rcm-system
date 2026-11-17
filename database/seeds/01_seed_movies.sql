@@ -1,6 +1,3 @@
--- ==========================================================
--- SEED DATA: 6 MOVIES WITH LOCAL VIDEO URLS
--- ==========================================================
 
 INSERT IGNORE INTO movies (id, title, release_year, rating, runtime, genres, description, poster, backdrop, video_url) VALUES
 ('the-last-orbit', 'The Last Orbit', 2026, 8.7, '2h 14m', 'Sci-Fi,Drama', 

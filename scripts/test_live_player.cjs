@@ -39,13 +39,11 @@ async function testPlayer() {
     await send('Runtime.enable');
     await new Promise(r => setTimeout(r, 2000));
 
-    // Click play button
     const clickRes = await send('Runtime.evaluate', {
       expression: 'document.querySelector("[data-testid=\'play-feature-btn\']").click(); true;'
     });
     console.log('Play button clicked:', clickRes);
 
-    // Wait 12 seconds for Google Drive stream to start and frame to render
     await new Promise(r => setTimeout(r, 12000));
 
     const snap = await send('Page.captureScreenshot', { format: 'png' });

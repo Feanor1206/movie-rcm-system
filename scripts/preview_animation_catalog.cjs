@@ -1,17 +1,3 @@
-/**
- * Animation Catalog Dry-Run & Preview Tool (M2 Gate Evidence)
- *
- * Simulates additive and idempotent catalog onboarding against an in-memory hardcoded
- * baseline fixture array (6 fiction movies from DataInitializer.java).
- *
- * NOTE: This tool strictly performs preview / dry-run analysis against the hardcoded baseline
- * and candidate fixture. It is NOT an importer and does NOT connect to or modify any live database.
- * Detects ADD, SKIP, and CONFLICT actions strictly by canonical ID.
- *
- * Usage:
- *   node scripts/preview_animation_catalog.cjs           # Runs preview against hardcoded baseline
- *   node scripts/preview_animation_catalog.cjs --test    # Runs automated dry-run test suite
- */
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,7 +5,6 @@ const assert = require('node:assert/strict');
 
 const DEFAULT_FIXTURE_PATH = path.resolve(__dirname, '../docs/fixtures/animation_catalog_fixture.json');
 
-// Default backend baseline seed (6 fiction movies from DataInitializer.java)
 const BASELINE_FICTION_MOVIES = [
   { id: 'the-last-orbit', title: 'The Last Orbit', year: 2026, rating: 8.7, genres: ['Sci-Fi', 'Drama'] },
   { id: 'afterlight', title: 'Afterlight', year: 2025, rating: 8.3, genres: ['Drama', 'Mystery'] },
@@ -141,14 +126,12 @@ function runSelfTests() {
   console.log('Running dry-run verification tests...');
   const fixture = JSON.parse(fs.readFileSync(DEFAULT_FIXTURE_PATH, 'utf8')).records;
 
-  // Test 1: First run against clean fiction baseline -> All 6 animation items are ADDed
   const r1 = dryRun(BASELINE_FICTION_MOVIES, fixture);
   assert.equal(r1.adds.length, 6, 'First run must mark all 6 records as ADD');
   assert.equal(r1.skips.length, 0, 'First run has 0 skips');
   assert.equal(r1.conflicts.length, 0, 'First run has 0 conflicts');
   console.log('✔ Test 1: First run marks all 6 records as ADD');
 
-  // Test 2: Idempotency (Second run against DB that already has the 6 animations)
   const populated = [...BASELINE_FICTION_MOVIES, ...fixture];
   const r2 = dryRun(populated, fixture);
   assert.equal(r2.adds.length, 0, 'Second run must NOT duplicate records (0 adds)');
@@ -156,7 +139,6 @@ function runSelfTests() {
   assert.equal(r2.conflicts.length, 0, 'Second run has 0 conflicts');
   console.log('✔ Test 2: Idempotency: second run produces 0 adds and 6 skips');
 
-  // Test 3: Conflict detection (Target has movie with same ID but different year/title)
   const conflictingTarget = [
     ...BASELINE_FICTION_MOVIES,
     { id: 'spirited-away', title: 'Spirited Away (Old Cut)', year: 1999, rating: 8.0, genres: ['Animation'] },

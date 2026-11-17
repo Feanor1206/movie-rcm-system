@@ -1,4 +1,3 @@
--- Migration 05: Add durable, account-scoped episode playback progress (MySQL 8.0)
 CREATE TABLE IF NOT EXISTS watch_progress (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,

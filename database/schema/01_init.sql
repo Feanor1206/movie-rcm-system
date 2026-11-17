@@ -1,9 +1,4 @@
--- =========================================================================
--- Dippie Cinema Database Schema Initialization (MySQL 8.0)
--- Version: 2.0 (MySQL Canonical Schema)
--- =========================================================================
 
--- 1. USERS TABLE
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -15,7 +10,6 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 2. MOVIES TABLE
 CREATE TABLE IF NOT EXISTS movies (
     id VARCHAR(100) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -34,7 +28,6 @@ CREATE TABLE IF NOT EXISTS movies (
     INDEX idx_movies_rating (rating)
 );
 
--- 3. WATCHLIST ITEMS TABLE
 CREATE TABLE IF NOT EXISTS watchlist_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -48,7 +41,6 @@ CREATE TABLE IF NOT EXISTS watchlist_items (
     INDEX idx_watchlist_movie (movie_id)
 );
 
--- 4. MOVIE RATINGS TABLE
 CREATE TABLE IF NOT EXISTS movie_ratings (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -62,7 +54,6 @@ CREATE TABLE IF NOT EXISTS movie_ratings (
     INDEX idx_ratings_movie (movie_id)
 );
 
--- 5. FAVORITE ITEMS TABLE
 CREATE TABLE IF NOT EXISTS favorite_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -76,7 +67,6 @@ CREATE TABLE IF NOT EXISTS favorite_items (
     INDEX idx_favorite_movie (movie_id)
 );
 
--- 6. MEDIA ASSETS TABLE (Streaming & Playback Registry)
 CREATE TABLE IF NOT EXISTS media_assets (
     id VARCHAR(64) PRIMARY KEY,
     movie_id VARCHAR(100) NOT NULL,
@@ -98,7 +88,6 @@ CREATE TABLE IF NOT EXISTS media_assets (
     INDEX idx_media_movie_kind (movie_id, kind)
 );
 
--- 7. DIPPIE CATALOG V1 COLLECTIONS
 CREATE TABLE IF NOT EXISTS catalog_packages (
     id VARCHAR(100) PRIMARY KEY,
     version VARCHAR(50) NOT NULL,

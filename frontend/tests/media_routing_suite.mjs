@@ -32,7 +32,6 @@ function loadMediaRouting() {
 
 const { buildMediaItemHref, resolveFileTimestamp, resolveMediaSeekSeconds } = loadMediaRouting();
 
-// 1. Series card -> đúng series
 test('1. Series card: resolves to /series/[id]', () => {
   const item = {
     id: 'ser_jadoo',
@@ -43,7 +42,6 @@ test('1. Series card: resolves to /series/[id]', () => {
   assert.equal(href, '/series/ser_jadoo');
 });
 
-// 2. Episode card -> đúng series/episode và asset nếu có
 test('2. Episode card: resolves to /series/[seriesId]?episode=[episodeId]', () => {
   const item = {
     id: 'ep_jadoo_s01_0001',
@@ -55,7 +53,6 @@ test('2. Episode card: resolves to /series/[seriesId]?episode=[episodeId]', () =
   const href = buildMediaItemHref(item);
   assert.equal(href, '/series/ser_jadoo?episode=ep_jadoo_s01_0001&asset=asset_jadoo_s01_v0001');
 
-  // Verify without asset
   const itemNoAsset = {
     id: 'ep_jadoo_s01_0002',
     item_type: 'episode',
@@ -64,7 +61,6 @@ test('2. Episode card: resolves to /series/[seriesId]?episode=[episodeId]', () =
   assert.equal(buildMediaItemHref(itemNoAsset), '/series/ser_jadoo?episode=ep_jadoo_s01_0002');
 });
 
-// 3. Hai tập cùng số thuộc hai mùa -> hai episode khác nhau
 test('3. Cross-season same episode number: resolves to distinct episode IDs without collision', () => {
   const s01e01 = {
     id: 'ep_jadoo_s01_0001',
@@ -91,7 +87,6 @@ test('3. Cross-season same episode number: resolves to distinct episode IDs with
   assert.match(href2, /episode=ep_jadoo_s03_0001/);
 });
 
-// 4. Segment -> đúng episode/asset/time
 test('4. Segment card: resolves to /series/[seriesId]?episode=[epId]&segment=[segId]&t=[time]', () => {
   const segment = {
     id: 'seg_jadoo_s01_008a',
@@ -110,7 +105,6 @@ test('4. Segment card: resolves to /series/[seriesId]?episode=[epId]&segment=[se
   );
 });
 
-// 5. Timestamp null -> không tự tua 0
 test('5. Null/undefined timestamp: does NOT emit &t=0', () => {
   const segNoTime = {
     id: 'seg_jadoo_s01_008a',
@@ -134,7 +128,6 @@ test('5. Null/undefined timestamp: does NOT emit &t=0', () => {
   assert.doesNotMatch(hrefUndef, /&t=/);
 });
 
-// 6. Movie legacy -> giữ route cũ
 test('6. Legacy movie item: maintains /movies/[id] route', () => {
   const legacy1 = {
     id: 'spirited-away',
@@ -150,9 +143,7 @@ test('6. Legacy movie item: maintains /movies/[id] route', () => {
   assert.equal(buildMediaItemHref(legacyNoType), '/movies/my-neighbor-totoro');
 });
 
-// 7. Thiếu context -> không tạo link nhầm
 test('7. Missing context: does NOT fabricate phantom series or link to wrong episode', () => {
-  // Orphan episode with no series_id: falls back to safe standalone route instead of guessing ser_jadoo
   const orphanEpisode = {
     id: 'ep_orphan_9999',
     item_type: 'episode',
@@ -161,13 +152,11 @@ test('7. Missing context: does NOT fabricate phantom series or link to wrong epi
   assert.equal(hrefOrphan, '/movies/ep_orphan_9999');
   assert.doesNotMatch(hrefOrphan, /ser_jadoo/);
 
-  // Completely empty item
   assert.equal(buildMediaItemHref({}), '/movies');
   assert.equal(buildMediaItemHref(null), '/movies');
   assert.equal(buildMediaItemHref(undefined), '/movies');
 });
 
-// 8. Tiêu đề và nút hành động dùng cùng đích
 test('8. Consistency: buildMediaItemHref is pure and deterministic for both title and button link', () => {
   const item = {
     id: 'ep_jadoo_s01_0001',
@@ -181,7 +170,6 @@ test('8. Consistency: buildMediaItemHref is pure and deterministic for both titl
   assert.equal(titleHref, '/series/ser_jadoo?episode=ep_jadoo_s01_0001');
 });
 
-// 9. Ký tự đặc biệt trong params được encode đúng
 test('9. Special characters in query parameters are strictly URL encoded and safely decoded', () => {
   const specialItem = {
     id: 'ep special #1 & 2 [test]',
@@ -192,14 +180,12 @@ test('9. Special characters in query parameters are strictly URL encoded and saf
   const href = buildMediaItemHref(specialItem);
   assert.match(href, /^\/series\/ser%20special%20%2F%20name\?/);
 
-  // Parse URL search params
   const [pathPart, queryPart] = href.split('?');
   const params = new URLSearchParams(queryPart);
   assert.equal(params.get('episode'), 'ep special #1 & 2 [test]');
   assert.equal(params.get('asset'), 'asset:special+1');
 });
 
-// 10. V2: Scene card emits timeline=file and preserves start_ms
 test('10. V2: Scene card emits timeline=file and preserves start_ms', () => {
   const scene = {
     id: 'scene_jadoo_s01_0001_sc01',
@@ -216,7 +202,6 @@ test('10. V2: Scene card emits timeline=file and preserves start_ms', () => {
   );
 });
 
-// 11. V2: Segment card preserves logical episode timeline (does not emit timeline=file)
 test('11. V2: Segment card preserves logical episode timeline without timeline=file', () => {
   const segment = {
     id: 'seg_jadoo_s01_0001_sg01',
@@ -234,7 +219,6 @@ test('11. V2: Segment card preserves logical episode timeline without timeline=f
   assert.doesNotMatch(href, /timeline=file/);
 });
 
-// 12. V2: Scene file timestamp resolves directly (5s with 30s source offset -> 5s)
 test('12. V2: Scene file timestamp resolves directly to file offset (5s with 30s source offset -> 5.0s)', () => {
   const asset = {
     id: 'asset_jadoo_s01_v0001',
@@ -248,7 +232,6 @@ test('12. V2: Scene file timestamp resolves directly to file offset (5s with 30s
     ]),
   };
 
-  // Scene with timeline=file or isScene=true resolves to file offset 5000/1000 = 5.0s
   const seekSec = resolveMediaSeekSeconds({
     timeMs: 5000,
     timeline: 'file',
@@ -260,7 +243,6 @@ test('12. V2: Scene file timestamp resolves directly to file offset (5s with 30s
   });
   assert.equal(seekSec, 5.0);
 
-  // Even if timeline parameter is omitted, isScene=true treats it as file timeline
   const seekSecFromSceneFlag = resolveMediaSeekSeconds({
     timeMs: '5000',
     isScene: true,
@@ -294,10 +276,9 @@ test('13. V2: Segment logical timestamp maps through coverage (5s with 30s sourc
     episodeId: 'ep_jadoo_s01_0001',
     segmentStartMs: 5000,
   });
-  assert.equal(seekSec, 35.0); // (30000 + 5000) / 1000 = 35.0s
+  assert.equal(seekSec, 35.0);
 });
 
-// 14. V2: Timestamp 0 is valid and resolves to 0.0s
 test('14. V2: Timestamp 0 is valid and resolves to 0.0s (not rejected or skipped)', () => {
   const asset = {
     id: 'asset_jadoo_s01_v0001',
@@ -311,7 +292,6 @@ test('14. V2: Timestamp 0 is valid and resolves to 0.0s (not rejected or skipped
     ]),
   };
 
-  // Scene at 0ms
   const sceneSeek = resolveMediaSeekSeconds({
     timeMs: 0,
     timeline: 'file',
@@ -320,7 +300,6 @@ test('14. V2: Timestamp 0 is valid and resolves to 0.0s (not rejected or skipped
   });
   assert.equal(sceneSeek, 0.0);
 
-  // Segment at 0ms
   const segSeek = resolveMediaSeekSeconds({
     timeMs: '0',
     isSegment: true,
@@ -329,7 +308,6 @@ test('14. V2: Timestamp 0 is valid and resolves to 0.0s (not rejected or skipped
   });
   assert.equal(segSeek, 0.0);
 
-  // href preserves t=0
   const scene = {
     id: 'scene_0',
     item_type: 'scene',
@@ -341,7 +319,6 @@ test('14. V2: Timestamp 0 is valid and resolves to 0.0s (not rejected or skipped
   assert.match(href, /&t=0/);
 });
 
-// 15. V2: Invalid timestamps (negative, NaN, Infinity) are strictly rejected
 test('15. V2: Invalid timestamps (negative, NaN, Infinity) return null', () => {
   const asset = {
     id: 'asset_test',
@@ -360,7 +337,6 @@ test('15. V2: Invalid timestamps (negative, NaN, Infinity) return null', () => {
   assert.equal(resolveFileTimestamp(Infinity, asset, null, 'ep1'), null);
 });
 
-// 16. V2: Null/undefined timestamps return null (does not fake seek to 0)
 test('16. V2: Null/undefined timestamps return null (does not fake seek to 0)', () => {
   assert.equal(resolveMediaSeekSeconds({ timeMs: null, isScene: true, sceneStartMs: null }), null);
   assert.equal(resolveMediaSeekSeconds({ timeMs: undefined, isScene: true }), null);
@@ -389,15 +365,12 @@ test('17. V2: Coverage mapping prioritizes matching segment_id', () => {
     ]),
   };
 
-  // seg_A at 5000ms -> 10000 + 5000 = 15000ms -> 15.0s
   const seekA = resolveFileTimestamp(5000, asset, 'seg_A', 'ep1');
   assert.equal(seekA, 15.0);
 
-  // seg_B at 5000ms -> 40000 + 5000 = 45000ms -> 45.0s
   const seekB = resolveFileTimestamp(5000, asset, 'seg_B', 'ep1');
   assert.equal(seekB, 45.0);
 
-  // unmapped segment returns null if delta is negative
   const assetNegative = {
     id: 'asset_neg',
     coverageJson: JSON.stringify([
@@ -412,7 +385,6 @@ test('17. V2: Coverage mapping prioritizes matching segment_id', () => {
   assert.equal(resolveFileTimestamp(5000, assetNegative, 'seg_C', 'ep1'), null);
 });
 
-// 18. V1: Series page AST audit: sync effect callback does NOT depend on selectedEpisode
 test('18. V1: Series page AST audit - URL sync effect does NOT depend on selectedEpisode', () => {
   const pageFile = path.resolve(__dirname, '../app/series/[id]/page.tsx');
   const code = fs.readFileSync(pageFile, 'utf8');
@@ -440,13 +412,11 @@ test('18. V1: Series page AST audit - URL sync effect does NOT depend on selecte
   assert.ok(syncEffectFound, 'Found URL sync useEffect in page.tsx');
 });
 
-// 19. V1: Series page sync callback simulation: deep-link A -> select B -> maintains B (no snapback)
 test('19. V1: Deep link A -> select B maintains B without snapback', () => {
   const ep1 = { id: 'ep_jadoo_s01_0001', title: 'Tập 1' };
   const ep2 = { id: 'ep_jadoo_s01_0002', title: 'Tập 2' };
   const seriesData = { episodes: [ep1, ep2] };
 
-  // Simulate component state
   let targetEpisodeId = 'ep_jadoo_s01_0001';
   let prevUrlEpisodeIdRef = { current: 'ep_jadoo_s01_0001' };
   let selectedEpisode = ep1;
@@ -454,7 +424,6 @@ test('19. V1: Deep link A -> select B maintains B without snapback', () => {
     selectedEpisode = ep;
   }
 
-  // Effect callback extracted from page.tsx:
   function runSyncEffect() {
     if (!seriesData?.episodes) return;
     if (targetEpisodeId !== prevUrlEpisodeIdRef.current) {
@@ -470,20 +439,16 @@ test('19. V1: Deep link A -> select B maintains B without snapback', () => {
     }
   }
 
-  // User manually selects episode B
   function handleSelectEpisode(ep) {
     if (ep.id === selectedEpisode?.id) return;
     setSelectedEpisode(ep);
   }
 
-  // 1. Initial state has ep1 selected
   assert.equal(selectedEpisode.id, 'ep_jadoo_s01_0001');
 
-  // 2. User selects ep2
   handleSelectEpisode(ep2);
   assert.equal(selectedEpisode.id, 'ep_jadoo_s01_0002');
 
-  // 3. Effect callback runs while targetEpisodeId is still ep1 (URL param hasn't changed from router)
   runSyncEffect();
   assert.equal(
     selectedEpisode.id,
@@ -491,7 +456,6 @@ test('19. V1: Deep link A -> select B maintains B without snapback', () => {
     'State must remain ep2! Snapback to ep1 is prevented.'
   );
 
-  // 4. Rapid selection: ep2 -> ep1 -> ep2
   handleSelectEpisode(ep1);
   assert.equal(selectedEpisode.id, 'ep_jadoo_s01_0001');
   runSyncEffect();
@@ -503,7 +467,6 @@ test('19. V1: Deep link A -> select B maintains B without snapback', () => {
   assert.equal(selectedEpisode.id, 'ep_jadoo_s01_0002');
 });
 
-// 20. V1: Series page URL update cleans up scene/segment/timestamp/asset on episode change
 test('20. V1: Manual episode change cleans up scene/segment/timestamp/asset query parameters', () => {
   const originalUrl = 'http://localhost:3000/series/ser_jadoo?episode=ep1&scene=sc1&segment=sg1&t=5000&timeline=file&asset=ast1';
   const url = new URL(originalUrl);
@@ -525,7 +488,6 @@ test('20. V1: Manual episode change cleans up scene/segment/timestamp/asset quer
   assert.equal(url.searchParams.get('asset'), null);
 });
 
-// 21. V1: External URL navigation (browser back/forward) updates selected episode
 test('21. V1: External URL navigation updates selected episode when URL param actually changes', () => {
   const ep1 = { id: 'ep1' };
   const ep2 = { id: 'ep2' };
@@ -554,17 +516,14 @@ test('21. V1: External URL navigation updates selected episode when URL param ac
     }
   }
 
-  // External navigation to ep3
   targetEpisodeId = 'ep3';
   runSyncEffect();
   assert.equal(selectedEpisode.id, 'ep3');
 
-  // External navigation (back) to ep2
   targetEpisodeId = 'ep2';
   runSyncEffect();
   assert.equal(selectedEpisode.id, 'ep2');
 
-  // External navigation to base series page without episode param
   targetEpisodeId = null;
   runSyncEffect();
   assert.equal(selectedEpisode.id, 'ep1', 'Defaults to first episode when no episode param in URL');

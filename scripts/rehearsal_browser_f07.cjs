@@ -40,7 +40,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
   };
 
   try {
-    // Wait for Chrome to be ready
     let pageFound = null;
     for (let i = 0; i < 15; i++) {
       await new Promise(r => setTimeout(r, 1000));
@@ -49,7 +48,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
         pageFound = pages.find(p => p.type === 'page');
         if (pageFound) break;
       } catch (e) {
-        // Retry
       }
     }
 
@@ -82,7 +80,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     await send('Page.enable');
     await send('Runtime.enable');
 
-    // 1. Inject auth token into localStorage on frontend origin
     if (authToken) {
       await send('Runtime.evaluate', {
         expression: `
@@ -95,11 +92,9 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
       console.log('[BrowserSuite-F07] Auth token pre-installed into localStorage.');
     }
 
-    // Now navigate to series detail page
     console.log(`[BrowserSuite-F07] Navigating to ${targetUrl}...`);
     await send('Page.navigate', { url: targetUrl });
 
-    // Wait for series detail page to render
     console.log('[BrowserSuite-F07] Waiting for series page to render...');
     let seriesRendered = false;
     for (let i = 0; i < 20; i++) {
@@ -129,7 +124,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     }
     results.assertions.series_page_rendered = true;
 
-    // 2. Await video playback and frame decoding
     console.log('[BrowserSuite-F07] Awaiting video playback start & frame decoding...');
     let activePlayback = false;
     let initialVState = null;
@@ -154,7 +148,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
       });
       const v = res?.result?.value;
       if (v && v.videoWidth > 0 && v.videoHeight > 0) {
-        // Trigger play if paused
         if (v.paused) {
           await send('Runtime.evaluate', {
             expression: `document.querySelector('video')?.play().catch(() => {}); true;`
@@ -168,7 +161,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     }
 
     if (!activePlayback) {
-      // Force play one more time
       await send('Runtime.evaluate', {
         expression: `const v = document.querySelector('video'); if (v) { v.muted = true; v.play(); } true;`
       });
@@ -191,7 +183,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     results.assertions.frames_decoded = true;
     results.measurements.dimensions = `${initialVState.videoWidth}x${initialVState.videoHeight}`;
 
-    // 3. Pause and Resume Controls
     console.log('[BrowserSuite-F07] Testing Pause control...');
     await send('Runtime.evaluate', {
       expression: `(() => {
@@ -226,7 +217,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     assertCondition(resumeState && resumeState.paused === false, 'Video failed to resume');
     results.assertions.resume_control = true;
 
-    // 4. Scene Direct Seek (Finding F2: scene.start_ms = 15000 -> seeks to 15.0s, NOT 25s!)
     console.log('[BrowserSuite-F07] Testing Scene Seek to scene_rehearsal_canyon (15,000ms -> 15.0s)...');
     const s1Res = await send('Runtime.evaluate', {
       expression: `(() => {
@@ -254,7 +244,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     results.assertions.scene_seek_15s = true;
     results.measurements.scene_seek_actual_sec = sceneSeekState;
 
-    // 5. Three Seeks (including near end: 30s, 60s, 115s)
     console.log('[BrowserSuite-F07] Testing 3 sequential seeks (30s, 60s, 115s)...');
     for (const targetSec of [30.0, 60.0, 115.0]) {
       await send('Runtime.evaluate', {
@@ -270,7 +259,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     }
     results.assertions.three_seeks = true;
 
-    // 6. Cross-Episode & Protected Asset Playback (Episode 2: ep_rehearsal_01_02, asset_feature_02)
     console.log('[BrowserSuite-F07] Testing switch to Episode 2 (protected asset_feature_02 with grant)...');
     const ep2ClickRes = await send('Runtime.evaluate', {
       expression: `(() => {
@@ -315,7 +303,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     assertCondition(ep2Active, 'Episode 2 failed to load protected asset with grant');
     results.assertions.protected_asset_stream_with_grant = true;
 
-    // 7. Protected Scene Seek (Mật Mã Căn Cứ Ngầm: 20000ms -> 20.0s)
     console.log('[BrowserSuite-F07] Testing seek on protected scene (20,000ms -> 20.0s)...');
     const protSRes = await send('Runtime.evaluate', {
       expression: `(() => {
@@ -341,7 +328,6 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     assertCondition(protSeekTime >= 19.5 && protSeekTime <= 23.0, `Protected scene seek mismatch: expected ~20.0s, got ${protSeekTime}s`);
     results.assertions.protected_scene_seek_20s = true;
 
-    // 8. Capture Screenshot Evidence
     console.log('[BrowserSuite-F07] Capturing screenshot evidence...');
     const snap = await send('Page.captureScreenshot', { format: 'png' });
     const evidenceDir = path.resolve('docs/reviews/evidence');
@@ -354,12 +340,10 @@ async function runBrowserSuite(frontendPort = 3008, cdpPort = 9228, authToken = 
     results.status = 'PASSED';
     console.log('[BrowserSuite-F07] ALL BROWSER ASSERTIONS PASSED!');
   } finally {
-    // Teardown Chrome by PID
     if (chromeProc && !chromeProc.killed) {
       try {
         chromeProc.kill('SIGTERM');
       } catch (e) {
-        // ignore
       }
     }
   }

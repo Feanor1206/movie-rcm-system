@@ -1,20 +1,3 @@
-/**
- * M3 Browser Walkthrough Automation & Evidence Generator (Round 10)
- *
- * Runs desktop & mobile walkthrough against a dedicated fixture transport server
- * and Next.js standalone production build using headless Chrome via Chrome DevTools Protocol (CDP).
- *
- * Verifies Milestone M3:
- *   - Accessible modals (AuthModal, video player, CineBot) with focus trap, Escape key, body scroll lock, focus restore.
- *   - Broken image fallback (404 / broken image URLs render clean title placeholders without layout distortion).
- *   - User isolation (Guest exploration -> User A save/rate -> Profile reload -> Uncertain retry -> Logout -> User B isolation check).
- *   - Mobile viewport (375x667) responsiveness with touch targets and non-overlapping controls.
- *   - Performance baseline & sanitized network / assertion logs in ROUND_10 directory.
- *
- * Usage:
- *   node scripts/run_browser_walkthrough.cjs
- *   node scripts/run_browser_walkthrough.cjs --negative-test
- */
 
 const http = require('node:http');
 const { spawn } = require('node:child_process');
@@ -32,7 +15,6 @@ const LOCAL_MOVIES_PATH = path.resolve(__dirname, '../frontend/lib/data/movies.t
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
-// Synthetic movie 1 (Valid metadata, no broken images)
 const SYNTHETIC_MOVIE_ID = 'm2-synthetic-anim-001';
 const SYNTHETIC_MOVIE = {
   id: SYNTHETIC_MOVIE_ID,
@@ -47,7 +29,6 @@ const SYNTHETIC_MOVIE = {
   videoUrl: 'http://127.0.0.1:8080/videos/trailer.mp4',
 };
 
-// Synthetic movie 2 (Broken Image 404 URLs to verify M3 fallback)
 const BROKEN_IMG_MOVIE_ID = 'm3-synthetic-broken-001';
 const BROKEN_IMG_MOVIE = {
   id: BROKEN_IMG_MOVIE_ID,
@@ -61,9 +42,6 @@ const BROKEN_IMG_MOVIE = {
   videoUrl: null,
 };
 
-// ----------------------------------------------------------------------------
-// 0. Preflight checks and Asset preparation
-// ----------------------------------------------------------------------------
 function ensureAssetsAndIsolation() {
   const localMoviesCode = fs.readFileSync(LOCAL_MOVIES_PATH, 'utf8');
   if (localMoviesCode.includes(SYNTHETIC_MOVIE_ID)) {
@@ -76,7 +54,6 @@ function ensureAssetsAndIsolation() {
   const standalonePublic = path.join(standaloneDir, 'public');
   const frontendPublic = path.resolve(__dirname, '../frontend/public');
 
-  // Always synchronize latest build assets into standalone to prevent stale chunks
   fs.cpSync(frontendStatic, standaloneStatic, { recursive: true });
   fs.cpSync(frontendPublic, standalonePublic, { recursive: true });
 }
@@ -92,9 +69,6 @@ function checkPortAvailable(port, host = '127.0.0.1') {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 1. In-Memory Fixture Backend Server (port 8080)
-// ----------------------------------------------------------------------------
 function startFixtureServer() {
   const candidateFixture = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8')).records;
 
@@ -104,7 +78,6 @@ function startFixtureServer() {
     ...candidateFixture,
   ];
 
-  // Isolated user libraries
   const users = {
     user_a: {
       token: 'token-user-a',
@@ -157,13 +130,11 @@ function startFixtureServer() {
       return res.end();
     }
 
-    // Broken image simulation: 404 for broken images
     if (pathname.startsWith('/images/broken-')) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('Image Not Found (404 Simulated)');
     }
 
-    // Video trailer dummy response
     if (pathname === '/videos/trailer.mp4') {
       res.writeHead(200, { 'Content-Type': 'video/mp4' });
       return res.end(Buffer.alloc(1024));
@@ -177,7 +148,6 @@ function startFixtureServer() {
       try { body = JSON.parse(raw); } catch {}
     }
 
-    // Control endpoints
     if (pathname === '/api/test-control/set') {
       if (parsedUrl.searchParams.has('catalogError')) {
         forceCatalogError = parsedUrl.searchParams.get('catalogError') === 'true';
@@ -203,7 +173,6 @@ function startFixtureServer() {
       return res.end(JSON.stringify({ ok: true }));
     }
 
-    // Auth Me: GET /api/auth/me
     if (pathname === '/api/auth/me' && method === 'GET') {
       const authHeader = req.headers.authorization || '';
       if (!authHeader.startsWith('Bearer ')) {
@@ -215,7 +184,6 @@ function startFixtureServer() {
       return res.end(JSON.stringify({ success: true, data: u.user }));
     }
 
-    // Auth Login: POST /api/auth/login
     if (pathname === '/api/auth/login' && method === 'POST') {
       const loginKey = body.usernameOrEmail || body.username || body.email;
       if (loginKey === 'regression_invalid' || body.password === 'not-real-password') {
@@ -237,7 +205,6 @@ function startFixtureServer() {
       }));
     }
 
-    // Catalog Browse: GET /api/movies/browse
     if (pathname === '/api/movies/browse' && method === 'GET') {
       if (forceCatalogError) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -284,7 +251,6 @@ function startFixtureServer() {
       }));
     }
 
-    // Detail: GET /api/movies/:id
     if (pathname.startsWith('/api/movies/') && method === 'GET') {
       const id = decodeURIComponent(pathname.replace('/api/movies/', ''));
       const found = allMovies.find((m) => m.id === id);
@@ -296,7 +262,6 @@ function startFixtureServer() {
       return res.end(JSON.stringify({ success: true, data: found }));
     }
 
-    // Watchlist: GET /api/users/watchlist
     if (pathname === '/api/users/watchlist' && method === 'GET') {
       if (forceReconcileError) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -310,7 +275,6 @@ function startFixtureServer() {
       }));
     }
 
-    // Watchlist: POST /api/users/watchlist
     if (pathname === '/api/users/watchlist' && method === 'POST') {
       const u = resolveUser(req);
       if (forceWriteDrop) {
@@ -323,7 +287,6 @@ function startFixtureServer() {
       return res.end(JSON.stringify({ success: true, data: { movieId: body.movieId } }));
     }
 
-    // Watchlist: DELETE /api/users/watchlist/:id
     if (pathname.startsWith('/api/users/watchlist/') && method === 'DELETE') {
       const u = resolveUser(req);
       const id = decodeURIComponent(pathname.replace('/api/users/watchlist/', ''));
@@ -337,7 +300,6 @@ function startFixtureServer() {
       return res.end(JSON.stringify({ success: true, data: true }));
     }
 
-    // Ratings: GET /api/users/ratings
     if (pathname === '/api/users/ratings' && method === 'GET') {
       const u = resolveUser(req);
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -347,7 +309,6 @@ function startFixtureServer() {
       }));
     }
 
-    // Ratings: POST /api/users/ratings
     if (pathname === '/api/users/ratings' && method === 'POST') {
       const u = resolveUser(req);
       if (body.movieId && body.rating) u.ratings.set(body.movieId, body.rating);
@@ -355,7 +316,6 @@ function startFixtureServer() {
       return res.end(JSON.stringify({ success: true, data: { movieId: body.movieId, rating: body.rating } }));
     }
 
-    // Favorites: GET /api/users/favorites
     if (pathname === '/api/users/favorites' && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: true, data: [] }));
@@ -375,9 +335,6 @@ function startFixtureServer() {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 2. Next.js Standalone Production Server (port 3005)
-// ----------------------------------------------------------------------------
 function startNextServer() {
   return new Promise((resolve, reject) => {
     const env = {
@@ -422,9 +379,6 @@ function startNextServer() {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 3. Headless Chrome via Chrome DevTools Protocol (CDP)
-// ----------------------------------------------------------------------------
 async function launchChromeSession() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chrome-walkthrough-'));
   let cdpPort = 9222;
@@ -451,7 +405,6 @@ async function launchChromeSession() {
 
   const proc = spawn(CHROME_PATH, chromeArgs, { stdio: 'ignore' });
 
-  // Wait for CDP endpoint
   let versionData = null;
   for (let i = 0; i < 40; i++) {
     try {
@@ -530,7 +483,6 @@ async function launchChromeSession() {
         req.timing = resp.timing;
       }
 
-      // Assert non-broken static assets
       if (
         (resp.url.includes('/_next/static/') || resp.url.includes('/static/')) &&
         resp.status >= 400
@@ -579,7 +531,6 @@ async function launchChromeSession() {
   await cdp('Runtime.enable');
   await cdp('Network.enable');
 
-  // C2: Buffered PerformanceObserver for LCP and standard Session Window CLS
   await cdp('Page.addScriptToEvaluateOnNewDocument', {
     source: `
       (() => {
@@ -811,9 +762,6 @@ async function launchChromeSession() {
   };
 }
 
-// ----------------------------------------------------------------------------
-// 4. Main Walkthrough Orchestrator
-// ----------------------------------------------------------------------------
 async function main() {
   const isNegativeTestOnly = process.argv.includes('--negative-test');
   console.log('🚀 Starting M3 Browser Walkthrough Runner (Round 10)...');
@@ -844,7 +792,6 @@ async function main() {
     if (isNegativeTestOnly) {
       await browser.navigate('http://127.0.0.1:3005/');
 
-      // 1. Missing element negative self-check
       let threw = false;
       try {
         await browser.waitForSelector('#non-existent-selector-for-negative-test', 300);
@@ -853,7 +800,6 @@ async function main() {
       }
       assert.ok(threw, 'Negative self-check must throw on missing element');
 
-      // 2. PerformanceObserver installation & support control check
       const observerCheck = await browser.evaluate(`
         (() => ({
           installed: Boolean(window.__perfObserverInstalled),
@@ -865,7 +811,6 @@ async function main() {
       assert.ok(observerCheck.lcpSupported, 'Browser must support largest-contentful-paint observer');
       assert.ok(observerCheck.clsSupported, 'Browser must support layout-shift observer');
 
-      // 3. Intentionally triggered layout shift control check (verifies observer sensitivity > 0)
       await browser.evaluate(`
         (() => {
           const shiftDiv = document.createElement('div');
@@ -889,7 +834,6 @@ async function main() {
       `);
       assert.ok(shiftResult.rawShifts > 0 || shiftResult.cls > 0, 'Intentionally triggered layout shift must be recorded by observer');
 
-      // 4. Dynamic Build Bytes calculation & negative self-test
       runBuildBytesSelfTest();
 
       console.log('🎉 Negative test execution completed successfully with exit code 0.');
@@ -903,9 +847,6 @@ async function main() {
     console.log('\n--- 1. DESKTOP WALKTHROUGH (Viewport: 1280x800) ---\n');
     await browser.setViewport(1280, 800, false);
 
-    // ------------------------------------------------------------------------
-    // Step 01: Home Guest Mode
-    // ------------------------------------------------------------------------
     console.log('[Step 01] Verifying Home in Guest Mode (exploration without login)...');
     await browser.navigate('http://127.0.0.1:3005/');
     await new Promise((r) => setTimeout(r, 2000));
@@ -933,9 +874,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 02: AuthModal Interaction & A11y (Focus trap, dialog role)
-    // ------------------------------------------------------------------------
     console.log('[Step 02] Opening AuthModal and verifying dialog accessibility...');
     await browser.evaluate(`
       (() => {
@@ -951,7 +889,6 @@ async function main() {
       'AuthModal to have role="dialog" and aria-modal="true"',
       6000
     );
-    // Check initial focus on first input
     await browser.waitForCondition(
       `(() => {
         const el = document.activeElement;
@@ -972,7 +909,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // Diagnostic Audit: Invalid login submission, close size check, and opener focus restore
     console.log('[Step 02b] Testing AuthModal invalid submission, touch target size, and opener restoration...');
     await browser.evaluate(`
       (() => {
@@ -1006,7 +942,6 @@ async function main() {
     assert.ok(closeBtnSize && closeBtnSize.width >= 44 && closeBtnSize.height >= 44,
       `Auth close button must be >= 44x44px, got ${JSON.stringify(closeBtnSize)}`);
 
-    // Close and verify focus restored to opener
     await browser.evaluate(`document.querySelector('button[aria-label="Đóng popup"]').click()`);
     await new Promise(r => setTimeout(r, 100));
     const isOpenerRestored = await browser.evaluate(`
@@ -1014,7 +949,6 @@ async function main() {
     `);
     assert.ok(isOpenerRestored, 'Closing AuthModal must restore focus to login button opener');
 
-    // Re-open for real user_a login
     await browser.evaluate(`
       (() => {
         const btns = Array.from(document.querySelectorAll('header button'));
@@ -1025,9 +959,6 @@ async function main() {
     `);
     await browser.waitForSelector('div[role="dialog"]', 4000);
 
-    // ------------------------------------------------------------------------
-    // Step 03: Login User A (user_a)
-    // ------------------------------------------------------------------------
     console.log('[Step 03] Submitting login form as user_a...');
     await browser.evaluate(`
       (() => {
@@ -1066,9 +997,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 04: Detail Save & Rate (User A)
-    // ------------------------------------------------------------------------
     console.log('[Step 04] Navigating to synthetic movie, adding to Watchlist, and rating 9 stars...');
     await browser.navigate(`http://127.0.0.1:3005/movies/${SYNTHETIC_MOVIE_ID}`);
     await browser.waitForCondition(
@@ -1077,7 +1005,6 @@ async function main() {
       6000
     );
 
-    // Diagnostic Audit: Video player modal initial focus, Tab trapping, Escape close, and opener focus restore
     console.log('[Step 04a] Auditing Video Player modal lifecycle (initial focus, Tab trap, Esc, opener restore)...');
     await browser.evaluate(`
       (() => {
@@ -1108,7 +1035,6 @@ async function main() {
     `);
     assert.ok(playerRestoredToOpener, 'Closing video player modal must restore focus to trailer button opener');
 
-    // Diagnostic Audit: Reduced motion in CineBot and opener restoration
     console.log('[Step 04b] Auditing CineBot reduced motion JS policy and opener restore...');
     await browser.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await browser.evaluate(`
@@ -1143,7 +1069,6 @@ async function main() {
     await browser.evaluate('Element.prototype.scrollIntoView = window.__walkthroughScrollOriginal');
     await browser.cdp('Emulation.setEmulatedMedia', { features: [] });
 
-    // Click Save
     await browser.evaluate(`
       (() => {
         const btns = Array.from(document.querySelectorAll('button'));
@@ -1159,7 +1084,6 @@ async function main() {
     );
     assert.ok(fixtureServer.users.user_a.watchlist.has(SYNTHETIC_MOVIE_ID), 'User A watchlist recorded movie');
 
-    // Click Star 9
     await browser.evaluate(`
       (() => {
         const star = document.querySelector('button[aria-label="Chấm 9 trên 10 sao"]');
@@ -1185,9 +1109,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 05: Profile Reload & Ratings Tab (User A)
-    // ------------------------------------------------------------------------
     console.log('[Step 05] Verifying User A Profile with Watchlist and Ratings tab score 9...');
     await browser.navigate('http://127.0.0.1:3005/profile');
     await browser.waitForCondition(
@@ -1196,7 +1117,6 @@ async function main() {
       6000
     );
 
-    // Switch to Ratings tab
     await browser.evaluate(`
       (() => {
         const btns = Array.from(document.querySelectorAll('button'));
@@ -1222,9 +1142,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 06: Hero Uncertain Retry
-    // ------------------------------------------------------------------------
     console.log('[Step 06] Verifying Hero uncertain ADD badge and retry flow...');
     await fetch('http://127.0.0.1:8080/api/test-control/set?clearWatchlist=true');
     await browser.navigate('http://127.0.0.1:3005/');
@@ -1280,12 +1197,8 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 07: Logout User A & Switch to User B via UI Form (No localStorage bypass)
-    // ------------------------------------------------------------------------
     console.log('[Step 07] Logging out User A via UI and logging in as User B via UI form...');
     
-    // 1. Open user dropdown menu in header
     await browser.evaluate(`
       (() => {
         const trigger = document.querySelector('header .relative button');
@@ -1294,14 +1207,12 @@ async function main() {
       })()
     `);
     
-    // Wait for dropdown to be visible
     await browser.waitForCondition(
       `Boolean(Array.from(document.querySelectorAll('header button')).find(b => b.textContent.includes('Đăng xuất')))`,
       'header user dropdown menu to be open with "Đăng xuất" option',
       4000
     );
 
-    // 2. Click "Đăng xuất" button in the menu (real UI click, no storage-clear fallback)
     await browser.evaluate(`
       (() => {
         const btns = Array.from(document.querySelectorAll('header button'));
@@ -1311,18 +1222,15 @@ async function main() {
       })()
     `);
 
-    // 3. Verify navbar returns to guest state with "Đăng nhập" button
     await browser.waitForCondition(
       `Boolean(Array.from(document.querySelectorAll('header button')).some(b => b.textContent.includes('Đăng nhập')) && !document.querySelector('header .relative button'))`,
       'navbar to return to guest state with "Đăng nhập" button',
       6000
     );
 
-    // 4. Assert token is removed from localStorage upon UI logout
     const clearedToken = await browser.evaluate(`localStorage.getItem('dippie_auth_token')`);
     assert.equal(clearedToken, null, 'dippie_auth_token must be removed upon UI logout');
 
-    // 5. Click "Đăng nhập" button in navbar to open AuthModal
     await browser.evaluate(`
       (() => {
         const loginBtn = Array.from(document.querySelectorAll('header button')).find(b => b.textContent.includes('Đăng nhập'));
@@ -1331,14 +1239,12 @@ async function main() {
       })()
     `);
 
-    // 6. Wait for AuthModal to render
     await browser.waitForCondition(
       `Boolean(document.querySelector('[role="dialog"]') && document.querySelector('#auth-modal-title'))`,
       'Auth modal dialog to appear',
       4000
     );
 
-    // 7. Fill in User B credentials via input events and submit
     await browser.evaluate(`
       (() => {
         const dialog = document.querySelector('[role="dialog"]');
@@ -1360,14 +1266,12 @@ async function main() {
       })()
     `);
 
-    // 8. Wait for AuthModal to close and navbar to show user_b
     await browser.waitForCondition(
       `Boolean(document.body.textContent.includes('user_b') && !document.querySelector('[role="dialog"]'))`,
       'navbar to display authenticated user "user_b" and dialog closed',
       6000
     );
 
-    // 9. Assert store ownership has updated to User B
     const userBStoredToken = await browser.evaluate(`localStorage.getItem('dippie_auth_token')`);
     assert.equal(userBStoredToken, 'token-user-b', 'User B token must be saved upon successful UI login');
 
@@ -1382,9 +1286,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 08: User B Data Isolation & Reload Persistence (Zero Leak from User A)
-    // ------------------------------------------------------------------------
     console.log('[Step 08] Verifying User B Profile has zero data leaked from User A...');
     await browser.navigate('http://127.0.0.1:3005/profile');
     await browser.waitForCondition(
@@ -1397,7 +1298,6 @@ async function main() {
     `);
     assert.equal(hasLeakedItem, false, 'User B must NOT see User A saved movie (Zero Data Leak)');
 
-    // Verify session persistence across page reload
     console.log('[Step 08] Verifying User B session persistence and store state after page reload...');
     await browser.evaluate('window.location.reload()');
     await browser.waitForCondition(
@@ -1427,9 +1327,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 09: Search Deep Link & Browser History Back
-    // ------------------------------------------------------------------------
     console.log('[Step 09] Verifying Search deep link and browser history.back()...');
     await browser.navigate('http://127.0.0.1:3005/search?q=quantum');
     await browser.waitForCondition(
@@ -1474,9 +1371,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 10: Broken Image 404 Fallback
-    // ------------------------------------------------------------------------
     console.log('[Step 10] Verifying Broken Image 404 fallback on MovieDetail...');
     await browser.navigate(`http://127.0.0.1:3005/movies/${BROKEN_IMG_MOVIE_ID}`);
     await browser.waitForCondition(
@@ -1485,7 +1379,6 @@ async function main() {
       6000
     );
 
-    // Verify poster fallback placeholder is active and shows title
     await browser.waitForCondition(
       `Boolean(document.querySelector('[data-testid="movie-poster-placeholder"]'))`,
       'Poster fallback placeholder to be active in DOM',
@@ -1508,9 +1401,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 11: Non-existent Detail (404 Page)
-    // ------------------------------------------------------------------------
     console.log('[Step 11] Verifying 404 state on missing canonical movie...');
     await browser.navigate('http://127.0.0.1:3005/movies/nonexistent-movie-uuid-404');
     await browser.waitForCondition(
@@ -1530,9 +1420,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 12: Catalog HTTP 500 Error State & Retry UI
-    // ------------------------------------------------------------------------
     console.log('[Step 12] Verifying Catalog HTTP 500 error banner and retry UI...');
     await fetch('http://127.0.0.1:8080/api/test-control/set?catalogError=true');
     await browser.navigate('http://127.0.0.1:3005/');
@@ -1554,13 +1441,9 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Mobile Walkthrough (Viewport: 375x667)
-    // ------------------------------------------------------------------------
     console.log('\n--- 2. MOBILE WALKTHROUGH (Viewport: 375x667) ---\n');
     await browser.setViewport(375, 667, true);
 
-    // Step 13: Mobile Home
     console.log('[Step 13] Verifying Mobile Home (375x667)...');
     await browser.navigate('http://127.0.0.1:3005/');
     await browser.waitForCondition(
@@ -1582,7 +1465,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // Step 14: Mobile Detail
     console.log('[Step 14] Verifying Mobile Movie Detail (375x667)...');
     await browser.navigate(`http://127.0.0.1:3005/movies/${SYNTHETIC_MOVIE_ID}`);
     await browser.waitForCondition(
@@ -1591,7 +1473,6 @@ async function main() {
       6000
     );
 
-    // Audit mobile touch target sizes (policy >= 44x44) and verify ZERO bounding collisions
     const mobileAudit = await browser.evaluate(`
       (() => {
         const btns = Array.from(document.querySelectorAll('button'));
@@ -1657,9 +1538,6 @@ async function main() {
       fixtureState: { userA_watchlist: fixtureServer.users.user_a.watchlist.size, userB_watchlist: fixtureServer.users.user_b.watchlist.size },
     });
 
-    // ------------------------------------------------------------------------
-    // Step 15: C2 Corrected Performance Benchmark (Cold & Warm, 3 runs each across 4 routes)
-    // ------------------------------------------------------------------------
     console.log('\n--- 3. PERFORMANCE BENCHMARK (Desktop 1280x800, Separate Cold & Warm Runs) ---\n');
     await browser.setViewport(1280, 800, false);
 
@@ -1754,7 +1632,6 @@ async function main() {
     for (const route of routesToBenchmark) {
       console.log(`[Perf] Benchmarking ${route.name} (${route.path}): 3 Cold Runs + 3 Warm Runs...`);
 
-      // 1. Cold Runs (HTTP cache disabled & cleared via CDP)
       const coldRuns = [];
       for (let runIdx = 1; runIdx <= 3; runIdx++) {
         await browser.clearCache();
@@ -1767,7 +1644,6 @@ async function main() {
           `page app-ready for ${route.name} cold run ${runIdx}`,
           8000
         );
-        // Bounded observation window for metrics finalization
         await new Promise((r) => setTimeout(r, 400));
 
         const cdpNet = browser.getNetworkAccounting();
@@ -1815,10 +1691,8 @@ async function main() {
         });
       }
 
-      // 2. Warm Runs (HTTP cache enabled, primed with 1 warm-up navigation)
       const warmRuns = [];
       await browser.setCacheDisabled(false);
-      // Priming warm-up visit
       browser.resetNetworkTracker();
       await browser.navigate(`http://127.0.0.1:3005${route.path}`);
       await browser.waitForCondition(
@@ -1904,7 +1778,6 @@ async function main() {
     fs.writeFileSync(perfFilePath, JSON.stringify(perfResults, null, 2));
     console.log(`\n✔ Saved performance measurements to ${perfFilePath}`);
 
-    // Save JSON evidence
     const evidenceFilePath = path.join(SCREENSHOTS_DIR, 'walkthrough_evidence.json');
     fs.writeFileSync(evidenceFilePath, JSON.stringify(evidenceRecords, null, 2));
     console.log(`\n✔ Saved structured evidence table to ${evidenceFilePath}`);

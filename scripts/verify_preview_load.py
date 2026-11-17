@@ -43,7 +43,6 @@ class Probe:
         try:
             request = urllib.request.Request(self.base + path, method=method, headers=headers or {})
             with urllib.request.urlopen(request, timeout=35) as response:
-                # No probe ever requests an unbounded video body.
                 limit = 2 * 1024 * 1024 + 1 if size is not None else 4 * 1024 * 1024
                 body = response.read(limit)
                 row.update(status=response.status, bytes=len(body))
