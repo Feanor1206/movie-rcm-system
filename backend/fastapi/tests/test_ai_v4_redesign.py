@@ -164,10 +164,12 @@ def test_local_http_llm_client_and_natural_paraphrase_with_followups(monkeypatch
     monkeypatch.delenv("LLM_API_KEY", raising=False)
 
     seen_headers = []
+    seen_requests = []
 
     def handler(request):
         seen_headers.append(dict(request.headers))
         payload = json.loads(request.content)
+        seen_requests.append(payload)
         if not payload.get("stream"):
             return httpx.Response(200, json={
                 "choices": [{"message": {"content": json.dumps({"intent_type": "DISCOVERY", "mode": "find_moment", "scope": "scene"})}}]
@@ -202,6 +204,9 @@ def test_local_http_llm_client_and_natural_paraphrase_with_followups(monkeypatch
             assert any("Jadoo" in f for f in done_payload["followUps"])
 
     asyncio.run(run())
+    assert len(seen_requests) == 1
+    assert seen_requests[0]["stream"] is True
+    assert "Chi làm vỡ bình hoa." in json.dumps(seen_requests[0], ensure_ascii=False)
     assert seen_headers[0]["authorization"] == "Bearer local"
 
 

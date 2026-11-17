@@ -29,7 +29,7 @@ def _load_deepseek_config():
         for name in ("DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY",
                      "LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY"):
             if settings.get(name):
-                os.environ[name] = settings[name]
+                os.environ.setdefault(name, settings[name])
 
 
 def create_app(**options):

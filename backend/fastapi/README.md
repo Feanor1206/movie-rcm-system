@@ -46,13 +46,21 @@ Các biến tùy chọn:
 | `DB_CONNECT_TIMEOUT`, `DB_READ_TIMEOUT`, `DB_WRITE_TIMEOUT` | Thời gian chờ kết nối, đọc và ghi MySQL. Mặc định 3, 15 và 15 giây. |
 | `MODEL_MODE` | `light`: tìm kiếm và trả lời theo mẫu; `cloud`: bật dịch vụ LLM đã cấu hình. |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Địa chỉ, tên mô hình và khóa của API tương thích OpenAI. Cũng nhận các biến `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPSEEK_API_KEY`. |
-| `ALLOW_FULL_CATALOG_GROUNDING=1` | Cho CineBot dùng bằng chứng trong toàn bộ danh mục, ngoài nhóm tập thử nghiệm. |
+| `ALLOW_FULL_CATALOG_GROUNDING=1` | Mở rộng nguồn DeepSeek sang các tập công khai trong gói danh mục được duyệt. Mặc định chỉ dùng nguồn thí điểm và các tập trong `APPROVED_CLOUD_EPISODES`. |
 | `TEXT_ENCODER_PATH` | Thư mục mô hình mã hóa văn bản ONNX. |
 | `RERANKER_MODEL_PATH` | Thư mục mô hình xếp hạng lại TorchScript. |
 | `SCORE_CALIBRATION_PATH` | Tệp JSON hiệu chuẩn điểm tìm kiếm. |
 | `FRAME_INDEX_PATH` | Thư mục chứa `keyframes.json` cho tìm kiếm bằng ảnh. |
 
 LLM có thể chạy trên máy qua `http://127.0.0.1` hoặc `http://localhost`, hoặc qua dịch vụ HTTPS như DeepSeek. Khóa API có thể bỏ trống với máy chủ HTTP cục bộ. Ví dụ địa chỉ: `https://api.deepseek.com`, `http://127.0.0.1:11434/v1`.
+
+## DeepSeek
+
+Chạy `& './scripts/configure_llm.ps1'` tại thư mục gốc. Giữ địa chỉ `https://api.deepseek.com` và mô hình `deepseek-flash` nếu dùng DeepSeek chính thức. Script kiểm tra kết nối rồi lưu khóa vào `.env.deepseek.local`, tệp được Git bỏ qua. Khởi động Python với `-ModelMode cloud`. Xem [API DeepSeek](https://api-docs.deepseek.com/api/create-chat-completion/) để đổi mô hình.
+
+CineBot tìm bằng chỉ mục cục bộ. Với kết quả có trích đoạn đã duyệt, máy chủ gửi loại yêu cầu và tối đa ba trích đoạn đến DeepSeek trong một lượt gọi. Câu hỏi gốc, lịch sử chat và dữ liệu cá nhân được xử lý cục bộ. Liên kết phim và mốc phát lấy từ danh mục. Khi thiếu nguồn phù hợp hoặc mô hình gặp lỗi, CineBot vẫn trả lời từ kho phim.
+
+Ở cấu hình mặc định, hỏi “Học tập trải nghiệm thú vị” để kiểm tra luồng DeepSeek. Phản hồi `done` ghi `pipelineStages.conversation` là `cloud` khi dùng câu trả lời đã kiểm tra từ nhà cung cấp hoặc `template` khi dùng nội dung cục bộ.
 
 ## Chạy
 
@@ -79,7 +87,7 @@ Cách chạy cùng Spring Boot nằm trong [README chính](../../README.md).
 | `POST /api/index/sync` | Nhận toàn bộ bản danh mục từ Spring Boot và cập nhật nguyên tử. |
 | `POST /v1/search`, `POST /v1/discover` | Tìm phim, tập, cảnh và lời thoại. Kết hợp BM25 với vector khi đã cấu hình mô hình. |
 | `POST /api/chat` | Hội thoại SSE với các sự kiện `metadata`, `token`, `done`; trả bằng chứng và câu hỏi tiếp theo trong `followUps`. |
-| `POST /api/recommend`, `POST /v1/recommend` | Gợi ý theo `likedMovieIds`, `genres` và `mood`. |
+| `POST /api/recommend`, `POST /v1/recommend` | Gợi ý theo `likedMovieIds`, `genres` và `mood`. Với token đăng nhập, dùng thêm yêu thích, điểm từ 8 và các tập đã xem của tài khoản đó. Khách nhận gợi ý từ kho phim. |
 | `POST /v1/frame-search` | Tìm tập và mốc thời gian từ ảnh JPEG, PNG hoặc WebP. |
 | `GET /health`, `GET /ready` | Trạng thái dịch vụ và từng tính năng. |
 

@@ -1,6 +1,6 @@
 # Dippie
 
-Dippie là web xem phim hoạt hình, có danh mục phim, danh sách đã lưu, đánh giá và lịch sử xem. Video được phát từ thư mục cục bộ hoặc Google Drive đã gắn vào máy. Phần tìm kiếm hỗ trợ văn bản, ảnh chụp cảnh phim và hội thoại qua CineBot.
+Dippie là web xem phim hoạt hình. Trang chủ gợi ý phim theo nội dung đã xem, yêu thích và đánh giá. Video phát từ tệp cục bộ hoặc Google Drive. CineBot tìm theo lời mô tả, dẫn về phim hoặc đoạn có trong kho và có thể dùng DeepSeek để diễn đạt câu trả lời.
 
 ## Yêu cầu
 
@@ -71,6 +71,15 @@ cd ..
 ```
 
 Script kiểm tra MySQL và API qua giao diện trước khi báo sẵn sàng. Log nằm cạnh tệp trạng thái trong `target/`.
+
+Để bật DeepSeek, nhập khóa bằng script cấu hình rồi chạy Python ở chế độ `cloud`.
+
+```powershell
+& './scripts/configure_llm.ps1'
+.\start-python-main.ps1 -ModelMode cloud -Production -Background
+```
+
+Ví dụ để thử CineBot là “Học tập trải nghiệm thú vị”. Xem [phạm vi nguồn và cấu hình DeepSeek](backend/fastapi/README.md#deepseek) để biết đoạn nào dùng mô hình.
 
 Dừng dịch vụ:
 

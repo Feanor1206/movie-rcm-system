@@ -131,9 +131,9 @@ class DiscoverResponse(BaseModel):
 
 
 class RecommendRequest(BaseModel):
-    genres: Optional[List[str]] = None
-    likedMovieIds: Optional[List[str]] = None
-    mood: Optional[str] = None
+    genres: Optional[List[Annotated[str, Field(max_length=100)]]] = Field(default=None, max_length=20)
+    likedMovieIds: Optional[List[Annotated[str, Field(max_length=100)]]] = Field(default=None, max_length=100)
+    mood: Optional[str] = Field(default=None, max_length=500)
     limit: int = Field(default=4, ge=1, le=100)
 
 

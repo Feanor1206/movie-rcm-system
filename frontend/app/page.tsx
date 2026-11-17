@@ -6,6 +6,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { FilmShelf } from '@/features/movies/components/FilmShelf';
 import { ContinueWatching } from '@/features/movies/components/ContinueWatching';
+import { RecommendationShelf } from '@/features/movies/components/RecommendationShelf';
 import { browseCatalog } from '@/lib/services/catalogService';
 import type { Movie } from '@/types/movie';
 import { useWatchlist } from '@/lib/context/WatchlistContext';
@@ -78,6 +79,7 @@ export default function HomePage() {
         </section>
 
         <ContinueWatching />
+        <RecommendationShelf />
 
         {loading ? (
           <div className="comic-loading" role="status">

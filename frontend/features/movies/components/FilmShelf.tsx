@@ -32,7 +32,7 @@ export function FilmShelf({
       </div>
       {movies.length === 0 ? (
         <div className="rounded-xl border border-dashed border-surface-border p-8 text-center text-sm text-muted">
-          Chưa có phim hoạt hình nào trong kho.
+          Chưa có phim phù hợp.
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -368,15 +368,15 @@ def test_cloud_requires_explicit_model_before_request(monkeypatch):
     asyncio.run(run())
 
 
-def test_pilot_intent_receives_only_enums_and_catalog_and_rejects_mismatch(monkeypatch):
+def test_cloud_sends_only_intent_labels_and_approved_catalog(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
     requests = []
     class FakeLLM:
         async def parse_intent(self, messages):
-            requests.extend(messages)
-            return {"intent_type": "NO_OP", "mode": "chitchat", "scope": "series", "semantic_query": "invented"}
+            pytest.fail("local routing must not call the provider")
         async def stream(self, messages):
+            requests.extend(messages)
             yield "Chi làm vỡ bình hoa."
     async def run():
         events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("PRIVATE QUERY", history=[{"role": "user", "content": "PRIVATE HISTORY"}])]
@@ -384,40 +384,47 @@ def test_pilot_intent_receives_only_enums_and_catalog_and_rejects_mismatch(monke
         assert intent["intent_type"] == "DISCOVERY"
         assert intent["semantic_query"] == "PRIVATE QUERY"
     asyncio.run(run())
-    assert requests
+    assert len(requests) == 2
+    body = json.loads(requests[1]["content"])
+    assert body["intent"] == {"intent_type": "DISCOVERY", "mode": "find_moment", "scope": "episode"}
+    assert body["sources"][0]["evidence"] == ["Chi làm vỡ bình hoa."]
     assert "PRIVATE" not in json.dumps(requests)
     assert "Chi làm vỡ bình hoa" in json.dumps(requests, ensure_ascii=False)
 
 
-def test_intent_provider_outage_uses_template_without_second_call(monkeypatch):
+def test_provider_outage_uses_template_without_retrying(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
+    attempts = []
     class FakeLLM:
-        async def parse_intent(self, messages):
-            raise LLMUnavailableError("private detail")
         async def stream(self, messages):
-            pytest.fail("should not retry after outage")
+            attempts.append(messages)
+            raise LLMUnavailableError("private detail")
             yield
     async def run():
         events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("bình hoa")]
         assert "chưa sẵn sàng" in events[-1][1]["text"]
         assert "private detail" not in events[-1][1]["text"]
+        assert "Chi làm vỡ bình hoa." in events[-1][1]["text"]
+        assert events[-1][1]["pipelineStages"]["conversation"] == "template"
     asyncio.run(run())
+    assert len(attempts) == 1
 
 
-def test_valid_pilot_intent_refines_scope_but_keeps_local_followup(monkeypatch):
+def test_cloud_followup_keeps_local_scope_and_constraints(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": "Tập 12", "startMs": 520000, "evidence": ["Chi làm vỡ bình hoa."]}])
     class FakeLLM:
         async def parse_intent(self, messages):
-            return {"intent_type": "CONVERSATIONAL_PATCH", "mode": "find_moment", "scope": "scene", "semantic_query": "wrong", "requested_k": 100}
+            pytest.fail("local routing must not call the provider")
         async def stream(self, messages):
+            assert json.loads(messages[1]["content"])["intent"]["scope"] == "episode"
             yield "Chi làm vỡ bình hoa."
     async def run():
         events = [item async for item in ChatService(ModelRegistry("cloud"), lambda *a, **k: [MOVIE], FakeLLM()).stream("không, tập khác", history=[{"role": "user", "content": "bình hoa"}])]
         intent = events[-1][1]["structuredIntent"]
         assert intent["intent_type"] == "CONVERSATIONAL_PATCH"
-        assert intent["scope"] == "scene"
+        assert intent["scope"] == "episode"
         assert intent["semantic_query"] == "bình hoa không, tập khác"
         assert intent["requested_k"] == 8
     asyncio.run(run())

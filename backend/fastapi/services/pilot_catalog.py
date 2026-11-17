@@ -68,7 +68,7 @@ def evidence_for_results(results):
             document = documents.get(document_id)
             if not episode or not document or document.get("episode_id", document["id"]) != episode_id:
                 continue
-            if document.get("item_type") not in {"episode", "scene", "dialogue"}:
+            if document.get("item_type") not in {"episode", "segment", "scene", "dialogue"}:
                 continue
             start = document.get("_episode_start_ms", document.get("start_ms"))
             if start != result.get("startMs") or start is not None and type(start) is not int:

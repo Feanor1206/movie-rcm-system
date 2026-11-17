@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([switch]$Clear)
 
 $ErrorActionPreference = 'Stop'
@@ -26,16 +26,17 @@ try {
     }
 
     Assert-Ignored $temporaryName
-    $baseUrl = (Read-Host 'Base URL [https://api.deepseek.com]').Trim()
+    $baseUrl = (Read-Host 'Địa chỉ API [https://api.deepseek.com]').Trim()
     if (!$baseUrl) { $baseUrl = 'https://api.deepseek.com' }
     $uri = $null
     if (![Uri]::TryCreate($baseUrl, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https' -or !$uri.Host -or $uri.UserInfo -or $uri.Query -or $uri.Fragment) {
         throw 'Invalid base URL.'
     }
     $baseUrl = $uri.AbsoluteUri.TrimEnd('/')
-    $model = (Read-Host 'Model ID').Trim()
+    $model = (Read-Host 'Tên mô hình [deepseek-flash]').Trim()
+    if (!$model) { $model = 'deepseek-flash' }
     if ($model -cnotmatch '\A[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}\z') { throw 'Invalid model ID.' }
-    $secureKey = Read-Host 'API key' -AsSecureString
+    $secureKey = Read-Host 'Khóa API' -AsSecureString
     $pointer = [IntPtr]::Zero
     try {
         $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
@@ -45,11 +46,6 @@ try {
         $secureKey.Dispose()
     }
     if ($key -cnotmatch '\A[A-Za-z0-9._~+/=-]+\z' -or $model.Contains($key)) { throw 'Invalid API key format.' }
-    $settings = "DEEPSEEK_BASE_URL=$baseUrl`nDEEPSEEK_MODEL=$model`nDEEPSEEK_API_KEY=$key`n"
-    [IO.File]::WriteAllText($temporary, $settings, [Text.UTF8Encoding]::new($false))
-    if ([IO.File]::Exists($path)) { [IO.File]::Replace($temporary, $path, [NullString]::Value) }
-    else { [IO.File]::Move($temporary, $path) }
-
     Add-Type -AssemblyName System.Net.Http
     $handler = [Net.Http.HttpClientHandler]::new()
     $handler.AllowAutoRedirect = $false
@@ -63,14 +59,19 @@ try {
     $response = $client.PostAsync("$baseUrl/chat/completions", $body).GetAwaiter().GetResult()
     $status = [int]$response.StatusCode
     try {
-        $returned = ($response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json).model
+        $reply = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+        $returned = $reply.model
         if ($returned -is [string] -and $returned -cmatch '\A[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}\z' -and !$returned.Contains($key)) { $reportedModel = $returned }
     } catch {}
-    if (!$response.IsSuccessStatusCode -or !$reportedModel) { throw 'Model verification failed.' }
-    Write-Output "Success | Model: $reportedModel"
+    if (!$response.IsSuccessStatusCode -or !$reportedModel -or !$reply.choices[0].message.content) { throw 'Model verification failed.' }
+    $settings = "DEEPSEEK_BASE_URL=$baseUrl`nDEEPSEEK_MODEL=$model`nDEEPSEEK_API_KEY=$key`n"
+    [IO.File]::WriteAllText($temporary, $settings, [Text.UTF8Encoding]::new($false))
+    if ([IO.File]::Exists($path)) { [IO.File]::Replace($temporary, $path, [NullString]::Value) }
+    else { [IO.File]::Move($temporary, $path) }
+    Write-Output "Đã kết nối $reportedModel"
 } catch {
     if (!$reportedModel) { $reportedModel = 'N/A' }
-    Write-Output "Failure | Model: $reportedModel | HTTP: $status"
+    Write-Output "Cấu hình chưa được lưu (HTTP $status). Kiểm tra địa chỉ, mô hình và khóa API."
     exit 1
 } finally {
     if ($response) { $response.Dispose() }
