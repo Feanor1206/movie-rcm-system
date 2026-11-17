@@ -11,6 +11,7 @@
   --muted: #59665a;
   --sage: #8dad86;
   --mint: #c9ddbd;
+  --font-display: Cambria, "Times New Roman", "Noto Serif", serif;
 }
 
 * { box-sizing: border-box; }
@@ -34,7 +35,7 @@ body {
 }
 
 ::selection { background: var(--mint); color: var(--ink); }
-h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
+h1, h2, h3, h4 { font-family: var(--font-display); }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--paper-shadow); }
@@ -54,8 +55,8 @@ h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
   .page-shell { @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8; }
 
   .section-title {
-    @apply text-2xl font-bold tracking-tight text-ink sm:text-3xl;
-    font-family: Georgia, Cambria, "Times New Roman", serif;
+    @apply text-2xl font-bold text-ink sm:text-3xl;
+    font-family: var(--font-display);
   }
 
   .btn-primary {
@@ -86,8 +87,7 @@ h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
 
   .comic-heading {
     color: var(--ink);
-    font-family: Georgia, Cambria, "Times New Roman", serif;
-    letter-spacing: -0.035em;
+    font-family: var(--font-display);
   }
 
   .comic-caption { border-top: 1px solid var(--ink); background: var(--paper-white); }
@@ -117,7 +117,7 @@ h1, h2, h3, h4 { font-family: Georgia, Cambria, "Times New Roman", serif; }
 .comic-book { max-width: 1280px; margin: auto; padding: 24px 32px 32px; }
 .cover-grid { display: grid; grid-template-columns: .91fr 1.09fr; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); background: var(--paper-white); }
 .cover-copy { display: flex; flex-direction: column; justify-content: center; padding: 32px 36px; }
-.cover-copy h1 { font: 700 clamp(38px,4.8vw,62px)/1.06 Georgia, serif; letter-spacing: -0.035em; }
+.cover-copy h1 { font: 700 clamp(38px,4.8vw,62px)/1.12 var(--font-display); text-wrap: balance; }
 .cover-cta { display: inline-flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 20px; border: 1.5px solid var(--ink); background: var(--mint); box-shadow: 3px 3px 0 var(--ink); font-size: 13px; font-weight: 700; transition: transform .15s, box-shadow .15s; }
 .cover-cta:hover { transform: translate(-1.5px,-2px); box-shadow: 4.5px 4.5px 0 var(--ink); }
 .hero-cta-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }

@@ -45,7 +45,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        display: ['Georgia', 'Cambria', '"Times New Roman"', 'serif'],
+        display: ['var(--font-display)'],
       },
       boxShadow: {
         'brand-sm': '3px 3px 0 #18241e',
