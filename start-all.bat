@@ -8,7 +8,7 @@ set ROOT_DIR=%~dp0
 
 echo.
 echo [1/3] Dang khoi dong Backend Spring Boot (:8080)...
-start "1. Spring Boot Core (:8080)" cmd /k "cd /d %ROOT_DIR%backend\springboot && set JAVA_HOME=C:\Program Files\Java\jdk-25.0.3&& mvnw.cmd spring-boot:run"
+start "1. Spring Boot Core (:8080)" cmd /k "cd /d %ROOT_DIR%backend\springboot && mvnw.cmd spring-boot:run"
 
 echo [2/3] Dang khoi dong Backend AI Gateway (FastAPI :8000)...
 set FASTAPI_PY=python
