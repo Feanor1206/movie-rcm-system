@@ -52,7 +52,8 @@ def test_production_bootstraps_without_demo_users_and_preserves_existing_admin(
     monkeypatch.setenv("APP_BOOTSTRAP_ADMIN_EMAIL", "owner@example.com")
     monkeypatch.setenv("APP_BOOTSTRAP_ADMIN_PASSWORD", "A-strong-private-password-123")
     app = make_app(tmp_path)
-    with TestClient(app):
+    with TestClient(app) as client:
+        assert client.get("/api/movies").json()["data"] == []
         with app.state.runtime.db.session() as db:
             users = db.query(User).all()
             assert [(u.username, u.role) for u in users] == [("owner", "ROLE_ADMIN")]

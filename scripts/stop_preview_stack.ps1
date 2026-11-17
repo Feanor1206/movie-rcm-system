@@ -133,6 +133,39 @@ for ($processIndex = $processRecords.Count - 1; $processIndex -ge 0; $processInd
     }
 
     Write-Host "  -> Xác minh danh tính thành công cho PID $targetPid ($procName, delta: $($timeDelta.ToString('F2'))s). Đang dừng..." -ForegroundColor Green
+    $descendants = @()
+    $parents = @($targetPid)
+    while ($parents.Count) {
+        $children = @(foreach ($parentPid in $parents) {
+            Get-CimInstance Win32_Process -Filter "ParentProcessId = $parentPid" -ErrorAction SilentlyContinue |
+                Where-Object { ([DateTime]$_.CreationDate).ToUniversalTime() -ge $expectedUtc }
+        })
+        $descendants += $children
+        $parents = @($children | Select-Object -ExpandProperty ProcessId)
+    }
+    foreach ($child in $descendants) {
+        if (-not @($state.Processes | Where-Object PID -eq $child.ProcessId).Count) {
+            $state.Processes = @($state.Processes) + @(@{
+                Name = "Tiến trình con"
+                PID = $child.ProcessId
+                StartTime = ([DateTime]$child.CreationDate).ToString("o")
+                ExecutablePath = $child.ExecutablePath
+            })
+        }
+    }
+    [IO.File]::WriteAllText($StateFile, ($state | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+    for ($childIndex = $descendants.Count - 1; $childIndex -ge 0; $childIndex--) {
+        $child = $descendants[$childIndex]
+        $liveChild = Get-CimInstance Win32_Process -Filter "ProcessId = $($child.ProcessId)" -ErrorAction SilentlyContinue
+        if ($liveChild -and $liveChild.CreationDate -eq $child.CreationDate -and $liveChild.ExecutablePath -eq $child.ExecutablePath) {
+            Stop-Process -Id $child.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+        $childDeadline = [DateTime]::UtcNow.AddSeconds(2)
+        while ((Get-Process -Id $child.ProcessId -ErrorAction SilentlyContinue) -and [DateTime]::UtcNow -lt $childDeadline) {
+            Start-Sleep -Milliseconds 100
+        }
+        if (Get-Process -Id $child.ProcessId -ErrorAction SilentlyContinue) { $allStopped = $false }
+    }
     try {
         Stop-Process -Id $targetPid -Force -ErrorAction SilentlyContinue
     } catch {}

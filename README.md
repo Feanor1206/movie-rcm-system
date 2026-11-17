@@ -56,9 +56,21 @@ Bản Python:
 
 Mở [localhost:3000](http://localhost:3000). Script Java bật tài khoản demo có mật khẩu công khai `password123`, chỉ dùng trong môi trường thử nghiệm riêng. Với bản Python, đặt `APP_DEMO_MODE=true` khi cần tài khoản demo, hoặc dùng các biến bootstrap trong hướng dẫn backend để tạo quản trị viên.
 
-Python có thể chuyển sang SQLite tại `data/python_main.db` tính từ thư mục chạy backend nếu kết nối MySQL thất bại. Java có profile `test` dùng H2 để kiểm thử.
+Python dừng khởi động khi cơ sở dữ liệu đã cấu hình gặp lỗi. Muốn dùng SQLite cục bộ, đặt `DATABASE_URL=sqlite:///data/python_main.db` rõ ràng. Java có profile `test` dùng H2 để kiểm thử.
 
 Để phát từ Google Drive, đặt `APP_MEDIA_DRIVE_MOUNT` trỏ tới thư mục hoặc ổ đĩa đã gắn Drive.
+
+Để chạy bản Python đã build, giữ khóa JWT cố định và build với đúng địa chỉ backend.
+
+```powershell
+$env:BACKEND_INTERNAL_URL = "http://127.0.0.1:8000"
+cd frontend
+npm run build
+cd ..
+.\start-python-main.ps1 -Production -Background
+```
+
+Script kiểm tra MySQL và API qua giao diện trước khi báo sẵn sàng. Log nằm cạnh tệp trạng thái trong `target/`.
 
 Dừng dịch vụ:
 

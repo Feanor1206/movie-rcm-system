@@ -24,6 +24,10 @@ python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)
 
 Lưu khóa qua biến môi trường hoặc hệ thống quản lý bí mật. Giữ khóa ngoài Git. Đổi khóa sẽ làm các phiên đăng nhập và quyền phát cũ hết hiệu lực.
 
+JWT đăng nhập và quyền phát phải có chủ thể cùng thời điểm tạo, hết hạn. Mật khẩu đăng ký dài ít nhất 6 ký tự, tối đa 72 byte UTF-8. Cùng một địa chỉ kết nối và tên đăng nhập được thử xác thực tối đa 30 lần mỗi phút trên một tiến trình.
+
+Python dừng nếu không kết nối được cơ sở dữ liệu đã cấu hình. SQLite cần được chọn rõ bằng `DATABASE_URL`. `GET /api/health` kiểm tra kết nối dữ liệu, còn `GET /ready` kiểm tra thêm chỉ mục tìm kiếm.
+
 Để tạo quản trị viên đầu tiên trên cơ sở dữ liệu mới, đặt `APP_BOOTSTRAP_ADMIN_USERNAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` và `APP_BOOTSTRAP_ADMIN_PASSWORD`. Mật khẩu cần ít nhất 16 ký tự, tối đa 72 byte. Gỡ các biến này sau khi tạo xong. Hệ thống giữ mật khẩu riêng của quản trị viên hiện có và chỉ tạo tài khoản khi chưa có quản trị viên.
 
 Khi nâng cấp cơ sở dữ liệu có quản trị viên dùng mật khẩu demo `password123`, ứng dụng dừng khởi động. Đặt `APP_BOOTSTRAP_ADMIN_USERNAME` đúng tài khoản và `APP_BOOTSTRAP_ADMIN_PASSWORD` mới để đổi mật khẩu; không cần email. Nếu còn nhiều quản trị viên dùng mật khẩu mặc định, cần đổi từng tài khoản bằng công cụ quản trị cơ sở dữ liệu trước khi chạy lại.
@@ -37,6 +41,9 @@ Các biến tùy chọn:
 | Biến | Công dụng |
 | --- | --- |
 | `APP_MEDIA_DRIVE_MOUNT` | Thư mục hoặc ổ đĩa đã gắn Google Drive. Danh mục có thể giữ tiền tố `VideoDieppie/` khi gắn trực tiếp thư mục đó. |
+| `APP_MEDIA_CACHE_ROOT` | Bản lưu video Drive trên máy, giữ nguyên đường dẫn tương đối trong danh mục. Chỉ dùng tệp đủ kích thước đã khai báo. Tệp thiếu hoặc sai kích thước được đọc từ Drive. |
+| `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT` | Số kết nối MySQL thường trực, kết nối bổ sung và thời gian chờ lấy kết nối. Mặc định 20, 10 và 10 giây. |
+| `DB_CONNECT_TIMEOUT`, `DB_READ_TIMEOUT`, `DB_WRITE_TIMEOUT` | Thời gian chờ kết nối, đọc và ghi MySQL. Mặc định 3, 15 và 15 giây. |
 | `MODEL_MODE` | `light`: tìm kiếm và trả lời theo mẫu; `cloud`: bật dịch vụ LLM đã cấu hình. |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Địa chỉ, tên mô hình và khóa của API tương thích OpenAI. Cũng nhận các biến `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPSEEK_API_KEY`. |
 | `ALLOW_FULL_CATALOG_GROUNDING=1` | Cho CineBot dùng bằng chứng trong toàn bộ danh mục, ngoài nhóm tập thử nghiệm. |
@@ -54,6 +61,14 @@ Từ thư mục gốc:
 ```powershell
 .\start-python-main.ps1 -Background
 ```
+
+Để dùng bản build, đặt `BACKEND_INTERNAL_URL` đúng cổng FastAPI trước khi chạy `npm run build` trong `frontend`, rồi thêm `-Production` vào lệnh khởi động. Chế độ này yêu cầu `APP_JWT_SECRET` đã cấu hình. Tệp trạng thái chỉ chuyển sang `READY` sau khi API và MySQL trả lời.
+
+Mỗi dịch vụ FastAPI chạy một tiến trình để giữ chỉ mục và trạng thái tác vụ nhất quán. Khởi động lại phục hồi danh mục từ bản lưu hoặc cơ sở dữ liệu. Trạng thái đồng bộ là `PENDING`, `BUILDING`, `READY`, `BLOCKED` hoặc `SYNC_FAILED`. Sau khi chuẩn bị cache, có thể thử lại bản dữ liệu mới nhất trong trang quản trị.
+
+Dữ liệu cũ có bản JSON gốc hợp lệ được sửa đúng loại tệp và MIME khi khởi động, không cần nhập lại danh mục.
+
+Chỉ đặt video từ nguồn đã kiểm tra trong thư mục cache. Kiểm tra kích thước xác nhận bản sao đầy đủ ở mức số byte.
 
 Cách chạy cùng Spring Boot nằm trong [README chính](../../README.md).
 

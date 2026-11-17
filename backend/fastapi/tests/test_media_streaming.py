@@ -8,7 +8,65 @@ sys.path.insert(0, str(ROOT / "backend" / "fastapi"))
 sys.path.insert(0, str(ROOT))
 
 from main import create_app
+from routers import core_api
 from services.database import MediaAsset
+
+
+def test_drive_mirror_prefers_complete_copy_and_falls_back(tmp_path, monkeypatch):
+    relative_path = "VideoDieppie/feature.mp4"
+    mirror = tmp_path / "mirror" / relative_path
+    drive = tmp_path / "drive" / relative_path
+    mirror.parent.mkdir(parents=True)
+    drive.parent.mkdir(parents=True)
+    mirror.write_bytes(b"mirror-video")
+    drive.write_bytes(b"drive--video")
+    monkeypatch.setenv("APP_MEDIA_CACHE_ROOT", str(tmp_path / "mirror"))
+    monkeypatch.setenv("APP_MEDIA_DRIVE_MOUNT", str(tmp_path / "drive"))
+    monkeypatch.setenv("APP_MEDIA_ROOT", str(tmp_path / "other"))
+    app = create_app(
+        sync_secret="test-secret",
+        sync_path=tmp_path / "sync.json",
+        cache_dir=tmp_path / "cache",
+        model_mode="light",
+        load_default=False,
+        database_url=f"sqlite:///{tmp_path / 'test.db'}",
+    )
+    with TestClient(app) as client:
+        with app.state.runtime.db.session() as db:
+            asset = db.get(MediaAsset, "ast-orbit-feat")
+            asset.storage_provider = "drive"
+            asset.relative_path = relative_path
+            asset.byte_length = len(b"mirror-video")
+            db.commit()
+        url = "/api/media/stream/ast-orbit-feat"
+        response = client.get(url, headers={"Range": "bytes=1-5"})
+        assert response.status_code == 206
+        assert response.content == b"irror"
+        assert response.headers["content-range"] == "bytes 1-5/12"
+        mirror.write_bytes(b"short")
+        assert client.get(url).content == b"drive--video"
+        mirror.write_bytes(b"mirror-video-extra")
+        assert client.get(url).content == b"drive--video"
+        mirror.write_bytes(b"mirror-video")
+        monkeypatch.delenv("APP_MEDIA_CACHE_ROOT")
+        assert client.get(url).content == b"drive--video"
+        monkeypatch.setenv("APP_MEDIA_CACHE_ROOT", str(tmp_path / "mirror"))
+        with app.state.runtime.db.session() as db:
+            asset = db.get(MediaAsset, "ast-orbit-feat")
+            asset.byte_length = 0
+            db.commit()
+        assert client.get(url).content == b"drive--video"
+        with app.state.runtime.db.session() as db:
+            asset = db.get(MediaAsset, "ast-orbit-feat")
+            asset.byte_length = len(b"mirror-video")
+            asset.is_public = False
+            db.commit()
+        assert client.get(url).status_code == 404
+        with app.state.runtime.db.session() as db:
+            db.get(MediaAsset, "ast-orbit-feat").is_public = True
+            db.commit()
+        mirror.unlink()
+        assert client.get(url).content == b"drive--video"
 
 
 def test_stream_reads_in_bounded_chunks_and_preserves_ranges(tmp_path, monkeypatch):
@@ -112,6 +170,35 @@ def test_stream_reads_in_bounded_chunks_and_preserves_ranges(tmp_path, monkeypat
         headers = {"Authorization": f"Bearer {login.json()['data']['token']}"}
         grant = client.post("/api/media/grant/ast-orbit-feat", headers=headers)
         assert grant.status_code == 200
+        validated = []
+        validate = core_api.validate_playback_grant_token
+
+        def record_validation(token, asset_id):
+            validated.append(asset_id)
+            return validate(token, asset_id)
+
+        monkeypatch.setattr(core_api, "validate_playback_grant_token", record_validation)
         response = client.get(grant.json()["streamUrl"], headers={"Range": "bytes=0-9"})
         assert response.status_code == 206
         assert response.content == payload[:10]
+        assert validated == ["ast-orbit-feat"]
+        restarted_app = create_app(
+            sync_secret="test-secret",
+            sync_path=tmp_path / "sync.json",
+            cache_dir=tmp_path / "cache",
+            model_mode="light",
+            load_default=False,
+            database_url=f"sqlite:///{tmp_path / 'test.db'}",
+        )
+        with TestClient(restarted_app) as restarted_client:
+            response = restarted_client.get(grant.json()["streamUrl"], headers={"Range": "bytes=0-9"})
+            assert response.status_code == 206
+            assert response.content == payload[:10]
+        assert validated == ["ast-orbit-feat", "ast-orbit-feat"]
+
+        class UnavailableFile:
+            def stat(self):
+                raise OSError("media unavailable")
+
+        monkeypatch.setattr(core_api, "_resolve_media_file", lambda asset: UnavailableFile())
+        assert client.get(grant.json()["streamUrl"]).status_code == 404

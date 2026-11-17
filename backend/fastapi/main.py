@@ -13,6 +13,7 @@ load_dotenv()
 
 from routers import chat, core_api, frame, health, recommend, search, sync
 from services.database import _jwt_key
+from services.auth_limit import AuthRateLimiter
 from services.chat import ChatService
 from services.llm_client import LLMClient
 from services.model_registry import InferenceCapacityError
@@ -36,6 +37,7 @@ def create_app(**options):
     async def lifespan(application):
         runtime = application.state.runtime
         _jwt_key()
+        await run_in_threadpool(runtime.db.ensure_initialized)
         await run_in_threadpool(runtime.db.secure_accounts)
         if runtime.registry.mode == "cloud":
             _load_deepseek_config()
@@ -65,6 +67,7 @@ def create_app(**options):
 
     application = FastAPI(title="Dippie AI Gateway", version="3.0.0", lifespan=lifespan)
     application.state.runtime = Runtime(**options)
+    application.state.auth_limiter = AuthRateLimiter()
     @application.exception_handler(InferenceCapacityError)
     async def capacity_error(request, error):
         return JSONResponse({"detail": "GPU đang bận. Vui lòng thử lại sau."}, status_code=429,

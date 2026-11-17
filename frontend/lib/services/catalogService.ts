@@ -94,6 +94,12 @@ export function normalizeCatalogMovie(raw: any): Movie {
   const poster = typeof raw.poster === 'string' && raw.poster.trim() ? raw.poster.trim() : '';
   const backdrop = typeof raw.backdrop === 'string' && raw.backdrop.trim() ? raw.backdrop.trim() : '';
   const videoUrl = typeof raw.videoUrl === 'string' && raw.videoUrl.trim() ? raw.videoUrl.trim() : undefined;
+  const navigation: Partial<Movie> = {};
+  if (raw.item_type === 'series' || raw.item_type === 'episode') {
+    navigation.item_type = raw.item_type;
+    if (typeof raw.series_id === 'string' && raw.series_id.trim()) navigation.series_id = raw.series_id.trim();
+    if (typeof raw.episode_id === 'string' && raw.episode_id.trim()) navigation.episode_id = raw.episode_id.trim();
+  }
 
   return {
     id,
@@ -106,6 +112,7 @@ export function normalizeCatalogMovie(raw: any): Movie {
     poster,
     backdrop,
     videoUrl,
+    ...navigation,
   };
 }
 

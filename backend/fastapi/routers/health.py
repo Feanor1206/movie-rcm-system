@@ -20,6 +20,10 @@ def health(request: Request):
 def ready(request: Request):
     runtime = request.app.state.runtime
     result = runtime.registry.readiness(runtime.snapshot)
+    database_ready = runtime.db.healthy()
+    result["database"] = "ready" if database_ready else "unavailable"
+    if not database_ready:
+        result.update(ready=False, status="not_ready", message="Không thể kết nối cơ sở dữ liệu.")
     result["features"]["search"]["calibrated"] = runtime.search.calibration is not None
     if "calibration" in runtime.registry.errors:
         result["features"]["search"]["calibrationError"] = runtime.registry.errors["calibration"]

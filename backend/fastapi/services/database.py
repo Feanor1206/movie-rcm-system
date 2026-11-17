@@ -3,8 +3,10 @@ from datetime import datetime, timedelta, timezone
 import functools
 import hashlib
 import json
+import mimetypes
 import os
 import secrets
+import threading
 from pathlib import Path
 import time
 
@@ -27,6 +29,8 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.engine import URL, make_url
+from sqlalchemy.exc import SQLAlchemyError
 
 Base = declarative_base()
 
@@ -731,10 +735,11 @@ def create_jwt_token(username: str) -> str:
 
 def decode_jwt_token(token: str) -> str | None:
     try:
-        payload = jwt.decode(token, _jwt_key(), algorithms=["HS256"])
+        payload = jwt.decode(token, _jwt_key(), algorithms=["HS256"], options={"require": ["sub", "iat", "exp"]})
         if payload.get("type") == "playback_grant" or payload.get("purpose") == "playback":
             return None
-        return payload.get("sub")
+        subject = payload.get("sub")
+        return subject if isinstance(subject, str) and 0 < len(subject) <= 50 else None
     except Exception:
         return None
 
@@ -755,7 +760,7 @@ def create_playback_grant_token(asset_id: str, username: str, role: str, validit
 
 def validate_playback_grant_token(token: str, asset_id: str) -> str | None:
     try:
-        payload = jwt.decode(token, _jwt_key(), algorithms=["HS256"])
+        payload = jwt.decode(token, _jwt_key(), algorithms=["HS256"], options={"require": ["sub", "iat", "exp"]})
         if payload.get("type") != "playback_grant":
             return None
         if not asset_id or payload.get("assetId") != asset_id:
@@ -776,7 +781,8 @@ def resolve_database_url(explicit_url: str | None = None) -> str:
     user = os.getenv("MYSQL_USER", "root")
     password = os.getenv("MYSQL_PASSWORD", "")
     db_name = os.getenv("MYSQL_DB", "movie_rcm_db")
-    return f"mysql+pymysql://{user}:{password}@{host}:{port}/{db_name}?charset=utf8mb4"
+    return URL.create("mysql+pymysql", username=user, password=password, host=host,
+                      port=int(port), database=db_name, query={"charset": "utf8mb4"}).render_as_string(hide_password=False)
 
 
 SEED_MOVIES = [
@@ -796,6 +802,13 @@ SEED_MOVIES = [
 ]
 
 
+def _media_mime_type(content_type, relative_path):
+    mime_type = mimetypes.guess_type(relative_path)[0]
+    if mime_type and mime_type.startswith(f"{content_type}/"):
+        return mime_type
+    return "audio/mpeg" if content_type == "audio" else "video/mp4"
+
+
 class DatabaseManager:
     def __init__(self, database_url: str | None = None, seed: bool = True):
         self.database_url = resolve_database_url(database_url)
@@ -803,42 +816,69 @@ class DatabaseManager:
         self.SessionLocal = None
         self._seed = seed
         self._initialized = False
+        self._initialization_lock = threading.RLock()
 
     def ensure_initialized(self):
-        if self._initialized:
-            return
-        url = self.database_url
+        with self._initialization_lock:
+            if self._initialized:
+                return
+            try:
+                if self.database_url.startswith("sqlite"):
+                    database_path = make_url(self.database_url).database
+                    if database_path and database_path != ":memory:" and not database_path.startswith("file:"):
+                        Path(database_path).parent.mkdir(parents=True, exist_ok=True)
+                    self.engine = create_engine(self.database_url, pool_pre_ping=True,
+                                                connect_args={"check_same_thread": False, "timeout": 10})
+                    @event.listens_for(self.engine, "connect")
+                    def _set_sqlite_pragma(dbapi_connection, connection_record):
+                        cursor = dbapi_connection.cursor()
+                        cursor.execute("PRAGMA synchronous=NORMAL")
+                        cursor.close()
+                else:
+                    self.engine = create_engine(
+                        self.database_url,
+                        pool_pre_ping=True,
+                        pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
+                        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+                        pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
+                        pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "10")),
+                        connect_args={"connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "3")),
+                                      "read_timeout": int(os.getenv("DB_READ_TIMEOUT", "15")),
+                                      "write_timeout": int(os.getenv("DB_WRITE_TIMEOUT", "15"))},
+                    )
+                Base.metadata.create_all(self.engine)
+                self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=False)
+                self.restore_media_metadata()
+                self._initialized = True
+                if self._seed and os.getenv("APP_DEMO_MODE", "").lower() == "true":
+                    self.seed_defaults()
+            except Exception:
+                if self.engine is not None:
+                    self.engine.dispose()
+                self.engine = self.SessionLocal = None
+                self._initialized = False
+                raise RuntimeError("Không thể kết nối hoặc khởi tạo cơ sở dữ liệu đã cấu hình.") from None
+
+    def restore_media_metadata(self):
+        with self.SessionLocal() as db:
+            rows = db.query(CatalogMediaAsset, MediaAsset).join(MediaAsset, MediaAsset.id == CatalogMediaAsset.id)
+            for asset, legacy in rows.filter(CatalogMediaAsset.raw_json.is_not(None)).yield_per(256):
+                try:
+                    raw = json.loads(asset.raw_json)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(raw, dict) and raw.get("content_type") in ("audio", "video"):
+                    asset.content_type = raw["content_type"]
+                    legacy.mime_type = _media_mime_type(asset.content_type, asset.relative_path)
+            db.commit()
+
+    def healthy(self):
         try:
-            if url.startswith("sqlite"):
-                connect_args = {"check_same_thread": False}
-                self.engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
-                @event.listens_for(self.engine, "connect")
-                def _set_sqlite_pragma(dbapi_connection, connection_record):
-                    cursor = dbapi_connection.cursor()
-                    cursor.execute("PRAGMA synchronous=NORMAL")
-                    cursor.close()
-            else:
-                connect_args = {"connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "3"))}
-                self.engine = create_engine(
-                    url,
-                    pool_pre_ping=True,
-                    pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
-                    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
-                    pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
-                    connect_args=connect_args,
-                )
-            Base.metadata.create_all(self.engine)
-        except Exception:
-            fallback_path = Path(os.getenv("PYTHON_MAIN_SQLITE_FALLBACK", "data/python_main.db"))
-            fallback_path.parent.mkdir(parents=True, exist_ok=True)
-            url = f"sqlite:///{fallback_path}"
-            self.database_url = url
-            self.engine = create_engine(url, connect_args={"check_same_thread": False})
-            Base.metadata.create_all(self.engine)
-        self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=False)
-        self._initialized = True
-        if self._seed:
-            self.seed_defaults()
+            with self.session() as db:
+                db.execute(text("SELECT 1"))
+            return True
+        except (SQLAlchemyError, RuntimeError):
+            return False
 
     def secure_accounts(self):
         if os.getenv("APP_DEMO_MODE", "").lower() == "true":
@@ -1003,6 +1043,8 @@ def validate_catalog_input(data):
                     raise CatalogInputError(f"{path}.record", "Bản ghi không hợp lệ.")
                 check_revision(record.get("revision", revision), f"{path}.record.revision")
             if collection == "media_assets":
+                if item.get("content_type", "video") not in ("audio", "video"):
+                    raise CatalogInputError(f"{path}.content_type", "Loại tệp phải là video hoặc audio.")
                 storage = item.get("storage")
                 if storage is not None and not isinstance(storage, dict):
                     raise CatalogInputError(f"{path}.storage", "Thông tin lưu trữ không hợp lệ.")
@@ -1235,6 +1277,11 @@ def import_catalog_package(db, data: dict) -> dict:
                 )
                 db.add(m)
                 existing_movies[sid] = m
+            else:
+                m = existing_movies[sid]
+                m.title = entity.title
+                m.release_year = entity.release_year_start or m.release_year
+                m.description = entity.synopsis or ""
     db.flush()
 
     if seasons:
@@ -1295,6 +1342,11 @@ def import_catalog_package(db, data: dict) -> dict:
                 )
                 db.add(m)
                 existing_movies[ep_id] = m
+            else:
+                m = existing_movies[ep_id]
+                m.title = entity.title
+                m.runtime = f"{int((entity.duration_ms or 1200000) / 60000)}m"
+                m.description = entity.synopsis or ""
     db.flush()
 
     segments = data.get("segments") or []
@@ -1366,7 +1418,7 @@ def import_catalog_package(db, data: dict) -> dict:
             if not entity:
                 entity = CatalogMediaAsset(id=mid)
                 db.add(entity)
-            entity.content_type = "video"
+            entity.content_type = ma.get("content_type") or "video"
             entity.role = ma.get("role", "feature")
             entity.edition_label = ma.get("edition_label") or ma.get("edition")
             entity.storage_provider = provider
@@ -1398,7 +1450,7 @@ def import_catalog_package(db, data: dict) -> dict:
             legacy.storage_key = storage_key
             legacy.relative_path = rel_path
             legacy.version = f"v1_{mid}"
-            legacy.mime_type = "video/mp4"
+            legacy.mime_type = _media_mime_type(entity.content_type, rel_path)
             legacy.byte_length = size_bytes
             legacy.duration_seconds = (entity.duration_ms / 1000.0) if entity.duration_ms else None
             legacy.is_public = entity.access_policy.lower() == "public"
@@ -1457,8 +1509,8 @@ def import_catalog_package(db, data: dict) -> dict:
     snap_id = f"snap_{int(time.time() * 1000)}_{pkg_id[:48]}_g{next_gen}"
     snap = CatalogSnapshot(
         id=snap_id, snapshot_version=next_gen, content_hash=content_hash,
-        total_items=sum(counts.values()), status="READY", retry_count=0,
-        created_at=now, completed_at=now, updated_at=now,
+        total_items=sum(counts.values()), status="PENDING", retry_count=0,
+        created_at=now, updated_at=now,
     )
     db.add(snap)
     db.commit()
@@ -1471,7 +1523,7 @@ def import_catalog_package(db, data: dict) -> dict:
         "contentHash": content_hash,
         "importedAt": now.isoformat(),
         "counts": counts,
-        "indexStatus": "READY",
+        "indexStatus": "PENDING",
         "message": "Đã nhập gói danh mục.",
     }
 
