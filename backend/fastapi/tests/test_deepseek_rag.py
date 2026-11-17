@@ -8,6 +8,7 @@ from main import create_app
 
 
 def test_deepseek_rag_uses_one_approved_catalog_request(tmp_path, monkeypatch):
+    monkeypatch.setattr("main.ROOT", tmp_path)
     monkeypatch.setenv("LLM_BASE_URL", "https://api.deepseek.com")
     monkeypatch.setenv("LLM_MODEL", "deepseek-flash")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
@@ -35,13 +36,20 @@ def test_deepseek_rag_uses_one_approved_catalog_request(tmp_path, monkeypatch):
         })
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
-        done = next(json.loads(event.split("data: ", 1)[1]) for event in response.text.split("\n\n")
-                    if event.startswith("event: done\n"))
+        events = {}
+        for block in response.text.split("\n\n"):
+            heading, _, data = block.partition("\ndata: ")
+            kind = heading.removeprefix("event: ")
+            if kind in {"metadata", "done"}:
+                events[kind] = json.loads(data)
+        assert set(events) == {"metadata", "done"}
+        done = events["done"]
         assert done["pipelineStages"]["conversation"] == "cloud", (len(calls), done["text"][:160], [
             (item["episodeId"], item["startMs"], item["evidence"][0]["documentId"], item["evidence"][0]["itemType"])
             for item in done["recommendedMovies"][:3]
         ])
-        assert done["recommendedMovies"][0]["episodeId"] == "ep_jadoo_s01_0022"
+        for event in events.values():
+            assert [item["episodeId"] for item in event["recommendedMovies"]] == ["ep_jadoo_s01_0022"]
         assert "Chuyến cắm trại dã ngoại bị hủy do bão lớn ở Gangwon." in done["text"]
         assert "Học tập trải nghiệm thú vị" in done["text"]
         assert client.get("/ready").json()["features"]["llm"]["ready"]

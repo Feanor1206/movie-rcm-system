@@ -214,6 +214,23 @@ def test_chat_patch_uses_request_history_without_global_sessions():
     assert intent["requested_k"] == 2
 
 
+@pytest.mark.parametrize(("query", "expected"), [
+    ("Học tập trải nghiệm thú vị", 1),
+    ("Tìm 1 tập Jadoo", 1),
+    ("Tìm tập 4 phim Jadoo", 1),
+    ("Tìm mùa 2 tập 4 Jadoo", 1),
+    ("Cảnh Jadoo đi cắm trại ở tập nào?", 1),
+    ("Tìm tập có nhiều cảnh dã ngoại", 1),
+    ("Gợi ý một tập Jadoo", 1),
+    ("Gợi ý 3 tập Jadoo", 3),
+    ("Tìm các tập Jadoo đi cắm trại", 8),
+    ("Liệt kê các tập Jadoo đi cắm trại", 8),
+    ("Gợi ý phim hoạt hình", 8),
+])
+def test_chat_uses_requested_result_count(query, expected):
+    assert deterministic_intent(query)["requested_k"] == expected
+
+
 def test_chat_provider_error_falls_back_without_exposing_details(monkeypatch):
     import services.chat as chat_module
     monkeypatch.setattr(chat_module, "evidence_for_results", lambda results: [{"title": MOVIE["title"], "startMs": MOVIE["startMs"], "evidence": ["Chi làm vỡ bình hoa."]}])
@@ -426,5 +443,5 @@ def test_cloud_followup_keeps_local_scope_and_constraints(monkeypatch):
         assert intent["intent_type"] == "CONVERSATIONAL_PATCH"
         assert intent["scope"] == "episode"
         assert intent["semantic_query"] == "bình hoa không, tập khác"
-        assert intent["requested_k"] == 8
+        assert intent["requested_k"] == 1
     asyncio.run(run())
