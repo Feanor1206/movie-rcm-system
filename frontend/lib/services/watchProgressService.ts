@@ -1,4 +1,4 @@
-const SPRINGBOOT_API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
+const API = '/api';
 export const WATCH_PROGRESS_LIMIT = 30;
 export const GUEST_WATCH_PROGRESS_KEY = 'dippie_guest_watch_progress_v1';
 export const AUTO_NEXT_PREFERENCE_KEY = 'dippie_auto_next_enabled_v1';
@@ -205,7 +205,7 @@ export async function listWatchProgress(
   options: { baseUrl?: string; signal?: AbortSignal; timeoutMs?: number } = {}
 ): Promise<WatchProgressRecord[]> {
   const headers = authHeaders(token);
-  const url = `${options.baseUrl || SPRINGBOOT_API}/users/watch-progress`;
+  const url = `${options.baseUrl || API}/users/watch-progress`;
   return executeWithTimeout(async (signal) => {
     const res = await fetch(url, { headers, signal });
     if (!res.ok) throwHttpError(res, 'Tải tiến độ xem');
@@ -222,7 +222,7 @@ export async function getWatchProgress(
 ): Promise<WatchProgressRecord | null> {
   if (!nonEmptyString(episodeId)) throw new WatchProgressError('ID tập phim không hợp lệ.', 400);
   const headers = authHeaders(token);
-  const url = `${options.baseUrl || SPRINGBOOT_API}/users/watch-progress/${encodeURIComponent(episodeId.trim())}`;
+  const url = `${options.baseUrl || API}/users/watch-progress/${encodeURIComponent(episodeId.trim())}`;
   return executeWithTimeout(async (signal) => {
     const res = await fetch(url, { headers, signal });
     if (res.status === 404) return null;
@@ -248,7 +248,7 @@ export async function saveWatchProgress(
     throw new WatchProgressError('Phiên bản tiến độ không hợp lệ.', 400);
   }
   const headers = authHeaders(token, true);
-  const url = `${options.baseUrl || SPRINGBOOT_API}/users/watch-progress/${encodeURIComponent(episodeId.trim())}`;
+  const url = `${options.baseUrl || API}/users/watch-progress/${encodeURIComponent(episodeId.trim())}`;
   const payload = { assetId: draft.assetId.trim(), positionMs: Math.floor(draft.positionMs), expectedVersion };
   return executeWithTimeout(async (signal) => {
     const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(payload), signal });
@@ -264,7 +264,7 @@ export async function deleteWatchProgress(
 ): Promise<void> {
   if (!nonEmptyString(episodeId)) throw new WatchProgressError('ID tập phim không hợp lệ.', 400);
   const headers = authHeaders(token);
-  const url = `${options.baseUrl || SPRINGBOOT_API}/users/watch-progress/${encodeURIComponent(episodeId.trim())}`;
+  const url = `${options.baseUrl || API}/users/watch-progress/${encodeURIComponent(episodeId.trim())}`;
   return executeWithTimeout(async (signal) => {
     const res = await fetch(url, { method: 'DELETE', headers, signal });
     if (!res.ok) throwHttpError(res, 'Xóa tiến độ xem');

@@ -24,7 +24,7 @@ function loadMediaService(mockFetch) {
     exports: {},
     module: { exports: {} },
     fetch: mockFetch || globalThis.fetch,
-    process: { env: { NEXT_PUBLIC_SPRINGBOOT_API_URL: 'http://test-server/api' } },
+
     AbortController: globalThis.AbortController,
     DOMException: globalThis.DOMException,
     setTimeout,
@@ -160,7 +160,7 @@ function createMovieDetailHarness(options = {}) {
     require(moduleName) {
       if (moduleName === '@/lib/labels') return labels;
       if (moduleName === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (moduleName === 'next/image' || moduleName === 'next/link') return { __esModule: true, default: moduleName };
+      if (moduleName === 'react-router') return { Link: 'route-link' };
       if (moduleName === 'lucide-react') return new Proxy({}, { get: (_, key) => String(key) });
       if (moduleName.includes('WatchlistContext')) {
         return {
@@ -192,7 +192,6 @@ function createMovieDetailHarness(options = {}) {
         };
       }
       if (moduleName.includes('movieProgress')) return options.movieProgress || {};
-      if (moduleName.includes('MovieSection')) return { MovieSection: 'MovieSection' };
       return {};
     },
   };
@@ -264,8 +263,7 @@ test('1. resolveStreamUrl correctly handles relative and absolute URLs', () => {
   assert.equal(resolveStreamUrl('http://cdn.example.com/media/clip.mp4'), 'http://cdn.example.com/media/clip.mp4');
 
   const relativeStream = resolveStreamUrl('/api/media/stream/ast-001');
-  assert.ok(relativeStream.endsWith('/api/media/stream/ast-001'), 'Must end with relative path');
-  assert.ok(relativeStream.startsWith('http://') || relativeStream.startsWith('https://'), 'Must start with protocol');
+  assert.equal(relativeStream, '/api/media/stream/ast-001');
 
   assert.equal(resolveStreamUrl(''), '');
 });

@@ -1,18 +1,13 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { FilmShelf } from '@/features/movies/components/FilmShelf';
 import { ContinueWatching } from '@/features/movies/components/ContinueWatching';
-import { RecommendationShelf } from '@/features/movies/components/RecommendationShelf';
-import { browseCatalog } from '@/lib/services/catalogService';
-import type { Movie } from '@/types/movie';
-import { useWatchlist } from '@/lib/context/WatchlistContext';
+import { useAuth } from '@/lib/context/AuthContext';
+import { listMovieProgress } from '@/lib/services/movieProgress';
+import { getGuestWatchProgress } from '@/lib/services/watchProgressService';
+import { getRecommendations } from '@/lib/services/recommendationService';
 
 const quickTopics = [
-  { label: 'Ghibli', href: '/search?q=Ghibli' },
   { label: 'Gia đình', href: '/search?genre=Family' },
   { label: 'Phiêu lưu', href: '/search?genre=Adventure' },
   { label: 'Hài', href: '/search?genre=Comedy' },
@@ -20,83 +15,71 @@ const quickTopics = [
 ];
 
 export default function HomePage() {
-  const { openChat } = useWatchlist();
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { status, token } = useAuth();
+  const [films] = useState(listMovieProgress);
+  const watched = useMemo(() => [
+    ...films.filter((film) => film.positionMs > 0).map((film) => film.movieId),
+    ...getGuestWatchProgress().filter((episode) => episode.positionMs > 0).map((episode) => episode.episodeId),
+  ].filter((id) => id.length <= 100), [films, status]);
+  const [state, setState] = useState<{
+    scope: string;
+    result: Awaited<ReturnType<typeof getRecommendations>> | null;
+  } | null>(null);
   const [retry, setRetry] = useState(0);
+  const accountToken = status === 'authenticated' ? token : null;
+  const scope = accountToken || status;
+  const result = state?.scope === scope ? state.result : undefined;
 
   useEffect(() => {
+    if (status === 'checking') return;
     const controller = new AbortController();
-    setLoading(true);
-    setError(false);
-    browseCatalog({ animationOnly: true, size: 24, signal: controller.signal })
-      .then((page) => {
-        if (!controller.signal.aborted) {
-          setMovies(page.items);
-          setLoading(false);
-        }
+    getRecommendations(accountToken, controller.signal, status === 'guest' ? watched : [])
+      .then((value) => {
+        if (!controller.signal.aborted) setState({ scope, result: value });
       })
-      .catch((e) => {
-        if (!controller.signal.aborted && e?.name !== 'AbortError' && !e?.isCanceled) {
-          setError(true);
-          setLoading(false);
-        }
+      .catch(() => {
+        if (!controller.signal.aborted) setState({ scope, result: null });
       });
     return () => controller.abort();
-  }, [retry]);
+  }, [accountToken, scope, retry, status, watched]);
 
   return (
-    <>
-      <Navbar />
-      <main className="comic-book">
-        <section className="cover-grid" aria-labelledby="cover-title">
-          <div className="cover-copy">
-            <h1 id="cover-title">Kho phim hoạt hình</h1>
+    <main className="page-shell home-page">
+      <section className="cover-grid" aria-labelledby="cover-title">
+        <div className="cover-copy">
+          <h1 id="cover-title">Kho phim hoạt hình</h1>
+          <p className="cover-intro">Tìm theo tên tập hoặc nội dung.</p>
+          <Link to="/search" className="cover-cta">Tìm phim</Link>
 
-            <div className="hero-cta-group">
-              <Link href="/search" className="cover-cta">Tìm phim</Link>
-              <button type="button" onClick={openChat} className="cover-secondary-cta">Hỏi CineBot</button>
-            </div>
+          <nav className="topics-list" aria-label="Gợi ý tìm phim">
+            {quickTopics.map((topic) => (
+              <Link key={topic.label} to={topic.href} className="topic-chip">
+                {topic.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
 
-            <nav className="topics-list" aria-label="Gợi ý tìm phim">
-              {quickTopics.map((topic) => (
-                <Link key={topic.label} href={topic.href} className="topic-chip">
-                  {topic.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
+        <div className="cover-art-panel">
+          <img
+            src="/illustrations/dippie-cover.svg"
+            alt="Bạn nhỏ và thỏ đi đến rạp chiếu phim trong rừng"
+            width="760"
+            height="580"
+          />
+        </div>
+      </section>
 
-          <div className="cover-art-panel">
-            <img
-              src="/illustrations/dippie-cover.svg"
-              alt="Bạn nhỏ và thỏ đi đến rạp chiếu phim trong rừng"
-              width="760"
-              height="580"
-            />
-          </div>
-        </section>
-
-        <ContinueWatching />
-        <RecommendationShelf />
-
-        {loading ? (
-          <div className="comic-loading" role="status">
-            <p>Đang tải phim…</p>
-          </div>
-        ) : error ? (
-          <div className="comic-loading flex-col gap-3 py-12" role="alert">
-            <p className="text-red-800 font-medium">Không thể tải phim. Vui lòng thử lại.</p>
-            <button className="btn-secondary" onClick={() => setRetry((n) => n + 1)}>
-              Thử lại
-            </button>
-          </div>
-        ) : (
-          <FilmShelf movies={movies} title="Phim trong kho" subtitle="" />
-        )}
-      </main>
-      <Footer />
-    </>
+      <ContinueWatching films={films} />
+      <FilmShelf
+        movies={result?.movies || []}
+        subtitle={result?.reasoning === 'Gợi ý từ kho phim.' ? '' : result?.reasoning}
+        loading={result === undefined}
+        onRetry={result === null ? () => {
+          setState(null);
+          setRetry((n) => n + 1);
+        } : undefined}
+      />
+    </main>
   );
 }

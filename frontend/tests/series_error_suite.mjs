@@ -35,7 +35,7 @@ test('Episode loading failure offers retry instead of claiming a missing video',
     require(name) {
       if (name === '@/lib/labels') return labels;
       if (name === 'react') return react;
-      if (name === 'next/navigation') return { useParams: () => ({ id: 'series1' }), useSearchParams: () => new URLSearchParams() };
+      if (name === 'react-router') return { Link: 'route-link', useParams: () => ({ id: 'series1' }), useSearchParams: () => [new URLSearchParams()] };
       if (name.includes('catalogService')) return {
         getCatalogSeriesDetail: async () => ({ series: { title: 'Series' }, seasons: [{ id: 'season1', number: 1 }], episodes: [episode] }),
         getCatalogEpisodeDetail: async () => { if (++calls === 1) throw new Error('network'); return { episode, mediaAssets: [], scenes: [], segments: [] }; },
@@ -84,7 +84,7 @@ test('Episode playback defaults to video and honors an explicitly selected asset
       require(name) {
         if (name === '@/lib/labels') return labels;
         if (name === 'react') return react;
-        if (name === 'next/navigation') return { useParams: () => ({ id: 'series1' }), useSearchParams: () => new URLSearchParams(query) };
+        if (name === 'react-router') return { Link: 'route-link', useParams: () => ({ id: 'series1' }), useSearchParams: () => [new URLSearchParams(query)] };
         if (name.includes('catalogService')) return { getCatalogSeriesDetail: async () => ({ series: { title: 'Series' }, seasons: [{ id: 'season1', number: 1 }], episodes: [episode] }), getCatalogEpisodeDetail: async () => ({ episode, mediaAssets, scenes: [], segments: [] }) };
         if (name.includes('episodeNavigation')) return { sortCatalogSeasons: (seasons) => seasons, getInitialSeasonId: () => 'season1', getInitialEpisode: () => episode, getEpisodesForSeason: (episodes) => episodes, getAdjacentEpisode: () => null };
         if (name.includes('mediaService')) return { resolveStreamUrl: (url) => url, getStoredAuthToken: () => null };

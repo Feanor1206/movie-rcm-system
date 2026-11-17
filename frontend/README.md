@@ -1,22 +1,23 @@
 # Giao diện Dippie
 
-Giao diện dùng Next.js 15 App Router, React 19, TypeScript, Tailwind CSS và Lucide React.
+React và TypeScript được Vite build thành tệp tĩnh trong `dist/`. FastAPI phục vụ các tệp này cùng API.
 
-## Chạy
+## Làm việc trên giao diện
 
-Cần Node.js 20. Từ thư mục `frontend`:
+Chạy FastAPI ở cổng 8000 với [cấu hình cơ sở dữ liệu](../backend/fastapi/README.md#2-cấu-hình-biến-môi-trường). Từ thư mục `frontend`, chạy các lệnh sau và mở [Dippie](http://localhost:3000/).
 
 ```powershell
 npm ci
 npm run dev
 ```
 
-Mở [localhost:3000](http://localhost:3000). Để chạy cùng backend Java hoặc Python, dùng các script trong [README chính](../README.md).
+Vite chuyển `/api` tới cổng 8000. Có thể đặt `BACKEND_INTERNAL_URL` để dùng cổng khác.
 
-## Kiểm tra
+## Kiểm thử và build
 
 ```powershell
 npm test
 npm run typecheck
 npm run build
+node ../scripts/compute_build_bytes.cjs
 ```

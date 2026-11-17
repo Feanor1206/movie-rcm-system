@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import {
   Database,
   Film,
@@ -114,7 +112,7 @@ export default function AdminImportPage() {
             <span>Làm mới</span>
           </button>
           <Link
-            href="/search"
+            to="/search"
             className="btn-secondary flex items-center gap-1.5 text-xs font-medium text-muted"
           >
             <Film size={14} />
@@ -159,7 +157,7 @@ export default function AdminImportPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          href={`/series/${encodeURIComponent(ser.id)}`}
+                          to={`/series/${encodeURIComponent(ser.id)}`}
                           className="text-sm font-bold text-ink hover:text-brand-dark transition-colors"
                         >
                           {ser.title}
@@ -181,7 +179,7 @@ export default function AdminImportPage() {
                     </div>
 
                     <Link
-                      href={`/series/${encodeURIComponent(ser.id)}`}
+                      to={`/series/${encodeURIComponent(ser.id)}`}
                       className="btn-secondary flex items-center gap-1.5 text-xs font-semibold shrink-0"
                     >
                       <span>Xem tập & cảnh</span>

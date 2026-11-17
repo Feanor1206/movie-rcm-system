@@ -1,11 +1,9 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router';
+import { useWatchProgress } from '@/lib/hooks/useWatchProgress';
+import { buildWatchProgressHref, isUsableResumeProgress } from '@/lib/services/watchProgressService';
 import {
   buildMovieProgressHref,
   isUsableMovieProgress,
-  listMovieProgress,
   type MovieProgressRecord,
 } from '@/lib/services/movieProgress';
 
@@ -14,28 +12,35 @@ function formatMark(positionMs: number): string {
   return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
 }
 
-export function ContinueWatching() {
-  const [records, setRecords] = useState<MovieProgressRecord[]>([]);
-
-  useEffect(() => {
-    setRecords(listMovieProgress().filter(isUsableMovieProgress));
-  }, []);
-
-  if (!records.length) return null;
+export function ContinueWatching({ films }: { films: MovieProgressRecord[] }) {
+  const { records } = useWatchProgress();
+  const entries = [
+    ...records.filter(isUsableResumeProgress).map((episode) => ({
+      id: episode.episodeId, title: episode.episodeTitle || episode.seriesTitle,
+      href: buildWatchProgressHref(episode), position: episode.positionMs, updatedAt: episode.updatedAt,
+    })),
+    ...films.filter(isUsableMovieProgress).map((film) => ({
+      id: film.movieId, title: film.title, href: buildMovieProgressHref(film),
+      position: film.positionMs, updatedAt: film.updatedAt,
+    })),
+  ];
+  const unique = [...new Map(entries.reverse().map((entry) => [entry.id, entry])).values()]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3);
+  if (!unique.length) return null;
 
   return (
-    <section className="my-10" aria-labelledby="continue-title" data-testid="continue-watching">
+    <section className="shelf-section" aria-labelledby="continue-title" data-testid="continue-watching">
       <h2 id="continue-title" className="section-title mb-4">Xem tiếp</h2>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {records.map((record) => (
+      <div className="film-grid">
+        {unique.map((entry) => (
           <Link
-            key={record.movieId}
-            href={buildMovieProgressHref(record)}
+            key={entry.id}
+            to={entry.href}
             data-testid="continue-card"
-            className="comic-card group px-4 py-3 hover:border-brand/40 hover:bg-surface-elevated"
+            className="continue-card"
           >
-            <h3 className="line-clamp-2 font-semibold text-ink group-hover:text-brand">{record.title}</h3>
-            <p className="mt-1 text-sm text-muted">Xem tiếp từ {formatMark(record.positionMs)}</p>
+            <h3 className="line-clamp-2 font-semibold text-ink">{entry.title}</h3>
+            <span className="resume-mark">{formatMark(entry.position)}</span>
           </Link>
         ))}
       </div>

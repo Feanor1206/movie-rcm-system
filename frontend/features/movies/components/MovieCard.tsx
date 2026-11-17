@@ -1,10 +1,7 @@
-'use client';
-
 import { formatRuntime, genreLabel } from '@/lib/labels';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import { Bookmark, Check, Loader2, Star, RefreshCw, Film } from 'lucide-react';
 import { buildMediaItemHref } from '@/lib/services/mediaRouting';
 import type { Movie } from '@/types/movie';
@@ -57,17 +54,12 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
       <article className="comic-card overflow-hidden rounded-xl border border-surface-border bg-surface transition-all duration-200 hover:border-brand/40 group-hover:shadow-card-hover">
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-elevated">
           {hasPoster ? (
-            <Image
+            <img
               src={movie.poster}
               alt={movie.title}
-              fill
+              loading="lazy" referrerPolicy="no-referrer"
               onError={() => setPosterError(true)}
-              sizes={
-                fluid
-                  ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw'
-                  : '(max-width: 640px) 155px, (max-width: 1024px) 185px, 205px'
-              }
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-surface-elevated text-muted">
@@ -94,7 +86,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
           )}
 
           <Link
-            href={buildMediaItemHref(movie)}
+            to={buildMediaItemHref(movie)}
             aria-label={`Xem chi tiết ${movie.title}`}
             className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
           >
@@ -135,7 +127,7 @@ export function MovieCard({ movie, fluid = false }: MovieCardProps) {
 
         <div className="border-t border-surface-border p-3">
           <Link
-            href={buildMediaItemHref(movie)}
+            to={buildMediaItemHref(movie)}
             className="block truncate text-sm font-semibold text-ink transition-colors hover:text-brand-dark focus-visible:outline-none focus-visible:text-brand-dark"
           >
             {movie.title}

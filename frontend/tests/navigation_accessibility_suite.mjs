@@ -36,7 +36,7 @@ function nodes(node, predicate) {
 test('Authenticated mobile navigation offers logout and closes after use', () => {
   let logouts = 0;
   const render = renderComponent('../components/layout/Navbar.tsx', 'Navbar', {
-    'next/navigation': { usePathname: () => '/' },
+    'react-router': { Link: 'route-link', useLocation: () => ({ pathname: '/' }) },
     '@/lib/context/WatchlistContext': { useWatchlist: () => ({ watchlist: [], openChat() {} }) },
     '@/lib/context/AuthContext': { useAuth: () => ({ isAuthenticated: true, user: { username: 'user' }, logout: () => logouts++ }) },
   });

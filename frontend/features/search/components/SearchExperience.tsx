@@ -1,12 +1,10 @@
-'use client';
-
-import { genreLabel, movieSynopsis } from '@/lib/labels';
+import { genreLabel } from '@/lib/labels';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
+
+import { useSearchParams, useNavigate, useLocation } from 'react-router';
 import { browseCatalog } from '@/lib/services/catalogService';
-import { buildMediaItemHref } from '@/lib/services/mediaRouting';
+import { FilmGrid } from '@/features/movies/components/FilmShelf';
 import type { Movie } from '@/types/movie';
 
 type SearchSnapshot = {
@@ -32,9 +30,9 @@ function emptySnapshot(query: string, genre: string, page: number, size: number)
 }
 
 export function SearchExperience() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const urlQuery = (searchParams.get('q') || searchParams.get('query') || '').trim();
   const genre = (searchParams.get('genre') || '').trim();
   const page = parseNonNegativeInteger(searchParams.get('page'), 0);
@@ -74,14 +72,14 @@ export function SearchExperience() {
       else params.delete('page');
     }
     const queryString = params.toString();
-    router.push(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+    navigate(queryString ? `${pathname}?${queryString}` : pathname);
   };
 
   useEffect(() => {
     if (inputValue.trim() === urlQuery) return;
     const timer = setTimeout(() => updateUrl({ q: inputValue, page: 0 }), 350);
     return () => clearTimeout(timer);
-  }, [inputValue, urlQuery, searchParams, pathname, router]);
+  }, [inputValue, urlQuery, searchParams, pathname, navigate]);
 
   useEffect(() => {
     const requestId = ++requestIdRef.current;
@@ -125,7 +123,7 @@ export function SearchExperience() {
 
   useEffect(() => {
     if (isCurrentSnapshot && snapshot.totalPages > 0 && page !== safePage) updateUrl({ page: safePage });
-  }, [isCurrentSnapshot, page, safePage, searchParams, pathname, router]);
+  }, [isCurrentSnapshot, page, safePage, searchParams, pathname, navigate]);
 
   const clearQuery = () => {
     setInputValue('');
@@ -133,26 +131,26 @@ export function SearchExperience() {
   };
 
   return (
-    <main className="page-shell min-h-[75vh] py-8 sm:py-12">
+    <main className="page-shell min-h-[75vh] py-6 sm:py-8">
       <header className="catalog-cover">
-        <h1 className="comic-heading text-3xl font-bold text-ink sm:text-5xl">Kho phim hoạt hình</h1>
+        <h1 className="comic-heading text-3xl font-bold sm:text-4xl">Kho phim</h1>
         <div className="catalog-cover-art" aria-hidden="true" />
       </header>
 
-      <div className="mt-6">
-        <div className="flex max-w-2xl items-center rounded-lg border border-surface-border bg-surface px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30">
+      <form className="catalog-search" onSubmit={(event) => { event.preventDefault(); updateUrl({ q: inputValue, page: 0 }); }}>
           <input
             data-testid="search-query-input"
             aria-label="Tìm phim hoạt hình"
-            autoFocus
             type="text"
+            enterKeyHint="search"
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
             placeholder="Tìm theo tên hoặc nội dung"
-            className="min-h-12 min-w-0 flex-1 bg-transparent px-1 text-base text-ink placeholder:text-muted focus:outline-none focus-visible:shadow-none"
+            className="min-h-12 min-w-0 flex-1 bg-transparent px-2 text-base text-ink placeholder:text-muted"
           />
           {inputValue && (
             <button
+              type="button"
               onClick={clearQuery}
               className="min-h-[44px] min-w-[44px] cursor-pointer rounded-md px-2 text-sm text-muted hover:bg-surface-elevated hover:text-ink"
               aria-label="Xóa từ khóa"
@@ -160,23 +158,18 @@ export function SearchExperience() {
               Xóa
             </button>
           )}
-        </div>
-      </div>
+      </form>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-ink/20 py-3 text-sm text-muted">
+      <div className="catalog-status" role="status">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 break-words">
           {urlQuery && <span className="min-w-0">Kết quả cho “{urlQuery}”</span>}
           {genre && <span>Thể loại {genreLabel(genre)}</span>}
         </div>
-        <div className="flex items-center gap-2">
-          {loading && snapshot && (
-            <span className="text-brand-dark">Đang cập nhật…</span>
-          )}
-          {isCurrentSnapshot && !loading && <span className="font-medium text-ink">{totalElements} phim</span>}
-        </div>
+        {loading && snapshot ? <span>Đang cập nhật…</span>
+          : isCurrentSnapshot && <span>{totalElements} phim</span>}
       </div>
 
-      <section className="mt-6" aria-live="polite">
+      <section aria-label="Kết quả tìm phim">
         {error && isCurrentSnapshot ? (
           <div role="alert" className="flex flex-col items-center rounded-xl border border-red-500/30 bg-red-950/10 px-6 py-12 text-center">
             <h2 className="mt-3 font-bold text-ink">Không thể tải kho phim</h2>
@@ -198,33 +191,7 @@ export function SearchExperience() {
           </div>
         ) : isCurrentSnapshot ? (
           <>
-            <div data-testid="catalog-results" className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${loading ? 'opacity-60' : ''}`}>
-              {currentResults.map((movie) => (
-                <Link
-                  key={movie.id}
-                  href={buildMediaItemHref(movie)}
-                  data-testid="search-result-card"
-                  data-result-id={movie.id}
-                  data-result-type={movie.item_type || 'movie'}
-                  className="comic-card group flex flex-col justify-between p-4 sm:p-5 hover:border-brand/40 hover:bg-surface-elevated"
-                >
-                  <div>
-                    <h2 className="comic-heading line-clamp-2 break-words text-base font-bold text-ink group-hover:text-brand-dark transition-colors">
-                      {movie.title}
-                    </h2>
-                    {movie.description && (
-                      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted">
-                        {movieSynopsis(movie.description)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="mt-4 flex items-center justify-between gap-3 text-xs">
-                    <span className="text-muted">{movie.year || ''}</span>
-                    <span className="font-semibold text-brand-dark">{movie.item_type === 'series' ? 'Chọn tập' : 'Xem phim'}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <FilmGrid movies={currentResults} search loading={loading} />
             {totalPages > 1 && (
               <nav aria-label="Phân trang kho phim" className="mt-8 flex items-center justify-between rounded-xl border border-surface-border bg-surface px-5 py-3 text-xs text-muted">
                 <span>Trang {safePage + 1} / {totalPages}</span>

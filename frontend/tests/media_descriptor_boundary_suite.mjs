@@ -23,7 +23,7 @@ function loadMediaService(mockFetch, overrides = {}) {
     exports: {},
     module: { exports: {} },
     fetch: mockFetch || globalThis.fetch,
-    process: { env: { NEXT_PUBLIC_SPRINGBOOT_API_URL: 'http://test-server/api' } },
+
     AbortController: globalThis.AbortController,
     DOMException: globalThis.DOMException,
     setTimeout: overrides.setTimeout || setTimeout,
@@ -83,7 +83,7 @@ test('1. Payload 200 hợp lệ trả về descriptor chuẩn', async () => {
   assert.equal(desc1.hasTrailer, true);
   assert.ok(desc1.feature);
   assert.equal(desc1.feature.kind, 'feature');
-  assert.equal(desc1.feature.streamUrl, 'http://test-server/media/stream/f1.mp4');
+  assert.equal(desc1.feature.streamUrl, '/media/stream/f1.mp4');
   assert.ok(desc1.trailer);
   assert.equal(desc1.trailer.kind, 'trailer');
   assert.equal(desc1.trailer.streamUrl, 'https://cdn.example.com/trailer.mp4');

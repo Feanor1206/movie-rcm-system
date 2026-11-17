@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useWatchlist } from '@/lib/context/WatchlistContext';

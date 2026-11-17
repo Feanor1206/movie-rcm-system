@@ -1,7 +1,5 @@
-'use client';
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import {
   Bookmark,
   Heart,
@@ -1005,7 +1003,7 @@ function EmptyState({
       <h3 className="text-base font-bold text-ink">{title}</h3>
       <p className="mt-1 max-w-md text-xs text-muted">{description}</p>
       <div className="mt-4 flex gap-2">
-        <Link href="/" className="btn-primary text-xs">
+        <Link to="/" className="btn-primary text-xs">
           Khám phá phim <ArrowRight size={13} />
         </Link>
         <button onClick={openChat} className="btn-secondary text-xs">

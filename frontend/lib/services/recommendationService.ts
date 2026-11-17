@@ -1,12 +1,12 @@
 import type { Movie } from '@/types/movie';
 
-const API = process.env.NEXT_PUBLIC_SPRINGBOOT_API_URL || '/api';
+const API = '/api';
 
-export async function getRecommendations(token: string | null, signal?: AbortSignal): Promise<{ movies: Movie[]; reasoning: string }> {
+export async function getRecommendations(token: string | null, signal?: AbortSignal, likedMovieIds: string[] = []): Promise<{ movies: Movie[]; reasoning: string }> {
   const response = await fetch(`${API}/recommend`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ limit: 6 }),
+    body: JSON.stringify({ limit: 6, likedMovieIds }),
     signal,
   });
   if (!response.ok) throw new Error('Không thể tải gợi ý');

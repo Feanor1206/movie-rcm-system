@@ -1,6 +1,6 @@
 # FastAPI
 
-Backend Python xử lý tài khoản, danh mục, thư viện và phát video. Khi chạy cùng Spring Boot, dịch vụ này cung cấp tìm kiếm, gợi ý phim và hội thoại CineBot.
+FastAPI phục vụ web, tài khoản, danh mục, thư viện, phát video, tìm kiếm, gợi ý phim và CineBot.
 
 ## Cài đặt
 
@@ -16,7 +16,7 @@ python -m pip install -r backend/fastapi/requirements.txt
 
 ### 2. Cấu hình biến môi trường
 
-`APP_JWT_SECRET` phải là Base64 của ít nhất 32 byte ngẫu nhiên. Dùng cùng khóa với Spring Boot khi chạy cả hai dịch vụ:
+`APP_JWT_SECRET` phải là Base64 của ít nhất 32 byte ngẫu nhiên.
 
 ```powershell
 python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
@@ -64,13 +64,13 @@ CineBot tìm bằng chỉ mục cục bộ. Với kết quả có trích đoạn
 
 ## Chạy
 
-Từ thư mục gốc:
+Build giao diện bằng `npm run build` trong `frontend`. Từ thư mục gốc, chạy ứng dụng với khóa JWT cố định.
 
 ```powershell
-.\start-python-main.ps1 -Background
+.\start-python-main.ps1 -Production -Background
 ```
 
-Để dùng bản build, đặt `BACKEND_INTERNAL_URL` đúng cổng FastAPI trước khi chạy `npm run build` trong `frontend`, rồi thêm `-Production` vào lệnh khởi động. Chế độ này yêu cầu `APP_JWT_SECRET` đã cấu hình. Tệp trạng thái chỉ chuyển sang `READY` sau khi API và MySQL trả lời.
+Web và API dùng cổng 3000. FastAPI đọc giao diện tại `frontend/dist`. Biến `DIPPIE_WEB_DIST` chỉ định nơi lưu tệp build khi cần. Tệp trạng thái chuyển sang `READY` sau khi FastAPI kết nối được cơ sở dữ liệu.
 
 Mỗi dịch vụ FastAPI chạy một tiến trình để giữ chỉ mục và trạng thái tác vụ nhất quán. Khởi động lại phục hồi danh mục từ bản lưu hoặc cơ sở dữ liệu. Trạng thái đồng bộ là `PENDING`, `BUILDING`, `READY`, `BLOCKED` hoặc `SYNC_FAILED`. Sau khi chuẩn bị cache, có thể thử lại bản dữ liệu mới nhất trong trang quản trị.
 
@@ -78,16 +78,14 @@ Dữ liệu cũ có bản JSON gốc hợp lệ được sửa đúng loại t�
 
 Chỉ đặt video từ nguồn đã kiểm tra trong thư mục cache. Kiểm tra kích thước xác nhận bản sao đầy đủ ở mức số byte.
 
-Cách chạy cùng Spring Boot nằm trong [README chính](../../README.md).
-
 ## API tìm kiếm và hội thoại
 
 | Đường dẫn | Chức năng |
 | --- | --- |
-| `POST /api/index/sync` | Nhận toàn bộ bản danh mục từ Spring Boot và cập nhật nguyên tử. |
+| `POST /api/index/sync` | Nhận bản danh mục đã xác thực và cập nhật chỉ mục. |
 | `POST /v1/search`, `POST /v1/discover` | Tìm phim, tập, cảnh và lời thoại. Kết hợp BM25 với vector khi đã cấu hình mô hình. |
 | `POST /api/chat` | Hội thoại SSE với các sự kiện `metadata`, `token`, `done`; trả bằng chứng và câu hỏi tiếp theo trong `followUps`. |
-| `POST /api/recommend`, `POST /v1/recommend` | Gợi ý theo `likedMovieIds`, `genres` và `mood`. Với token đăng nhập, dùng thêm yêu thích, điểm từ 8 và các tập đã xem của tài khoản đó. Khách nhận gợi ý từ kho phim. |
+| `POST /api/recommend`, `POST /v1/recommend` | Gợi ý theo `likedMovieIds`, `genres` và `mood`. Với token đăng nhập, dùng thêm phim yêu thích, điểm từ 8 và các tập đã xem. Trang chủ gửi mã những tập đã xem trên thiết bị khi dùng chế độ khách. |
 | `POST /v1/frame-search` | Tìm tập và mốc thời gian từ ảnh JPEG, PNG hoặc WebP. |
 | `GET /health`, `GET /ready` | Trạng thái dịch vụ và từng tính năng. |
 

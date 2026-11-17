@@ -25,6 +25,15 @@ test('recommendations send the current bearer token and preserve media routing f
   assert.equal(result.reasoning, 'Gợi ý');
 });
 
+test('guest suggestions send only local film IDs and no authorization', async () => {
+  const service = load(async (_url, options) => {
+    assert.equal(options.headers.Authorization, undefined);
+    assert.deepEqual(JSON.parse(options.body), { limit: 6, likedMovieIds: ['recently-viewed'] });
+    return { ok: true, json: async () => ({ recommendedMovies: [], reasoning: '' }) };
+  });
+  await service.getRecommendations(null, undefined, ['recently-viewed']);
+});
+
 test('recommendations reject malformed server responses', async () => {
   const service = load(async () => ({ ok: true, json: async () => ({ recommendedMovies: null }) }));
   await assert.rejects(service.getRecommendations(null));

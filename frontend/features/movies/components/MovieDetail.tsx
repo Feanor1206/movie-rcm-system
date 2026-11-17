@@ -1,10 +1,7 @@
-'use client';
-
 import { formatRuntime, genreLabel, movieSynopsis } from '@/lib/labels';
 
 import React, { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import {
   Play,
   Star,
@@ -543,13 +540,13 @@ export function MovieDetail({
 
         <div className="absolute inset-0 z-0 h-full w-full">
           {movie.backdrop?.trim() && !backdropError ? (
-            <Image
+            <img
               src={movie.backdrop}
               alt={movie.title}
-              fill
-              priority
+              referrerPolicy="no-referrer"
+              fetchPriority="high"
               onError={() => setBackdropError(true)}
-              className="object-cover opacity-80"
+              className="absolute inset-0 h-full w-full object-cover opacity-80"
             />
           ) : (
             <div className="h-full w-full bg-zinc-950" />
@@ -558,7 +555,7 @@ export function MovieDetail({
         </div>
 
         <div className="page-shell relative z-10 pb-12 pt-6 sm:pt-10">
-          <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted mb-6">
+          <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted mb-6">
             &larr; Trang chủ
           </Link>
 
@@ -567,13 +564,12 @@ export function MovieDetail({
             <div className="relative shrink-0">
               <div className="relative aspect-[2/3] w-44 overflow-hidden rounded-lg border border-surface-border bg-surface sm:w-56">
                 {movie.poster?.trim() && !posterError ? (
-                  <Image
+                  <img
                     src={movie.poster}
                     alt={movie.title}
-                    fill
+                    loading="lazy" referrerPolicy="no-referrer"
                     onError={() => setPosterError(true)}
-                    sizes="224px"
-                    className="object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
                 ) : (
                   <div data-testid="movie-poster-placeholder" className="flex h-full w-full flex-col items-center justify-center p-4 text-center bg-mint">
@@ -775,7 +771,7 @@ export function MovieDetail({
         <div className="mt-12 pt-8 border-t border-surface-border">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-bold text-ink uppercase">Phim tương tự</h2>
-            <Link href="/search?genre=Animation" className="text-xs text-muted hover:text-brand">Tất cả &rarr;</Link>
+            <Link to="/search?genre=Animation" className="text-xs text-muted hover:text-brand">Tất cả &rarr;</Link>
           </div>
           {similarMovies.length > 0 ? (
             <div className="movie-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 sm:gap-4 scroll-smooth">
@@ -784,7 +780,7 @@ export function MovieDetail({
                   <div className="overflow-hidden rounded-lg border border-surface-border bg-surface">
                     <div className="relative aspect-[2/3] w-full overflow-hidden bg-surface-elevated group">
                       {m.poster?.trim() ? (
-                        <Image src={m.poster} alt={m.title} fill sizes="185px" className="object-cover" />
+                        <img src={m.poster} alt={m.title} loading="lazy" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center bg-mint text-muted">
                           <Film size={24} className="mb-1 text-zinc-600" />
@@ -794,10 +790,10 @@ export function MovieDetail({
                       <span className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-surface/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-400 border border-surface-border">
                         <Star size={10} className="fill-amber-400" /> {m.rating}
                       </span>
-                      <Link href={`/movies/${m.id}`} className="absolute inset-0 z-10" />
+                      <Link to={`/movies/${m.id}`} className="absolute inset-0 z-10" />
                     </div>
                     <div className="p-3">
-                      <Link href={`/movies/${m.id}`} className="block truncate text-sm font-semibold text-ink hover:text-brand">{m.title}</Link>
+                      <Link to={`/movies/${m.id}`} className="block truncate text-sm font-semibold text-ink hover:text-brand">{m.title}</Link>
                       <div className="mt-1 flex items-center justify-between text-xs text-muted">
                         <span>{m.year} · {formatRuntime(m.runtime)}</span>
                       </div>

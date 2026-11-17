@@ -29,6 +29,10 @@ const transpileOptions = {
 
 const searchTranspiled = ts.transpileModule(searchSource, transpileOptions).outputText;
 const movieCardTranspiled = ts.transpileModule(movieCardSource, transpileOptions).outputText;
+const filmGridTranspiled = ts.transpileModule(
+  fs.readFileSync(path.join(root, 'features/movies/components/FilmShelf.tsx'), 'utf8'),
+  transpileOptions,
+).outputText;
 
 const mediaRoutingModule = { exports: {} };
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../lib/services/mediaRouting.ts'), 'utf8'), {
@@ -88,6 +92,7 @@ function getText(node) {
 }
 
 function createSearchHarness(initialUrl = '', catalogMocks = {}) {
+  const grid = { exports: {} };
   const mocks = typeof catalogMocks === 'function' ? {} : catalogMocks;
   let params = new URLSearchParams(initialUrl);
   let slots = [];
@@ -148,6 +153,7 @@ function createSearchHarness(initialUrl = '', catalogMocks = {}) {
       }
     },
     createElement(type, props, ...children) {
+      if (type === grid.exports.FilmGrid) return type(props);
       const flatChildren = children.length === 1 ? children[0] : children.length > 1 ? children : undefined;
       return {
         type,
@@ -194,14 +200,16 @@ function createSearchHarness(initialUrl = '', catalogMocks = {}) {
     require: (mod) => {
       if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (mod === 'next/navigation') {
+      if (mod === 'react-router') {
         return {
-          useSearchParams: () => params,
-          useRouter: () => router,
-          usePathname: () => '/search',
+          Link: 'route-link',
+          useSearchParams: () => [params],
+          useNavigate: () => router.push,
+          useLocation: () => ({ pathname: '/search' }),
         };
       }
       if (mod.includes('mediaRouting')) return mediaRoutingModule.exports;
+      if (mod.includes('FilmShelf')) return grid.exports;
       if (mod.includes('catalogService')) {
         return {
           browseCatalog: mocks.browse || (async () => ({
@@ -230,6 +238,7 @@ function createSearchHarness(initialUrl = '', catalogMocks = {}) {
     },
   };
 
+  vm.runInNewContext(filmGridTranspiled, { ...context, React: hooks, module: grid, exports: grid.exports });
   vm.runInNewContext(searchTranspiled, context, { filename: searchFilePath });
 
   function render() {
@@ -336,18 +345,7 @@ function renderActualMovieCard(movie, watchlistContext = {}) {
     require: (mod) => {
       if (mod === '@/lib/labels') return labels;
       if (mod === 'react') return { __esModule: true, default: hooks, ...hooks };
-      if (mod === 'next/image') {
-        return {
-          default: 'next/image',
-          __esModule: true,
-        };
-      }
-      if (mod === 'next/link') {
-        return {
-          default: 'next/link',
-          __esModule: true,
-        };
-      }
+      if (mod === 'react-router') return { Link: 'route-link' };
       if (mod === 'lucide-react') {
         return new Proxy({}, { get: (_, name) => name });
       }
@@ -503,7 +501,7 @@ test('6. Catalog list: renders standalone films and asks the server for the URL 
   assert.equal(listCalls, 1);
   assert.equal(cards.length, 2, 'URL page and size select one server page');
   assert.equal(cards[0].props['data-result-id'], 'film-2');
-  assert.equal(cards[0].props.href, '/movies/film-2');
+  assert.equal(cards[0].props.to, '/movies/film-2');
   assert.ok(getText(cards[0]).includes('Catalog synopsis 2'));
   assert.ok(getText(cards[0]).includes('2002'));
   assert.equal(getText(h.tree).includes('Điểm cao nhất'), false, 'Sort controls stay off this screen');
@@ -522,8 +520,8 @@ test('Catalog search opens imported series and episodes on their playback routes
   h.render();
   await h.settle();
   const cards = findNodes(h.tree, (node) => node.props?.['data-testid'] === 'search-result-card');
-  assert.equal(cards[0].props.href, '/series/ser_jadoo');
-  assert.equal(cards[1].props.href, '/series/ser_jadoo?episode=ep_jadoo_s01_0001');
+  assert.equal(cards[0].props.to, '/series/ser_jadoo');
+  assert.equal(cards[1].props.to, '/series/ser_jadoo?episode=ep_jadoo_s01_0001');
   assert.equal(cards[0].props['data-result-type'], 'series');
   assert.equal(cards[1].props['data-result-type'], 'episode');
 });
@@ -595,7 +593,7 @@ test('10. S4 (P2): MovieCard renders fallback placeholder when poster is missing
 
   const cardNode = renderActualMovieCard(movieWithoutPoster);
 
-  const imageNodes = findNodes(cardNode, (n) => n.type === 'next/image');
+  const imageNodes = findNodes(cardNode, (n) => n.type === 'img');
   assert.equal(imageNodes.length, 0, 'Must NOT render Image when poster is empty');
 
   const filmIcons = findNodes(cardNode, (n) => n.type === 'Film');
@@ -604,11 +602,11 @@ test('10. S4 (P2): MovieCard renders fallback placeholder when poster is missing
   const cardText = getText(cardNode);
   assert.ok(cardText.includes('The Tale of Princess Kaguya'), 'Placeholder must display movie title');
 
-  const links = findNodes(cardNode, (n) => n.type === 'next/link');
-  assert.ok(links.some((l) => l.props.href === '/movies/anim-no-poster'), 'Must link to /movies/anim-no-poster');
+  const links = findNodes(cardNode, (n) => n.type === 'route-link');
+  assert.ok(links.some((l) => l.props.to === '/movies/anim-no-poster'), 'Must link to /movies/anim-no-poster');
 });
 
-test('11. S4 (P2): MovieCard renders Next Image with correct src and alt when poster is valid', () => {
+test('11. S4 (P2): MovieCard renders a poster with the correct src and alt', () => {
   const movieWithPoster = sampleMovie({
     id: 'anim-totoro',
     title: 'My Neighbor Totoro',
@@ -617,8 +615,8 @@ test('11. S4 (P2): MovieCard renders Next Image with correct src and alt when po
 
   const cardNode = renderActualMovieCard(movieWithPoster);
 
-  const imageNodes = findNodes(cardNode, (n) => n.type === 'next/image');
-  assert.equal(imageNodes.length, 1, 'Must render exactly one next/image component');
+  const imageNodes = findNodes(cardNode, (n) => n.type === 'img');
+  assert.equal(imageNodes.length, 1, 'Must render exactly one image');
   assert.equal(imageNodes[0].props.src, 'https://cdn.example.com/totoro.jpg');
   assert.equal(imageNodes[0].props.alt, 'My Neighbor Totoro');
 

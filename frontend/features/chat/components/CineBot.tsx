@@ -1,8 +1,5 @@
-'use client';
-
 import React, { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Link } from 'react-router';
 import {
   X,
   Send,
@@ -311,12 +308,11 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
                         <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-surface-border bg-surface">
                           {hasPoster ? (
-                            <Image
+                            <img
                               src={movie.poster}
                               alt={movie.title}
-                              fill
-                              className="object-cover"
-                              sizes="56px"
+                              loading="lazy" referrerPolicy="no-referrer"
+                              className="absolute inset-0 h-full w-full object-cover"
                             />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center bg-mint text-muted">
@@ -330,7 +326,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                           <div>
                             <div className="flex items-center justify-between gap-1">
                               <Link
-                                href={mediaHref}
+                                to={mediaHref}
                                 onClick={onClose}
                                 className="truncate text-xs sm:text-sm font-semibold text-ink hover:text-brand-dark transition-colors"
                               >
@@ -348,7 +344,7 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
                           <div className="mt-2 flex items-center gap-2">
                             <Link
-                              href={mediaHref}
+                              to={mediaHref}
                               onClick={onClose}
                               className="inline-flex items-center gap-1 rounded bg-brand px-2 py-0.5 text-[10px] font-bold text-zinc-950 hover:bg-brand-hover shadow-brand-sm cursor-pointer"
                             >
@@ -438,5 +434,3 @@ function CineBotConversation({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     </div>
   );
 }
-
-export { CineBotFloatingTrigger } from './CineBotFloatingTrigger';

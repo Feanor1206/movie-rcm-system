@@ -22,7 +22,7 @@ function loadService(mockFetch) {
     exports: {},
     module: { exports: {} },
     fetch: mockFetch,
-    process: { env: { NEXT_PUBLIC_SPRINGBOOT_API_URL: 'http://test-server/api' } },
+
     URLSearchParams,
     AbortController,
     setTimeout: (fn, ms) => {
@@ -429,7 +429,7 @@ test('10. Catalog API: series list validates and maps real catalog fields', asyn
   });
 
   const result = await api.getCatalogSeriesList();
-  assert.equal(requestedUrl, 'http://test-server/api/catalog/series');
+  assert.equal(requestedUrl, '/api/catalog/series');
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 'jadoo');
   assert.equal(result[0].title, 'Jadoo');

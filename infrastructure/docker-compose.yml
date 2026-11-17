@@ -1,142 +1,55 @@
-version: '3.8'
-
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: movie_rcm_nginx
-    restart: always
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - frontend
-      - fastapi
-    networks:
-      - movie_network
-
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-      args:
-        SPRINGBOOT_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://springboot:8080}
-    container_name: movie_rcm_frontend
-    restart: always
-    environment:
-      - NEXT_PUBLIC_SPRINGBOOT_API_URL=/api
-      - BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL:-http://springboot:8080}
-      - SPRINGBOOT_INTERNAL_URL=${BACKEND_INTERNAL_URL:-http://springboot:8080}
-      - MODEL_API_URL=http://fastapi:8000/api/chat
-    expose:
-      - "3000"
-    networks:
-      - movie_network
-
-  springboot:
-    build:
-      context: ../backend/springboot
-      dockerfile: Dockerfile
-    container_name: movie_rcm_springboot
-    restart: always
-    environment:
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
-      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:mysql://mysql:3306/${MYSQL_DB:-movie_rcm_db}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC}
-      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-${MYSQL_USER:-root}}
-      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-${MYSQL_PASSWORD:-}}
-      - APP_JWT_SECRET=${APP_JWT_SECRET}
-      - APP_CATALOG_SYNC_URL=http://fastapi:8000/api/index/sync
-      - CATALOG_SYNC_TOKEN=${CATALOG_SYNC_TOKEN:-}
-    expose:
-      - "8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - movie_network
-
   fastapi:
-    build:
-      context: ../backend/fastapi
-      dockerfile: Dockerfile
-    container_name: movie_rcm_fastapi
-    restart: always
+    build: ../backend/fastapi
+    restart: unless-stopped
     environment:
-      - HOST=0.0.0.0
-      - PORT=8000
-      - DATABASE_URL=${DATABASE_URL:-mysql+pymysql://${MYSQL_USER:-root}:${MYSQL_PASSWORD:-}@mysql:3306/${MYSQL_DB:-movie_rcm_db}?charset=utf8mb4}
-      - MYSQL_HOST=${MYSQL_HOST:-mysql}
-      - MYSQL_PORT=${MYSQL_PORT:-3306}
-      - MYSQL_USER=${MYSQL_USER:-root}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
-      - MYSQL_DB=${MYSQL_DB:-movie_rcm_db}
-      - APP_JWT_SECRET=${APP_JWT_SECRET:?APP_JWT_SECRET required}
-      - APP_DEMO_MODE=${APP_DEMO_MODE:-false}
-      - APP_BOOTSTRAP_ADMIN_USERNAME=${APP_BOOTSTRAP_ADMIN_USERNAME:-}
-      - APP_BOOTSTRAP_ADMIN_EMAIL=${APP_BOOTSTRAP_ADMIN_EMAIL:-}
-      - APP_BOOTSTRAP_ADMIN_PASSWORD=${APP_BOOTSTRAP_ADMIN_PASSWORD:-}
-      - MODEL_MODE=${MODEL_MODE:-light}
-      - TEXT_ENCODER_PATH=${TEXT_ENCODER_PATH:-}
-      - RERANKER_MODEL_PATH=${RERANKER_MODEL_PATH:-}
-      - SCORE_CALIBRATION_PATH=${SCORE_CALIBRATION_PATH:-}
-      - LLAMA_SERVER_URL=${LLAMA_SERVER_URL:-http://host.docker.internal:8081/v1}
-      - LLM_MODEL=${LLM_MODEL:-Qwen3-4B-GGUF}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
-      - SYNC_STATE_PATH=/app/data/indices/catalog_sync_state.json
-      - EMBEDDING_CACHE_DIR=/app/data/indices/text
-      - CATALOG_SYNC_TOKEN=${CATALOG_SYNC_TOKEN:-}
+      DIPPIE_WEB_DIST: /app/web
+      MYSQL_HOST: mysql
+      MYSQL_PORT: '3306'
+      MYSQL_DB: ${MYSQL_DB:-movie_rcm_db}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-${MYSQL_ROOT_PASSWORD:-}}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?APP_JWT_SECRET required}
+      APP_DEMO_MODE: ${APP_DEMO_MODE:-false}
+      APP_BOOTSTRAP_ADMIN_USERNAME: ${APP_BOOTSTRAP_ADMIN_USERNAME:-}
+      APP_BOOTSTRAP_ADMIN_EMAIL: ${APP_BOOTSTRAP_ADMIN_EMAIL:-}
+      APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:-}
+      MODEL_MODE: ${MODEL_MODE:-light}
+      TEXT_ENCODER_PATH: ${TEXT_ENCODER_PATH:-}
+      RERANKER_MODEL_PATH: ${RERANKER_MODEL_PATH:-}
+      SCORE_CALIBRATION_PATH: ${SCORE_CALIBRATION_PATH:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CATALOG_SYNC_TOKEN: ${CATALOG_SYNC_TOKEN:-}
+    ports:
+      - "127.0.0.1:${DIPPIE_PORT:-3000}:8000"
     volumes:
+      - ../frontend/dist:/app/web:ro
       - ../ai/models:/app/models:ro
       - ../data/indices:/app/data/indices
+      - ../data/catalog.jadoo_all.json:/app/data/catalog.jadoo_all.json:ro
     depends_on:
       mysql:
         condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    expose:
-      - "8000"
-    networks:
-      - movie_network
 
   mysql:
     image: mysql:8.0
-    container_name: movie_rcm_mysql
-    restart: always
+    restart: unless-stopped
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_DATABASE: ${MYSQL_DB:-movie_rcm_db}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-password}}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:?MYSQL_PASSWORD required}}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysqldata:/var/lib/mysql
       - ../database/schema/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 5s
       retries: 10
-    networks:
-      - movie_network
-
-  redis:
-    image: redis:7-alpine
-    container_name: movie_rcm_redis
-    restart: always
-    expose:
-      - "6379"
-    networks:
-      - movie_network
-
-networks:
-  movie_network:
-    driver: bridge
 
 volumes:
   mysqldata:

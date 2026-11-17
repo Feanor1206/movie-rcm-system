@@ -1,10 +1,8 @@
-'use client';
-
 import { genreLabel } from '@/lib/labels';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { Link, useParams, useSearchParams } from 'react-router';
+
 import {
   getCatalogSeriesDetail,
   getCatalogEpisodeDetail,
@@ -36,9 +34,8 @@ const formatDuration = (ms?: number) => {
 };
 
 export default function SeriesDetailPage() {
-  const params = useParams();
-  const searchParams = useSearchParams();
-  const seriesId = (params?.id as string) || '';
+  const { id: seriesId = '' } = useParams<'id'>();
+  const [searchParams] = useSearchParams();
   const targetEpisodeId = searchParams.get('episode');
   const targetSceneId = searchParams.get('scene');
   const targetSegmentId = searchParams.get('segment');
@@ -556,7 +553,7 @@ export default function SeriesDetailPage() {
         <h2 className="mt-4 text-xl font-bold text-ink">Lỗi hiển thị bộ phim</h2>
         <p className="mt-2 text-sm text-muted">{error || 'Không tìm thấy dữ liệu bộ phim.'}</p>
         <button onClick={() => setSeriesRetry((value) => value + 1)} className="btn-secondary mt-6 inline-flex items-center gap-2 text-xs">Thử tải lại</button>
-        <Link href="/search" className="btn-secondary mt-6 ml-2 inline-flex items-center gap-2 text-xs">
+        <Link to="/search" className="btn-secondary mt-6 ml-2 inline-flex items-center gap-2 text-xs">
           <span>Quay lại kho phim</span>
         </Link>
       </div>
@@ -569,7 +566,7 @@ export default function SeriesDetailPage() {
     <main className="series-page mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
 
       <header className="mb-5">
-        <Link href="/search" className="text-sm font-medium text-muted hover:text-ink">Kho phim</Link>
+        <Link to="/search" className="text-sm font-medium text-muted hover:text-ink">Kho phim</Link>
         <h1 className="mt-2 break-words text-2xl font-bold text-ink sm:text-3xl">{series.title}</h1>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
           {series.releaseYearStart && (

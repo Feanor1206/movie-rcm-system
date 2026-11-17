@@ -1,8 +1,6 @@
-'use client';
-
 import React, { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, useLocation } from 'react-router';
+
 import { useWatchlist } from '@/lib/context/WatchlistContext';
 import { useAuth } from '@/lib/context/AuthContext';
 
@@ -10,7 +8,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const { watchlist, openChat } = useWatchlist();
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
 
@@ -18,8 +16,8 @@ export function Navbar() {
     { name: 'Trang chủ', href: '/' },
     { name: 'Kho phim', href: '/search' },
     { name: 'Danh sách xem', href: '/profile', count: watchlist.length },
-    { name: 'Nhập dữ liệu', href: '/admin/import' },
   ];
+  if (user?.role === 'ROLE_ADMIN') navLinks.push({ name: 'Nhập dữ liệu', href: '/admin/import' });
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -39,11 +37,11 @@ export function Navbar() {
   };
 
   return (
-    <header className="comic-navbar sticky top-0 z-40 border-b border-surface-border bg-background/85 backdrop-blur-md">
-      <nav className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="comic-navbar sticky top-0 z-40 border-b border-surface-border/25 bg-background">
+      <nav aria-label="Điều hướng chính" className="page-shell flex h-[68px] items-center justify-between">
         <div className="flex items-center gap-8">
           <Link
-            href="/"
+            to="/"
             className="flex items-center gap-2 text-xl font-bold tracking-tight text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand rounded px-1"
           >
             <span className="comic-wordmark">Dippie</span>
@@ -55,7 +53,7 @@ export function Navbar() {
               return (
                 <Link
                   key={link.name}
-                  href={link.href}
+                  to={link.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={`text-sm font-medium transition-colors ${
                     isActive ? 'text-brand-dark font-semibold' : 'text-muted hover:text-ink'
@@ -76,7 +74,7 @@ export function Navbar() {
         <div className="hidden lg:flex items-center gap-3">
           <button
             onClick={openChat}
-            className="rounded-lg border border-surface-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink transition-all hover:border-brand/60 hover:bg-surface-elevated cursor-pointer"
+            className="min-h-[44px] min-w-[44px] rounded-lg border border-surface-border/50 bg-surface px-3.5 text-sm font-semibold text-ink hover:bg-surface-elevated cursor-pointer"
           >
             Hỏi CineBot
           </button>
@@ -106,7 +104,7 @@ export function Navbar() {
 
                   <div className="mt-1.5 space-y-0.5">
                     <Link
-                      href="/profile"
+                      to="/profile"
                       onClick={() => setUserDropdownOpen(false)}
                       className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted hover:bg-surface-hover hover:text-ink transition-colors"
                     >
@@ -132,7 +130,7 @@ export function Navbar() {
             <button
               data-testid="nav-login-button"
               onClick={() => openAuthModal('login')}
-              className="rounded-lg bg-brand px-3.5 py-1.5 text-xs font-bold text-zinc-950 hover:bg-brand-hover active:bg-brand-active transition-all cursor-pointer shadow-sm"
+              className="min-h-[44px] rounded-lg bg-brand px-3.5 text-sm font-bold text-ink hover:bg-brand-hover active:bg-brand-active cursor-pointer"
             >
               Đăng nhập
             </button>
@@ -142,7 +140,7 @@ export function Navbar() {
         <div className="flex items-center gap-2 lg:hidden">
           {isAuthenticated ? (
             <Link
-              href="/profile"
+              to="/profile"
               aria-label="Hồ sơ cá nhân"
               className="grid h-11 w-11 place-items-center rounded-lg bg-brand text-xs font-bold text-zinc-950 shadow-sm"
             >
@@ -177,7 +175,7 @@ export function Navbar() {
               return (
                 <Link
                   key={link.name}
-                  href={link.href}
+                  to={link.href}
                   aria-current={isActive ? 'page' : undefined}
                   onClick={() => setOpen(false)}
                   className={`flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm font-medium ${
@@ -200,7 +198,7 @@ export function Navbar() {
                   setOpen(false);
                   openChat();
                 }}
-                className="btn-primary w-full justify-center text-xs"
+                className="btn-primary min-h-[44px] w-full justify-center text-sm"
               >
                 Hỏi CineBot
               </button>

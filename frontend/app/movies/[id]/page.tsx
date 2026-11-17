@@ -1,18 +1,12 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { Footer } from '@/components/layout/Footer';
-import { Navbar } from '@/components/layout/Navbar';
+
+import { Link, useParams } from 'react-router';
 import { MovieDetail } from '@/features/movies/components/MovieDetail';
 import { getCatalogMovieById, browseCatalog } from '@/lib/services/catalogService';
 import type { Movie } from '@/types/movie';
 
 export default function MovieDetailPage() {
-  const params = useParams();
-  const rawId = params?.id;
-  const canonicalId = typeof rawId === 'string' ? rawId.trim() : Array.isArray(rawId) ? rawId[0] : '';
+  const canonicalId = useParams<'id'>().id?.trim() || '';
 
   const [loading, setLoading] = useState(true);
   const [movie, setMovie] = useState<Movie | null>(null);
@@ -72,7 +66,7 @@ export default function MovieDetailPage() {
 
   return (
     <>
-      <Navbar />
+
       {loading ? (
         <main className="min-h-screen bg-background">
           <div className="min-h-[420px] bg-surface animate-pulse" />
@@ -83,15 +77,15 @@ export default function MovieDetailPage() {
             <div className="grid h-12 w-12 place-items-center rounded-full mx-auto bg-zinc-800 text-zinc-300 font-bold">
               {notFoundState ? '404' : '!'}
             </div>
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="text-xl font-bold text-ink">
               {notFoundState ? 'Không tìm thấy phim hoạt hình' : 'Không thể kết nối đến máy chủ'}
             </h1>
-            <p className="text-xs text-zinc-400">
+            <p className="text-sm text-muted">
               {notFoundState ? `Mã phim "${canonicalId}" không tồn tại.` : error}
             </p>
             <div className="pt-2 flex flex-wrap justify-center gap-3">
               {notFoundState ? (
-                <Link href="/search?genre=Animation" className="btn-primary text-xs">
+                <Link to="/search?genre=Animation" className="btn-primary text-xs">
                   Khám phá kho hoạt hình
                 </Link>
               ) : (
@@ -102,7 +96,7 @@ export default function MovieDetailPage() {
                   Thử kết nối lại
                 </button>
               )}
-              <Link href="/" className="btn-secondary text-xs">
+              <Link to="/" className="btn-secondary text-xs">
                 Về trang chủ
               </Link>
             </div>
@@ -111,7 +105,7 @@ export default function MovieDetailPage() {
       ) : movie ? (
         <MovieDetail movie={movie} similarMovies={similarMovies} />
       ) : null}
-      <Footer />
+
     </>
   );
 }

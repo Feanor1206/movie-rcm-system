@@ -268,14 +268,17 @@ def _movie_responses(db, movies):
     if not ids:
         return []
     series_ids = set(db.scalars(select(CatalogSeries.id).where(CatalogSeries.id.in_(ids))))
-    episodes = dict(db.execute(select(CatalogEpisode.id, CatalogEpisode.series_id).where(CatalogEpisode.id.in_(ids))).all())
+    episodes = {episode_id: (series_id, number) for episode_id, series_id, number in db.execute(
+        select(CatalogEpisode.id, CatalogEpisode.series_id, CatalogEpisode.number).where(CatalogEpisode.id.in_(ids))
+    )}
     result = []
     for movie in movies:
         item = movie.to_response()
         if movie.id in series_ids:
             item.update(item_type="series", series_id=movie.id)
         elif movie.id in episodes:
-            item.update(item_type="episode", series_id=episodes[movie.id], episode_id=movie.id)
+            series_id, number = episodes[movie.id]
+            item.update(item_type="episode", series_id=series_id, episode_id=movie.id, episode_number=number)
         result.append(item)
     return result
 

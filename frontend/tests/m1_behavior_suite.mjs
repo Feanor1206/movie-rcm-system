@@ -49,15 +49,14 @@ function renderComponent(filePath, componentName, contextVal, authVal, props = {
     process: { env: {} },
     require: (name) => {
       if (name === '@/lib/labels') return labels;
-      if (name === 'next/dynamic') return { __esModule: true, default: () => () => null };
+
       if (name === 'react') return { createElement: (t, p, ...c) => ({ type: t, props: { ...(p || {}), children: c.length === 1 ? c[0] : c } }), ...hooks };
-      if (name === 'next/image') return { default: (p) => ({ type: 'img', props: p }) };
-      if (name === 'next/link') return { default: (p) => ({ type: 'a', props: p }) };
+
+      if (name === 'react-router') return { Link: 'route-link' };
       if (name === 'lucide-react') return new Proxy({}, { get: (_, prop) => (p) => ({ type: String(prop), props: p }) });
       if (name.includes('mediaRouting')) return mediaRoutingModule.exports;
       if (name.includes('WatchlistContext')) return { useWatchlist: () => contextVal };
       if (name.includes('AuthContext')) return { useAuth: () => authVal };
-      if (name.includes('MovieSection')) return { MovieSection: () => null };
       if (name.includes('MovieCard')) return { MovieCard: (p) => ({ type: 'MovieCard', props: p }) };
       if (name.includes('movies')) return { movies: [] };
       return {};
@@ -183,8 +182,8 @@ function makeHarness(file, provider, fetcher, authContextRef) {
     clearTimeout: (id) => timers.delete(id),
     require: (name) => {
       if (name === '@/lib/labels') return labels;
-      if (name === 'next/dynamic') return { __esModule: true, default: () => () => null };
-      if (name === 'react') return { __esModule: true, default: hooks, ...hooks };
+
+      if (name === 'react') return { __esModule: true, default: hooks, ...hooks, lazy: () => () => null };
       if (name === './AuthContext') return { useAuth: () => authContextRef.current };
       return {};
     },
