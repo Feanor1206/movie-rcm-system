@@ -4,9 +4,11 @@ Dippie là web xem phim hoạt hình. FastAPI phục vụ giao diện, tài kho�
 
 ## Chạy trên Windows
 
-Cần Python 3.11, MySQL 8.0 và Node.js 22.12 trở lên để build. Chạy từ thư mục gốc.
+Cần Python 3.11 và Node.js 22.12 trở lên. Giao diện hiện tại nằm trên nhánh `dev`.
 
 ```powershell
+git clone --branch dev https://github.com/Feanor1206/movie-rcm-system.git
+cd movie-rcm-system
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r backend/fastapi/requirements.txt
@@ -14,7 +16,39 @@ npm.cmd --prefix frontend ci
 npm.cmd --prefix frontend run build
 ```
 
-Cấu hình MySQL và `APP_JWT_SECRET`, rồi khởi động Dippie. [Biến môi trường](backend/fastapi/README.md#2-cấu-hình-biến-môi-trường)
+Nếu đã clone, cập nhật nhánh `dev` rồi chạy lại hai lệnh `npm.cmd` ở trên.
+
+### Chạy thử với danh mục mẫu
+
+Chạy từ thư mục gốc trong một cửa sổ PowerShell dành riêng cho bản thử. Bản thử dùng SQLite trong `target/dippie-demo/` và nhập ba gói Jadoo, Larva và Ori. Lần đầu, đặt mật khẩu cho tài khoản `dippie-admin` dài ít nhất 16 ký tự và tối đa 72 byte.
+
+```powershell
+$env:DATABASE_URL = 'sqlite:///../../target/dippie-demo/catalog.sqlite3'
+$env:SYNC_STATE_PATH = '../../target/dippie-demo/catalog-sync.json'
+$env:APP_DEMO_MODE = 'false'
+$stateFile = Join-Path $PWD 'target/dippie-demo/stack.json'
+$password = Read-Host 'Mật khẩu dippie-admin' -AsSecureString
+$admin = [PSCredential]::new('dippie-admin', $password)
+$env:APP_BOOTSTRAP_ADMIN_USERNAME = $admin.UserName
+$env:APP_BOOTSTRAP_ADMIN_EMAIL = 'dippie-admin@example.invalid'
+$env:APP_BOOTSTRAP_ADMIN_PASSWORD = $admin.GetNetworkCredential().Password
+try {
+    .\start-python-main.ps1 -Background -StateFile $stateFile
+} finally {
+    Remove-Item Env:APP_BOOTSTRAP_ADMIN_USERNAME, Env:APP_BOOTSTRAP_ADMIN_EMAIL, Env:APP_BOOTSTRAP_ADMIN_PASSWORD
+}
+foreach ($catalog in @('jadoo_all', 'larva', 'ori')) {
+    .\scripts\import_preview_catalog.ps1 -CatalogPath "data/catalog.$catalog.json" -ApiBaseUrl 'http://127.0.0.1:3000/api' -Username $admin.UserName -Password $admin.Password
+}
+```
+
+Mở trang chủ để xem mục **Gợi ý cho bạn**. [Dippie ở cổng 3000](http://localhost:3000/)
+
+Dùng `.\scripts\stop_preview_stack.ps1 -StateFile $stateFile` để dừng. Lần chạy sau, đặt lại `DATABASE_URL`, `SYNC_STATE_PATH` và `$stateFile` như trên rồi chạy lệnh khởi động. Danh mục đã nhập nằm trong tệp SQLite.
+
+### Chạy với MySQL
+
+Mở một cửa sổ PowerShell riêng và cấu hình MySQL 8.0 cùng `APP_JWT_SECRET`. [Biến môi trường](backend/fastapi/README.md#2-cấu-hình-biến-môi-trường)
 
 ```powershell
 .\start-python-main.ps1 -Production -Background
