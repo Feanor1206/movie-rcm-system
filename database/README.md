@@ -64,6 +64,8 @@ Truy vấn chỉ mục tập–tệp ổn định cả ở 10.000 và 100.000 t�
 
 Ở mốc 100.000 tập, giao dịch thêm 1.000 tập cùng 1.000 liên kết mất khoảng 1,06 giây. Nhập lại gói trả kết quả cũ trong khoảng 0,19 giây. Gói có quan hệ sai bị chặn, tổng sau thử nghiệm là 101.000 tập và 101.000 liên kết. Thời gian này đo phần ghi database, gồm kiểm tra và commit, trước khi đồng bộ chỉ mục.
 
+Ngày 23/11/2026, FastAPI đồng bộ và khôi phục thành công chỉ mục từ khóa của 100.000 tập trong bản thử riêng. Dữ liệu gồm 755 tập thật và 99.245 tập giả lập. Đồng bộ qua API mất 30,59 giây, khôi phục sau khởi động lại mất 30,08 giây. Trung vị ba truy vấn tiêu đề mẫu là 86,74 ms với một tập có thật và 320,70 ms với một tập giả lập. Các số đo dùng chế độ `light` và một người gọi API.
+
 ## Nhập danh mục thật
 
 Chạy thử trên bản sao MySQL sau khi áp dụng migration. Chia nội dung thành gói tự chứa theo bộ hoặc nhóm mùa, giữ nguyên mã của bản ghi đã có và tăng `revision` khi sửa. Dùng `--report` để biết phần metadata còn thiếu trước khi nhập.

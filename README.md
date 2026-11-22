@@ -20,7 +20,7 @@ Nếu đã clone, cập nhật nhánh `dev` rồi chạy lại hai lệnh `npm.c
 
 ### Chạy thử với danh mục mẫu
 
-Chạy từ thư mục gốc trong một cửa sổ PowerShell dành riêng cho bản thử. Bản thử dùng SQLite trong `target/dippie-demo/` và nhập năm gói Jadoo, Larva, Ori, Doraemon và Trạng Quỳnh Thời Nhí Nhố. Lần đầu, đặt mật khẩu cho tài khoản `dippie-admin` dài ít nhất 16 ký tự và tối đa 72 byte.
+Chạy từ thư mục gốc trong một cửa sổ PowerShell dành riêng cho bản thử. Bản thử dùng SQLite trong `target/dippie-demo/` và nhập sáu gói cho Jadoo, Larva, Ori, Doraemon và Trạng Quỳnh Thời Nhí Nhố. Lần đầu, đặt mật khẩu cho tài khoản `dippie-admin` dài ít nhất 16 ký tự và tối đa 72 byte.
 
 ```powershell
 $env:DATABASE_URL = 'sqlite:///../../target/dippie-demo/catalog.sqlite3'
@@ -37,7 +37,7 @@ try {
 } finally {
     Remove-Item Env:APP_BOOTSTRAP_ADMIN_USERNAME, Env:APP_BOOTSTRAP_ADMIN_EMAIL, Env:APP_BOOTSTRAP_ADMIN_PASSWORD
 }
-foreach ($catalog in @('jadoo_all', 'larva', 'ori', 'doraemon', 'trang_quynh')) {
+foreach ($catalog in @('jadoo_all', 'larva', 'ori', 'doraemon', 'doraemon_s05_s11', 'trang_quynh')) {
     .\scripts\import_preview_catalog.ps1 -CatalogPath "data/catalog.$catalog.json" -ApiBaseUrl 'http://127.0.0.1:3000/api' -Username $admin.UserName -Password $admin.Password
 }
 ```
