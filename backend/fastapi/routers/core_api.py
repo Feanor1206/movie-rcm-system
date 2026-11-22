@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import LargeBinary, case, cast, func, or_, select
+from sqlalchemy import LargeBinary, and_, case, cast, func, or_, select
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError, StatementError
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.concurrency import run_in_threadpool
@@ -233,8 +233,7 @@ def _matches_genre_token(genres_str: str | None, raw_token: str | None) -> bool:
     if not genres_str:
         return False
     token = raw_token.strip().lower()
-    tokens = [t.strip().lower() for t in genres_str.split(",") if t.strip()]
-    return token in tokens
+    return any(value.strip().lower() == token for value in genres_str.split(","))
 
 
 def _matches_search(movie: Movie, raw_query: str | None) -> bool:
@@ -254,14 +253,16 @@ def _published_record(column):
 def _visible_movies(db):
     series = select(CatalogSeries.id).where(_published_record(CatalogSeries.record_json))
     seasons = select(CatalogSeason.id).where(_published_record(CatalogSeason.record_json))
-    episodes = select(CatalogEpisode.id).where(
+    episode_is_visible = and_(
         _published_record(CatalogEpisode.record_json),
         CatalogEpisode.series_id.in_(series),
         or_(CatalogEpisode.season_id.is_(None), CatalogEpisode.season_id.in_(seasons)),
     )
+    hidden_series = select(CatalogSeries.id).where(_published_record(CatalogSeries.record_json).is_not(True))
+    hidden_episodes = select(CatalogEpisode.id).where(episode_is_visible.is_not(True))
     return db.query(Movie).filter(
-        or_(~Movie.id.in_(select(CatalogSeries.id)), Movie.id.in_(series)),
-        or_(~Movie.id.in_(select(CatalogEpisode.id)), Movie.id.in_(episodes)),
+        Movie.id.not_in(hidden_series),
+        Movie.id.not_in(hidden_episodes),
     )
 
 
@@ -334,6 +335,11 @@ def browse_movies(
         return api_response(None, f"Chiều sắp xếp không hợp lệ: '{direction}'", False, 400)
 
     effective_q = next((v.strip() for v in (query, search, q) if v and v.strip()), None)
+    genre_tokens = [token.strip().lower() for token in [genre or "", *(genres or "").split(",")] if token.strip()]
+    if animationOnly is True:
+        genre_tokens.append("animation")
+    genre_tokens = list(dict.fromkeys(genre_tokens))
+    start = page * size
 
     with get_db(request) as db:
         db_query = _visible_movies(db)
@@ -341,57 +347,38 @@ def browse_movies(
             db_query = db_query.filter(Movie.release_year >= yearMin)
         if yearMax is not None:
             db_query = db_query.filter(Movie.release_year <= yearMax)
-        if (not effective_q and not (genre or "").strip() and not (genres or "").replace(",", "").strip()
-                and animationOnly is not True and sort_field in {"rating", "year"}):
+        order = {
+            "rating": func.coalesce(Movie.rating, 0),
+            "year": func.coalesce(Movie.release_year, 0),
+            "title": cast(Movie.title, LargeBinary),
+        }[sort_field]
+        ordered = db_query.order_by(order.desc() if sort_dir == "desc" else order.asc(),
+                                    cast(Movie.id, LargeBinary).asc())
+        if not effective_q and not genre_tokens:
             total_elements = db_query.count()
-            total_pages = math.ceil(total_elements / size) if total_elements > 0 else 0
-            column = Movie.rating if sort_field == "rating" else Movie.release_year
-            order = func.coalesce(column, 0)
-            order = order.desc() if sort_dir == "desc" else order.asc()
-            start = page * size
-            items = (db_query.order_by(order, cast(Movie.id, LargeBinary).asc()).offset(start).limit(size).all()
-                     if start < total_elements else [])
-            return api_response(data={
-                "items": _movie_responses(db, items),
-                "page": page,
-                "size": size,
-                "totalElements": total_elements,
-                "totalPages": total_pages,
-                "hasNext": (page + 1) < total_pages,
-                "hasPrevious": page > 0 and total_pages > 0,
-            })
-        items = db_query.all()
-        result = []
-        genre_tokens = [t.strip() for t in (genres or "").split(",") if t.strip()]
-        for m in items:
-            if not _matches_search(m, effective_q):
-                continue
-            if not _matches_genre_token(m.genres, genre):
-                continue
-            if any(not _matches_genre_token(m.genres, gt) for gt in genre_tokens):
-                continue
-            if animationOnly is True and not _matches_genre_token(m.genres, "Animation"):
-                continue
-            result.append(m)
-
-        reverse = sort_dir == "desc"
-        if sort_field == "rating":
-            result.sort(key=lambda m: (m.id,))
-            result.sort(key=lambda m: (m.rating or 0.0), reverse=reverse)
-        elif sort_field == "year":
-            result.sort(key=lambda m: (m.id,))
-            result.sort(key=lambda m: (m.release_year or 0), reverse=reverse)
+            items = ordered.offset(start).limit(size).all() if start < total_elements else []
         else:
-            result.sort(key=lambda m: (m.id,))
-            result.sort(key=lambda m: (m.title or ""), reverse=reverse)
-
-        total_elements = len(result)
+            columns = [Movie.id]
+            if effective_q:
+                columns.extend([Movie.title, Movie.description])
+            if genre_tokens:
+                columns.append(Movie.genres)
+            total_elements = 0
+            page_ids = []
+            for candidate in ordered.with_entities(*columns).yield_per(512):
+                if any(not _matches_genre_token(candidate.genres, token) for token in genre_tokens):
+                    continue
+                if effective_q and not _matches_search(candidate, effective_q):
+                    continue
+                if start <= total_elements < start + size:
+                    page_ids.append(candidate.id)
+                total_elements += 1
+            movies_by_id = {movie.id: movie for movie in db_query.filter(Movie.id.in_(page_ids))} if page_ids else {}
+            items = [movies_by_id[movie_id] for movie_id in page_ids if movie_id in movies_by_id]
         total_pages = math.ceil(total_elements / size) if total_elements > 0 else 0
-        start = page * size
-        page_items = _movie_responses(db, result[start : start + size])
         return api_response(
             data={
-                "items": page_items,
+                "items": _movie_responses(db, items),
                 "page": page,
                 "size": size,
                 "totalElements": total_elements,

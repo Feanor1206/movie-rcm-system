@@ -48,3 +48,24 @@ python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.jado
 ```
 
 Kết quả đếm số tập có tóm tắt, từ khóa, nhân vật, nguồn phát được khai báo và mốc thời gian có bản ghi đã duyệt. Kiểm tra phát và đối chiếu nội dung dùng nguồn video thực tế.
+
+## Mốc kiểm thử 100.000 tập
+
+Phép đo dùng MySQL 8.0.46 cục bộ trên schema riêng, với 100.000 tập giả lập, 1.000 bộ, 100.000 liên kết tập–tệp và khoảng 7,7% tập nháp. Mỗi trường hợp gọi API qua TestClient, chạy 2 lần làm nóng rồi lấy trung vị của 7 lần đo. Bản đối chiếu là commit `539ac26`. Các số đo tập trung vào API đọc MySQL, với bước tải chỉ mục CineBot được tách khỏi phép thử.
+
+| Truy vấn ở 100.000 tập | Trước | Sau | Số bản ghi phim được nạp sau |
+| --- | ---: | ---: | ---: |
+| Duyệt kho hoạt hình, trang 12 kết quả | 2.864 ms | 1.642 ms | 12 |
+| Duyệt kho theo thể loại, trang 12 kết quả | 2.710 ms | 1.782 ms | 12 |
+| Tìm theo một tiêu đề tập | 2.768 ms | 1.940 ms | 1 |
+| Lấy tập và danh sách tệp theo mã | 6,2 ms | 6,4 ms | Không tải bảng `movies` |
+
+Truy vấn chỉ mục tập–tệp ổn định cả ở 10.000 và 100.000 tập. Duyệt kho sắp xếp ở MySQL và đọc theo lô các cột cần lọc. Cách này giảm dữ liệu được nạp thành đối tượng nhưng bộ lọc chuỗi và số kết quả chính xác vẫn phải duyệt các dòng đủ điều kiện. Kết quả là phép đo một người dùng với dữ liệu giả lập.
+
+Ở mốc 100.000 tập, giao dịch thêm 1.000 tập cùng 1.000 liên kết mất khoảng 1,06 giây. Nhập lại gói trả kết quả cũ trong khoảng 0,19 giây. Gói có quan hệ sai bị chặn, tổng sau thử nghiệm là 101.000 tập và 101.000 liên kết. Thời gian này đo phần ghi database, gồm kiểm tra và commit, trước khi đồng bộ chỉ mục.
+
+## Nhập danh mục thật
+
+Chạy thử trên bản sao MySQL sau khi áp dụng migration. Chia nội dung thành gói tự chứa theo bộ hoặc nhóm mùa, giữ nguyên mã của bản ghi đã có và tăng `revision` khi sửa. Dùng `--report` để biết phần metadata còn thiếu trước khi nhập.
+
+Sau mỗi gói, đối chiếu số tập và phiên bản gói trong lịch sử nhập. Kiểm tra trạng thái `catalog_snapshots`, một truy vấn lấy tập theo mã và một vài nguồn phát mẫu. Đo lại độ trễ theo hình dạng dữ liệu thật, mức truy cập đồng thời và thời gian đồng bộ chỉ mục trước khi đưa toàn bộ kho vào sử dụng.
