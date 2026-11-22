@@ -44,6 +44,99 @@ def catalog_client(tmp_path, monkeypatch):
         app.state.runtime.db.engine.dispose()
 
 
+def test_catalog_rejects_inconsistent_episode_seasons_without_committing(catalog_client):
+    client, headers, database = catalog_client
+    initial = {
+        "package": {"id": "season-links", "revision": 1},
+        "series": [{"id": "series-a"}, {"id": "series-b"}],
+        "seasons": [
+            {"id": "season-a", "series_id": "series-a"},
+            {"id": "season-b", "series_id": "series-b"},
+        ],
+        "episodes": [{"id": "episode-kept", "series_id": "series-a", "season_id": "season-a"}],
+    }
+    assert client.post("/api/admin/catalog/import", json=initial, headers=headers).status_code == 200
+
+    for season_id in ("season-b", "missing-season"):
+        updates = {
+            "package": {"id": "season-links", "revision": 2},
+            "episodes": [{"id": "episode-new", "series_id": "series-a", "season_id": season_id}],
+        }
+        preview = client.post("/api/admin/catalog/validate", json=updates, headers=headers)
+        assert preview.status_code == 400
+        assert preview.json()["errors"][0]["path"] == "episodes[0].season_id"
+        assert client.post("/api/admin/catalog/import", json=updates, headers=headers).status_code == 400
+
+    move_season = {
+        "package": {"id": "season-links", "revision": 2},
+        "seasons": [{"id": "season-a", "series_id": "series-b"}],
+    }
+    preview = client.post("/api/admin/catalog/validate", json=move_season, headers=headers)
+    assert preview.status_code == 400
+    assert preview.json()["errors"][0]["path"] == "seasons[0].series_id"
+    assert client.post("/api/admin/catalog/import", json=move_season, headers=headers).status_code == 400
+
+    assert client.get("/api/catalog/episodes/episode-new").status_code == 404
+    assert client.get("/api/catalog/episodes/episode-kept").json()["episode"]["seasonId"] == "season-a"
+    with database.session() as db:
+        assert db.query(CatalogSnapshot).count() == 1
+
+    valid = {
+        "package": {"id": "season-links", "revision": 2},
+        "episodes": [
+            {"id": "episode-new", "series_id": "series-a", "season_id": "season-a"},
+            {"id": "episode-special", "series_id": "series-a", "season_id": None},
+        ],
+    }
+    assert client.post("/api/admin/catalog/validate", json=valid, headers=headers).json()["valid"]
+    assert client.post("/api/admin/catalog/import", json=valid, headers=headers).status_code == 200
+
+
+def test_asset_coverage_validation_and_episode_lookup_follow_catalog_updates(catalog_client):
+    client, headers, _ = catalog_client
+    initial = {
+        "package": {"id": "asset-links", "revision": 1},
+        "series": [{"id": "series-assets"}],
+        "episodes": [{"id": item, "series_id": "series-assets"} for item in ("ep-a", "ep-aa", "ep-b")],
+        "media_assets": [
+            {"id": "asset-updated", "coverage": [
+                {"episode_id": "ep-a", "scope": "part"},
+                {"episode_id": "ep-a", "scope": "clip"},
+                {"episode_id": "ep-b", "scope": "part"},
+            ]},
+            {"id": "asset-private", "access_policy": "private", "coverage": [{"episode_id": "ep-a"}]},
+        ],
+    }
+    assert client.post("/api/admin/catalog/import", json=initial, headers=headers).status_code == 200
+
+    def asset_ids(episode_id, request_headers=None):
+        response = client.get(f"/api/catalog/episodes/{episode_id}", headers=request_headers)
+        assert response.status_code == 200
+        return {asset["id"] for asset in response.json()["mediaAssets"]}
+
+    assert asset_ids("ep-a") == {"asset-updated"}
+    assert asset_ids("ep-a", headers) == {"asset-updated", "asset-private"}
+    assert asset_ids("ep-aa") == set()
+    assert asset_ids("ep-b") == {"asset-updated"}
+
+    update = {
+        "package": {"id": "asset-links", "revision": 2},
+        "media_assets": [{"id": "asset-updated", "coverage": [{"episode_id": "missing-episode"}]}],
+    }
+    preview = client.post("/api/admin/catalog/validate", json=update, headers=headers)
+    assert preview.status_code == 400
+    assert preview.json()["errors"][0]["path"] == "media_assets[0].coverage[0].episode_id"
+    assert client.post("/api/admin/catalog/import", json=update, headers=headers).status_code == 400
+    assert asset_ids("ep-a") == {"asset-updated"}
+
+    update["media_assets"][0]["coverage"] = [{"episode_id": "ep-aa"}]
+    assert client.post("/api/admin/catalog/import", json=update, headers=headers).status_code == 200
+    assert client.post("/api/admin/catalog/import", json=update, headers=headers).status_code == 200
+    assert asset_ids("ep-a") == set()
+    assert asset_ids("ep-b") == set()
+    assert asset_ids("ep-aa") == {"asset-updated"}
+
+
 def test_catalog_import_rejects_older_packages_and_records_atomically(catalog_client):
     client, headers, database = catalog_client
     first = {"package": {"id": "catalog", "revision": 2}, "genres": [

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import functools
 import hashlib
 import json
+import logging
 import mimetypes
 import os
 import secrets
@@ -19,13 +20,16 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     create_engine,
+    delete,
     event,
+    insert,
     text,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -340,7 +344,7 @@ class CatalogSeries(Base):
 
 class CatalogSeason(Base):
     __tablename__ = "catalog_seasons"
-    __table_args__ = (Index("idx_cat_season_series", "series_id"),)
+    __table_args__ = (UniqueConstraint("series_id", "id", name="uq_cat_season_series_id"),)
     id = Column(String(100), primary_key=True)
     series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE"), nullable=False)
     number = Column(Integer)
@@ -380,7 +384,11 @@ class CatalogSeason(Base):
 class CatalogEpisode(Base):
     __tablename__ = "catalog_episodes"
     __table_args__ = (
-        Index("idx_cat_ep_series", "series_id"),
+        ForeignKeyConstraint(
+            ["series_id", "season_id"], ["catalog_seasons.series_id", "catalog_seasons.id"],
+            name="fk_episode_season_same_series",
+        ),
+        Index("idx_cat_ep_series_season", "series_id", "season_id"),
         Index("idx_cat_ep_season", "season_id"),
     )
     id = Column(String(100), primary_key=True)
@@ -567,6 +575,13 @@ class CatalogMediaAsset(Base):
             "optLockVersion": self.opt_lock_version,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class CatalogEpisodeAsset(Base):
+    __tablename__ = "catalog_episode_assets"
+    __table_args__ = (Index("idx_cat_episode_assets_media", "media_asset_id"),)
+    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), primary_key=True)
+    media_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", ondelete="CASCADE"), primary_key=True)
 
 
 class CatalogTextTrack(Base):
@@ -832,6 +847,7 @@ class DatabaseManager:
                     @event.listens_for(self.engine, "connect")
                     def _set_sqlite_pragma(dbapi_connection, connection_record):
                         cursor = dbapi_connection.cursor()
+                        cursor.execute("PRAGMA foreign_keys=ON")
                         cursor.execute("PRAGMA synchronous=NORMAL")
                         cursor.close()
                 else:
@@ -849,6 +865,7 @@ class DatabaseManager:
                 Base.metadata.create_all(self.engine)
                 self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=False)
                 self.restore_media_metadata()
+                self._restore_episode_asset_links()
                 self._initialized = True
                 if self._seed and os.getenv("APP_DEMO_MODE", "").lower() == "true":
                     self.seed_defaults()
@@ -871,6 +888,40 @@ class DatabaseManager:
                     asset.content_type = raw["content_type"]
                     legacy.mime_type = _media_mime_type(asset.content_type, asset.relative_path)
             db.commit()
+
+    def _restore_episode_asset_links(self):
+        malformed = missing = 0
+        with self.SessionLocal() as db:
+            _begin_catalog_write(db)
+            assets = db.query(CatalogMediaAsset.id, CatalogMediaAsset.coverage_json).order_by(CatalogMediaAsset.id)
+            assets = assets.with_for_update()
+            previous_id = None
+            while True:
+                page = assets if previous_id is None else assets.filter(CatalogMediaAsset.id > previous_id)
+                batch = page.limit(256).all()
+                if not batch:
+                    break
+                expected = {}
+                for asset_id, coverage_json in batch:
+                    try:
+                        coverage = json.loads(coverage_json) if coverage_json is not None else []
+                    except (TypeError, ValueError):
+                        coverage = None
+                    malformed += not isinstance(coverage, list)
+                    expected[asset_id] = _coverage_episode_ids(coverage)
+                referenced = set().union(*expected.values())
+                available = set()
+                if referenced:
+                    available.update(row.id for row in db.query(CatalogEpisode.id).filter(CatalogEpisode.id.in_(referenced)))
+                missing += sum(len(ids - available) for ids in expected.values())
+                _sync_episode_asset_links(db, {asset_id: ids & available for asset_id, ids in expected.items()})
+                previous_id = batch[-1].id
+            db.commit()
+        if malformed or missing:
+            logging.getLogger(__name__).warning(
+                "Bỏ qua dữ liệu coverage cũ không thể liên kết (%d JSON lỗi, %d lượt tham chiếu thiếu tập).",
+                malformed, missing,
+            )
 
     def healthy(self):
         try:
@@ -1042,7 +1093,20 @@ def validate_catalog_input(data):
                 if not isinstance(record, dict):
                     raise CatalogInputError(f"{path}.record", "Bản ghi không hợp lệ.")
                 check_revision(record.get("revision", revision), f"{path}.record.revision")
+            if collection in ("seasons", "episodes"):
+                check_id(item.get("series_id"), f"{path}.series_id")
+            if collection == "episodes" and item.get("season_id") is not None:
+                check_id(item["season_id"], f"{path}.season_id")
             if collection == "media_assets":
+                coverage = item.get("coverage")
+                if coverage is not None:
+                    if not isinstance(coverage, list):
+                        raise CatalogInputError(f"{path}.coverage", "Phạm vi tệp phải là một danh sách.")
+                    for coverage_index, part in enumerate(coverage):
+                        part_path = f"{path}.coverage[{coverage_index}]"
+                        if not isinstance(part, dict):
+                            raise CatalogInputError(part_path, "Phạm vi tệp không hợp lệ.")
+                        check_id(part.get("episode_id"), f"{part_path}.episode_id")
                 if item.get("content_type", "video") not in ("audio", "video"):
                     raise CatalogInputError(f"{path}.content_type", "Loại tệp phải là video hoặc audio.")
                 storage = item.get("storage")
@@ -1063,6 +1127,55 @@ def _stored_catalog_hash(raw_json):
         except (TypeError, ValueError):
             return compute_sha256(raw_json)
     return ""
+
+
+def _validate_catalog_seasons(db, data, stored_seasons, lock):
+    seasons = data.get("seasons") or []
+    parents = {season["id"]: season["series_id"] for season in seasons}
+    moved = {
+        season["id"]: index for index, season in enumerate(seasons)
+        if season["id"] in stored_seasons and stored_seasons[season["id"]].series_id != season["series_id"]
+    }
+    if moved:
+        query = (
+            db.query(CatalogSeason.id)
+            .join(CatalogEpisode, CatalogEpisode.season_id == CatalogSeason.id)
+            .filter(CatalogSeason.id.in_(moved))
+        )
+        if lock:
+            query = query.with_for_update()
+        used = query.first()
+        if used:
+            raise CatalogInputError(f"seasons[{moved[used.id]}].series_id",
+                                    "Không thể chuyển mùa sang bộ khác khi mùa còn tập.")
+
+    episodes = data.get("episodes") or []
+    external = {episode["season_id"] for episode in episodes if episode.get("season_id") is not None} - parents.keys()
+    if external:
+        query = db.query(CatalogSeason.id, CatalogSeason.series_id).filter(CatalogSeason.id.in_(external))
+        if lock:
+            query = query.with_for_update()
+        parents.update(query.all())
+    for index, episode in enumerate(episodes):
+        season_id = episode.get("season_id")
+        if season_id is not None and parents.get(season_id) != episode["series_id"]:
+            raise CatalogInputError(f"episodes[{index}].season_id",
+                                    "Mùa phải tồn tại và thuộc đúng bộ của tập phim.")
+
+
+def _validate_catalog_asset_episodes(db, data, lock):
+    paths = {}
+    for asset_index, asset in enumerate(data.get("media_assets") or []):
+        for part_index, part in enumerate(asset.get("coverage") or []):
+            paths.setdefault(part["episode_id"], f"media_assets[{asset_index}].coverage[{part_index}].episode_id")
+    external = paths.keys() - {episode["id"] for episode in (data.get("episodes") or [])}
+    if external:
+        query = db.query(CatalogEpisode.id).filter(CatalogEpisode.id.in_(external))
+        if lock:
+            query = query.with_for_update()
+        missing = external - {row.id for row in query}
+        if missing:
+            raise CatalogInputError(paths[min(missing)], "Tập tham chiếu trong phạm vi tệp chưa tồn tại.")
 
 
 def catalog_diff(db, data, revision, content_hash, existing_pkg, lock=False):
@@ -1109,7 +1222,42 @@ def catalog_diff(db, data, revision, content_hash, existing_pkg, lock=False):
                 and compute_sha256(item) == _stored_catalog_hash(existing.raw_json)
             )
             count(old_revision, item_revision, same_content)
+    _validate_catalog_seasons(db, data, stored.get("seasons", {}), lock)
+    _validate_catalog_asset_episodes(db, data, lock)
     return counts, stored
+
+
+def _coverage_episode_ids(coverage):
+    if not isinstance(coverage, list):
+        return set()
+    return {
+        part["episode_id"] for part in coverage
+        if isinstance(part, dict) and isinstance(part.get("episode_id"), str) and part["episode_id"]
+    }
+
+
+def _sync_episode_asset_links(db, expected):
+    actual = {asset_id: set() for asset_id in expected}
+    query = db.query(CatalogEpisodeAsset.media_asset_id, CatalogEpisodeAsset.episode_id)
+    for asset_id, episode_id in query.filter(CatalogEpisodeAsset.media_asset_id.in_(expected)):
+        if asset_id in actual:
+            actual[asset_id].add(episode_id)
+    changed = {asset_id: ids for asset_id, ids in expected.items() if ids != actual[asset_id]}
+    if not changed:
+        return
+    db.execute(delete(CatalogEpisodeAsset).where(CatalogEpisodeAsset.media_asset_id.in_(changed)))
+    links = [
+        {"media_asset_id": asset_id, "episode_id": episode_id}
+        for asset_id, ids in changed.items() for episode_id in sorted(ids)
+    ]
+    if links:
+        db.execute(insert(CatalogEpisodeAsset), links)
+
+
+def _begin_catalog_write(db):
+    connection = db.connection()
+    if connection.dialect.name == "sqlite" and not connection.connection.driver_connection.in_transaction:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
 
 
 def import_catalog_package(db, data: dict) -> dict:
@@ -1122,9 +1270,7 @@ def import_catalog_package(db, data: dict) -> dict:
     content_hash = compute_sha256(data)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    connection = db.connection()
-    if connection.dialect.name == "sqlite" and not connection.connection.driver_connection.in_transaction:
-        connection.execute(text("BEGIN IMMEDIATE"))
+    _begin_catalog_write(db)
     existing_pkg = db.get(CatalogPackage, pkg_id, with_for_update=True, populate_existing=True)
     changes, stored = catalog_diff(db, data, revision, content_hash, existing_pkg, lock=True)
     if changes["conflicts"]:
@@ -1303,6 +1449,7 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.raw_json = json.dumps(sea, ensure_ascii=False)
             entity.revision = int((sea.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
+        db.flush()
 
     if episodes:
         existing = stored["episodes"]
@@ -1456,6 +1603,10 @@ def import_catalog_package(db, data: dict) -> dict:
             legacy.is_public = entity.access_policy.lower() == "public"
             legacy.is_available = entity.enabled
     db.flush()
+    if media_assets:
+        _sync_episode_asset_links(db, {
+            asset["id"]: _coverage_episode_ids(asset.get("coverage")) for asset in media_assets
+        })
 
     tracks = data.get("text_tracks") or []
     if tracks:

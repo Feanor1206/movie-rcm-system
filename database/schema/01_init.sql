@@ -194,7 +194,8 @@ CREATE TABLE IF NOT EXISTS catalog_seasons (
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_season_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE
+    CONSTRAINT fk_season_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE,
+    CONSTRAINT uq_cat_season_series_id UNIQUE (series_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS catalog_episodes (
@@ -227,7 +228,9 @@ CREATE TABLE IF NOT EXISTS catalog_episodes (
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_episode_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE,
-    INDEX idx_cat_ep_series (series_id),
+    CONSTRAINT fk_episode_season_same_series FOREIGN KEY (series_id, season_id)
+        REFERENCES catalog_seasons(series_id, id),
+    INDEX idx_cat_ep_series_season (series_id, season_id),
     INDEX idx_cat_ep_season (season_id)
 );
 
@@ -299,6 +302,15 @@ CREATE TABLE IF NOT EXISTS catalog_media_assets (
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS catalog_episode_assets (
+    episode_id VARCHAR(100) NOT NULL,
+    media_asset_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (episode_id, media_asset_id),
+    INDEX idx_cat_episode_assets_media (media_asset_id),
+    CONSTRAINT fk_cat_ep_asset_ep FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_cat_ep_asset_media FOREIGN KEY (media_asset_id) REFERENCES catalog_media_assets(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS catalog_text_tracks (

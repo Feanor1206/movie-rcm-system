@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from services.database import (
     Base,
     CatalogEpisode,
+    CatalogInputError,
     CatalogMediaAsset,
     CatalogSeason,
     CatalogSegment,
@@ -83,8 +84,8 @@ def test_rehearsal_catalog_import_respects_foreign_keys_and_is_repeatable(catalo
     assert catalog_db.query(CatalogEpisode).count() == len(data["episodes"])
 
 
-@pytest.mark.parametrize("bad_kind", ["episode", "track"])
-def test_import_failure_rolls_back_parent_and_child_rows(catalog_db, bad_kind):
+@pytest.mark.parametrize("bad_kind, error_type", [("episode", CatalogInputError), ("track", IntegrityError)])
+def test_import_failure_rolls_back_parent_and_child_rows(catalog_db, bad_kind, error_type):
     data = json.loads(
         (ROOT / "docs/fixtures/rehearsal_catalog.json").read_text(encoding="utf-8")
     )
@@ -93,7 +94,7 @@ def test_import_failure_rolls_back_parent_and_child_rows(catalog_db, bad_kind):
         data["episodes"][0]["series_id"] = "missing-series"
     else:
         data["text_tracks"][0]["media_asset_id"] = "missing-asset"
-    with pytest.raises(IntegrityError):
+    with pytest.raises(error_type):
         import_catalog_package(catalog_db, data)
     catalog_db.rollback()
     assert catalog_db.query(CatalogSeries).count() == 0

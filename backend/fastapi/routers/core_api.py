@@ -22,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from services.database import (
     CatalogConflictError,
     CatalogEpisode,
+    CatalogEpisodeAsset,
     CatalogInputError,
     CatalogMediaAsset,
     CatalogPackage,
@@ -491,18 +492,6 @@ def get_catalog_series_detail(series_id: str, request: Request, authorization: s
         return JSONResponse({"series": series.to_dict(), "seasons": pub_seasons, "episodes": pub_episodes})
 
 
-def _asset_covers_episode(asset: CatalogMediaAsset, episode_id: str) -> bool:
-    if not asset.coverage_json:
-        return False
-    try:
-        items = json.loads(asset.coverage_json)
-        if not isinstance(items, list):
-            return False
-        return any(isinstance(i, dict) and i.get("episode_id") == episode_id for i in items)
-    except Exception:
-        return False
-
-
 def _asset_allowed(asset: CatalogMediaAsset, user: User | None) -> bool:
     if not asset.enabled:
         return False
@@ -555,15 +544,20 @@ def get_catalog_episode_detail(episode_id: str, request: Request, authorization:
             return api_response(None, f"Không tìm thấy tập phim với mã: {episode_id}", False, 404)
         if ep.season_id:
             sea = db.get(CatalogSeason, ep.season_id)
-            if not is_admin and (not sea or not is_published(sea.record_json)):
+            if not is_admin and (not sea or sea.series_id != ep.series_id or not is_published(sea.record_json)):
                 return api_response(None, f"Không tìm thấy tập phim với mã: {episode_id}", False, 404)
         segments = [
             s.to_dict()
             for s in db.query(CatalogSegment).filter(CatalogSegment.episode_id == episode_id).order_by(CatalogSegment.position.asc()).all()
             if is_admin or is_published(s.record_json)
         ]
-        all_assets = db.query(CatalogMediaAsset).filter(CatalogMediaAsset.coverage_json.like(f"%{episode_id}%")).all()
-        assets = [a.to_dict() for a in all_assets if _asset_covers_episode(a, episode_id) and _asset_allowed(a, user)]
+        episode_assets = (
+            db.query(CatalogMediaAsset)
+            .join(CatalogEpisodeAsset, CatalogEpisodeAsset.media_asset_id == CatalogMediaAsset.id)
+            .filter(CatalogEpisodeAsset.episode_id == ep.id)
+            .order_by(CatalogEpisodeAsset.media_asset_id)
+        )
+        assets = [a.to_dict() for a in episode_assets if _asset_allowed(a, user)]
         allowed_asset_ids = {a["id"] for a in assets}
         scenes = [
             sc.to_dict()
@@ -1218,6 +1212,9 @@ def _validate_catalog(request, authorization, body, error):
             if error:
                 raise error
             pkg_id, revision = validate_catalog_input(body)
+            content_hash = compute_sha256(body)
+            existing_pkg = db.get(CatalogPackage, pkg_id)
+            counts, _ = catalog_diff(db, body, revision, content_hash, existing_pkg)
         except CatalogInputError as exc:
             return JSONResponse(
                 {
@@ -1233,9 +1230,6 @@ def _validate_catalog(request, authorization, body, error):
                 },
                 status_code=400,
             )
-        content_hash = compute_sha256(body)
-        existing_pkg = db.get(CatalogPackage, pkg_id)
-        counts, _ = catalog_diff(db, body, revision, content_hash, existing_pkg)
         return JSONResponse(
             {
                 "valid": True,
