@@ -1,6 +1,7 @@
 """Validate catalog structure and internal consistency; never import or open media."""
+import argparse
 import json
-import sys
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -169,11 +170,43 @@ def validate(data):
     return errors
 
 
+def coverage_report(data):
+    episodes = data['episodes']
+    playable = {
+        part['episode_id']
+        for asset in data['media_assets']
+        if asset['content_type'] == 'video' and asset['role'] not in ('dub', 'audio_description')
+        and asset['enabled'] and asset['record']['status'] == 'ready'
+        for part in asset['coverage'] if part['scope'] == 'full_episode'
+    }
+    playable.update(
+        episode['id'] for episode in episodes
+        if any(link['namespace'] in ('youtube_playback', 'youtube_watch')
+               and re.fullmatch(r'[A-Za-z0-9_-]{11}', link['value'])
+               for link in episode.get('external_ids', []))
+    )
+    timecodes = {
+        row['episode_id'] for row in data['segments']
+        if row['record']['status'] == 'ready' and row['episode_start_ms'] is not None
+    }
+    timecodes.update(row['episode_id'] for row in data['scenes'] if row['record']['status'] == 'ready')
+    return {
+        'episodes': len(episodes),
+        'with_synopsis': sum(bool((episode['synopsis'] or '').strip()) for episode in episodes),
+        'with_keywords': sum(bool(episode['keywords']) for episode in episodes),
+        'with_characters': sum(bool(episode['character_ids']) for episode in episodes),
+        'with_declared_playback_source': len(playable),
+        'with_reviewed_timecodes': len(timecodes),
+    }
+
+
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise SystemExit('Usage: python validate_catalog.py path/to/catalog.json')
+    parser = argparse.ArgumentParser(description='Validate a Dippie catalog package.')
+    parser.add_argument('catalog', type=Path)
+    parser.add_argument('--report', action='store_true', help='Print episode metadata coverage as JSON after validation.')
+    args = parser.parse_args()
     try:
-        data = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8-sig'))
+        data = json.loads(args.catalog.read_text(encoding='utf-8-sig'))
         failures = validate(data)
     except (OSError, ValueError) as error:
         print('ERROR:', error)
@@ -181,4 +214,7 @@ if __name__ == '__main__':
     if failures:
         print('\n'.join(failures))
         raise SystemExit(1)
-    print('VALID: structure and internal references/timestamps pass; media and factual truth were not verified.')
+    if args.report:
+        print(json.dumps(coverage_report(data), indent=2))
+    else:
+        print('VALID: structure and internal references/timestamps pass; media and factual truth were not verified.')
