@@ -29,6 +29,7 @@ from sqlalchemy import (
     create_engine,
     delete,
     event,
+    func,
     insert,
     text,
 )
@@ -1680,14 +1681,21 @@ def import_catalog_package(db, data: dict) -> dict:
 
 
 def export_eligible_catalog(db, include_draft: bool = False, include_private: bool = False) -> dict:
-    def _filter_rows(rows, check_access: bool = False):
+    def _filter_rows(model):
+        check_access = model is CatalogMediaAsset and not include_private
+        columns = [model.raw_json, model.record_json]
+        if check_access:
+            columns.append(model.access_policy)
+        rows = db.query(*columns).filter(model.raw_json.is_not(None))
+        if not include_draft:
+            rows = rows.filter(func.lower(model.record_json).contains("ready"))
         out = []
         for row in rows:
             if not row.raw_json:
                 continue
             if not include_draft and not is_published(row.record_json):
                 continue
-            if check_access and not include_private and str(getattr(row, "access_policy", "public")).lower() != "public":
+            if check_access and str(row.access_policy).lower() != "public":
                 continue
             try:
                 out.append(json.loads(row.raw_json))
@@ -1714,16 +1722,6 @@ def export_eligible_catalog(db, include_draft: bool = False, include_private: bo
     return {
         "schema_version": "dippie.catalog.v1",
         "package": pkg_meta,
-        "genres": _filter_rows(db.query(CatalogGenre).all()),
-        "attribute_scales": _filter_rows(db.query(CatalogAttributeScale).all()),
-        "sources": _filter_rows(db.query(CatalogSource).all()),
-        "series": _filter_rows(db.query(CatalogSeries).all()),
-        "seasons": _filter_rows(db.query(CatalogSeason).all()),
-        "episodes": _filter_rows(db.query(CatalogEpisode).all()),
-        "segments": _filter_rows(db.query(CatalogSegment).all()),
-        "characters": _filter_rows(db.query(CatalogCharacter).all()),
-        "media_assets": _filter_rows(db.query(CatalogMediaAsset).all(), check_access=True),
-        "text_tracks": _filter_rows(db.query(CatalogTextTrack).all()),
-        "scenes": _filter_rows(db.query(CatalogScene).all()),
+        **{collection: _filter_rows(model) for collection, model in CATALOG_COLLECTIONS.items()},
     }
 

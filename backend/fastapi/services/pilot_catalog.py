@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from functools import lru_cache
 
 from services.catalog_sync import CatalogSyncError, CatalogSyncManager
@@ -92,4 +93,82 @@ def evidence_for_results(results):
                 continue
             evidence.append({"title": episode["title"], "startMs": start, "evidence": [text[:1200]]})
             break
+    return evidence
+
+
+def _verified(row, sources):
+    record = row.get("record") or {}
+    if not isinstance(record, dict) or record.get("status") != "ready":
+        return False
+    provenance = record.get("provenance")
+    if not isinstance(provenance, dict):
+        return False
+    refs = provenance.get("source_ids")
+    return (provenance.get("verification") in ("source_verified", "human_verified")
+            and isinstance(refs, list) and bool(refs)
+            and all(isinstance(ref, str) and ref in sources for ref in refs))
+
+
+def _public_video(episode, asset):
+    if any(isinstance(entry, dict) and entry.get("namespace") in {"youtube_playback", "youtube_watch"}
+           and isinstance(entry.get("value"), str) and re.fullmatch(r"[A-Za-z0-9_-]{11}", entry["value"])
+           for entry in episode.get("external_ids", [])):
+        return True
+    return (
+        asset.get("enabled", True) is True
+        and asset.get("access_policy", "public") == "public"
+        and asset.get("content_type") == "video"
+        and asset.get("role") not in {"dub", "audio_description"}
+        and (asset.get("record") or {}).get("status") == "ready"
+        and any(part.get("episode_id") == episode["id"] and part.get("scope") == "full_episode"
+                for part in asset.get("coverage", []) if isinstance(part, dict))
+    )
+
+
+def _snapshot_source(snapshot, result, quote):
+    records = snapshot.catalog_records
+    episode_id = result.get("episodeId")
+    episode = records["episodes"].get(episode_id, {})
+    visible = snapshot.get_item_by_id(episode_id)
+    if not visible or not _verified(episode, records["sources"]):
+        return None
+    asset = records["media_assets"].get(visible.get("primary_media_asset_id"), {})
+    if not _public_video(episode, asset):
+        return None
+
+    document_id = quote.get("documentId")
+    if quote.get("itemType") == "episode":
+        if document_id != episode_id:
+            return None
+        document, start = episode, None
+    else:
+        document = records["segments"].get(document_id, {})
+        if (document.get("episode_id") != episode_id or not snapshot.get_item_by_id(document_id)
+                or not _verified(document, records["sources"])):
+            return None
+        start = document.get("episode_start_ms")
+    if start != result.get("startMs") or (start is not None and type(start) is not int):
+        return None
+    text, title = document.get("synopsis"), episode.get("title")
+    if not isinstance(text, str) or not text.strip() or not isinstance(title, str) or not title.strip():
+        return None
+    return {"title": title, "startMs": start, "evidence": [text[:1200]]}
+
+
+def evidence_for_snapshot_results(snapshot, results):
+    full = os.getenv("ALLOW_FULL_CATALOG_GROUNDING", "").lower() in {"1", "true", "yes"}
+    selected = {part.strip() for part in os.getenv("APPROVED_CLOUD_EPISODES", "").split(",") if part.strip()}
+    if not (full or selected) or snapshot is None or not snapshot.is_ready:
+        return None
+    evidence = []
+    for result in results[:3]:
+        quote = next(iter(result.get("evidence") or []), {})
+        if not isinstance(quote, dict):
+            continue
+        if (full or result.get("episodeId") in selected) and quote.get("itemType") in {"episode", "segment"}:
+            source = _snapshot_source(snapshot, result, quote)
+            if source:
+                evidence.append(source)
+        else:
+            evidence.extend(evidence_for_results([result]))
     return evidence

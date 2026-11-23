@@ -84,6 +84,42 @@ def test_rehearsal_catalog_import_respects_foreign_keys_and_is_repeatable(catalo
     assert catalog_db.query(CatalogEpisode).count() == len(data["episodes"])
 
 
+def test_serving_export_prefilters_episode_rows_without_loading_orm_entities(catalog_db):
+    catalog_db.add(CatalogSeries(id="series", title="Series"))
+    catalog_db.flush()
+    statuses = {
+        "verified": '{"status":"READY"}',
+        "draft": '{"status":"draft"}',
+        "draft-mention": '{"status":"draft","note":"ready later"}',
+        "legacy": '{"status":"draft","status":"ready"}',
+        "malformed": 'ready but invalid JSON',
+        "absent": None,
+    }
+    for episode_id, record in statuses.items():
+        catalog_db.add(CatalogEpisode(id=episode_id, series_id="series", title=episode_id, kind="regular",
+                                      record_json=record, raw_json=json.dumps({"id": episode_id})))
+    catalog_db.commit()
+    catalog_db.expunge_all()
+    statements = []
+
+    def capture(_connection, _cursor, statement, _params, _context, _many):
+        if "FROM catalog_episodes" in statement:
+            statements.append(statement)
+
+    event.listen(catalog_db.bind, "before_cursor_execute", capture)
+    try:
+        visible = export_eligible_catalog(catalog_db)
+        assert {row["id"] for row in visible["episodes"]} == {"verified", "legacy"}
+        assert len(statements) == 1
+        assert "WHERE" in statements[0]
+        assert "catalog_episodes.raw_json" in statements[0]
+        assert "catalog_episodes.title" not in statements[0]
+        administrative = export_eligible_catalog(catalog_db, include_draft=True)
+        assert {row["id"] for row in administrative["episodes"]} == set(statuses)
+    finally:
+        event.remove(catalog_db.bind, "before_cursor_execute", capture)
+
+
 @pytest.mark.parametrize("bad_kind, error_type", [("episode", CatalogInputError), ("track", IntegrityError)])
 def test_import_failure_rolls_back_parent_and_child_rows(catalog_db, bad_kind, error_type):
     data = json.loads(
