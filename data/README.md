@@ -9,12 +9,16 @@
 | [Doraemon bổ sung](catalog.doraemon_s05_s11.json) | 291 tập lồng tiếng Việt ở mùa 5, 6, 7, 9, 10 và 11 | Các playlist của POPS Kids, gồm [mùa 5](https://www.youtube.com/playlist?list=PLdhrcCVXurgJB_9uBT0wWJfLLiF7tHgJu) và [mùa 11](https://www.youtube.com/playlist?list=PLdhrcCVXurgKG1lEhpBuosfSwIptJAcVM) |
 | [Trạng Quỳnh Thời Nhí Nhố](catalog.trang_quynh.json) | 35 tập, 30 tập có tóm tắt đã đối chiếu | [Playlist gốc](https://www.youtube.com/playlist?list=PLJscQ6PJLmu3zd6RfLDVUxP4EfahF2OKO) và [kênh phát hành](https://www.youtube.com/channel/UCndGTJ1ZllgoBXRUR-xfDUQ) |
 | [Chuẩn hóa metadata theo mẫu Jadoo](catalog.episode_metadata.json) | Cập nhật 133 tập đã có, gồm 54 Larva, 37 Ori, 7 Doraemon và 35 Trạng Quỳnh | Tóm tắt đã đối chiếu, phụ đề ASR và khung hình từ video phát hành |
+| [Pokémon TV](catalog.pokemon_tv.json) | 479 tập từ mùa 1 đến mùa 11 với tóm tắt tiếng Việt | [Pokémon TV](https://www.youtube.com/channel/UC8wrbl5viYtQmRUgdFdf4ew), [TVmaze](https://www.tvmaze.com/shows/590/pokemon/episodeguide) |
+| [Mr Bean hoạt hình](catalog.mr_bean_animated.json) | 87 tập từ ba mùa đầu theo cách đánh số của kênh | [Mr Bean](https://www.youtube.com/channel/UCkAGrHCLFmlK3H2kd6isipg), [TVmaze](https://www.tvmaze.com/shows/5251/mr-bean/episodeguide) |
+| [Heo Peppa](catalog.peppa_pig.json) | 51 tập đầy đủ với tóm tắt tiếng Việt | [Peppa Pig Pretend Play](https://www.youtube.com/channel/UCoCSjc-4JCGqOxuhuw-xjSw), [TVmaze](https://www.tvmaze.com/shows/4972/peppa-pig/episodeguide) |
+| [Metadata từ phụ đề ASR](catalog.episode_metadata_asr.json) | Cập nhật 193 tập Doraemon và 68 tập Ori đã có | Phụ đề tự động tiếng Việt của từng video đã lưu trong danh mục |
 
 Bản ghi lưu số tập, vị trí trong playlist, thời lượng và nguồn. Ngày đăng video nằm trong `youtube_upload_date` khi có. Larva dùng dữ liệu phân tích hình và tiếng từ Gemini để đối chiếu với nguồn theo tập. Tập Kem có hai mốc đã kiểm tra trên video ở 00:33 và 01:22. Mốc trong bản nháp Gemini chờ đối chiếu.
 
-Ori có 136 tập dùng trình phát nhúng và 44 tập mở qua liên kết gốc. Khi khởi tạo kho phim, nhập Jadoo, Larva, Ori, hai gói Doraemon, Trạng Quỳnh Thời Nhí Nhố rồi gói cập nhật metadata.
+Ori có 136 tập dùng trình phát nhúng và 44 tập mở qua liên kết gốc. Khi khởi tạo kho phim, nhập các gói lần lượt theo bảng để bản cập nhật metadata áp dụng lên các tập đã có.
 
-Ngày 23/11/2026, gói Doraemon bổ sung đối chiếu số tập và thời lượng theo playlist của POPS Kids. YouTube trả metadata nhúng cho 291 video. Các tập trong gói này chờ bổ sung tóm tắt và mốc cảnh.
+Ngày 23/11/2026, gói Doraemon bổ sung đối chiếu số tập và thời lượng theo playlist của POPS Kids. YouTube trả metadata nhúng cho 291 video. Gói metadata ASR cập nhật tóm tắt cho những tập có đủ bằng chứng từ lời thoại.
 
 ## Hai gói thêm ngày 22/11/2026
 
@@ -28,6 +32,16 @@ Gói cập nhật giữ ID tập, số thứ tự, thời lượng và nguồn p
 
 Doraemon 579 có tóm tắt cho cả hai truyện trong tập và hai đoạn thoại có mốc đối chiếu. Bốn tập Trạng Quỳnh có thêm mốc từ phụ đề tự động. Tập 16 được đối chiếu bằng khung hình. [Nội dung Doraemon 579 trên TV Asahi](https://www.tv-asahi.co.jp/doraemon/story/0468/) · [Trạng Quỳnh tập 16](https://www.youtube.com/watch?v=dzxjaprCieA)
 
+### Lô 1.000 tập
+
+SQLite demo có 1.372 tập ở trạng thái `ready`, trong đó 1.017 tập đạt bộ kiểm metadata cấp tập. Mỗi tập đạt có mùa và số tập, thời lượng, tóm tắt riêng, ID nhân vật, từ khóa, chủ đề và nguồn phát. Lô này bổ sung 617 tập và cập nhật metadata cho 261 tập đã có.
+
+Gemini 3.1 Flash-Lite biên tập tóm tắt tiếng Việt. Với Doraemon và Ori, mỗi tóm tắt dựa trên phụ đề ASR của đúng video. Câu dẫn được so lại với phụ đề, sau đó nội dung được kiểm lại bằng một lượt riêng. Dấu thời gian và mã SHA-256 của phụ đề được lưu ở nguồn tham chiếu. Tập Doraemon có hai truyện được trình bày theo từng truyện khi tiêu đề và lời thoại đủ rõ.
+
+Pokémon và Mr Bean giữ mùa và số tập trên kênh phát hành. Heo Peppa dùng mùa và số tập của TVmaze. Cả ba gói đối chiếu tên tập với mục TVmaze và kiểm tra metadata nhúng của từng video. Tóm tắt tiếng Việt là bản biên tập từ mô tả TVmaze, với đường dẫn từng tập trong `sources`. Phần dữ liệu chuyển thể từ TVmaze theo giấy phép CC BY-SA của nguồn. [Giấy phép API TVmaze](https://www.tvmaze.com/api#licensing)
+
+Mốc lời thoại ở nguồn ASR phục vụ đối chiếu tóm tắt. Bộ kiểm xác nhận 13 tập có mốc đoạn hoặc cảnh công bố trong danh mục.
+
 Kiểm tra các gói mới từ thư mục gốc.
 
 ```powershell
@@ -37,4 +51,8 @@ python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.dora
 python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.doraemon_s05_s11.json --report
 python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.trang_quynh.json --report
 python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.episode_metadata.json --report
+python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.pokemon_tv.json --report
+python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.mr_bean_animated.json --report
+python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.peppa_pig.json --report
+python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.episode_metadata_asr.json --report
 ```
