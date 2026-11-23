@@ -170,6 +170,13 @@ def validate(data):
     return errors
 
 
+def has_episode_synopsis(episode):
+    synopsis = ' '.join((episode['synopsis'] or '').casefold().split())
+    title = ' '.join(episode['title'].casefold().split())
+    return bool(synopsis and synopsis != title
+                and not synopsis.startswith(f'tập phim {title} của bộ hoạt hình '))
+
+
 def coverage_report(data):
     episodes = data['episodes']
     playable = {
@@ -190,11 +197,37 @@ def coverage_report(data):
         if row['record']['status'] == 'ready' and row['episode_start_ms'] is not None
     }
     timecodes.update(row['episode_id'] for row in data['scenes'] if row['record']['status'] == 'ready')
+    genre_labels = {genre['id'].casefold() for genre in data['genres']}
+    genre_labels.update(label['text'].strip().casefold()
+                        for genre in data['genres'] for label in genre['labels'])
+    episode_synopses = {episode['id'] for episode in episodes if has_episode_synopsis(episode)}
+    episode_keywords = {
+        episode['id'] for episode in episodes
+        if any(keyword.strip() and keyword.strip().casefold() not in genre_labels
+               for keyword in episode['keywords'])
+    }
+    themed = {episode['id'] for episode in episodes if any(theme.strip() for theme in episode['themes'])}
+    ready_series = {row['id'] for row in data['series'] if row['record']['status'] == 'ready'}
+    ready_seasons = {row['id']: row['series_id'] for row in data['seasons'] if row['record']['status'] == 'ready'}
+    complete = episode_synopses & episode_keywords & themed & playable
     return {
         'episodes': len(episodes),
         'with_synopsis': sum(bool((episode['synopsis'] or '').strip()) for episode in episodes),
         'with_keywords': sum(bool(episode['keywords']) for episode in episodes),
         'with_characters': sum(bool(episode['character_ids']) for episode in episodes),
+        'with_themes': len(themed),
+        'with_episode_synopsis': len(episode_synopses),
+        'with_episode_keywords': len(episode_keywords),
+        'with_normalized_metadata': sum(
+            episode['id'] in complete
+            and episode['record']['status'] == 'ready'
+            and episode['series_id'] in ready_series
+            and ready_seasons.get(episode['season_id']) == episode['series_id']
+            and episode['number'] is not None
+            and episode['duration_ms'] is not None
+            and bool(episode['character_ids'])
+            for episode in episodes
+        ),
         'with_declared_playback_source': len(playable),
         'with_reviewed_timecodes': len(timecodes),
     }

@@ -47,7 +47,9 @@ Chạy từ thư mục gốc của repo.
 python docs/contracts/animation-catalog-v1/validate_catalog.py data/catalog.jadoo_all.json --report
 ```
 
-Kết quả đếm số tập có tóm tắt, từ khóa, nhân vật, nguồn phát được khai báo và mốc thời gian có bản ghi đã duyệt. Kiểm tra phát và đối chiếu nội dung dùng nguồn video thực tế.
+Kết quả đếm số tập có tóm tắt, từ khóa, chủ đề, nhân vật, nguồn phát được khai báo và mốc thời gian có bản ghi đã duyệt. Chỉ số `with_normalized_metadata` đếm tập `ready` có bộ, nhóm mùa, số tập, thời lượng, tóm tắt riêng, từ khóa nội dung, chủ đề, nhân vật và nguồn phát. Phép đếm nhận biết câu tóm tắt chỉ lặp tên tập theo mẫu và từ khóa chỉ lặp nhãn thể loại.
+
+Theo dõi mục tiêu 100.000 tập theo `with_normalized_metadata`. Dùng `with_reviewed_timecodes` để theo dõi phần mốc đã đối chiếu. Kiểm tra phát, lời thoại và tình tiết bằng video gốc trước khi duyệt nội dung do mô hình tạo.
 
 ## Mốc kiểm thử 100.000 tập
 
