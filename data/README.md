@@ -1,5 +1,29 @@
 # Danh mục phim
 
+## Catalog theo từng bộ
+
+Các gói trong `catalog-by-series/` dùng schema `dippie.catalog.v1` như catalog Jadoo. Mỗi file tự chứa bộ phim, các mùa, tập, nhân vật và nguồn tham chiếu. Mục `segments` lưu tên, tóm tắt, từ khóa và khoảng thời gian của từng đoạn. Nhập trực tiếp tám gói này khi tạo kho mới.
+
+| Catalog | Tập | Tập có phụ đề | Phân đoạn mới |
+| --- | ---: | ---: | ---: |
+| [Xin Chào Jadoo](catalog-by-series/catalog.jadoo.json) | 99 | 98 | 276 |
+| [Larva](catalog-by-series/catalog.larva.json) | 104 | 83 | 0 |
+| [Công chúa Ori](catalog-by-series/catalog.ori.json) | 180 | 131 | 363 |
+| [Doraemon](catalog-by-series/catalog.doraemon.json) | 337 | 310 | 887 |
+| [Trạng Quỳnh Thời Nhí Nhố](catalog-by-series/catalog.trang_quynh.json) | 35 | 35 | 51 |
+| [Pokémon](catalog-by-series/catalog.pokemon.json) | 479 | 0 | 0 |
+| [Mr Bean hoạt hình](catalog-by-series/catalog.mr_bean_animated.json) | 87 | 0 | 0 |
+| [Heo Peppa](catalog-by-series/catalog.peppa_pig.json) | 51 | 51 | 100 |
+| **Tổng** | **1.372** | **708** | **1.677** |
+
+Đợt rà ngày 23/11/2026 bổ sung 1.677 phân đoạn cho 610 tập. Sáu tập Jadoo có phụ đề đã được phủ bởi các phân đoạn đã lưu trước đó. 92 track còn lại chỉ có âm thanh hoặc lời thoại quá ít để mô tả tình tiết. YouTube không trả track cho 98 video khác và báo 566 video Pokémon, Mr Bean không khả dụng từ kết nối kiểm tra.
+
+Sau đợt này, 1.237 trong 1.372 tập đạt bộ kiểm metadata cấp tập. Tổng cộng 617 tập có mốc phân đoạn.
+
+Phân đoạn mới dùng lời thoại đã đối chiếu bằng hai lượt tự động. Mốc đầu và cuối lấy từ phụ đề của đúng video. Mỗi nguồn lưu ngôn ngữ, đường dẫn và SHA-256 để đối chiếu lại. Những track chủ yếu ghi nhạc hoặc tiếng động được lưu tham chiếu nguồn.
+
+## Các gói nhập trước đây
+
 | Gói | Phạm vi | Nguồn |
 | --- | --- | --- |
 | [Jadoo](catalog.jadoo_all.json) | 99 tập thuộc bốn mùa | Phát từ tệp hoặc Google Drive |
@@ -16,7 +40,7 @@
 
 Bản ghi lưu số tập, vị trí trong playlist, thời lượng và nguồn. Ngày đăng video nằm trong `youtube_upload_date` khi có. Larva dùng dữ liệu phân tích hình và tiếng từ Gemini để đối chiếu với nguồn theo tập. Tập Kem có hai mốc đã kiểm tra trên video ở 00:33 và 01:22. Mốc trong bản nháp Gemini chờ đối chiếu.
 
-Ori có 136 tập dùng trình phát nhúng và 44 tập mở qua liên kết gốc. Khi khởi tạo kho phim, nhập các gói lần lượt theo bảng để bản cập nhật metadata áp dụng lên các tập đã có.
+Ori có 136 tập dùng trình phát nhúng và 44 tập mở qua liên kết gốc. Các gói trong bảng trên ghi lại từng đợt nhập trước khi tạo catalog đầy đủ theo bộ.
 
 Ngày 23/11/2026, gói Doraemon bổ sung đối chiếu số tập và thời lượng theo playlist của POPS Kids. YouTube trả metadata nhúng cho 291 video. Gói metadata ASR cập nhật tóm tắt cho những tập có đủ bằng chứng từ lời thoại.
 
@@ -34,7 +58,7 @@ Doraemon 579 có tóm tắt cho cả hai truyện trong tập và hai đoạn th
 
 ### Lô 1.000 tập
 
-SQLite demo có 1.372 tập ở trạng thái `ready`, trong đó 1.017 tập đạt bộ kiểm metadata cấp tập. Mỗi tập đạt có mùa và số tập, thời lượng, tóm tắt riêng, ID nhân vật, từ khóa, chủ đề và nguồn phát. Lô này bổ sung 617 tập và cập nhật metadata cho 261 tập đã có.
+Ở đợt này, SQLite demo có 1.372 tập ở trạng thái `ready`, trong đó 1.017 tập đạt bộ kiểm metadata cấp tập. Mỗi tập đạt có mùa và số tập, thời lượng, tóm tắt riêng, ID nhân vật, từ khóa, chủ đề và nguồn phát. Lô này bổ sung 617 tập và cập nhật metadata cho 261 tập đã có.
 
 Gemini 3.1 Flash-Lite biên tập tóm tắt tiếng Việt. Với Doraemon và Ori, mỗi tóm tắt dựa trên phụ đề ASR của đúng video. Câu dẫn được so lại với phụ đề, sau đó nội dung được kiểm lại bằng một lượt riêng. Dấu thời gian và mã SHA-256 của phụ đề được lưu ở nguồn tham chiếu. Tập Doraemon có hai truyện được trình bày theo từng truyện khi tiêu đề và lời thoại đủ rõ.
 

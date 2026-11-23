@@ -37,13 +37,9 @@ try {
 } finally {
     Remove-Item Env:APP_BOOTSTRAP_ADMIN_USERNAME, Env:APP_BOOTSTRAP_ADMIN_EMAIL, Env:APP_BOOTSTRAP_ADMIN_PASSWORD
 }
-$catalogs = @(
-    'jadoo_all', 'larva', 'ori', 'doraemon', 'doraemon_s05_s11', 'trang_quynh',
-    'episode_metadata', 'pokemon_tv', 'mr_bean_animated', 'peppa_pig',
-    'episode_metadata_asr'
-)
+$catalogs = @('jadoo', 'larva', 'ori', 'doraemon', 'trang_quynh', 'pokemon', 'mr_bean_animated', 'peppa_pig')
 foreach ($catalog in $catalogs) {
-    .\scripts\import_preview_catalog.ps1 -CatalogPath "data/catalog.$catalog.json" -ApiBaseUrl 'http://127.0.0.1:3000/api' -Username $admin.UserName -Password $admin.Password
+    .\scripts\import_preview_catalog.ps1 -CatalogPath "data/catalog-by-series/catalog.$catalog.json" -ApiBaseUrl 'http://127.0.0.1:3000/api' -Username $admin.UserName -Password $admin.Password
 }
 ```
 
@@ -69,7 +65,7 @@ Trang chủ gợi ý tập chưa xem từ lịch sử, phim yêu thích và đi�
 
 ## Danh mục phim
 
-Đăng nhập quản trị và nhập từng gói ở trang Nhập dữ liệu. Jadoo phát từ tệp hoặc Google Drive. Các bộ còn lại dùng trình phát YouTube hoặc liên kết mở video gốc. [Trang Nhập dữ liệu](http://localhost:3000/admin/import) · [Danh mục và nguồn](data/README.md)
+Đăng nhập quản trị và nhập từng gói trong `data/catalog-by-series/` ở trang Nhập dữ liệu. Mỗi gói đầy đủ một bộ và có cùng cấu trúc với catalog Jadoo. Jadoo phát từ tệp hoặc Google Drive. Các bộ còn lại dùng nguồn YouTube đã lưu. [Trang Nhập dữ liệu](http://localhost:3000/admin/import) · [Danh mục và nguồn](data/README.md)
 
 ## Kiểm thử
 
