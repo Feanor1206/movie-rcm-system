@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import LargeBinary, case, cast, func, or_, select
+from sqlalchemy import LargeBinary, and_, case, cast, func, or_, select
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError, StatementError
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.concurrency import run_in_threadpool
@@ -22,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from services.database import (
     CatalogConflictError,
     CatalogEpisode,
+    CatalogEpisodeAsset,
     CatalogInputError,
     CatalogMediaAsset,
     CatalogPackage,
@@ -232,8 +233,7 @@ def _matches_genre_token(genres_str: str | None, raw_token: str | None) -> bool:
     if not genres_str:
         return False
     token = raw_token.strip().lower()
-    tokens = [t.strip().lower() for t in genres_str.split(",") if t.strip()]
-    return token in tokens
+    return any(value.strip().lower() == token for value in genres_str.split(","))
 
 
 def _matches_search(movie: Movie, raw_query: str | None) -> bool:
@@ -253,14 +253,16 @@ def _published_record(column):
 def _visible_movies(db):
     series = select(CatalogSeries.id).where(_published_record(CatalogSeries.record_json))
     seasons = select(CatalogSeason.id).where(_published_record(CatalogSeason.record_json))
-    episodes = select(CatalogEpisode.id).where(
+    episode_is_visible = and_(
         _published_record(CatalogEpisode.record_json),
         CatalogEpisode.series_id.in_(series),
         or_(CatalogEpisode.season_id.is_(None), CatalogEpisode.season_id.in_(seasons)),
     )
+    hidden_series = select(CatalogSeries.id).where(_published_record(CatalogSeries.record_json).is_not(True))
+    hidden_episodes = select(CatalogEpisode.id).where(episode_is_visible.is_not(True))
     return db.query(Movie).filter(
-        or_(~Movie.id.in_(select(CatalogSeries.id)), Movie.id.in_(series)),
-        or_(~Movie.id.in_(select(CatalogEpisode.id)), Movie.id.in_(episodes)),
+        Movie.id.not_in(hidden_series),
+        Movie.id.not_in(hidden_episodes),
     )
 
 
@@ -333,6 +335,11 @@ def browse_movies(
         return api_response(None, f"Chiều sắp xếp không hợp lệ: '{direction}'", False, 400)
 
     effective_q = next((v.strip() for v in (query, search, q) if v and v.strip()), None)
+    genre_tokens = [token.strip().lower() for token in [genre or "", *(genres or "").split(",")] if token.strip()]
+    if animationOnly is True:
+        genre_tokens.append("animation")
+    genre_tokens = list(dict.fromkeys(genre_tokens))
+    start = page * size
 
     with get_db(request) as db:
         db_query = _visible_movies(db)
@@ -340,57 +347,38 @@ def browse_movies(
             db_query = db_query.filter(Movie.release_year >= yearMin)
         if yearMax is not None:
             db_query = db_query.filter(Movie.release_year <= yearMax)
-        if (not effective_q and not (genre or "").strip() and not (genres or "").replace(",", "").strip()
-                and animationOnly is not True and sort_field in {"rating", "year"}):
+        order = {
+            "rating": func.coalesce(Movie.rating, 0),
+            "year": func.coalesce(Movie.release_year, 0),
+            "title": cast(Movie.title, LargeBinary),
+        }[sort_field]
+        ordered = db_query.order_by(order.desc() if sort_dir == "desc" else order.asc(),
+                                    cast(Movie.id, LargeBinary).asc())
+        if not effective_q and not genre_tokens:
             total_elements = db_query.count()
-            total_pages = math.ceil(total_elements / size) if total_elements > 0 else 0
-            column = Movie.rating if sort_field == "rating" else Movie.release_year
-            order = func.coalesce(column, 0)
-            order = order.desc() if sort_dir == "desc" else order.asc()
-            start = page * size
-            items = (db_query.order_by(order, cast(Movie.id, LargeBinary).asc()).offset(start).limit(size).all()
-                     if start < total_elements else [])
-            return api_response(data={
-                "items": _movie_responses(db, items),
-                "page": page,
-                "size": size,
-                "totalElements": total_elements,
-                "totalPages": total_pages,
-                "hasNext": (page + 1) < total_pages,
-                "hasPrevious": page > 0 and total_pages > 0,
-            })
-        items = db_query.all()
-        result = []
-        genre_tokens = [t.strip() for t in (genres or "").split(",") if t.strip()]
-        for m in items:
-            if not _matches_search(m, effective_q):
-                continue
-            if not _matches_genre_token(m.genres, genre):
-                continue
-            if any(not _matches_genre_token(m.genres, gt) for gt in genre_tokens):
-                continue
-            if animationOnly is True and not _matches_genre_token(m.genres, "Animation"):
-                continue
-            result.append(m)
-
-        reverse = sort_dir == "desc"
-        if sort_field == "rating":
-            result.sort(key=lambda m: (m.id,))
-            result.sort(key=lambda m: (m.rating or 0.0), reverse=reverse)
-        elif sort_field == "year":
-            result.sort(key=lambda m: (m.id,))
-            result.sort(key=lambda m: (m.release_year or 0), reverse=reverse)
+            items = ordered.offset(start).limit(size).all() if start < total_elements else []
         else:
-            result.sort(key=lambda m: (m.id,))
-            result.sort(key=lambda m: (m.title or ""), reverse=reverse)
-
-        total_elements = len(result)
+            columns = [Movie.id]
+            if effective_q:
+                columns.extend([Movie.title, Movie.description])
+            if genre_tokens:
+                columns.append(Movie.genres)
+            total_elements = 0
+            page_ids = []
+            for candidate in ordered.with_entities(*columns).yield_per(512):
+                if any(not _matches_genre_token(candidate.genres, token) for token in genre_tokens):
+                    continue
+                if effective_q and not _matches_search(candidate, effective_q):
+                    continue
+                if start <= total_elements < start + size:
+                    page_ids.append(candidate.id)
+                total_elements += 1
+            movies_by_id = {movie.id: movie for movie in db_query.filter(Movie.id.in_(page_ids))} if page_ids else {}
+            items = [movies_by_id[movie_id] for movie_id in page_ids if movie_id in movies_by_id]
         total_pages = math.ceil(total_elements / size) if total_elements > 0 else 0
-        start = page * size
-        page_items = _movie_responses(db, result[start : start + size])
         return api_response(
             data={
-                "items": page_items,
+                "items": _movie_responses(db, items),
                 "page": page,
                 "size": size,
                 "totalElements": total_elements,
@@ -476,31 +464,15 @@ def get_catalog_series_detail(series_id: str, request: Request, authorization: s
         )
         pub_seasons = [s.to_dict() for s in seasons if is_admin or is_published(s.record_json)]
         pub_season_ids = {s["id"] for s in pub_seasons}
-        episodes = (
-            db.query(CatalogEpisode)
-            .filter(CatalogEpisode.series_id == series_id)
-            .order_by(CatalogEpisode.number.asc())
-            .all()
-        )
+        episodes = db.query(CatalogEpisode).filter(CatalogEpisode.series_id == series_id)
+        if not is_admin:
+            episodes = episodes.filter(CatalogEpisode.publication_status == "ready")
         pub_episodes = [
             e.to_dict()
-            for e in episodes
-            if (is_admin or is_published(e.record_json))
-            and (is_admin or not e.season_id or e.season_id in pub_season_ids)
+            for e in episodes.order_by(CatalogEpisode.number.asc())
+            if is_admin or not e.season_id or e.season_id in pub_season_ids
         ]
         return JSONResponse({"series": series.to_dict(), "seasons": pub_seasons, "episodes": pub_episodes})
-
-
-def _asset_covers_episode(asset: CatalogMediaAsset, episode_id: str) -> bool:
-    if not asset.coverage_json:
-        return False
-    try:
-        items = json.loads(asset.coverage_json)
-        if not isinstance(items, list):
-            return False
-        return any(isinstance(i, dict) and i.get("episode_id") == episode_id for i in items)
-    except Exception:
-        return False
 
 
 def _asset_allowed(asset: CatalogMediaAsset, user: User | None) -> bool:
@@ -555,15 +527,20 @@ def get_catalog_episode_detail(episode_id: str, request: Request, authorization:
             return api_response(None, f"Không tìm thấy tập phim với mã: {episode_id}", False, 404)
         if ep.season_id:
             sea = db.get(CatalogSeason, ep.season_id)
-            if not is_admin and (not sea or not is_published(sea.record_json)):
+            if not is_admin and (not sea or sea.series_id != ep.series_id or not is_published(sea.record_json)):
                 return api_response(None, f"Không tìm thấy tập phim với mã: {episode_id}", False, 404)
         segments = [
             s.to_dict()
             for s in db.query(CatalogSegment).filter(CatalogSegment.episode_id == episode_id).order_by(CatalogSegment.position.asc()).all()
             if is_admin or is_published(s.record_json)
         ]
-        all_assets = db.query(CatalogMediaAsset).filter(CatalogMediaAsset.coverage_json.like(f"%{episode_id}%")).all()
-        assets = [a.to_dict() for a in all_assets if _asset_covers_episode(a, episode_id) and _asset_allowed(a, user)]
+        episode_assets = (
+            db.query(CatalogMediaAsset)
+            .join(CatalogEpisodeAsset, CatalogEpisodeAsset.media_asset_id == CatalogMediaAsset.id)
+            .filter(CatalogEpisodeAsset.episode_id == ep.id)
+            .order_by(CatalogEpisodeAsset.media_asset_id)
+        )
+        assets = [a.to_dict() for a in episode_assets if _asset_allowed(a, user)]
         allowed_asset_ids = {a["id"] for a in assets}
         scenes = [
             sc.to_dict()
@@ -586,11 +563,16 @@ def search_catalog(request: Request, q: str = Query(default=""), authorization: 
         results = []
         pub_series = {s.id: s for s in db.query(CatalogSeries).all() if is_admin or is_published(s.record_json)}
         pub_seasons = {s.id: s for s in db.query(CatalogSeason).all() if is_admin or is_published(s.record_json)}
+        episodes = db.query(
+            CatalogEpisode.id, CatalogEpisode.series_id, CatalogEpisode.season_id, CatalogEpisode.title,
+            CatalogEpisode.synopsis, CatalogEpisode.duration_ms, CatalogEpisode.plot_facts_json, CatalogEpisode.keywords_json,
+        )
+        if not is_admin:
+            episodes = episodes.filter(CatalogEpisode.publication_status == "ready")
         pub_episodes = {
             e.id: e
-            for e in db.query(CatalogEpisode).all()
-            if (is_admin or is_published(e.record_json))
-            and e.series_id in pub_series
+            for e in episodes
+            if e.series_id in pub_series
             and (is_admin or not e.season_id or e.season_id in pub_seasons)
         }
         allowed_assets = {a.id: a for a in db.query(CatalogMediaAsset).all() if _asset_allowed(a, user)}
@@ -647,8 +629,9 @@ def get_watchlist(request: Request, authorization: str | None = Header(default=N
         user = require_user(request, db, authorization)
         if not user:
             return api_response(None, "Chưa xác thực người dùng", False, 401)
-        items = db.query(WatchlistItem).filter(WatchlistItem.user_id == user.id).order_by(WatchlistItem.added_at.desc()).all()
-        return api_response(data=[i.to_dict() for i in items])
+        items = db.query(WatchlistItem, Movie).join(Movie).filter(
+            WatchlistItem.user_id == user.id).order_by(WatchlistItem.added_at.desc())
+        return api_response(data=[item.to_dict(movie) for item, movie in items])
 
 
 def _commit_library_item(db, item):
@@ -684,11 +667,11 @@ def add_watchlist(payload: MovieIdPayload, request: Request, authorization: str 
             return api_response(None, f"Phim không tồn tại trong danh mục: {movie_id}", False, 400)
         existing = db.query(WatchlistItem).filter(WatchlistItem.user_id == user.id, WatchlistItem.movie_id == movie_id).first()
         if existing:
-            return api_response(data=existing.to_dict(), message="Đã thêm phim vào danh sách xem sau")
-        item = WatchlistItem(user_id=user.id, movie_id=movie.id, movie_title=movie.title, poster_url=movie.poster)
+            return api_response(data=existing.to_dict(movie), message="Đã thêm phim vào danh sách xem sau")
+        item = WatchlistItem(user_id=user.id, movie_id=movie.id)
         db.add(item)
         item = _commit_library_item(db, item)
-        return api_response(data=item.to_dict(), message="Đã thêm phim vào danh sách xem sau")
+        return api_response(data=item.to_dict(movie), message="Đã thêm phim vào danh sách xem sau")
 
 
 @router.delete("/api/users/watchlist/{movie_id}")
@@ -708,8 +691,9 @@ def get_favorites(request: Request, authorization: str | None = Header(default=N
         user = require_user(request, db, authorization)
         if not user:
             return api_response(None, "Chưa xác thực người dùng", False, 401)
-        items = db.query(FavoriteItem).filter(FavoriteItem.user_id == user.id).order_by(FavoriteItem.added_at.desc()).all()
-        return api_response(data=[i.to_dict() for i in items])
+        items = db.query(FavoriteItem, Movie).join(Movie).filter(
+            FavoriteItem.user_id == user.id).order_by(FavoriteItem.added_at.desc())
+        return api_response(data=[item.to_dict(movie) for item, movie in items])
 
 
 @router.post("/api/users/favorites")
@@ -726,11 +710,11 @@ def add_favorite(payload: MovieIdPayload, request: Request, authorization: str |
             return api_response(None, f"Phim không tồn tại trong danh mục: {movie_id}", False, 400)
         existing = db.query(FavoriteItem).filter(FavoriteItem.user_id == user.id, FavoriteItem.movie_id == movie_id).first()
         if existing:
-            return api_response(data=existing.to_dict(), message="Đã thêm phim vào danh sách yêu thích")
-        item = FavoriteItem(user_id=user.id, movie_id=movie.id, movie_title=movie.title, poster_url=movie.poster)
+            return api_response(data=existing.to_dict(movie), message="Đã thêm phim vào danh sách yêu thích")
+        item = FavoriteItem(user_id=user.id, movie_id=movie.id)
         db.add(item)
         item = _commit_library_item(db, item)
-        return api_response(data=item.to_dict(), message="Đã thêm phim vào danh sách yêu thích")
+        return api_response(data=item.to_dict(movie), message="Đã thêm phim vào danh sách yêu thích")
 
 
 @router.delete("/api/users/favorites/{movie_id}")
@@ -834,9 +818,14 @@ def _resolve_episode_context(db, episode_id: str, asset_id: str, user: User):
     return _valid_episode_context(ep, series, season, asset, playable, episode_id, user)
 
 
+def _watch_progress_duration(episode, asset):
+    durations = (episode.duration_ms, asset.duration_ms)
+    return min((duration for duration in durations if duration is not None and duration > 0), default=None)
+
+
 def _to_progress_response(progress: WatchProgress, ctx) -> dict:
     ep, series, season, asset = ctx
-    dur = asset.duration_ms
+    dur = _watch_progress_duration(ep, asset)
     completed = False
     if dur is not None and dur > 0:
         five_pct = max(1, dur // 20)
@@ -945,8 +934,9 @@ def _save_watch_progress(episode_id, request, authorization, body):
         ctx = _resolve_episode_context(db, episode_id, asset_id, user)
         if not ctx:
             return api_response(None, f"Không tìm thấy tập có thể phát: {episode_id}", False, 404)
-        _, _, _, asset = ctx
-        if asset.duration_ms is not None and asset.duration_ms > 0 and pos_ms > asset.duration_ms:
+        episode, _, _, asset = ctx
+        duration = _watch_progress_duration(episode, asset)
+        if duration is not None and pos_ms > duration:
             return api_response(None, "Vị trí xem vượt quá thời lượng video.", False, 400)
         current = db.query(WatchProgress).filter(WatchProgress.user_id == user.id, WatchProgress.episode_id == episode_id).first()
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -974,6 +964,11 @@ def _save_watch_progress(episode_id, request, authorization, body):
         except StaleDataError:
             db.rollback()
             return api_response(None, "Watch progress changed since it was loaded; refresh and retry.", False, 409)
+        except OperationalError as exc:
+            db.rollback()
+            if exc.orig.args[:2] == (1644, "Watch position exceeds episode duration_ms."):
+                return api_response(None, "Vị trí xem vượt quá thời lượng video.", False, 400)
+            raise
         except IntegrityError as exc:
             db.rollback()
             error = str(exc.orig)
@@ -1218,6 +1213,9 @@ def _validate_catalog(request, authorization, body, error):
             if error:
                 raise error
             pkg_id, revision = validate_catalog_input(body)
+            content_hash = compute_sha256(body)
+            existing_pkg = db.get(CatalogPackage, pkg_id)
+            counts, _ = catalog_diff(db, body, revision, content_hash, existing_pkg)
         except CatalogInputError as exc:
             return JSONResponse(
                 {
@@ -1233,9 +1231,6 @@ def _validate_catalog(request, authorization, body, error):
                 },
                 status_code=400,
             )
-        content_hash = compute_sha256(body)
-        existing_pkg = db.get(CatalogPackage, pkg_id)
-        counts, _ = catalog_diff(db, body, revision, content_hash, existing_pkg)
         return JSONResponse(
             {
                 "valid": True,

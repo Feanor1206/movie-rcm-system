@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 
 from main import create_app
-from services.database import CatalogEpisode, CatalogSeries, FavoriteItem, MovieRating, User, WatchProgress, create_jwt_token
+from services.catalog_sync import AcceptedSnapshot
+from services.database import CatalogEpisode, CatalogMediaAsset, CatalogSeries, FavoriteItem, Movie, MovieRating, User, WatchProgress, create_jwt_token
 
 
 def test_recommend_personalizes_only_from_authenticated_account(tmp_path):
@@ -20,8 +21,11 @@ def test_recommend_personalizes_only_from_authenticated_account(tmp_path):
             other = User(username='bob', email='bob@example.com', password='x')
             db.add_all([user, other, CatalogSeries(id='s', title='Series')])
             db.flush()
-            db.add(CatalogEpisode(id='watched', series_id='s', title='watched', kind='episode'))
-            db.add_all([FavoriteItem(user_id=user.id, movie_id='liked', movie_title='liked'),
+            db.add(CatalogEpisode(id='watched', series_id='s', title='watched', kind='regular'))
+            db.add(CatalogMediaAsset(id='asset', storage_provider='local', storage_key='demo', relative_path='test.mp4'))
+            db.add_all([Movie(id=name, title=name, release_year=2026, rating=0) for name in ('liked', 'other')])
+            db.flush()
+            db.add_all([FavoriteItem(user_id=user.id, movie_id='liked'),
                         MovieRating(user_id=other.id, movie_id='other', rating=10),
                         WatchProgress(user_id=user.id, episode_id='watched', asset_id='asset', position_ms=1000)])
             db.commit()
@@ -60,6 +64,30 @@ def test_recommend_filters_draft_seasons_and_private_assets(tmp_path):
         assert [item['id'] for item in response.json()['recommendedMovies']] == ['ok']
 
 
+def test_recommend_reuses_candidates_until_the_snapshot_changes(tmp_path, monkeypatch):
+    app = create_app(sync_secret='test-token', sync_path=tmp_path / 'state.json', cache_dir=tmp_path / 'cache',
+                     model_mode='light', load_default=False, database_url=f'sqlite:///{tmp_path / "cache.db"}')
+    flatten = AcceptedSnapshot.get_flattened_catalog
+    calls = []
+
+    def count(snapshot):
+        calls.append(snapshot.generation)
+        return flatten(snapshot)
+
+    monkeypatch.setattr(AcceptedSnapshot, 'get_flattened_catalog', count)
+    with TestClient(app) as client:
+        for generation, episode_id in [(1, 'old'), (2, 'new')]:
+            payload = {'schema_version': 'dippie.catalog.v1', 'series': [{'id': 's', 'title': 'Series'}],
+                       'episodes': [{'id': episode_id, 'series_id': 's', 'title': episode_id}]}
+            result = client.post('/api/index/sync', headers={'X-Service-Token': 'test-token'},
+                                 json={'generation': generation, 'catalog': payload})
+            assert result.status_code == 200
+            for _ in range(2):
+                response = client.post('/api/recommend', json={})
+                assert [item['id'] for item in response.json()['recommendedMovies']] == [episode_id]
+    assert calls == [1, 2]
+
+
 def test_old_viewed_items_are_excluded_even_when_affinity_history_is_bounded(tmp_path):
     app = create_app(sync_secret='test-token', sync_path=tmp_path / 'state.json', cache_dir=tmp_path / 'cache',
                      model_mode='light', load_default=False, database_url=f'sqlite:///{tmp_path / "history.db"}')
@@ -71,6 +99,8 @@ def test_old_viewed_items_are_excluded_even_when_affinity_history_is_bounded(tmp
         with app.state.runtime.db.session() as db:
             user = User(username='long_history', email='history@example.com', password='x')
             db.add(user)
+            ids = ['old', *(f'other-{n}' for n in range(101))]
+            db.add_all([Movie(id=name, title=name, release_year=2026, rating=0) for name in ids])
             db.flush()
             db.add(MovieRating(user_id=user.id, movie_id='old', rating=5))
             db.flush()

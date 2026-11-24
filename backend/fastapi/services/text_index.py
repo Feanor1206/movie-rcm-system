@@ -21,6 +21,7 @@ NEGATION_CUE = re.compile(
     r"tru(?=\s+(?:s\d+e\d+\b|(?:mùa|mua|season|phần|phan|tập|tap|ep|episode)\s*#?\s*\d)))\b"
 )
 _TOKEN_RE = re.compile(r"\b\w+\b")
+_TIMECODE_REQUEST = re.compile(r"\b(?:(?:phut|giay)\s+(?:nao|may|thu may|bao nhieu)|moc thoi gian|timecode|timestamp)\b")
 _RRF_SCORES = tuple(1.0 / (60 + rank) for rank in range(1, 65))
 _EMBEDDING_FILE_CACHE: dict[tuple[str, int], np.ndarray] = {}
 
@@ -74,6 +75,32 @@ def document_text(item: dict) -> str:
         elif isinstance(value, list):
             values.extend(text for text in value if isinstance(text, str))
     return "\n".join(dict.fromkeys(values))
+
+
+def _evidence_text(item):
+    return (item.get("dialogue_summary") or item.get("visual_summary") or item.get("description")
+            or item.get("synopsis") or item.get("title", ""))
+
+
+def _prefer_matching_timecodes(candidates, documents, query):
+    query = normalize(query)
+    if not _TIMECODE_REQUEST.search(query):
+        return candidates
+    phrases = set(_cached_bigrams(_cached_tokenize(_TIMECODE_REQUEST.sub(" ", query))))
+    if not phrases:
+        return candidates
+    episode_order = {}
+    ranking = []
+    for index in candidates:
+        item = documents[index]
+        group = item.get("episode_id") or item["id"]
+        ordinal = episode_order.setdefault(group, len(episode_order))
+        start = item.get("_episode_start_ms", item.get("start_ms"))
+        matching_timecode = type(start) is int and not phrases.isdisjoint(
+            _cached_bigrams(_cached_tokenize(normalize(_evidence_text(item))))
+        )
+        ranking.append((ordinal, not matching_timecode, index))
+    return [index for _, _, index in sorted(ranking, key=lambda row: row[:2])]
 
 
 def _field_values(item: dict, fields: tuple[str, ...]) -> str:
@@ -438,6 +465,7 @@ class TextIndex:
                 raise ValueError("Reranker must return a finite score for each candidate")
             raw_scores = dict(zip(candidates, ranked_scores.tolist()))
             candidates.sort(key=lambda index: (-raw_scores[index], index))
+        candidates = _prefer_matching_timecodes(candidates, self._documents, scopes[0])
         by_id = {item["id"]: item for item in self._documents}
         results, used = [], set()
         for index in candidates:
@@ -457,7 +485,7 @@ class TextIndex:
             if "genres" in result and isinstance(result["genres"], list):
                 result["genres"] = list(result["genres"])
             result["year"] = result.get("year") or result.get("release_year") or 0
-            evidence_text = source.get("dialogue_summary") or source.get("visual_summary") or source.get("description") or source.get("synopsis") or source.get("title", "")
+            evidence_text = _evidence_text(source)
             position = source.get("_episode_start_ms", source.get("start_ms"))
             result.update(episodeId=episode_id, startMs=position, score=float(raw_scores[index]),
                           start_ms=source.get("start_ms"), end_ms=source.get("end_ms"),

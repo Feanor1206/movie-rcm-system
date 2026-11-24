@@ -2,6 +2,8 @@ import importlib.util
 import hashlib
 import json
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -115,6 +117,42 @@ def test_export_preserves_unselected_episodes_and_passes_schema(tmp_path, dialog
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
     assert not validator.validate(export)
+
+
+def test_catalog_validator_reports_episode_coverage():
+    result = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(CATALOG), "--report"],
+        capture_output=True, text=True, check=True,
+    )
+    report = json.loads(result.stdout)
+    assert report["episodes"] == 99
+    assert report["with_synopsis"] == report["with_keywords"] == report["with_characters"] == 99
+    assert report["with_themes"] == 99
+    assert report["with_episode_synopsis"] == 8
+    assert report["with_episode_keywords"] == 6
+    assert report["with_normalized_metadata"] == 6
+    assert report["with_declared_playback_source"] == 99
+    assert 0 < report["with_reviewed_timecodes"] < 99
+
+
+def test_normalized_coverage_excludes_draft_and_unplayable_episodes(tmp_path):
+    payload = read(CATALOG)
+    draft = next(episode for episode in payload["episodes"] if episode["id"] == "ep_jadoo_s01_0008")
+    draft["record"]["status"] = "draft"
+    for asset in payload["media_assets"]:
+        if any(part["episode_id"] == "ep_jadoo_s01_0011" for part in asset["coverage"]):
+            asset["enabled"] = False
+    path = tmp_path / "catalog.json"
+    write(path, payload)
+
+    result = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(path), "--report"],
+        capture_output=True, text=True, check=True,
+    )
+    report = json.loads(result.stdout)
+    assert report["with_episode_synopsis"] == 8
+    assert report["with_declared_playback_source"] == 98
+    assert report["with_normalized_metadata"] == 4
 
 
 def test_mirror_adopts_existing_media_and_retains_identity(tmp_path, monkeypatch):

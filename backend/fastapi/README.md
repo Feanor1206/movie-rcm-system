@@ -46,7 +46,7 @@ Các biến tùy chọn:
 | `DB_CONNECT_TIMEOUT`, `DB_READ_TIMEOUT`, `DB_WRITE_TIMEOUT` | Thời gian chờ kết nối, đọc và ghi MySQL. Mặc định 3, 15 và 15 giây. |
 | `MODEL_MODE` | `light`: tìm kiếm và trả lời theo mẫu; `cloud`: bật dịch vụ LLM đã cấu hình. |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Địa chỉ, tên mô hình và khóa của API tương thích OpenAI. Cũng nhận các biến `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPSEEK_API_KEY`. |
-| `ALLOW_FULL_CATALOG_GROUNDING=1` | Mở rộng nguồn DeepSeek sang các tập công khai trong gói danh mục được duyệt. Mặc định dùng nguồn thí điểm, tóm tắt Larva và Ori đã đối chiếu, cùng các tập trong `APPROVED_CLOUD_EPISODES`. |
+| `ALLOW_FULL_CATALOG_GROUNDING=1` | Mở rộng nguồn DeepSeek sang các tập và phân đoạn đã xác minh trong snapshot công khai hiện hành. Mặc định dùng nguồn thí điểm và tóm tắt Larva, Ori đã đối chiếu. Dùng `APPROVED_CLOUD_EPISODES` để chọn thêm ID tập từ snapshot. |
 | `TEXT_ENCODER_PATH` | Thư mục mô hình mã hóa văn bản ONNX. |
 | `RERANKER_MODEL_PATH` | Thư mục mô hình xếp hạng lại TorchScript. |
 | `SCORE_CALIBRATION_PATH` | Tệp JSON hiệu chuẩn điểm tìm kiếm. |

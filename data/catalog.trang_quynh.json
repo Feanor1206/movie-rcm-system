@@ -1,0 +1,3892 @@
+{
+  "schema_version": "dippie.catalog.v1",
+  "package": {
+    "id": "pkg_dippie_trang_quynh",
+    "revision": 5,
+    "created_at": "2026-11-22T16:17:55Z",
+    "default_language": "vi",
+    "import_mode": "upsert",
+    "reference_scope": "self_contained",
+    "description": "Danh mục Trạng Quỳnh Thời Nhí Nhố từ các video đánh số của Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D."
+  },
+  "genres": [
+    {
+      "id": "animation",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hoạt hình"
+        },
+        {
+          "language": "en",
+          "text": "Animation"
+        },
+        {
+          "language": "ko",
+          "text": "애니메이션"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "comedy",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hài hước"
+        },
+        {
+          "language": "en",
+          "text": "Comedy"
+        },
+        {
+          "language": "ko",
+          "text": "코미디"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "family",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Gia đình"
+        },
+        {
+          "language": "en",
+          "text": "Family"
+        },
+        {
+          "language": "ko",
+          "text": "가족"
+        }
+      ],
+      "aliases": []
+    }
+  ],
+  "attribute_scales": [],
+  "sources": [
+    {
+      "id": "src_trang_quynh_e26f9faa2457",
+      "kind": "official",
+      "title": "Trạng Quỳnh thời Nhí Nhố - Full 100 Tập",
+      "url": "https://www.youtube.com/playlist?list=PLJscQ6PJLmu3zd6RfLDVUxP4EfahF2OKO",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Danh sách của kênh phát hành. Vị trí trong playlist lưu riêng với số tập ghi trên video."
+    },
+    {
+      "id": "src_trang_quynh_cf054e24187c",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D",
+      "url": "https://www.youtube.com/channel/UCndGTJ1ZllgoBXRUR-xfDUQ",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": null
+    },
+    {
+      "id": "src_trang_quynh_f14e42a4e51b",
+      "kind": "official",
+      "title": "Sconnect giới thiệu Trạng Quỳnh Thời Nhí Nhố",
+      "url": "https://sconnect.com.vn/trang-quynh-thoi-nhi-nho-thang-lon-tai-lien-hoan-phim-chau-a-da-nang/",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": null
+    },
+    {
+      "id": "src_trang_quynh_5afa265a107a",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 1: PHẢI DÙNG CÁI ĐẦU | Phim Hoạt Hình 3D Việt Nam Mới Nhất",
+      "url": "https://www.youtube.com/watch?v=GnCfwuHRGgk",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_06b54eae5ac8",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 2: KỲ TÀI VÕ THUẬT | Phim Hoạt Hình 3D Việt Nam Mới Nhất",
+      "url": "https://www.youtube.com/watch?v=7W_Q6RaEZMY",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_86026f4e89e5",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 3: CAO THỦ VÔ DANH | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=nnDNzp8tBPI",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_437768f9c44d",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 4: BÁI SƯ | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=syAowJT0MlY",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_2184ab3c4479",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 5: BUỔI HỌC BẤT ỔN | Phim Hoạt Hình 3D Việt Nam",
+      "url": "https://www.youtube.com/watch?v=-yOj-5YQ7DI",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_4dd800d11981",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 7: CHUỒN CHUỒN BAY THẤP THÌ MƯA | Phim Hoạt Hình 3D Việt Nam Mới 2023",
+      "url": "https://www.youtube.com/watch?v=Yzk2AcM0BCw",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_aef065588530",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 8: TUYỆT ĐỈNH KHINH CÔNG | Phim Hoạt Hình 3D VN Mới Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=xNq3SqWEUPU",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_4cc7c0428c6d",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 09: KHO BÁU CỦA SƯ PHỤ | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=5GJJld91gSk",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_9c977f1279b0",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 10: NHIỆM VỤ BẤT KHẢ THI | Phim Hoạt Hình 3D VN Mới Nhất",
+      "url": "https://www.youtube.com/watch?v=wM3O18ioi3k",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_b910e9819367",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 11: CUỘC PHỤC KÍCH BẤT NGỜ | Phim Hoạt Hình 3D VN Mới Nhất",
+      "url": "https://www.youtube.com/watch?v=KezpfW5OOWU",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_7171502d8e89",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 12: BÍ KÍP VÕ CÔNG | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=vF-BuiWL9DY",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_3069771b64b2",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 13: SỨC MẠNH ĐẠI SƯ HUYNH | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=dcDLExnVygI",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_c8c4a21c9713",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 14: TRÂU ỐM RỒI | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=DGHiEqXAK0M",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_2a9b58ce8eaa",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 15: PHI VỤ BẮT GÀ | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=F534M6KmGFI",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_4aad4588580f",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 16: BÓNG MA BÍ ẨN | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=dzxjaprCieA",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_85a96d536421",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 17: CỘC ĐẾN CHƠI NHÀ | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=BDAqcnb-qYM",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_24a345581003",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 18: CHÚA TỂ BẦU TRỜI | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2023",
+      "url": "https://www.youtube.com/watch?v=C9UXDFx1E40",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_7709d0061d21",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 19: THẦY GIỎI DẠY TRÒ HAY | Phim Hoạt Hình 3D Việt Nam Mới 2023",
+      "url": "https://www.youtube.com/watch?v=o8m2xfMQcGQ",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_4d22e1ab266e",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 20: TRÂU GIẢ - TRÂU THẬT | Phim Hoạt Hình 3D Việt Nam Mới 2025",
+      "url": "https://www.youtube.com/watch?v=0cQWFozvPLg",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_fd50168d5254",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 21: CAO THỦ BÍ ẨN - Cuộc Thách Đấu Ly Kỳ | Phim Hoạt Hình 3D Việt Nam",
+      "url": "https://www.youtube.com/watch?v=Idz0nJOd_uo",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_42901ccff6d5",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 22: TIÊN ÔNG HIỂN LINH | Phim Hoạt Hình 3D Việt Nam Mới 2024",
+      "url": "https://www.youtube.com/watch?v=L75m2YqXhYc",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_2f522a543004",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 23: KHI \"MẸ\" VẮNG NHÀ | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2024",
+      "url": "https://www.youtube.com/watch?v=beq0O5ugcAM",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_62f04d62bbe2",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 24: RĂNG RƠI ĐÁY NƯỚC | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2024",
+      "url": "https://www.youtube.com/watch?v=5WSC3SrJaYI",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_abd68853a760",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 25: CHỮA \"ĐIẾC\" CHO THẦY HẠC | Phim Hoạt Hình 3D Việt Nam Mới Nhất",
+      "url": "https://www.youtube.com/watch?v=e86C53aHqgY",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_140332df2588",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | TẬP 26: GÀ KHỎE, GÀ ĐẸP | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=r14acYiFh-s",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_11665e9b12bc",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố || Tập 27: QUÂN SƯ MAI MỐI | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất 2024",
+      "url": "https://www.youtube.com/watch?v=6uyt88iJd_c",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_7073924cd610",
+      "kind": "official",
+      "title": "Trạng Quỳnh Thời Nhí Nhố | Tập 28: LÀM VỠ BÌNH QUÝ | Phim Hoạt Hình 3D Việt Nam Mới Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=Abj5ZTUhKRA",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_27453a2f167d",
+      "kind": "official",
+      "title": "Tập 77: RẠP CHIẾU BÓNG ĐẲNG CẤP | Trạng Quỳnh Thời Nhí Nhố | Phim Hoạt Hình 3D Việt Nam",
+      "url": "https://www.youtube.com/watch?v=TPWo2knvb0U",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_7202b665df92",
+      "kind": "official",
+      "title": "TẬP 78: ĐẦU BẾP ĐẠI TÀI | TRẠNG QUỲNH THỜI NHÍ NHỐ | PHIM HOẠT HÌNH 3D VIỆT NAM",
+      "url": "https://www.youtube.com/watch?v=Knyn-jCy0a4",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_97181c7cc8eb",
+      "kind": "official",
+      "title": "TẬP 79: KHO BÁU BÍ ẨN | TRẠNG QUỲNH THỜI NHÍ NHỐ | PHIM HOẠT HÌNH 3D VIỆT NAM",
+      "url": "https://www.youtube.com/watch?v=OpFrnHYK_Y8",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_d8b285cd3b91",
+      "kind": "official",
+      "title": "TẬP 80: HỌA SĨ THIÊN TÀI | TRẠNG QUỲNH THỜI NHÍ NHỐ | PHIM HOẠT HÌNH 3D VIỆT NAM",
+      "url": "https://www.youtube.com/watch?v=eRwrYds0-oQ",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_9e25224fa07e",
+      "kind": "official",
+      "title": "Tập 81: NHIỆM VỤ LẦY LỘI | Trạng Quỳnh Thời Nhí Nhố | Phim Hoạt Hình 3D Việt Nam",
+      "url": "https://www.youtube.com/watch?v=2qUzNEfghaI",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_5bc9b056a619",
+      "kind": "official",
+      "title": "Tập 82: GIẢI CỨU BÉ TRÂU | Trạng Quỳnh Thời Nhí Nhố | Phim Hoạt Hình 3D Việt Nam",
+      "url": "https://www.youtube.com/watch?v=5Rbu11O-ZoU",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_5ef3af13f95f",
+      "kind": "official",
+      "title": "TẬP 83: GIẢ ỐM | Trạng Quỳnh Thời Nhí Nhố | Phim Hoạt Hình 3D Việt Nam",
+      "url": "https://www.youtube.com/watch?v=gui4AR-kSmM",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_trang_quynh_46a97bf4aed9",
+      "kind": "official",
+      "title": "TẬP 84: SINH NHẬT BẤT NGỜ | Trạng Quỳnh Thời Nhí Nhố | Phim Hoạt Hình 3D Việt Nam",
+      "url": "https://www.youtube.com/watch?v=SWifIdOGeGU",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do Trạng Quỳnh Thời Nhí Nhố - Phim Hoạt Hình 3D đăng. YouTube báo cho phép phát nhúng."
+    }
+  ],
+  "series": [
+    {
+      "id": "ser_trang_quynh",
+      "title": "Trạng Quỳnh Thời Nhí Nhố",
+      "original_title": "Trạng Quỳnh Thời Nhí Nhố",
+      "primary_language": "vi",
+      "aliases": [
+        {
+          "text": "Trạng Quỳnh Nhí",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "translations": [],
+      "synopsis": "Quỳnh, Còi và các bạn bày đủ trò ở làng Khoai. Qua các cuộc thách đấu, buổi học võ và chuyện trong nhà thầy Hạc, bộ phim kể về tình bạn và đời sống làng quê Việt Nam.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "làng Khoai",
+        "trò chơi dân gian",
+        "hoạt hình Việt Nam"
+      ],
+      "themes": [
+        "tình bạn",
+        "làng quê"
+      ],
+      "origin_countries": [
+        "VN"
+      ],
+      "original_languages": [
+        "vi"
+      ],
+      "release_year_start": 2023,
+      "release_year_end": null,
+      "release_status": "unknown",
+      "creators": [],
+      "studios": [
+        "Alpha Animation Studio",
+        "Sconnect"
+      ],
+      "networks": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_bi_map",
+        "char_trang_quynh_sao",
+        "char_trang_quynh_muoi",
+        "char_trang_quynh_su_huynh",
+        "char_trang_quynh_su_nuong",
+        "char_trang_quynh_trau",
+        "char_trang_quynh_coc"
+      ],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_channel_id",
+          "value": "UCndGTJ1ZllgoBXRUR-xfDUQ"
+        },
+        {
+          "namespace": "youtube_playlist",
+          "value": "PLJscQ6PJLmu3zd6RfLDVUxP4EfahF2OKO"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_e26f9faa2457",
+            "src_trang_quynh_cf054e24187c",
+            "src_trang_quynh_f14e42a4e51b"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    }
+  ],
+  "seasons": [
+    {
+      "id": "sea_trang_quynh_main",
+      "series_id": "ser_trang_quynh",
+      "number": null,
+      "title": "Các tập đánh số",
+      "kind": "collection",
+      "translations": [],
+      "synopsis": null,
+      "release_year_start": null,
+      "release_year_end": null,
+      "artwork": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_playlist",
+          "value": "PLJscQ6PJLmu3zd6RfLDVUxP4EfahF2OKO"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_e26f9faa2457",
+            "src_trang_quynh_cf054e24187c"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Nhóm theo danh sách phát hành."
+        }
+      }
+    }
+  ],
+  "episodes": [
+    {
+      "id": "ep_trang_quynh_0001",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 1,
+      "production_code": null,
+      "title": "Phải dùng cái đầu",
+      "original_title": "Phải dùng cái đầu",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 195000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 3,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Sau khi thua Bí Mập trong cuộc tranh chỗ dưới gốc đa, Quỳnh và Còi nghĩ cách giành lại chỗ chơi bằng mưu trí.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "gốc đa",
+        "mưu trí"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_bi_map"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "GnCfwuHRGgk"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "GnCfwuHRGgk"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-10"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_5afa265a107a",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0002",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 2,
+      "production_code": null,
+      "title": "Kỳ tài võ thuật",
+      "original_title": "Kỳ tài võ thuật",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 244000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 4,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh và Còi quan sát một cao thủ lạ để tìm cách thắng Bí Mập. Buổi học lỏm khiến hai bạn nhận ra luyện võ khó hơn mình tưởng.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "học võ",
+        "cao thủ"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_bi_map"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "7W_Q6RaEZMY"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "7W_Q6RaEZMY"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-12"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_06b54eae5ac8",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0003",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 3,
+      "production_code": null,
+      "title": "Cao thủ vô danh",
+      "original_title": "Cao thủ vô danh",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 206000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 5,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Bí Mập ra cầu đá đợi Quỳnh và Còi tới đấu. Cả đám trẻ bất ngờ khi một người đội nón che kín mặt xuất hiện.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "cầu đá",
+        "thách đấu"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_bi_map"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "nnDNzp8tBPI"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "nnDNzp8tBPI"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-15"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_86026f4e89e5",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0004",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 4,
+      "production_code": null,
+      "title": "Bái sư",
+      "original_title": "Bái sư",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 232000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 6,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh và Còi tới lò võ thầy Hạc xin học để tự bảo vệ mình trước Bí Mập. Đến nơi, hai bạn thấy đám trẻ trong làng xếp hàng mang lễ xin nhập môn.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "lò võ",
+        "bái sư"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_bi_map"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "syAowJT0MlY"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "syAowJT0MlY"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-17"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_437768f9c44d",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0005",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 5,
+      "production_code": null,
+      "title": "Buổi học bất ổn",
+      "original_title": "Buổi học bất ổn",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 199000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 7,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh và Còi ngủ nướng trong khi cả nhà thầy Hạc đã thức dậy. Sáo nghĩ cách kéo hai bạn ra khỏi giường để tập võ.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "ngủ nướng",
+        "luyện võ"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_sao"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "-yOj-5YQ7DI"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "-yOj-5YQ7DI"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-19"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_2184ab3c4479",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0007",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 7,
+      "production_code": null,
+      "title": "Chuồn chuồn bay thấp thì mưa",
+      "original_title": "Chuồn chuồn bay thấp thì mưa",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 278000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 10,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Được giao phơi bánh đa, Quỳnh và Còi nhìn chuồn chuồn để đoán mưa. Trời liên tục đổi nắng mưa khiến hai bạn phải khiêng bánh ra vào nhiều lần.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "chuồn chuồn",
+        "bánh đa",
+        "thời tiết"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "Yzk2AcM0BCw"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "Yzk2AcM0BCw"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-23"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_4dd800d11981",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0008",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 8,
+      "production_code": null,
+      "title": "Tuyệt đỉnh khinh công",
+      "original_title": "Tuyệt đỉnh khinh công",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 238000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 11,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Đại sư huynh tập nhảy qua một cái cây ngày càng cao. Quỳnh và Còi giúp chăm cây cho tới khi một bóng người lạ xuất hiện trong đêm.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "khinh công",
+        "chăm cây"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_su_huynh"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "xNq3SqWEUPU"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "xNq3SqWEUPU"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-24"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_aef065588530",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0009",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 9,
+      "production_code": null,
+      "title": "Kho báu của sư phụ",
+      "original_title": "Kho báu của sư phụ",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 279000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 14,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Thấy sư phụ chôn một món đồ sau vườn, Quỳnh và Còi đào tìm. Hai bạn quên mất vị trí và lần lượt lôi lên nhiều thứ bất ngờ.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "kho báu",
+        "đào vườn"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "5GJJld91gSk"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "5GJJld91gSk"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-08-31"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_4cc7c0428c6d",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0010",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 10,
+      "production_code": null,
+      "title": "Nhiệm vụ bất khả thi",
+      "original_title": "Nhiệm vụ bất khả thi",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 298000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 15,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Đại sư huynh trở về với nhiều vết thương và còn sót một đơn bánh đa. Quỳnh và Còi nhận giao nốt dù chưa biết vì sao chuyến giao hàng lại gian nan.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "bánh đa",
+        "giao hàng"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_su_huynh"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "wM3O18ioi3k"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "wM3O18ioi3k"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-09-03"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_9c977f1279b0",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0011",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 11,
+      "production_code": null,
+      "title": "Cuộc phục kích bất ngờ",
+      "original_title": "Cuộc phục kích bất ngờ",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 269000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 17,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Trong trò tập trận của trẻ trong làng, đội Quỳnh bị đội Bí Mập chặn đường bằng đạn đất. Quỳnh phải nghĩ kế để đưa đội mình ra khỏi thế bị động.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "trò chơi dân gian",
+        "tập trận giả",
+        "đạn đất"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_muoi",
+        "char_trang_quynh_bi_map"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "KezpfW5OOWU"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "KezpfW5OOWU"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-09-09"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_b910e9819367",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0012",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 12,
+      "production_code": null,
+      "title": "Bí kíp võ công",
+      "original_title": "Bí kíp võ công",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 266000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 19,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Đang quét nhà, Quỳnh và Còi thấy sư phụ trao một cuốn sách cho đại sư huynh. Tưởng đó là bí kíp võ công, hai bạn tìm cách lấy để học tuyệt chiêu.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "bí kíp",
+        "đấu chổi"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_su_huynh"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "vF-BuiWL9DY"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "vF-BuiWL9DY"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-09-16"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_7171502d8e89",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0013",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 13,
+      "production_code": null,
+      "title": "Sức mạnh đại sư huynh",
+      "original_title": "Sức mạnh đại sư huynh",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 330000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 21,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Một con quái vật quấy phá nhà thầy Hạc giữa đêm. Đại sư huynh đứng ra đối đầu khi cả nhà gặp nguy.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "quái vật",
+        "dũng cảm"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_su_huynh",
+        "char_trang_quynh_su_nuong"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "dcDLExnVygI"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "dcDLExnVygI"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-09-23"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_3069771b64b2",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0014",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 14,
+      "production_code": null,
+      "title": "Trâu ốm rồi",
+      "original_title": "Trâu ốm rồi",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 264000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 28,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Trâu sốt vì một cái nhọt, nhưng lại bỏ chạy khi thấy thầy lang đem kim tiêm ra. Quỳnh và Còi tìm cách giúp bạn bình tĩnh để được chữa bệnh.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "ốm",
+        "thầy lang",
+        "sợ tiêm"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_trau"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "DGHiEqXAK0M"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "DGHiEqXAK0M"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-10-14"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_c8c4a21c9713",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0015",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 15,
+      "production_code": null,
+      "title": "Phi vụ bắt gà",
+      "original_title": "Phi vụ bắt gà",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 292000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 30,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Sư nương đi vắng, cả nhà ăn rau liền mấy ngày. Quỳnh và Còi muốn bắt gà để đổi món, nhưng con gà nhanh nhẹn hơn hai bạn dự tính.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "bắt gà",
+        "bữa cơm"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "F534M6KmGFI"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "F534M6KmGFI"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-10-21"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_2a9b58ce8eaa",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0016",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 16,
+      "production_code": null,
+      "title": "Bóng ma bí ẩn",
+      "original_title": "Bóng ma bí ẩn",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 347000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 32,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "bóng ma"
+      ],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "dzxjaprCieA"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "dzxjaprCieA"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-10-28"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_4aad4588580f",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0017",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 17,
+      "production_code": null,
+      "title": "Cộc đến chơi nhà",
+      "original_title": "Cộc đến chơi nhà",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 372000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 34,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Thầy Hạc nhờ Quỳnh trông chó Cộc cho ông Cam. Vừa khuất bóng thầy, Cộc đã làm khó Quỳnh và Còi, buộc hai bạn tìm cách đeo rọ mõm cho nó.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "trông chó",
+        "rọ mõm"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_coc"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "BDAqcnb-qYM"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "BDAqcnb-qYM"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-11-04"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_85a96d536421",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0018",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 18,
+      "production_code": null,
+      "title": "Chúa tể bầu trời",
+      "original_title": "Chúa tể bầu trời",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 324000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 36,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Cơn gió làm đứt dây diều phượng hoàng. Sáo bay lên cứu diều nhưng mắc vào dây, khiến đám trẻ hiểu nhầm rằng Sáo đang phá trò chơi.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "thả diều",
+        "diều phượng hoàng"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_sao"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "C9UXDFx1E40"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "C9UXDFx1E40"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-11-11"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_24a345581003",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0019",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 19,
+      "production_code": null,
+      "title": "Thầy giỏi dạy trò hay",
+      "original_title": "Thầy giỏi dạy trò hay",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 357000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 38,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Thầy Hạc mải chăm cây cảnh, còn Quỳnh nhân cơ hội lơ là việc học võ. Sau một cú ngã của thầy, Quỳnh và Còi phải đưa thầy đi chữa đau lưng.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "cây cảnh",
+        "sư đồ"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "o8m2xfMQcGQ"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "o8m2xfMQcGQ"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-11-18"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_7709d0061d21",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0020",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 20,
+      "production_code": null,
+      "title": "Trâu giả - Trâu thật",
+      "original_title": "Trâu giả - Trâu thật",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 335000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 40,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Một con trâu giống hệt Trâu xuất hiện và lén thế chỗ. Trâu phải tìm cách cho Quỳnh và Còi biết ai mới là bạn của họ.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "mạo danh",
+        "tình bạn"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_trau"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "0cQWFozvPLg"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "0cQWFozvPLg"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-11-25"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_4d22e1ab266e",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0021",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 21,
+      "production_code": null,
+      "title": "Cao thủ bí ẩn - Cuộc thách đấu ly kỳ",
+      "original_title": "Cao thủ bí ẩn - Cuộc thách đấu ly kỳ",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 359000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 42,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "cao thủ",
+        "thách đấu"
+      ],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "Idz0nJOd_uo"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "Idz0nJOd_uo"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-12-09"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_fd50168d5254",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0022",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 22,
+      "production_code": null,
+      "title": "Tiên ông hiển linh",
+      "original_title": "Tiên ông hiển linh",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 342000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 44,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "tiên ông"
+      ],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "L75m2YqXhYc"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "L75m2YqXhYc"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-12-16"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_42901ccff6d5",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0023",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 23,
+      "production_code": null,
+      "title": "Khi \"mẹ\" vắng nhà",
+      "original_title": "Khi \"mẹ\" vắng nhà",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 315000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 46,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "beq0O5ugcAM"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "beq0O5ugcAM"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-12-23"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_2f522a543004",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0024",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 24,
+      "production_code": null,
+      "title": "Răng rơi đáy nước",
+      "original_title": "Răng rơi đáy nước",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 274000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 48,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh và Còi đá bóng trúng Trâu đang đánh răng, làm hàm răng văng xuống ao. Hai bạn phải tìm cách mò lại hàm răng giữa mặt nước rộng.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "đá bóng",
+        "ao làng"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_trau"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "5WSC3SrJaYI"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "5WSC3SrJaYI"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2023-12-30"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_62f04d62bbe2",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0025",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 25,
+      "production_code": null,
+      "title": "Chữa \"điếc\" cho thầy Hạc",
+      "original_title": "Chữa \"điếc\" cho thầy Hạc",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 287000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 50,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Thầy Hạc bỗng dưng lãng tai sau khi bị sư nương mắng. Trong lúc cả nhà lo đi tìm thầy lang, Quỳnh và Còi phát hiện một chuyện bất ngờ.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "lãng tai",
+        "thầy lang"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_su_nuong"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "e86C53aHqgY"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "e86C53aHqgY"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-01-06"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_abd68853a760",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0026",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 26,
+      "production_code": null,
+      "title": "Gà khỏe, gà đẹp",
+      "original_title": "Gà khỏe, gà đẹp",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 332000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 52,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Làng mở hội thi gà trống và Quỳnh muốn đem gà Cồ đi dự. Việc khó nhất là bắt được con gà vốn rất dữ.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "hội làng",
+        "gà trống"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "r14acYiFh-s"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "r14acYiFh-s"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-01-13"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_140332df2588",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0027",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 27,
+      "production_code": null,
+      "title": "Quân sư mai mối",
+      "original_title": "Quân sư mai mối",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 325000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 54,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Nhận ra chị Nếp có cảm tình với đại sư huynh, Quỳnh và Còi bày cách giúp hai người nói chuyện. Hai bạn còn hy vọng được ăn bánh nếp thỏa thích.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "mai mối",
+        "bánh nếp"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_su_huynh"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "6uyt88iJd_c"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "6uyt88iJd_c"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-01-20"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_11665e9b12bc",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0028",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 28,
+      "production_code": null,
+      "title": "Làm vỡ bình quý",
+      "original_title": "Làm vỡ bình quý",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 359000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 56,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh và Còi làm vỡ bình của sư phụ. Nhờ ghé lò gốm, hai bạn có dịp tự học cách nặn một chiếc bình thay thế.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "làm gốm",
+        "bình gốm"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "Abj5ZTUhKRA"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "Abj5ZTUhKRA"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-01-27"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_7073924cd610",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0077",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 77,
+      "production_code": null,
+      "title": "Rạp chiếu bóng đẳng cấp",
+      "original_title": "Rạp chiếu bóng đẳng cấp",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 289000,
+      "orders": [],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "chiếu bóng"
+      ],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "TPWo2knvb0U"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "TPWo2knvb0U"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-05-24"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_27453a2f167d"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0078",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 78,
+      "production_code": null,
+      "title": "Đầu bếp đại tài",
+      "original_title": "Đầu bếp đại tài",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 229000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 77,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Sư nương đi vắng, thầy Hạc phải nấu cơm với sự giúp đỡ của Quỳnh và Còi. Ba thầy trò lúng túng biến bữa cơm thành một phen náo loạn.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "nấu ăn",
+        "bếp"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "Knyn-jCy0a4"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "Knyn-jCy0a4"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-07-05"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_7202b665df92",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0079",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 79,
+      "production_code": null,
+      "title": "Kho báu bí ẩn",
+      "original_title": "Kho báu bí ẩn",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 253000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 79,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Đóng vai cướp biển, Quỳnh và Còi lục tung nhà để tìm kho báu. Sư nương đưa ra chỉ dẫn khiến hai bạn hăng hái đi tìm khắp nơi.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "cướp biển",
+        "kho báu"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_thay_hac",
+        "char_trang_quynh_su_nuong"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "OpFrnHYK_Y8"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "OpFrnHYK_Y8"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-07-12"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_97181c7cc8eb",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0080",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 80,
+      "production_code": null,
+      "title": "Họa sĩ thiên tài",
+      "original_title": "Họa sĩ thiên tài",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 232000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 81,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh và Còi lỡ vẽ lên một bức tranh Đông Hồ của sư phụ. Hai bạn tìm cách đưa bức tranh quý về nguyên trạng.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "tranh Đông Hồ",
+        "vẽ"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "eRwrYds0-oQ"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "eRwrYds0-oQ"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-07-19"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_d8b285cd3b91",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0081",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 81,
+      "production_code": null,
+      "title": "Nhiệm vụ lầy lội",
+      "original_title": "Nhiệm vụ lầy lội",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 197000,
+      "orders": [],
+      "synopsis": "Sư nương giao cho đại sư huynh trông nhà và dặn dò nhiều điều. Quỳnh và Còi đang chơi bóng thì bị bạn giữ nhà nhắc phải tuân thủ danh sách ấy.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "trông nhà",
+        "đá bóng"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_su_huynh"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "2qUzNEfghaI"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "2qUzNEfghaI"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-07-26"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_9e25224fa07e"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0082",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 82,
+      "production_code": null,
+      "title": "Giải cứu bé trâu",
+      "original_title": "Giải cứu bé trâu",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 231000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 82,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Trong lúc tranh chuối với một con ếch, Trâu trượt chân rơi xuống hố dưới chân đê và mắc kẹt.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "cứu hộ",
+        "chân đê"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_trau"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "5Rbu11O-ZoU"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "5Rbu11O-ZoU"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-08-02"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_5bc9b056a619",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0083",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 83,
+      "production_code": null,
+      "title": "Giả ốm",
+      "original_title": "Giả ốm",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 224000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 83,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh và Còi vờ bị ốm để khỏi làm việc nhà. Hai bạn lại phải ăn cháo, xông hơi và uống thuốc đắng như người bệnh thật.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "việc nhà",
+        "giả bệnh"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "gui4AR-kSmM"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "gui4AR-kSmM"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-08-09"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_5ef3af13f95f",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    },
+    {
+      "id": "ep_trang_quynh_0084",
+      "series_id": "ser_trang_quynh",
+      "season_id": "sea_trang_quynh_main",
+      "number": 84,
+      "production_code": null,
+      "title": "Sinh nhật bất ngờ",
+      "original_title": "Sinh nhật bất ngờ",
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "short",
+      "release_date": null,
+      "duration_ms": 235000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 84,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Quỳnh mong chờ quà sinh nhật của Còi, Muối và những người trong nhà, nhưng cả ngày có vẻ chẳng ai nhớ đến dịp này.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "sinh nhật",
+        "tình bạn"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_trang_quynh_quynh",
+        "char_trang_quynh_coi",
+        "char_trang_quynh_muoi"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "SWifIdOGeGU"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "SWifIdOGeGU"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2025-08-16"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_46a97bf4aed9",
+            "src_trang_quynh_e26f9faa2457"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt biên tập từ phần giới thiệu của kênh."
+        }
+      }
+    }
+  ],
+  "segments": [],
+  "characters": [
+    {
+      "id": "char_trang_quynh_quynh",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Quỳnh",
+      "aliases": [
+        {
+          "text": "Trạng Quỳnh",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": "Cậu bé thích nghĩ kế khi gặp chuyện khó.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_5afa265a107a",
+            "src_trang_quynh_06b54eae5ac8",
+            "src_trang_quynh_86026f4e89e5"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_coi",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Còi",
+      "aliases": [],
+      "description": "Bạn đồng hành của Quỳnh trong nhiều trò ở làng Khoai.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_5afa265a107a",
+            "src_trang_quynh_06b54eae5ac8",
+            "src_trang_quynh_86026f4e89e5"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_thay_hac",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Thầy Hạc",
+      "aliases": [
+        {
+          "text": "Sư phụ",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": "Thầy dạy võ của Quỳnh và Còi.",
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_437768f9c44d",
+            "src_trang_quynh_2184ab3c4479",
+            "src_trang_quynh_4cc7c0428c6d"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_bi_map",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Bí Mập",
+      "aliases": [
+        {
+          "text": "Mập",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_5afa265a107a",
+            "src_trang_quynh_06b54eae5ac8",
+            "src_trang_quynh_86026f4e89e5"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_sao",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Sáo",
+      "aliases": [],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_2184ab3c4479",
+            "src_trang_quynh_24a345581003"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_muoi",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Muối",
+      "aliases": [],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_b910e9819367",
+            "src_trang_quynh_46a97bf4aed9"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_su_huynh",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Đại sư huynh",
+      "aliases": [
+        {
+          "text": "Sư huynh",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_aef065588530",
+            "src_trang_quynh_9c977f1279b0",
+            "src_trang_quynh_7171502d8e89"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_su_nuong",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Sư nương",
+      "aliases": [
+        {
+          "text": "Bà Quy",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_3069771b64b2",
+            "src_trang_quynh_abd68853a760",
+            "src_trang_quynh_97181c7cc8eb"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_trau",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Trâu",
+      "aliases": [
+        {
+          "text": "Bé Trâu",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_c8c4a21c9713",
+            "src_trang_quynh_4d22e1ab266e",
+            "src_trang_quynh_62f04d62bbe2"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_trang_quynh_coc",
+      "series_ids": [
+        "ser_trang_quynh"
+      ],
+      "name": "Cộc",
+      "aliases": [],
+      "description": "Chó của ông Cam.",
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_trang_quynh_85a96d536421"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    }
+  ],
+  "media_assets": [],
+  "text_tracks": [],
+  "scenes": []
+}

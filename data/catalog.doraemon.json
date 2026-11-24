@@ -1,0 +1,4591 @@
+{
+  "schema_version": "dippie.catalog.v1",
+  "package": {
+    "id": "pkg_dippie_doraemon",
+    "revision": 5,
+    "created_at": "2026-11-22T16:17:55Z",
+    "default_language": "vi",
+    "import_mode": "upsert",
+    "reference_scope": "self_contained",
+    "description": "Danh mục Doraemon từ các video đánh số của POPS Kids."
+  },
+  "genres": [
+    {
+      "id": "animation",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hoạt hình"
+        },
+        {
+          "language": "en",
+          "text": "Animation"
+        },
+        {
+          "language": "ko",
+          "text": "애니메이션"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "comedy",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Hài hước"
+        },
+        {
+          "language": "en",
+          "text": "Comedy"
+        },
+        {
+          "language": "ko",
+          "text": "코미디"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "family",
+      "labels": [
+        {
+          "language": "vi",
+          "text": "Gia đình"
+        },
+        {
+          "language": "en",
+          "text": "Family"
+        },
+        {
+          "language": "ko",
+          "text": "가족"
+        }
+      ],
+      "aliases": []
+    }
+  ],
+  "attribute_scales": [],
+  "sources": [
+    {
+      "id": "src_doraemon_6a8cfcfb82f7",
+      "kind": "official",
+      "title": "Doraemon mùa 12, bản lồng tiếng POPS Kids",
+      "url": "https://www.youtube.com/playlist?list=PLdhrcCVXurgJrmtUIdeeOJlwN0O8UAZx4",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Danh sách của kênh phát hành. Vị trí trong playlist lưu riêng với số tập ghi trên video."
+    },
+    {
+      "id": "src_doraemon_382e611ded81",
+      "kind": "official",
+      "title": "POPS Kids",
+      "url": "https://www.youtube.com/channel/UC5ezaYrzZpyItPSRG27MLpg",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": null
+    },
+    {
+      "id": "src_doraemon_63f5d4f52a53",
+      "kind": "official",
+      "title": "Doraemon và các nhân vật trên TV Asahi",
+      "url": "https://www.tv-asahi.co.jp/doraemon/character/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": null
+    },
+    {
+      "id": "src_doraemon_66bd09ec8933",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 573 - Gas Sửa Chữa Tật Xấu - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=S5UeNHBhUMQ",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_c3d9809956f4",
+      "kind": "official",
+      "title": "くせなおしガス",
+      "url": "https://www.tv-asahi.co.jp/doraemon_2017/story/0461/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Nội dung truyện do TV Asahi công bố."
+    },
+    {
+      "id": "src_doraemon_4a50e79f215d",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 574 - Taxi Khăn Gói - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=JSFhIMhLlH8",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_20c7d4603e2d",
+      "kind": "official",
+      "title": "ふろしきタクシー",
+      "url": "https://www.tv-asahi.co.jp/doraemon_2017/story/0462/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Nội dung truyện do TV Asahi công bố."
+    },
+    {
+      "id": "src_doraemon_df676fec8431",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 575 - Máy Huấn Luyện Lái Tên Lửa - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=KTGCEcT8x1k",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_0a0b0001a216",
+      "kind": "official",
+      "title": "ロケットそうじゅうくんれん機",
+      "url": "https://www.tv-asahi.co.jp/doraemon_2017/story/0463/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Nội dung truyện do TV Asahi công bố."
+    },
+    {
+      "id": "src_doraemon_854a4e7cc3e2",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 576 - Khăn Vải Siêu Nhân - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=o7rZwxil96o",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_5bd57017a1f8",
+      "kind": "official",
+      "title": "スーパーヒーローふろしき",
+      "url": "https://www.tv-asahi.co.jp/doraemon_2017/story/0464/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Nội dung truyện do TV Asahi công bố."
+    },
+    {
+      "id": "src_doraemon_4f66b39160b2",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 577 - Cùng Nhau Giải Cứu Chim Cánh Cụt Nam Cực! - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=FgYh6IUjSsg",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_01a7ced71448",
+      "kind": "official",
+      "title": "南極ペンギンを救え！",
+      "url": "https://www.tv-asahi.co.jp/doraemon_2017/story/0465/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Nội dung truyện do TV Asahi công bố."
+    },
+    {
+      "id": "src_doraemon_59dd2bd540ee",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 578 - Trận Tuyết Rơi Kỳ Tích Trong Đêm Giáng Sinh - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=XL4Vg58q10c",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_438b16e7dd78",
+      "kind": "official",
+      "title": "クリスマスに雪を",
+      "url": "https://www.tv-asahi.co.jp/doraemon_2017/story/0466/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Nội dung truyện do TV Asahi công bố."
+    },
+    {
+      "id": "src_doraemon_973746c2434e",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 579 - Thang Máy Địa Cầu - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=73kdxrgNNnA",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_6f7dde9239c9",
+      "kind": "official",
+      "title": "地球エレベーター",
+      "url": "https://www.tv-asahi.co.jp/doraemon_2017/story/0468/",
+      "reference": null,
+      "language": "ja",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Nội dung truyện do TV Asahi công bố."
+    },
+    {
+      "id": "src_doraemon_30f2058b67c0",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 580 - Sợi Dây Nhạc - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=DEN_RwRieBc",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_cc4665e6b578",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 581 - Quần Đùi Tazan - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=dOOKpDm9TfA",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_070613747e8b",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 582 - Chuyến Phiêu Lưu Ma Quái Của Nobita Nhỏ - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=W5YQmpv_8xE",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_a05c4e2b437d",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 583 - Socola Trái Tim - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=KfWHnBb2Qfo",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_1e2b7d92d529",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 584 - Boomerang Hồi Hộp - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=LX7bl4CTMl0",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_43a4bade8c4a",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 585 - Tuyết Và Khủng Long - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=JOXdHwk9cSk",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_0fb65e98047e",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 586 - Paopao Đi Lạc - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=cf21W-C33MA",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_58d8d05d1bcb",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 587 - Chào Mừng Đến Với Lâu Đài Bằng Bìa Các Tông - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=6ymyP8MgW8w",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_4a373206c4de",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 588 - Thuốc Nhỏ Mắt Tàng Hình - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=cCBCTKaMjr0",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_55eb496236b1",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 592 - Nobita Và Kiến Chúa - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=FiSzhg8HMug",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_62443d10ddb0",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 596 - Phụ Lục Một Trăm Năm Sau - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=JtPHQ7QwmiE",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_944d397f987f",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 597 - Máy Quay Kịch Tác Nổi Tiếng - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=hvMwrPpl1hI",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_df72baf0db79",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 598 - Bơi Lội Trong Phòng - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=rOkV-mTWHdA",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_09c2d4b1ebc2",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 599 - Chiến Tranh Vũ Trụ Dưới Mái Nhà - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=oPWKfkhyW0Q",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_f7abfc8ea141",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 600 - Cố Lên! Ngôi Nhà Ma Quái - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=uHF0xkPz8Wg",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_761e01a5b97b",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 601 - Nông Trại Bánh Kẹo - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=VBjTy9C_db8",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_e9c4f6efa1da",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 602 - Bộ Huấn Luyện Nhẫn Giả - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=D1Fq9QsX9q8",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_f638520e6d5e",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 603 - Có Ai Đó Đang Muốn Nuôi Mèo Nobita Không? - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=7pbyr9QvOC0",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_0730cb562e04",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 604 - Ngôi Trường Vận Động Bắt Buộc - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=S6kDxufnmQE",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_0ffde8a8fc12",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 605 - Bé Mi Xinh Đẹp - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=X2cAnj4Vhew",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_45c3b3ea04b1",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 606 - Ông Vua Trần Như Nhộng!? Bộ Giáp Tối Thượng - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=sDL0g5onEwk",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_9f2434e47f16",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 607 - Tơ Nhện Cân Bằng - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=Cv_n5McwQpQ",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_333c373afe82",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 608 - Thám Tử Lá Nobita - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=Q7eqBjOJsHo",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_582ffa771d58",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 609 - Phát Minh Vĩ Đại Với Máy Sáng Chế - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=NESs1KPmtKM",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_bcd4a2ea022e",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 610 - Thế Giới Không Có Gương Soi - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=D9RLWvuJ5NE",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_cb6f23c19d2f",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 611 - Giáng Sinh Trong Ngôi Nhà Bánh Kẹo - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=0l29xJY3sWw",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_fd7607e80552",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 612 - Tay Súng Nobita - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=CAFfwEs1tmQ",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_70f5f8b17070",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 613 - Buffet Loại Nào Cũng Có - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=RZzbDFgXMUU",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_3835aea96f4a",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 614 - Trứng Tạo Nhân Vật - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=82-j0qQa7iY",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_ecabbc871e0a",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 615 - Tôi Yêu Roboko - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=zu5nBfghmIY",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_513919b3a242",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 616 - Những Người Giúp Việc Tí Hon - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=SByaaFakppU",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_7f4b11e4864e",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 617 - Jaian Đấu Với Người Máy Jaian - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=XSajnOeOZz0",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_81f2e3c3a3d9",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 618 - Gulliver Phiền Toái - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=1gY8AAryLx8",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_d1af365b9fd0",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 619 - Hòn Đảo Kho Báu Dễ Chịu - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=f_DPhOw5aTQ",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_7ee640a15ea7",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 620 - Bánh Quy Biến Hình - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=DcdilkT1cvk",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_8016b2faa5b8",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 621 - Ấm Nước Doraemon - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=Cl4oH6l9YDA",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_9a25aae7f93e",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 622 - Công Viên Động Vật Hoang Dã - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=pzL_FW80zoY",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_74b6f44b3991",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 623 - Đổi Mẹ Cho Nhau - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=tR_O63IOMZc",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    },
+    {
+      "id": "src_doraemon_774269b7b1b6",
+      "kind": "official",
+      "title": "[S12] Doraemon - Tập 624 - Chỉ Còn Lại Một Nobita Trên Đời Này Thôi - Bản Lồng Tiếng Hay Nhất",
+      "url": "https://www.youtube.com/watch?v=NH_OWDWOCFc",
+      "reference": null,
+      "language": "vi",
+      "retrieved_at": "2026-11-22T16:17:55Z",
+      "note": "Video công khai do POPS Kids đăng. YouTube báo cho phép phát nhúng."
+    }
+  ],
+  "series": [
+    {
+      "id": "ser_doraemon",
+      "title": "Doraemon",
+      "original_title": "ドラえもん",
+      "primary_language": "vi",
+      "aliases": [
+        {
+          "text": "Đôrêmon",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "translations": [],
+      "synopsis": "Mèo máy Doraemon đến từ thế kỷ 22 để giúp Nobita. Những bảo bối trong túi thần kỳ mở ra các cuộc phiêu lưu của hai bạn cùng Shizuka, Jaian và Suneo.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "mèo máy",
+        "bảo bối",
+        "Nobita"
+      ],
+      "themes": [
+        "tình bạn"
+      ],
+      "origin_countries": [
+        "JP"
+      ],
+      "original_languages": [
+        "ja"
+      ],
+      "release_year_start": null,
+      "release_year_end": null,
+      "release_status": "unknown",
+      "creators": [],
+      "studios": [],
+      "networks": [
+        "TV Asahi"
+      ],
+      "character_ids": [
+        "char_doraemon_doraemon",
+        "char_doraemon_nobita",
+        "char_doraemon_shizuka",
+        "char_doraemon_jaian",
+        "char_doraemon_suneo",
+        "char_doraemon_dorami"
+      ],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_channel_id",
+          "value": "UC5ezaYrzZpyItPSRG27MLpg"
+        },
+        {
+          "namespace": "youtube_playlist",
+          "value": "PLdhrcCVXurgJrmtUIdeeOJlwN0O8UAZx4"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_382e611ded81",
+            "src_doraemon_63f5d4f52a53"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    }
+  ],
+  "seasons": [
+    {
+      "id": "sea_doraemon_s12",
+      "series_id": "ser_doraemon",
+      "number": 12,
+      "title": "Mùa 12 theo POPS Kids",
+      "kind": "regular",
+      "translations": [],
+      "synopsis": null,
+      "release_year_start": null,
+      "release_year_end": null,
+      "artwork": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_playlist",
+          "value": "PLdhrcCVXurgJrmtUIdeeOJlwN0O8UAZx4"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_382e611ded81"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Nhóm theo danh sách phát hành."
+        }
+      }
+    }
+  ],
+  "episodes": [
+    {
+      "id": "ep_doraemon_s12_0573",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 573,
+      "production_code": null,
+      "title": "Gas Sửa Chữa Tật Xấu",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1454000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 2,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Nobita muốn bố mẹ nhận ra thói quen xấu của mình. Doraemon đưa cậu một loại khí làm những thói quen ấy lộ rõ mỗi khi lặp lại.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "bảo bối",
+        "thói quen"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_doraemon_nobita",
+        "char_doraemon_doraemon"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "S5UeNHBhUMQ"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "S5UeNHBhUMQ"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-01"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_66bd09ec8933",
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_c3d9809956f4"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt truyện nêu tên trong tiêu đề Việt, đối chiếu với TV Asahi."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0574",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 574,
+      "production_code": null,
+      "title": "Taxi Khăn Gói",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1455000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 3,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Nhà bạn cho mượn truyện tranh ở xa nên Nobita ngại đi bộ. Doraemon lấy ra chiếc khăn gói có thể biến chuyến đi thành một cuốc taxi bất ngờ.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "truyện tranh",
+        "khăn gói",
+        "taxi"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_doraemon_nobita",
+        "char_doraemon_doraemon"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "JSFhIMhLlH8"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "JSFhIMhLlH8"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-02"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_4a50e79f215d",
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_20c7d4603e2d"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt truyện nêu tên trong tiêu đề Việt, đối chiếu với TV Asahi."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0575",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 575,
+      "production_code": null,
+      "title": "Máy Huấn Luyện Lái Tên Lửa",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1454000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 4,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Sau khi đọc truyện phiêu lưu vũ trụ, Nobita thử lái một chiếc đĩa bay nhỏ bằng máy huấn luyện của Doraemon. Một cú điều khiển nhầm đưa nó bay ra ngoài cửa sổ.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "vũ trụ",
+        "đĩa bay",
+        "máy huấn luyện"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_doraemon_nobita",
+        "char_doraemon_doraemon"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "KTGCEcT8x1k"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "KTGCEcT8x1k"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-03"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_df676fec8431",
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_0a0b0001a216"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt truyện nêu tên trong tiêu đề Việt, đối chiếu với TV Asahi."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0576",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 576,
+      "production_code": null,
+      "title": "Khăn Vải Siêu Nhân",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1400000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 5,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Jaian bắt chước một siêu anh hùng trên truyền hình và đòi tìm kẻ xấu để truy đuổi. Doraemon cho Nobita mượn chiếc khăn chơi trò siêu nhân để đối phó.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "siêu anh hùng",
+        "khăn bay",
+        "bảo bối"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_doraemon_nobita",
+        "char_doraemon_doraemon",
+        "char_doraemon_jaian"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "o7rZwxil96o"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "o7rZwxil96o"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-08"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_854a4e7cc3e2",
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_5bd57017a1f8"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt truyện nêu tên trong tiêu đề Việt, đối chiếu với TV Asahi."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0577",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 577,
+      "production_code": null,
+      "title": "Cùng Nhau Giải Cứu Chim Cánh Cụt Nam Cực!",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1448000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 6,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Một buổi đi trượt băng đổ bể khiến Dorami rủ cả nhóm sang Nam Cực. Trên mặt băng, chuyến vui chơi chuyển thành cuộc giải cứu chim cánh cụt.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "Nam Cực",
+        "trượt băng",
+        "chim cánh cụt"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_doraemon_nobita",
+        "char_doraemon_doraemon",
+        "char_doraemon_shizuka",
+        "char_doraemon_dorami",
+        "char_doraemon_jaian",
+        "char_doraemon_suneo"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "FgYh6IUjSsg"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "FgYh6IUjSsg"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-09"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_4f66b39160b2",
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_01a7ced71448"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt truyện nêu tên trong tiêu đề Việt, đối chiếu với TV Asahi."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0578",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 578,
+      "production_code": null,
+      "title": "Trận Tuyết Rơi Kỳ Tích Trong Đêm Giáng Sinh",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1458000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 7,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Muốn Shizuka có một Giáng sinh đầy tuyết, Nobita dùng hộp điều khiển thời tiết đang hỏng của Doraemon. Tuyết bất ngờ rơi và phủ trắng khu phố.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "Giáng sinh",
+        "tuyết",
+        "thời tiết"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_doraemon_nobita",
+        "char_doraemon_doraemon",
+        "char_doraemon_shizuka"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "XL4Vg58q10c"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "XL4Vg58q10c"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-10"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_59dd2bd540ee",
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_438b16e7dd78"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt truyện nêu tên trong tiêu đề Việt, đối chiếu với TV Asahi."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0579",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 579,
+      "production_code": null,
+      "title": "Thang Máy Địa Cầu",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1438000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 8,
+          "display_label": null
+        }
+      ],
+      "synopsis": "Nobita muốn tới Brazil trước Suneo. Cậu cùng Shizuka và Jaian dùng thang máy xuyên lòng đất của Doraemon, nhưng chuyến đi đầu tiên đưa họ ra giữa biển.",
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [
+        "Brazil",
+        "lòng đất",
+        "thang máy"
+      ],
+      "themes": [],
+      "character_ids": [
+        "char_doraemon_nobita",
+        "char_doraemon_doraemon",
+        "char_doraemon_shizuka",
+        "char_doraemon_jaian",
+        "char_doraemon_suneo"
+      ],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "73kdxrgNNnA"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "73kdxrgNNnA"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-15"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_973746c2434e",
+            "src_doraemon_6a8cfcfb82f7",
+            "src_doraemon_6f7dde9239c9"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Tóm tắt truyện nêu tên trong tiêu đề Việt, đối chiếu với TV Asahi."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0580",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 580,
+      "production_code": null,
+      "title": "Sợi Dây Nhạc",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1442000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 9,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "DEN_RwRieBc"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "DEN_RwRieBc"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-16"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_30f2058b67c0",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0581",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 581,
+      "production_code": null,
+      "title": "Quần Đùi Tazan",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1438000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 10,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "dOOKpDm9TfA"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "dOOKpDm9TfA"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-17"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_cc4665e6b578",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0582",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 582,
+      "production_code": null,
+      "title": "Chuyến Phiêu Lưu Ma Quái Của Nobita Nhỏ",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1438000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 11,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "W5YQmpv_8xE"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "W5YQmpv_8xE"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-22"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_070613747e8b",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0583",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 583,
+      "production_code": null,
+      "title": "Socola Trái Tim",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1437000,
+      "orders": [],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "KfWHnBb2Qfo"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "KfWHnBb2Qfo"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-23"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_a05c4e2b437d"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0584",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 584,
+      "production_code": null,
+      "title": "Boomerang Hồi Hộp",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1422000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 12,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "LX7bl4CTMl0"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "LX7bl4CTMl0"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-24"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_1e2b7d92d529",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0585",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 585,
+      "production_code": null,
+      "title": "Tuyết Và Khủng Long",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1328000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 13,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "JOXdHwk9cSk"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "JOXdHwk9cSk"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-29"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_43a4bade8c4a",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0586",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 586,
+      "production_code": null,
+      "title": "Paopao Đi Lạc",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1199000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 16,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "cf21W-C33MA"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "cf21W-C33MA"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-04-05"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_0fb65e98047e",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0587",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 587,
+      "production_code": null,
+      "title": "Chào Mừng Đến Với Lâu Đài Bằng Bìa Các Tông",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1438000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 14,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "6ymyP8MgW8w"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "6ymyP8MgW8w"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-30"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_58d8d05d1bcb",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0588",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 588,
+      "production_code": null,
+      "title": "Thuốc Nhỏ Mắt Tàng Hình",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1439000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 15,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "cCBCTKaMjr0"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "cCBCTKaMjr0"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-03-31"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_4a373206c4de",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0592",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 592,
+      "production_code": null,
+      "title": "Nobita Và Kiến Chúa",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1453000,
+      "orders": [],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "FiSzhg8HMug"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "FiSzhg8HMug"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-04-13"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_55eb496236b1"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0596",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 596,
+      "production_code": null,
+      "title": "Phụ Lục Một Trăm Năm Sau",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1453000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 17,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "JtPHQ7QwmiE"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "JtPHQ7QwmiE"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-04-21"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_62443d10ddb0",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0597",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 597,
+      "production_code": null,
+      "title": "Máy Quay Kịch Tác Nổi Tiếng",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1433000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 18,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "hvMwrPpl1hI"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "hvMwrPpl1hI"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-04-26"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_944d397f987f",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0598",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 598,
+      "production_code": null,
+      "title": "Bơi Lội Trong Phòng",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1398000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 19,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "rOkV-mTWHdA"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "rOkV-mTWHdA"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-04-27"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_df72baf0db79",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0599",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 599,
+      "production_code": null,
+      "title": "Chiến Tranh Vũ Trụ Dưới Mái Nhà",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1374000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 20,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "oPWKfkhyW0Q"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "oPWKfkhyW0Q"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-04-28"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_09c2d4b1ebc2",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0600",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 600,
+      "production_code": null,
+      "title": "Cố Lên! Ngôi Nhà Ma Quái",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1283000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 21,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "uHF0xkPz8Wg"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "uHF0xkPz8Wg"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-03"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_f7abfc8ea141",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0601",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 601,
+      "production_code": null,
+      "title": "Nông Trại Bánh Kẹo",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1373000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 22,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "VBjTy9C_db8"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "VBjTy9C_db8"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-04"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_761e01a5b97b",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0602",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 602,
+      "production_code": null,
+      "title": "Bộ Huấn Luyện Nhẫn Giả",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1374000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 23,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "D1Fq9QsX9q8"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "D1Fq9QsX9q8"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-05"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_e9c4f6efa1da",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0603",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 603,
+      "production_code": null,
+      "title": "Có Ai Đó Đang Muốn Nuôi Mèo Nobita Không?",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1374000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 24,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "7pbyr9QvOC0"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "7pbyr9QvOC0"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-10"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_f638520e6d5e",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0604",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 604,
+      "production_code": null,
+      "title": "Ngôi Trường Vận Động Bắt Buộc",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1372000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 25,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "S6kDxufnmQE"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "S6kDxufnmQE"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-11"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_0730cb562e04",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0605",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 605,
+      "production_code": null,
+      "title": "Bé Mi Xinh Đẹp",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1364000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 26,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "X2cAnj4Vhew"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "X2cAnj4Vhew"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-12"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_0ffde8a8fc12",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0606",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 606,
+      "production_code": null,
+      "title": "Ông Vua Trần Như Nhộng!? Bộ Giáp Tối Thượng",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1364000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 27,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "sDL0g5onEwk"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "sDL0g5onEwk"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-17"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_45c3b3ea04b1",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0607",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 607,
+      "production_code": null,
+      "title": "Tơ Nhện Cân Bằng",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1364000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 28,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "Cv_n5McwQpQ"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "Cv_n5McwQpQ"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-18"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_9f2434e47f16",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0608",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 608,
+      "production_code": null,
+      "title": "Thám Tử Lá Nobita",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1364000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 29,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "Q7eqBjOJsHo"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "Q7eqBjOJsHo"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-19"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_333c373afe82",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0609",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 609,
+      "production_code": null,
+      "title": "Phát Minh Vĩ Đại Với Máy Sáng Chế",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1367000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 30,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "NESs1KPmtKM"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "NESs1KPmtKM"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-24"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_582ffa771d58",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0610",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 610,
+      "production_code": null,
+      "title": "Thế Giới Không Có Gương Soi",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1367000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 31,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "D9RLWvuJ5NE"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "D9RLWvuJ5NE"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-25"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_bcd4a2ea022e",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0611",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 611,
+      "production_code": null,
+      "title": "Giáng Sinh Trong Ngôi Nhà Bánh Kẹo",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1379000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 32,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "0l29xJY3sWw"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "0l29xJY3sWw"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-26"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_cb6f23c19d2f",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0612",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 612,
+      "production_code": null,
+      "title": "Tay Súng Nobita",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1379000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 33,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "CAFfwEs1tmQ"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "CAFfwEs1tmQ"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-05-31"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_fd7607e80552",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0613",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 613,
+      "production_code": null,
+      "title": "Buffet Loại Nào Cũng Có",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1379000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 34,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "RZzbDFgXMUU"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "RZzbDFgXMUU"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-01"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_70f5f8b17070",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0614",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 614,
+      "production_code": null,
+      "title": "Trứng Tạo Nhân Vật",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1290000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 35,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "82-j0qQa7iY"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "82-j0qQa7iY"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-02"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_3835aea96f4a",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0615",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 615,
+      "production_code": null,
+      "title": "Tôi Yêu Roboko",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1295000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 36,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "zu5nBfghmIY"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "zu5nBfghmIY"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-07"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_ecabbc871e0a",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0616",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 616,
+      "production_code": null,
+      "title": "Những Người Giúp Việc Tí Hon",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1310000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 37,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "SByaaFakppU"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "SByaaFakppU"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-08"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_513919b3a242",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0617",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 617,
+      "production_code": null,
+      "title": "Jaian Đấu Với Người Máy Jaian",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1294000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 38,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "XSajnOeOZz0"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "XSajnOeOZz0"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-09"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_7f4b11e4864e",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0618",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 618,
+      "production_code": null,
+      "title": "Gulliver Phiền Toái",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1384000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 39,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "1gY8AAryLx8"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "1gY8AAryLx8"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-14"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_81f2e3c3a3d9",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0619",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 619,
+      "production_code": null,
+      "title": "Hòn Đảo Kho Báu Dễ Chịu",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1254000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 40,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "f_DPhOw5aTQ"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "f_DPhOw5aTQ"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-15"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_d1af365b9fd0",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0620",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 620,
+      "production_code": null,
+      "title": "Bánh Quy Biến Hình",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1379000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 41,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "DcdilkT1cvk"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "DcdilkT1cvk"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-16"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_7ee640a15ea7",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0621",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 621,
+      "production_code": null,
+      "title": "Ấm Nước Doraemon",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1449000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 42,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "Cl4oH6l9YDA"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "Cl4oH6l9YDA"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-21"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_8016b2faa5b8",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0622",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 622,
+      "production_code": null,
+      "title": "Công Viên Động Vật Hoang Dã",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1379000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 43,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "pzL_FW80zoY"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "pzL_FW80zoY"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-22"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_9a25aae7f93e",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0623",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 623,
+      "production_code": null,
+      "title": "Đổi Mẹ Cho Nhau",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1404000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 44,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "tR_O63IOMZc"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "tR_O63IOMZc"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-23"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_74b6f44b3991",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    },
+    {
+      "id": "ep_doraemon_s12_0624",
+      "series_id": "ser_doraemon",
+      "season_id": "sea_doraemon_s12",
+      "number": 624,
+      "production_code": null,
+      "title": "Chỉ Còn Lại Một Nobita Trên Đời Này Thôi",
+      "original_title": null,
+      "aliases": [],
+      "translations": [],
+      "primary_language": "vi",
+      "kind": "regular",
+      "release_date": null,
+      "duration_ms": 1404000,
+      "orders": [
+        {
+          "scheme": "platform",
+          "position": 45,
+          "display_label": null
+        }
+      ],
+      "synopsis": null,
+      "genre_ids": [
+        "animation",
+        "comedy",
+        "family"
+      ],
+      "keywords": [],
+      "themes": [],
+      "character_ids": [],
+      "plot_facts": [],
+      "attributes": [],
+      "ratings": [],
+      "content_advisory": {
+        "minimum_age": null,
+        "rating_system": null,
+        "classification": null,
+        "warnings": [],
+        "source_ids": []
+      },
+      "artwork": [],
+      "links": [],
+      "external_ids": [
+        {
+          "namespace": "youtube_video_id",
+          "value": "NH_OWDWOCFc"
+        },
+        {
+          "namespace": "youtube_playback",
+          "value": "NH_OWDWOCFc"
+        },
+        {
+          "namespace": "youtube_upload_date",
+          "value": "2024-06-28"
+        }
+      ],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_774269b7b1b6",
+            "src_doraemon_6a8cfcfb82f7"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": "Số tập lấy từ tiêu đề của kênh. Ngày đăng trên YouTube lưu riêng. Chờ đối chiếu nội dung để bổ sung tóm tắt."
+        }
+      }
+    }
+  ],
+  "segments": [],
+  "characters": [
+    {
+      "id": "char_doraemon_doraemon",
+      "series_ids": [
+        "ser_doraemon"
+      ],
+      "name": "Doraemon",
+      "aliases": [],
+      "description": "Mèo máy từ thế kỷ 22, mang các bảo bối trong túi thần kỳ.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_63f5d4f52a53"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_doraemon_nobita",
+      "series_ids": [
+        "ser_doraemon"
+      ],
+      "name": "Nobita",
+      "aliases": [],
+      "description": "Cậu bé thường nhờ Doraemon giúp khi gặp rắc rối.",
+      "role": "main",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_63f5d4f52a53"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_doraemon_shizuka",
+      "series_ids": [
+        "ser_doraemon"
+      ],
+      "name": "Shizuka",
+      "aliases": [
+        {
+          "text": "Xuka",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_63f5d4f52a53"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_doraemon_jaian",
+      "series_ids": [
+        "ser_doraemon"
+      ],
+      "name": "Jaian",
+      "aliases": [
+        {
+          "text": "Gian",
+          "language": "vi",
+          "kind": "alternate"
+        },
+        {
+          "text": "Chaien",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_63f5d4f52a53"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_doraemon_suneo",
+      "series_ids": [
+        "ser_doraemon"
+      ],
+      "name": "Suneo",
+      "aliases": [
+        {
+          "text": "Xêkô",
+          "language": "vi",
+          "kind": "alternate"
+        }
+      ],
+      "description": null,
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_63f5d4f52a53"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    },
+    {
+      "id": "char_doraemon_dorami",
+      "series_ids": [
+        "ser_doraemon"
+      ],
+      "name": "Dorami",
+      "aliases": [],
+      "description": "Em gái của Doraemon.",
+      "role": "supporting",
+      "traits": [],
+      "relationships": [],
+      "voice_credits": [],
+      "artwork": [],
+      "external_ids": [],
+      "record": {
+        "status": "ready",
+        "revision": 1,
+        "created_at": "2026-11-22T16:17:55Z",
+        "updated_at": "2026-11-22T16:17:55Z",
+        "provenance": {
+          "source_ids": [
+            "src_doraemon_63f5d4f52a53"
+          ],
+          "origin": "imported",
+          "verification": "source_verified",
+          "confidence": null,
+          "annotator": null,
+          "tool_or_model": null,
+          "tool_revision": null,
+          "annotated_at": "2026-11-22T16:17:55Z",
+          "note": null
+        }
+      }
+    }
+  ],
+  "media_assets": [],
+  "text_tracks": [],
+  "scenes": []
+}

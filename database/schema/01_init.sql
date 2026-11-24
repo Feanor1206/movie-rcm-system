@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(100),
     role VARCHAR(20) NOT NULL DEFAULT 'ROLE_USER',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT ck_user_role CHECK (HEX(role) IN (HEX('ROLE_USER'), HEX('ROLE_ADMIN')))
 );
 
 CREATE TABLE IF NOT EXISTS movies (
@@ -25,46 +26,44 @@ CREATE TABLE IF NOT EXISTS movies (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_movies_title (title),
     INDEX idx_movies_year (release_year),
-    INDEX idx_movies_rating (rating)
+    INDEX idx_movies_rating (rating),
+    CONSTRAINT ck_movie_rating_bounds CHECK (rating BETWEEN 0 AND 10)
 );
 
 CREATE TABLE IF NOT EXISTS watchlist_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     movie_id VARCHAR(100) NOT NULL,
-    movie_title VARCHAR(255) NOT NULL,
-    poster_url VARCHAR(500),
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_movie_watchlist UNIQUE (user_id, movie_id),
-    INDEX idx_watchlist_user (user_id),
-    INDEX idx_watchlist_movie (movie_id)
+    INDEX idx_watchlist_movie (movie_id),
+    CONSTRAINT fk_watchlist_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS movie_ratings (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     movie_id VARCHAR(100) NOT NULL,
-    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 10),
+    rating INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT ck_movie_rating_range CHECK (rating >= 1 AND rating <= 10),
     CONSTRAINT fk_rating_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_movie_rating UNIQUE (user_id, movie_id),
-    INDEX idx_ratings_user (user_id),
-    INDEX idx_ratings_movie (movie_id)
+    INDEX idx_ratings_movie (movie_id),
+    CONSTRAINT fk_rating_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS favorite_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     movie_id VARCHAR(100) NOT NULL,
-    movie_title VARCHAR(255) NOT NULL,
-    poster_url VARCHAR(500),
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_favorite_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_movie_favorite UNIQUE (user_id, movie_id),
-    INDEX idx_favorite_user (user_id),
-    INDEX idx_favorite_movie (movie_id)
+    INDEX idx_favorite_movie (movie_id),
+    CONSTRAINT fk_favorite_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS media_assets (
@@ -84,8 +83,7 @@ CREATE TABLE IF NOT EXISTS media_assets (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
     CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version),
-    INDEX idx_media_movie_id (movie_id),
-    INDEX idx_media_movie_kind (movie_id, kind)
+    CONSTRAINT ck_media_kind CHECK (HEX(kind) IN (HEX('feature'), HEX('trailer'), HEX('extra'), HEX('opening'), HEX('ending'), HEX('dub'), HEX('audio_description')))
 );
 
 CREATE TABLE IF NOT EXISTS catalog_packages (
@@ -102,7 +100,8 @@ CREATE TABLE IF NOT EXISTS catalog_packages (
     error_message LONGTEXT,
     opt_lock_version BIGINT DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_catalog_package_status CHECK (HEX(status) IN (HEX('COMMITTED')))
 );
 
 CREATE TABLE IF NOT EXISTS catalog_genres (
@@ -130,7 +129,8 @@ CREATE TABLE IF NOT EXISTS catalog_attribute_scales (
     raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT ck_catalog_scale_bounds CHECK (minimum < maximum)
 );
 
 CREATE TABLE IF NOT EXISTS catalog_sources (
@@ -139,12 +139,13 @@ CREATE TABLE IF NOT EXISTS catalog_sources (
     title VARCHAR(255) NOT NULL,
     uri VARCHAR(1000),
     note LONGTEXT,
-    retrieved_at VARCHAR(100),
+    retrieved_at DATETIME(6),
     record_json LONGTEXT,
     raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT ck_catalog_source_kind CHECK (HEX(kind) IN (HEX('manual'), HEX('official'), HEX('external_catalog'), HEX('subtitle'), HEX('transcript'), HEX('video_observation'), HEX('model_output'), HEX('other')))
 );
 
 CREATE TABLE IF NOT EXISTS catalog_series (
@@ -175,7 +176,8 @@ CREATE TABLE IF NOT EXISTS catalog_series (
     opt_lock_version BIGINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_cat_series_title (title)
+    INDEX idx_cat_series_title (title),
+    CONSTRAINT ck_catalog_series_years CHECK (release_year_start <= release_year_end)
 );
 
 CREATE TABLE IF NOT EXISTS catalog_seasons (
@@ -186,7 +188,7 @@ CREATE TABLE IF NOT EXISTS catalog_seasons (
     synopsis LONGTEXT,
     kind VARCHAR(50),
     translations_json LONGTEXT,
-    release_date VARCHAR(50),
+    release_date DATE,
     artworks_json LONGTEXT,
     attributes_json LONGTEXT,
     record_json LONGTEXT,
@@ -194,7 +196,9 @@ CREATE TABLE IF NOT EXISTS catalog_seasons (
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_season_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE
+    CONSTRAINT fk_season_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE,
+    CONSTRAINT uq_cat_season_series_id UNIQUE (series_id, id),
+    CONSTRAINT ck_catalog_season_kind CHECK (kind IS NULL OR HEX(kind) IN (HEX('regular'), HEX('specials'), HEX('collection'), HEX('unknown')))
 );
 
 CREATE TABLE IF NOT EXISTS catalog_episodes (
@@ -207,7 +211,7 @@ CREATE TABLE IF NOT EXISTS catalog_episodes (
     synopsis LONGTEXT,
     translations_json LONGTEXT,
     kind VARCHAR(50) NOT NULL,
-    release_date VARCHAR(50),
+    release_date DATE,
     duration_ms BIGINT,
     genre_ids_json LONGTEXT,
     primary_language VARCHAR(50),
@@ -222,13 +226,20 @@ CREATE TABLE IF NOT EXISTS catalog_episodes (
     artworks_json LONGTEXT,
     credits_json LONGTEXT,
     record_json LONGTEXT,
+    publication_status VARCHAR(16) NOT NULL DEFAULT 'draft' CONSTRAINT ck_catalog_episode_publication CHECK (HEX(publication_status) IN (HEX('draft'), HEX('ready'), HEX('archived'))),
     raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_episode_series FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE,
-    INDEX idx_cat_ep_series (series_id),
-    INDEX idx_cat_ep_season (season_id)
+    CONSTRAINT fk_episode_season_same_series FOREIGN KEY (series_id, season_id)
+        REFERENCES catalog_seasons(series_id, id),
+    INDEX idx_cat_ep_series_season (series_id, season_id),
+    INDEX idx_cat_ep_season (season_id),
+    INDEX idx_cat_ep_publication (publication_status),
+    INDEX idx_cat_ep_status_series_duration (publication_status, series_id, duration_ms),
+    CONSTRAINT ck_catalog_episode_kind CHECK (HEX(kind) IN (HEX('regular'), HEX('special'), HEX('ova'), HEX('ona'), HEX('recap'), HEX('short'), HEX('pilot'), HEX('movie'), HEX('unknown'))),
+    CONSTRAINT ck_catalog_episode_duration CHECK (duration_ms > 0)
 );
 
 CREATE TABLE IF NOT EXISTS catalog_segments (
@@ -253,7 +264,12 @@ CREATE TABLE IF NOT EXISTS catalog_segments (
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_segment_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
-    INDEX idx_cat_seg_ep (episode_id)
+    UNIQUE KEY uq_cat_segment_position (episode_id, position),
+    CONSTRAINT ck_cat_segment_time_range CHECK (
+        (episode_start_ms IS NULL AND episode_end_ms IS NULL)
+        OR (episode_start_ms IS NOT NULL AND episode_end_ms IS NOT NULL
+            AND episode_start_ms >= 0 AND episode_end_ms > episode_start_ms)
+    )
 );
 
 CREATE TABLE IF NOT EXISTS catalog_characters (
@@ -272,6 +288,24 @@ CREATE TABLE IF NOT EXISTS catalog_characters (
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS catalog_episode_characters (
+    episode_id VARCHAR(100) NOT NULL,
+    character_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (episode_id, character_id),
+    INDEX idx_cat_ep_character (character_id),
+    FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES catalog_characters(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS catalog_episode_genres (
+    episode_id VARCHAR(100) NOT NULL,
+    genre_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (episode_id, genre_id),
+    INDEX idx_cat_ep_genre (genre_id),
+    FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (genre_id) REFERENCES catalog_genres(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS catalog_media_assets (
@@ -298,12 +332,29 @@ CREATE TABLE IF NOT EXISTS catalog_media_assets (
     raw_json LONGTEXT,
     revision INT NOT NULL DEFAULT 1,
     opt_lock_version BIGINT DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_asset_related FOREIGN KEY (related_asset_id) REFERENCES catalog_media_assets(id) ON DELETE SET NULL,
+    CONSTRAINT ck_catalog_asset_policy CHECK (HEX(access_policy) IN (HEX('private'), HEX('authenticated'), HEX('public'))),
+    CONSTRAINT ck_catalog_asset_content CHECK (HEX(content_type) IN (HEX('video'), HEX('audio'))),
+    CONSTRAINT ck_catalog_asset_role CHECK (HEX(role) IN (HEX('feature'), HEX('trailer'), HEX('extra'), HEX('opening'), HEX('ending'), HEX('dub'), HEX('audio_description'))),
+    CONSTRAINT ck_catalog_asset_size CHECK (size_bytes >= 0),
+    CONSTRAINT ck_catalog_asset_duration CHECK (duration_ms > 0)
+);
+
+CREATE TABLE IF NOT EXISTS catalog_episode_assets (
+    episode_id VARCHAR(100) NOT NULL,
+    media_asset_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (episode_id, media_asset_id),
+    INDEX idx_cat_episode_assets_media (media_asset_id),
+    CONSTRAINT fk_cat_ep_asset_ep FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_cat_ep_asset_media FOREIGN KEY (media_asset_id) REFERENCES catalog_media_assets(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS catalog_text_tracks (
     id VARCHAR(100) PRIMARY KEY,
-    media_asset_id VARCHAR(100) NOT NULL,
+    media_asset_id VARCHAR(100),
+    episode_id VARCHAR(100),
+    source_id VARCHAR(100),
     language VARCHAR(50) NOT NULL,
     kind VARCHAR(50) NOT NULL,
     label VARCHAR(255),
@@ -318,7 +369,14 @@ CREATE TABLE IF NOT EXISTS catalog_text_tracks (
     opt_lock_version BIGINT DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_text_track_asset FOREIGN KEY (media_asset_id) REFERENCES catalog_media_assets(id) ON DELETE CASCADE,
-    INDEX idx_cat_track_asset (media_asset_id)
+    CONSTRAINT fk_cat_track_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_cat_track_source FOREIGN KEY (source_id) REFERENCES catalog_sources(id),
+    CONSTRAINT ck_cat_text_track_origin CHECK (
+        media_asset_id IS NOT NULL OR (episode_id IS NOT NULL AND source_id IS NOT NULL)
+    ),
+    INDEX idx_cat_track_asset (media_asset_id),
+    INDEX idx_cat_track_episode (episode_id),
+    CONSTRAINT ck_catalog_track_kind CHECK (HEX(kind) IN (HEX('subtitle'), HEX('transcript'), HEX('ocr')))
 );
 
 CREATE TABLE IF NOT EXISTS catalog_scenes (
@@ -346,7 +404,10 @@ CREATE TABLE IF NOT EXISTS catalog_scenes (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_scene_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
     INDEX idx_cat_scene_ep (episode_id),
-    INDEX idx_cat_scene_asset (media_asset_id)
+    INDEX idx_cat_scene_asset (media_asset_id),
+    CONSTRAINT fk_scene_asset FOREIGN KEY (media_asset_id) REFERENCES catalog_media_assets(id) ON DELETE CASCADE,
+    CONSTRAINT fk_scene_segment FOREIGN KEY (segment_id) REFERENCES catalog_segments(id) ON DELETE SET NULL,
+    CONSTRAINT ck_catalog_scene_time_range CHECK (start_ms >= 0 AND end_ms > start_ms)
 );
 
 CREATE TABLE IF NOT EXISTS catalog_snapshots (
@@ -361,7 +422,8 @@ CREATE TABLE IF NOT EXISTS catalog_snapshots (
     completed_at TIMESTAMP NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_cat_snap_status (status),
-    UNIQUE INDEX uq_cat_snap_version (snapshot_version)
+    UNIQUE INDEX uq_cat_snap_version (snapshot_version),
+    CONSTRAINT ck_catalog_snapshot_status CHECK (HEX(status) IN (HEX('PENDING'), HEX('BUILDING'), HEX('READY'), HEX('BLOCKED'), HEX('SYNC_FAILED')))
 );
 
 CREATE TABLE IF NOT EXISTS watch_progress (
@@ -369,11 +431,65 @@ CREATE TABLE IF NOT EXISTS watch_progress (
     user_id BIGINT NOT NULL,
     episode_id VARCHAR(100) NOT NULL,
     asset_id VARCHAR(100) NOT NULL,
-    position_ms BIGINT NOT NULL CHECK (position_ms >= 0),
+    position_ms BIGINT NOT NULL,
     opt_lock_version BIGINT NOT NULL DEFAULT 0,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT ck_watch_progress_position CHECK (position_ms >= 0),
     CONSTRAINT fk_watch_progress_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_watch_progress_episode FOREIGN KEY (episode_id) REFERENCES catalog_episodes(id) ON DELETE CASCADE,
     CONSTRAINT uq_watch_progress_user_episode UNIQUE (user_id, episode_id),
-    INDEX idx_watch_progress_user_updated (user_id, updated_at)
+    INDEX idx_watch_progress_user_updated (user_id, updated_at),
+    CONSTRAINT fk_watch_progress_asset FOREIGN KEY (asset_id) REFERENCES catalog_media_assets(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS movie_genre_terms (
+    name VARCHAR(255) COLLATE utf8mb4_bin PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS catalog_series_genres (
+    series_id VARCHAR(100) NOT NULL,
+    genre_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (series_id, genre_id),
+    INDEX idx_cat_series_genre (genre_id),
+    CONSTRAINT fk_catalog_series_genres_series_id FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE,
+    CONSTRAINT fk_catalog_series_genres_genre_id FOREIGN KEY (genre_id) REFERENCES catalog_genres(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS catalog_series_characters (
+    series_id VARCHAR(100) NOT NULL,
+    character_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (series_id, character_id),
+    INDEX idx_cat_series_character (character_id),
+    CONSTRAINT fk_catalog_series_characters_series_id FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE,
+    CONSTRAINT fk_catalog_series_characters_character_id FOREIGN KEY (character_id) REFERENCES catalog_characters(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS catalog_character_series (
+    character_id VARCHAR(100) NOT NULL,
+    series_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (character_id, series_id),
+    INDEX idx_cat_character_series (series_id),
+    CONSTRAINT fk_catalog_character_series_character_id FOREIGN KEY (character_id) REFERENCES catalog_characters(id) ON DELETE CASCADE,
+    CONSTRAINT fk_catalog_character_series_series_id FOREIGN KEY (series_id) REFERENCES catalog_series(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS movie_genres (
+    movie_id VARCHAR(100) NOT NULL,
+    genre_name VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+    PRIMARY KEY (movie_id, genre_name),
+    INDEX idx_movie_genre_name (genre_name),
+    CONSTRAINT fk_movie_genres_movie_id FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
+    CONSTRAINT fk_movie_genres_genre_name FOREIGN KEY (genre_name) REFERENCES movie_genre_terms(name) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(64) NOT NULL,
+    record_id VARCHAR(100) NOT NULL,
+    operation VARCHAR(8) NOT NULL,
+    old_values JSON NOT NULL,
+    new_values JSON,
+    action_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    mysql_user VARCHAR(288) NOT NULL,
+    INDEX idx_audit_record (table_name, record_id, action_at)
 );

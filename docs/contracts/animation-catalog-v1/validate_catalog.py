@@ -1,6 +1,6 @@
-"""Validate catalog structure and internal consistency; never import or open media."""
+import argparse
 import json
-import sys
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -149,7 +149,11 @@ def validate(data):
     for row in data['text_tracks']:
         if (row['format'] == 'inline') != (row['external_file'] is None):
             errors.append(f"track {row['id']}: inline requires no external file; other formats require one")
-        duration = tables['media_assets'].get(row['media_asset_id'], {}).get('duration_ms')
+        duration = (
+            tables['media_assets'].get(row['media_asset_id'], {}).get('duration_ms')
+            if row['media_asset_id'] is not None
+            else tables['episodes'].get(row.get('episode_id'), {}).get('duration_ms')
+        )
         starts = [cue['start_ms'] for cue in row['cues']]
         if starts != sorted(starts):
             errors.append(f"track {row['id']}: cues must be sorted by start_ms")
@@ -169,11 +173,76 @@ def validate(data):
     return errors
 
 
+def has_episode_synopsis(episode):
+    synopsis = ' '.join((episode['synopsis'] or '').casefold().split())
+    title = ' '.join(episode['title'].casefold().split())
+    return bool(synopsis and synopsis != title
+                and not synopsis.startswith(f'tập phim {title} của bộ hoạt hình '))
+
+
+def coverage_report(data):
+    episodes = data['episodes']
+    playable = {
+        part['episode_id']
+        for asset in data['media_assets']
+        if asset['content_type'] == 'video' and asset['role'] not in ('dub', 'audio_description')
+        and asset['enabled'] and asset['record']['status'] == 'ready'
+        for part in asset['coverage'] if part['scope'] == 'full_episode'
+    }
+    playable.update(
+        episode['id'] for episode in episodes
+        if any(link['namespace'] in ('youtube_playback', 'youtube_watch')
+               and re.fullmatch(r'[A-Za-z0-9_-]{11}', link['value'])
+               for link in episode.get('external_ids', []))
+    )
+    timecodes = {
+        row['episode_id'] for row in data['segments']
+        if row['record']['status'] == 'ready' and row['episode_start_ms'] is not None
+    }
+    timecodes.update(row['episode_id'] for row in data['scenes'] if row['record']['status'] == 'ready')
+    genre_labels = {genre['id'].casefold() for genre in data['genres']}
+    genre_labels.update(label['text'].strip().casefold()
+                        for genre in data['genres'] for label in genre['labels'])
+    episode_synopses = {episode['id'] for episode in episodes if has_episode_synopsis(episode)}
+    episode_keywords = {
+        episode['id'] for episode in episodes
+        if any(keyword.strip() and keyword.strip().casefold() not in genre_labels
+               for keyword in episode['keywords'])
+    }
+    themed = {episode['id'] for episode in episodes if any(theme.strip() for theme in episode['themes'])}
+    ready_series = {row['id'] for row in data['series'] if row['record']['status'] == 'ready'}
+    ready_seasons = {row['id']: row['series_id'] for row in data['seasons'] if row['record']['status'] == 'ready'}
+    complete = episode_synopses & episode_keywords & themed & playable
+    return {
+        'episodes': len(episodes),
+        'with_synopsis': sum(bool((episode['synopsis'] or '').strip()) for episode in episodes),
+        'with_keywords': sum(bool(episode['keywords']) for episode in episodes),
+        'with_characters': sum(bool(episode['character_ids']) for episode in episodes),
+        'with_themes': len(themed),
+        'with_episode_synopsis': len(episode_synopses),
+        'with_episode_keywords': len(episode_keywords),
+        'with_normalized_metadata': sum(
+            episode['id'] in complete
+            and episode['record']['status'] == 'ready'
+            and episode['series_id'] in ready_series
+            and ready_seasons.get(episode['season_id']) == episode['series_id']
+            and episode['number'] is not None
+            and episode['duration_ms'] is not None
+            and bool(episode['character_ids'])
+            for episode in episodes
+        ),
+        'with_declared_playback_source': len(playable),
+        'with_reviewed_timecodes': len(timecodes),
+    }
+
+
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise SystemExit('Usage: python validate_catalog.py path/to/catalog.json')
+    parser = argparse.ArgumentParser(description='Validate a Dippie catalog package.')
+    parser.add_argument('catalog', type=Path)
+    parser.add_argument('--report', action='store_true', help='Print episode metadata coverage as JSON after validation.')
+    args = parser.parse_args()
     try:
-        data = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8-sig'))
+        data = json.loads(args.catalog.read_text(encoding='utf-8-sig'))
         failures = validate(data)
     except (OSError, ValueError) as error:
         print('ERROR:', error)
@@ -181,4 +250,7 @@ if __name__ == '__main__':
     if failures:
         print('\n'.join(failures))
         raise SystemExit(1)
-    print('VALID: structure and internal references/timestamps pass; media and factual truth were not verified.')
+    if args.report:
+        print(json.dumps(coverage_report(data), indent=2))
+    else:
+        print('VALID: structure and internal references/timestamps pass; media and factual truth were not verified.')

@@ -4,7 +4,7 @@ import re
 from services.intent import deterministic_intent, fold_text
 from services.llm_client import LLMProtocolError, LLMUnavailableError
 from services.model_registry import InferenceCapacityError
-from services.pilot_catalog import evidence_for_results
+from services.pilot_catalog import evidence_for_results, evidence_for_snapshot_results
 from services.rag import catalog_reply, series_reply, source_intro, summarize_sources
 
 
@@ -54,10 +54,13 @@ class ChatService:
         self.search = search_callable
         self.llm = llm_client
 
-    async def _approved_sources(self, results):
+    async def _approved_sources(self, results, snapshot):
         if self.registry.mode != "cloud" or self.llm is None or not results:
             return []
         try:
+            evidence = await asyncio.to_thread(evidence_for_snapshot_results, snapshot, results)
+            if evidence is not None:
+                return evidence
             return await asyncio.to_thread(evidence_for_results, results)
         except (OSError, ValueError, KeyError, TypeError):
             return []
@@ -98,7 +101,7 @@ class ChatService:
         }
         yield "metadata", metadata
 
-        sources = await self._approved_sources(results) if not (mood or series_info) else []
+        sources = await self._approved_sources(results, snapshot) if not (mood or series_info) else []
         if sources:
             first = sources[0]
             prefix = source_intro(first["title"], first.get("startMs"), mode) + " "

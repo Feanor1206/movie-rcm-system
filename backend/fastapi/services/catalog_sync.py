@@ -6,6 +6,7 @@ import hashlib
 import time
 import threading
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union
 
@@ -122,6 +123,10 @@ class CatalogSyncManager:
 
     def get_item_by_id(self, item_id: str) -> Dict[str, Any]:
         return copy.deepcopy(self._items_by_id.get(item_id, {}))
+
+    def get_catalog_ids(self) -> frozenset[str]:
+        return frozenset(value for item in self._flattened_items
+                         for value in (item.get("id"), item.get("series_id")) if value)
 
     def copy_from(self, other: "CatalogSyncManager") -> None:
 
@@ -688,6 +693,25 @@ class AcceptedSnapshot:
 
     def get_item_by_id(self, item_id: str) -> Dict[str, Any]:
         return self.catalog_manager.get_item_by_id(item_id)
+
+    @cached_property
+    def catalog_records(self) -> dict[str, dict[str, dict]]:
+        payload = self.payload or {}
+        return {
+            collection: {row["id"]: row for row in payload.get(collection, [])
+                         if isinstance(row, dict) and isinstance(row.get("id"), str)}
+            for collection in ("episodes", "segments", "media_assets", "sources")
+        }
+
+    @cached_property
+    def catalog_item_ids(self) -> frozenset[str]:
+        return self.catalog_manager.get_catalog_ids()
+
+    @cached_property
+    def recommendation_items(self) -> tuple[dict, ...]:
+        from services.recommendations import eligible_items
+
+        return tuple(eligible_items(self))
 
 
 _current_snapshot: Optional[AcceptedSnapshot] = None

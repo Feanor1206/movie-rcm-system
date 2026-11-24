@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
+import sqlite3
 import sys
 
 from fastapi.testclient import TestClient
@@ -24,13 +25,14 @@ from services.database import (
 
 
 def test_recent_progress_keeps_cap_and_eligibility_with_bounded_queries(tmp_path):
+    database_path = tmp_path / "test.db"
     app = create_app(
         sync_secret="test-secret",
         sync_path=tmp_path / "sync.json",
         cache_dir=tmp_path / "cache",
         model_mode="light",
         load_default=False,
-        database_url=f"sqlite:///{tmp_path / 'test.db'}",
+        database_url=f"sqlite:///{database_path}",
     )
     with TestClient(app) as client:
         db_service = app.state.runtime.db
@@ -48,6 +50,7 @@ def test_recent_progress_keeps_cap_and_eligibility_with_bounded_queries(tmp_path
             db.add(
                 CatalogSeries(id="s", title="Series", record_json='{"status":"ready"}')
             )
+            db.flush()
             db.add(
                 CatalogSeason(
                     id="season",
@@ -65,12 +68,10 @@ def test_recent_progress_keeps_cap_and_eligibility_with_bounded_queries(tmp_path
                     CatalogEpisode(
                         id=ep_id,
                         series_id="s",
-                        season_id=(
-                            None if i == 30 else "missing" if i == 25 else "season"
-                        ),
+                        season_id=None if i == 30 else "season",
                         title=f"Episode {i}",
                         number=i,
-                        kind="standard",
+                        kind="regular",
                         record_json='{"status":"ready"}',
                     )
                 )
@@ -100,7 +101,8 @@ def test_recent_progress_keeps_cap_and_eligibility_with_bounded_queries(tmp_path
                         MediaAsset(
                             id=asset_id,
                             movie_id="the-last-orbit",
-                            kind=f"test{i}",
+                            kind="feature",
+                            version=f"test{i}",
                             relative_path="test.mp4",
                             mime_type="video/mp4",
                             is_available=i != 29,
@@ -126,6 +128,9 @@ def test_recent_progress_keeps_cap_and_eligibility_with_bounded_queries(tmp_path
                 )
             )
             db.commit()
+        with sqlite3.connect(database_path) as legacy_db:
+            legacy_db.execute("PRAGMA foreign_keys=OFF")
+            legacy_db.execute("UPDATE catalog_episodes SET season_id='missing' WHERE id='ep25'")
         statements = []
 
         def count_sql(conn, cursor, statement, parameters, context, executemany):

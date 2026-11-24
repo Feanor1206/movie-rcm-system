@@ -35,3 +35,31 @@ INSERT IGNORE INTO movies (id, title, release_year, rating, runtime, genres, des
  'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85', 
  'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1800&q=85', 
  '/videos/nocturne.mp4');
+
+DROP TEMPORARY TABLE IF EXISTS dippie_movie_genre_backfill;
+CREATE TEMPORARY TABLE dippie_movie_genre_backfill (
+    movie_id VARCHAR(100) NOT NULL,
+    genre_name VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+    PRIMARY KEY (movie_id, genre_name)
+);
+INSERT INTO dippie_movie_genre_backfill (movie_id, genre_name)
+SELECT DISTINCT movies.id,
+       LOWER(REGEXP_REPLACE(linked.genre_name, '^[[:space:]]+|[[:space:]]+$', '')) COLLATE utf8mb4_bin
+FROM movies
+CROSS JOIN JSON_TABLE(
+    CONCAT('[', REPLACE(JSON_QUOTE(COALESCE(movies.genres,'')), ',', '","'), ']'),
+    '$[*]' COLUMNS(genre_name VARCHAR(255) PATH '$' NULL ON ERROR)
+) AS linked
+WHERE REGEXP_REPLACE(linked.genre_name, '^[[:space:]]+|[[:space:]]+$', '') <> '';
+
+INSERT INTO movie_genre_terms (name)
+SELECT DISTINCT source.genre_name FROM dippie_movie_genre_backfill AS source
+WHERE NOT EXISTS (SELECT 1 FROM movie_genre_terms AS previous WHERE previous.name = source.genre_name);
+
+INSERT INTO movie_genres (movie_id, genre_name)
+SELECT source.movie_id, source.genre_name FROM dippie_movie_genre_backfill AS source
+WHERE NOT EXISTS (
+    SELECT 1 FROM movie_genres AS previous WHERE previous.movie_id = source.movie_id
+    AND previous.genre_name = source.genre_name
+);
+DROP TEMPORARY TABLE dippie_movie_genre_backfill;

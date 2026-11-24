@@ -54,6 +54,27 @@ python -m ai.enrich.teacher_audit --episode ep_jadoo_s01_0022 --episode ep_jadoo
 
 Bản xuất mặc định cần mô tả ảnh và tóm tắt cho đủ năm tập. `--dialogue-only` xuất lời thoại ASR kèm nguồn dữ liệu, giữ nguyên cảnh và tóm tắt gốc.
 
+### Dùng Gemini với dữ liệu ASR
+
+Với tập có tệp nguồn như Jadoo, dùng `inventory`, `asr`, `keyframes` và `scenes` để chuẩn bị lời thoại có mốc mili giây và các khung hình. `caption` gửi các cue giao với từng cảnh, khung hình và danh sách ID nhân vật. `summarize` dùng mô tả cảnh đã sinh để viết tóm tắt tập và các tình tiết chính.
+
+Gemini có endpoint tương thích OpenAI cho đầu vào văn bản và hình ảnh. Chọn model Gemini hỗ trợ hình ảnh và Structured Outputs trong tài khoản của bạn. Ví dụ dưới đây dùng một tập trong inventory đã chuẩn bị theo các bước ở trên. [Tài liệu tương thích OpenAI của Google](https://ai.google.dev/gemini-api/docs/openai) · [Danh sách model](https://ai.google.dev/gemini-api/docs/models)
+
+```powershell
+$env:TEACHER_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai'
+$env:TEACHER_MODEL = '<ID model Gemini trong tài khoản>'
+$env:TEACHER_API_KEY = $env:GEMINI_API_KEY
+$episodeArgs = @('--episode', 'ep_jadoo_s01_0022')
+python -m ai.enrich.caption --dry-run @episodeArgs
+python -m ai.enrich.summarize --dry-run @episodeArgs
+```
+
+`caption --dry-run` báo số yêu cầu và số khung hình. `summarize --dry-run` báo một yêu cầu dự kiến cho mỗi tập đang đợi caption. Khi chạy thật, thay `--dry-run` bằng `--execute --max-requests N --run-id NAME` ở cả hai lệnh. Dùng cùng `N` và `NAME` cho phần ngân sách chạy chung. Cảnh có dưới bốn khung hình khác nhau sẽ bị bỏ qua. Cần đủ mô tả cảnh để xuất gói đầy đủ.
+
+Dùng `publish_preview` với `--episode` và `--review-template` như phần dưới để tạo bản nháp cùng danh sách duyệt. Bỏ `--dialogue-only` để đưa cả tóm tắt và cảnh vào gói. Đối chiếu nội dung, ID nhân vật và mốc thời gian với video nguồn trước khi đặt trạng thái duyệt. Gói pilot chỉ chứa các tập đã chọn. Có thể nhập để kiểm tra ở trang `/admin/import` của bản FastAPI dùng database thử trống.
+
+Pilot ASR hiện chọn tập loại `regular` dài 10–40 phút, có tệp nguồn và một `media_asset` khớp timeline. Với gói chỉ có link YouTube như Doraemon hoặc Trạng Quỳnh, có thể dùng tính năng đọc URL YouTube công khai của Gemini API để tạo bản nháp. Gắn kết quả vào ID tập sẵn có và giữ mốc thời gian ở bản nháp cho đến khi đối chiếu. [Tài liệu Gemini về URL YouTube và video](https://ai.google.dev/gemini-api/docs/video-understanding)
+
 ## Duyệt và nhập danh mục
 
 `publish_preview` tạo bản nháp và tệp duyệt. Dùng `--dialogue-only` để duyệt ASR trước khi có mô tả ảnh; lặp `--episode` để giới hạn tập:

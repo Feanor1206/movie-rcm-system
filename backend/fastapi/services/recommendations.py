@@ -18,8 +18,7 @@ def profile_signals(db, user_id, snapshot, requested):
     liked.update(item_id for item_id, in progress.order_by(
         WatchProgress.updated_at.desc(), WatchProgress.id.desc()).limit(100))
     seen.update(liked)
-    ids = {value for item in snapshot.get_flattened_catalog()
-           for value in (item.get('id'), item.get('series_id')) if value}
+    ids = snapshot.catalog_item_ids
     seen.update(item_id for item_id, in favorites.union_all(ratings, progress).yield_per(256) if item_id in ids)
     return liked, seen
 
@@ -76,7 +75,7 @@ def eligible_items(snapshot):
 
 
 def recommend_items(snapshot, search, request, liked, seen):
-    all_items = eligible_items(snapshot)
+    all_items = snapshot.recommendation_items
     liked_items = [item for item in all_items if item['id'] in liked or item.get('series_id') in liked]
     explicit = {genre.casefold() for genre in request.genres or []}
     preferred = explicit | {genre for item in liked_items for genre in tags(item, 'genres')}

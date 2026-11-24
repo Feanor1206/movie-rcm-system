@@ -87,6 +87,21 @@ def test_snapshot_and_results_own_catalog_and_keep_grounding(tmp_path, catalog):
     assert "MUTATED" not in index.search("bình hoa")[0]["genres"]
 
 
+def test_time_query_keeps_matching_segment_when_reranker_prefers_the_episode(tmp_path, catalog):
+    catalog[0]["description"] = "Đi học và làm vỡ bình hoa"
+    index = TextIndex.build(catalog, cache_dir=tmp_path)
+    reranker = lambda _, docs: [10 if "Đi học" in text else 1 for text in docs]
+
+    timed = index.search("bình hoa ở phút nào", reranker=reranker)[0]
+    assert timed["id"] == "ep1"
+    assert timed["startMs"] == 520_000
+    assert timed["evidence"][0]["documentId"] == "scene1"
+
+    summary = index.search("nội dung bình hoa", reranker=reranker)[0]
+    assert summary["evidence"][0]["documentId"] == "ep1"
+    assert index.search("đi học ở phút nào", reranker=reranker)[0]["startMs"] is None
+
+
 def test_number_filters_are_hard_and_negations_do_not_become_positive(tmp_path, catalog):
     index = TextIndex.build(catalog, cache_dir=tmp_path)
     assert {item["episodeId"] for item in index.search("mùa 2 tập 1")} == {"ep1"}

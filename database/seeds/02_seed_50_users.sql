@@ -51,20 +51,20 @@ INSERT IGNORE INTO users (id, username, email, password, full_name, role) VALUES
 (49, 'the_vinh', 'vinh.the@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Hoàng Thế Vinh', 'ROLE_USER'),
 (50, 'lan_huong', 'huong.lan@gmail.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'Trương Lan Hương', 'ROLE_USER');
 
-INSERT IGNORE INTO watchlist_items (user_id, movie_id, movie_title, poster_url) VALUES
-(1, 'afterlight', 'Afterlight', 'https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85'),
-(1, 'quiet-places', 'Quiet Places', 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=85'),
-(2, 'the-last-orbit', 'The Last Orbit', 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85'),
-(2, 'glass-horizon', 'Glass Horizon', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=85'),
-(3, 'deep-blue', 'Deep Blue', 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85'),
-(3, 'nocturne', 'Nocturne', 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85'),
-(4, 'the-last-orbit', 'The Last Orbit', 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85'),
-(5, 'quiet-places', 'Quiet Places', 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=600&q=85'),
-(6, 'glass-horizon', 'Glass Horizon', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=85'),
-(7, 'nocturne', 'Nocturne', 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=600&q=85'),
-(8, 'the-last-orbit', 'The Last Orbit', 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=600&q=85'),
-(9, 'afterlight', 'Afterlight', 'https://images.unsplash.com/photo-1519608487953-e999c86e7453?auto=format&fit=crop&w=600&q=85'),
-(10, 'deep-blue', 'Deep Blue', 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=85');
+INSERT IGNORE INTO watchlist_items (user_id, movie_id) VALUES
+(1, 'afterlight'),
+(1, 'quiet-places'),
+(2, 'the-last-orbit'),
+(2, 'glass-horizon'),
+(3, 'deep-blue'),
+(3, 'nocturne'),
+(4, 'the-last-orbit'),
+(5, 'quiet-places'),
+(6, 'glass-horizon'),
+(7, 'nocturne'),
+(8, 'the-last-orbit'),
+(9, 'afterlight'),
+(10, 'deep-blue');
 
 INSERT IGNORE INTO movie_ratings (user_id, movie_id, rating) VALUES
 (1, 'the-last-orbit', 9),

@@ -2,6 +2,7 @@ from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 
@@ -34,6 +35,38 @@ def test_restart_repairs_imported_media_metadata_without_reimport(tmp_path, cont
     finally:
         if restored.engine is not None:
             restored.engine.dispose()
+
+
+def test_restart_backfills_and_repairs_links_from_existing_coverage(tmp_path):
+    url = f"sqlite:///{(tmp_path / 'catalog.db').as_posix()}"
+    manager = database.DatabaseManager(database_url=url, seed=False)
+    with manager.session() as db:
+        database.import_catalog_package(db, {
+            "package": {"id": "legacy-catalog"},
+            "series": [{"id": "legacy-series"}],
+            "episodes": [{"id": item, "series_id": "legacy-series"} for item in ("ep-first", "ep-second")],
+            "media_assets": [{"id": "old-asset", "coverage": [{"episode_id": "ep-first"}]}],
+        })
+        db.execute(text("DROP TABLE IF EXISTS catalog_episode_assets"))
+        db.commit()
+    manager.engine.dispose()
+
+    restored = database.DatabaseManager(database_url=url, seed=False)
+    with restored.session() as db:
+        links = text("SELECT episode_id, media_asset_id FROM catalog_episode_assets")
+        assert db.execute(links).all() == [("ep-first", "old-asset")]
+        db.get(database.CatalogMediaAsset, "old-asset").coverage_json = (
+            '[{"episode_id":"ep-second"},{"episode_id":"missing-legacy"}]'
+        )
+        db.commit()
+    restored.engine.dispose()
+
+    for _ in range(2):
+        reloaded = database.DatabaseManager(database_url=url, seed=False)
+        with reloaded.session() as db:
+            assert db.execute(links).all() == [("ep-second", "old-asset")]
+            assert '"missing-legacy"' in db.get(database.CatalogMediaAsset, "old-asset").coverage_json
+        reloaded.engine.dispose()
 
 
 def test_explicit_sqlite_creates_its_data_directory(tmp_path):
