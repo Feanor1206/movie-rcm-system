@@ -214,3 +214,24 @@ def test_mysql_transaction_exercises_use_two_sessions(mysql_database, mysql_obje
             run(second, "writer_change")
             assert run(first, "reader_finish") == [expected]
             run(second, "writer_restore")
+
+
+def test_mysql_sample_queries_execute_in_documented_order(mysql_database, mysql_objects):
+    engine, _ = mysql_objects
+    source = (ROOT / "database/queries/sample_queries.sql").read_text(encoding="utf-8-sig")
+    queries = [statement.strip() for statement in source.split(";") if statement.strip()]
+    assert len(queries) == 20
+    columns = []
+    results = []
+    with mysql_database.connection(engine.url.database) as db, db.cursor() as cursor:
+        for query in queries:
+            cursor.execute(query)
+            columns.append(tuple(column[0] for column in cursor.description))
+            results.append(cursor.fetchall())
+    assert columns[0][-1] == "character_name"
+    assert columns[5][-1] == "duration_rank"
+    assert columns[6][-1] == "previous_episode_number"
+    assert columns[16][-1] == "cumulative_positions_ms"
+    assert results[8][0] == (0, 5, 1)
+    assert results[13][0][2:] == (3, 2, 1, 0)
+    assert results[17] == (("genre", 1, Decimal("0.00")),)

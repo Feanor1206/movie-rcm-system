@@ -55,6 +55,12 @@ DOMAIN_TABLES = (
     "catalog_sources", "catalog_seasons", "catalog_text_tracks", "media_assets", "movies", "catalog_series",
     "catalog_scenes", "catalog_attribute_scales",
 )
+SUPERSEDED_INDEXES = {
+    "watchlist_items": {"idx_watchlist_user"},
+    "favorite_items": {"idx_favorite_user"},
+    "movie_ratings": {"idx_ratings_user"},
+    "media_assets": {"idx_media_movie_id", "idx_media_movie_kind"},
+}
 
 
 def upgrade_catalog_schema(engine):
@@ -86,6 +92,7 @@ def upgrade_catalog_schema(engine):
             _backfill_taxonomy(connection, backfill_tables)
             rebuilt = _upgrade_references(connection)
             domains_rebuilt = _upgrade_domains(connection)
+            _upgrade_query_indexes(connection)
             if dialect == "sqlite" and (rebuilt or tracks_rebuilt or domains_rebuilt):
                 orphans = connection.exec_driver_sql("PRAGMA foreign_key_check").all()
                 if orphans:
@@ -112,6 +119,20 @@ def _table_batches(connection, table, *columns):
     while batch:
         yield batch
         batch = connection.execute(query.where(table.c.id > batch[-1].id)).all()
+
+
+def _upgrade_query_indexes(connection):
+    inspector = inspect(connection)
+    episodes = CatalogEpisode.__table__
+    covering = "idx_cat_ep_status_series_duration"
+    if covering not in {index["name"] for index in inspector.get_indexes(episodes.name)}:
+        next(index for index in episodes.indexes if index.name == covering).create(connection)
+
+    for table, superseded in SUPERSEDED_INDEXES.items():
+        indexes = {index["name"] for index in inspector.get_indexes(table)}
+        suffix = f" ON {table}" if connection.dialect.name == "mysql" else ""
+        for name in sorted(indexes & superseded):
+            connection.exec_driver_sql(f"DROP INDEX {name}{suffix}")
 
 
 def _backfill_taxonomy(connection, backfill_tables):

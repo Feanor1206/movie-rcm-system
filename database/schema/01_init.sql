@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS watchlist_items (
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_movie_watchlist UNIQUE (user_id, movie_id),
-    INDEX idx_watchlist_user (user_id),
     INDEX idx_watchlist_movie (movie_id),
     CONSTRAINT fk_watchlist_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
 );
@@ -52,7 +51,6 @@ CREATE TABLE IF NOT EXISTS movie_ratings (
     CONSTRAINT ck_movie_rating_range CHECK (rating >= 1 AND rating <= 10),
     CONSTRAINT fk_rating_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_movie_rating UNIQUE (user_id, movie_id),
-    INDEX idx_ratings_user (user_id),
     INDEX idx_ratings_movie (movie_id),
     CONSTRAINT fk_rating_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
 );
@@ -64,7 +62,6 @@ CREATE TABLE IF NOT EXISTS favorite_items (
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_favorite_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_movie_favorite UNIQUE (user_id, movie_id),
-    INDEX idx_favorite_user (user_id),
     INDEX idx_favorite_movie (movie_id),
     CONSTRAINT fk_favorite_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
 );
@@ -86,8 +83,6 @@ CREATE TABLE IF NOT EXISTS media_assets (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_media_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
     CONSTRAINT uq_movie_kind_version UNIQUE (movie_id, kind, version),
-    INDEX idx_media_movie_id (movie_id),
-    INDEX idx_media_movie_kind (movie_id, kind),
     CONSTRAINT ck_media_kind CHECK (HEX(kind) IN (HEX('feature'), HEX('trailer'), HEX('extra'), HEX('opening'), HEX('ending'), HEX('dub'), HEX('audio_description')))
 );
 
@@ -242,6 +237,7 @@ CREATE TABLE IF NOT EXISTS catalog_episodes (
     INDEX idx_cat_ep_series_season (series_id, season_id),
     INDEX idx_cat_ep_season (season_id),
     INDEX idx_cat_ep_publication (publication_status),
+    INDEX idx_cat_ep_status_series_duration (publication_status, series_id, duration_ms),
     CONSTRAINT ck_catalog_episode_kind CHECK (HEX(kind) IN (HEX('regular'), HEX('special'), HEX('ova'), HEX('ona'), HEX('recap'), HEX('short'), HEX('pilot'), HEX('movie'), HEX('unknown'))),
     CONSTRAINT ck_catalog_episode_duration CHECK (duration_ms > 0)
 );

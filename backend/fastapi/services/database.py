@@ -124,7 +124,6 @@ class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
     __table_args__ = (
         UniqueConstraint("user_id", "movie_id", name="uq_user_movie_watchlist"),
-        Index("idx_watchlist_user", "user_id"),
         Index("idx_watchlist_movie", "movie_id"),
     )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
@@ -148,7 +147,6 @@ class MovieRating(Base):
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 10", name="ck_movie_rating_range"),
         UniqueConstraint("user_id", "movie_id", name="uq_user_movie_rating"),
-        Index("idx_ratings_user", "user_id"),
         Index("idx_ratings_movie", "movie_id"),
     )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
@@ -173,7 +171,6 @@ class FavoriteItem(Base):
     __tablename__ = "favorite_items"
     __table_args__ = (
         UniqueConstraint("user_id", "movie_id", name="uq_user_movie_favorite"),
-        Index("idx_favorite_user", "user_id"),
         Index("idx_favorite_movie", "movie_id"),
     )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
@@ -197,8 +194,6 @@ class MediaAsset(Base):
     __table_args__ = (
         CheckConstraint("HEX(kind) IN (HEX('feature'), HEX('trailer'), HEX('extra'), HEX('opening'), HEX('ending'), HEX('dub'), HEX('audio_description'))", name="ck_media_kind"),
         UniqueConstraint("movie_id", "kind", "version", name="uq_movie_kind_version"),
-        Index("idx_media_movie_id", "movie_id"),
-        Index("idx_media_movie_kind", "movie_id", "kind"),
     )
     id = Column(String(64), primary_key=True)
     movie_id = Column(String(100), ForeignKey("movies.id", ondelete="CASCADE", name="fk_media_movie"), nullable=False)
@@ -431,6 +426,7 @@ class CatalogEpisode(Base):
         Index("idx_cat_ep_series_season", "series_id", "season_id"),
         Index("idx_cat_ep_season", "season_id"),
         Index("idx_cat_ep_publication", "publication_status"),
+        Index("idx_cat_ep_status_series_duration", "publication_status", "series_id", "duration_ms"),
     )
     id = Column(String(100), primary_key=True)
     series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE", name="fk_episode_series"), nullable=False)

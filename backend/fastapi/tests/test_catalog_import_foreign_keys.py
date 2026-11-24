@@ -247,6 +247,7 @@ def test_existing_database_backfills_publication_and_relationships(tmp_path):
         connection.exec_driver_sql("DROP TABLE catalog_episode_characters")
         connection.exec_driver_sql("DROP TABLE catalog_episode_genres")
         connection.exec_driver_sql("DROP INDEX idx_cat_ep_publication")
+        connection.exec_driver_sql("DROP INDEX idx_cat_ep_status_series_duration")
         connection.exec_driver_sql("ALTER TABLE catalog_episodes DROP COLUMN publication_status")
         connection.execute(text(
             "UPDATE catalog_episodes SET record_json=:record WHERE id=:episode"

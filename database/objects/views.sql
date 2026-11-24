@@ -12,12 +12,16 @@ WHERE e.publication_status = 'ready';
 
 CREATE SQL SECURITY DEFINER VIEW v_genre_stats AS
 SELECT g.id AS genre_id, g.labels_json,
-       COUNT(e.episode_id) AS episode_count,
-       COALESCE(SUM(e.duration_ms), 0) AS total_duration_ms
+       COALESCE(stats.episode_count, 0) AS episode_count,
+       COALESCE(stats.total_duration_ms, 0) AS total_duration_ms
 FROM catalog_genres AS g
-LEFT JOIN catalog_episode_genres AS eg ON eg.genre_id = g.id
-LEFT JOIN v_published_episodes AS e ON e.episode_id = eg.episode_id
-GROUP BY g.id, g.labels_json;
+LEFT JOIN (
+    SELECT eg.genre_id, COUNT(*) AS episode_count, SUM(e.duration_ms) AS total_duration_ms
+    FROM catalog_episodes AS e
+    JOIN catalog_episode_genres AS eg ON eg.episode_id = e.id
+    WHERE e.publication_status = 'ready'
+    GROUP BY eg.genre_id
+) AS stats ON stats.genre_id = g.id;
 
 CREATE SQL SECURITY DEFINER VIEW v_user_watch_history AS
 SELECT p.user_id, p.episode_id, e.title AS episode_title, e.series_id, s.title AS series_title,

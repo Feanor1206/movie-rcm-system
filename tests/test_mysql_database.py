@@ -76,7 +76,7 @@ def create_before_07(mysql_database, engine):
     for _, constraint in REFERENCES_07 + (("catalog_text_tracks", "fk_cat_track_episode"),
                                           ("catalog_text_tracks", "fk_cat_track_source")):
         source = re.sub(rf"^    CONSTRAINT {constraint} FOREIGN KEY .*?,?\n", "", source, flags=re.M)
-    source = re.sub(r"^    (publication_status VARCHAR.*|INDEX idx_cat_ep_publication.*|"
+    source = re.sub(r"^    (publication_status VARCHAR.*|INDEX idx_cat_ep_(?:publication|status_series_duration).*|"
                     r"UNIQUE KEY uq_cat_segment_position.*|INDEX idx_cat_track_episode.*)\n", "", source, flags=re.M)
     source = re.sub(r"^    CONSTRAINT (ck_cat_segment_time_range|ck_cat_text_track_origin) CHECK \(.*?\n    \),?\n",
                     "", source, flags=re.M | re.S)
@@ -267,3 +267,19 @@ VALUES ('bad-offset','Source','manual','2026-11-24T01:02:03+88:00'), ('bad-range
         for value in (b"bad-leap", b"bad-month", b"bad-offset", b"bad-range"):
             assert value in result.stdout
         assert describe_schema(engine) == before
+
+
+def test_mysql_query_index_migration_replays_and_preserves_foreign_keys(mysql_database):
+    with mysql_database.schema() as engine:
+        mysql_database.run_sql(engine.url.database, INIT_SCHEMA)
+        expected = describe_schema(engine)
+        mysql_database.run_sql(engine.url.database, """
+ALTER TABLE catalog_episodes DROP INDEX idx_cat_ep_status_series_duration;
+ALTER TABLE watchlist_items ADD INDEX idx_watchlist_user (user_id);
+ALTER TABLE favorite_items ADD INDEX idx_favorite_user (user_id);
+ALTER TABLE movie_ratings ADD INDEX idx_ratings_user (user_id);
+ALTER TABLE media_assets ADD INDEX idx_media_movie_id (movie_id), ADD INDEX idx_media_movie_kind (movie_id,kind);
+""")
+        for _ in range(2):
+            mysql_database.run_sql(engine.url.database, MIGRATIONS / "10_catalog_query_indexes.sql")
+        assert describe_schema(engine) == expected
