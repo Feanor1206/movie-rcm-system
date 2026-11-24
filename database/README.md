@@ -8,6 +8,34 @@ Các tệp SQL cho MySQL:
 
 Compose nạp lược đồ khi tạo cơ sở dữ liệu mới. Bản `docker-compose.dev.yml` nạp thêm dữ liệu demo; chỉ dùng trong môi trường thử nghiệm riêng.
 
+## Đối tượng MySQL và quyền tài khoản
+
+Compose nạp `01_init.sql`, bốn tệp định nghĩa đối tượng, quyền người dùng, rồi mới đến seed của bản dev. Điền `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` dành cho `dippie_app`, `DIPPIE_DB_READONLY_PASSWORD` và `DIPPIE_DB_ADMIN_PASSWORD` trong cấu hình Compose. Khi dùng volume cũ, tải các migration theo thứ tự số, rồi nạp lại đối tượng bằng script PowerShell. Chuẩn bị tệp cấu hình MySQL của tài khoản cài đặt bên ngoài Git và đặt ba biến `DIPPIE_DB_APP_PASSWORD`, `DIPPIE_DB_READONLY_PASSWORD`, `DIPPIE_DB_ADMIN_PASSWORD` trong phiên PowerShell.
+
+```powershell
+.\scripts\load_database_objects.ps1 -Database movie_rcm_db -Port 3306 -DefaultsFile $dippieClientOptions
+```
+
+| Tài khoản | Phạm vi |
+| --- | --- |
+| `dippie_app` | Đọc và ghi hàng, gọi routine trong schema Dippie |
+| `dippie_readonly` | Đọc bốn view, gồm lịch sử xem theo ID người dùng |
+| `dippie_admin` | Quản trị trong schema Dippie |
+
+Ba tên tài khoản dành riêng cho một schema trên mỗi máy chủ. Nạp lại `security.sql` cập nhật mật khẩu và cấp lại quyền của các tên này. Tài khoản cài đặt định nghĩa view và trigger. Routine chạy với quyền của người gọi. [Quyền của đối tượng MySQL](https://dev.mysql.com/doc/refman/8.0/en/stored-objects-security.html)
+
+`sp_add_favorite` trả mục yêu thích hiện có nếu cặp người dùng–phim đã được lưu. `sp_next_episode` ưu tiên tập đang xem dở gần nhất, rồi xét tập chưa hoàn tất theo thứ tự mùa và số tập. `sp_publish_episode` yêu cầu tên, tóm tắt, số tập, thời lượng và thể loại. Trạng thái mới xuất hiện trong view và lần xuất catalog kế tiếp. `raw_json` giữ bản nhập gốc. API lưu tiến độ dùng thời lượng ngắn hơn trong các thời lượng đã biết của tập và video. Trigger MySQL áp giới hạn của tập cho cả thao tác SQL trực tiếp.
+
+Migration `09_audit_log.sql` bổ sung bảng lưu ảnh chụp cũ/mới của tập khi cập nhật và ảnh chụp cũ khi xóa. Cột `mysql_user` ghi tài khoản phiên kết nối. Trigger chạy trên thao tác trực tiếp vào `catalog_episodes`. MySQL thực hiện xóa dây chuyền bằng khóa ngoại mà không gọi trigger xóa của bảng con. [Quy tắc trigger MySQL](https://dev.mysql.com/doc/refman/8.0/en/create-trigger.html)
+
+### Thực hành giao dịch
+
+Mở hai kết nối Workbench tới **schema demo có seed** và kiểm tra phim `the-last-orbit` đã có. Chọn chạy từng khối trong `transactions_demo.sql` theo dòng `exercise` của khối.
+
+1. Phiên A chạy `savepoint_walkthrough`. Điểm hiện tại được khóa bằng `FOR UPDATE`, thay đổi tạm rồi trở về điểm ban đầu khi `ROLLBACK TO SAVEPOINT`.
+2. A chạy `read_committed_begin`, B chạy `writer_change` và commit. A chạy `reader_finish` và thấy điểm B đã commit. B chạy `writer_restore`.
+3. A chạy `repeatable_read_begin`, B chạy `writer_change`. A chạy `reader_finish` và vẫn thấy điểm ở lần đọc đầu. B chạy `writer_restore` để trả lại điểm ban đầu. [Mức cô lập InnoDB](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html)
+
 ## Quan hệ danh mục
 
 - Một tập thuộc một bộ. Nếu tập có mùa, khóa ngoại `(series_id, season_id)` yêu cầu mùa thuộc đúng bộ. Tập có thể để `season_id` là `NULL`. Muốn xóa hoặc đổi bộ của một mùa, xử lý các tập đang trỏ đến mùa đó trước.

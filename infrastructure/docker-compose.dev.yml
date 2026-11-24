@@ -1,11 +1,9 @@
 
 services:
   mysql:
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-password}}
     volumes:
-      - ../database/seeds/01_seed_movies.sql:/docker-entrypoint-initdb.d/02_seed_movies.sql:ro
-      - ../database/seeds/02_seed_50_users.sql:/docker-entrypoint-initdb.d/03_seed_50_users.sql:ro
+      - ../database/seeds/01_seed_movies.sql:/docker-entrypoint-initdb.d/03_seed_movies.sql:ro
+      - ../database/seeds/02_seed_50_users.sql:/docker-entrypoint-initdb.d/04_seed_50_users.sql:ro
 
   fastapi:
     environment:

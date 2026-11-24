@@ -26,6 +26,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -818,6 +819,19 @@ class CatalogSnapshot(Base):
             "completedAt": self.completed_at.isoformat() if self.completed_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    __table_args__ = (Index("idx_audit_record", "table_name", "record_id", "action_at"),)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    table_name = Column(String(64), nullable=False)
+    record_id = Column(String(100), nullable=False)
+    operation = Column(String(8), nullable=False)
+    old_values = Column(JSON, nullable=False)
+    new_values = Column(JSON(none_as_null=True))
+    action_at = Column(Timestamp, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    mysql_user = Column(String(288), nullable=False)
 
 
 class WatchProgress(Base):
@@ -2017,6 +2031,7 @@ def export_eligible_catalog(db, include_draft: bool = False, include_private: bo
     def _filter_rows(model):
         check_access = model is CatalogMediaAsset and not include_private
         check_record = model is not CatalogEpisode and not include_draft
+        published_episode = model is CatalogEpisode and not include_draft
         columns = [model.raw_json]
         if check_record:
             columns.append(model.record_json)
@@ -2025,7 +2040,7 @@ def export_eligible_catalog(db, include_draft: bool = False, include_private: bo
         rows = db.query(*columns).filter(model.raw_json.is_not(None))
         if check_record:
             rows = rows.filter(func.lower(model.record_json).contains("ready"))
-        if model is CatalogEpisode and not include_draft:
+        if published_episode:
             rows = rows.filter(model.publication_status == "ready")
         if model is CatalogTextTrack:
             if not include_draft:
@@ -2043,9 +2058,12 @@ def export_eligible_catalog(db, include_draft: bool = False, include_private: bo
             if check_access and str(row.access_policy).lower() != "public":
                 continue
             try:
-                out.append(json.loads(row.raw_json))
-            except Exception:
-                pass
+                document = json.loads(row.raw_json)
+            except (TypeError, ValueError):
+                continue
+            if published_episode and isinstance(document, dict) and isinstance(document.get("record"), dict):
+                document["record"]["status"] = "ready"
+            out.append(document)
         return out
 
     latest_pkg = db.query(CatalogPackage).order_by(CatalogPackage.imported_at.desc()).first()

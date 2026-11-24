@@ -86,6 +86,22 @@ def progress_app(tmp_path):
         yield app, client, user_id
 
 
+def test_watch_progress_uses_the_shorter_known_duration(progress_app):
+    app, client, _ = progress_app
+    with app.state.runtime.db.session() as db:
+        db.get(CatalogEpisode, "episode").duration_ms = 1000
+        db.get(CatalogMediaAsset, "asset").duration_ms = 2000
+        db.commit()
+    headers = {"Authorization": f"Bearer {create_jwt_token('watcher')}"}
+    url = "/api/users/watch-progress/episode"
+    payload = {"assetId": "asset", "expectedVersion": -1}
+    assert client.put(url, json={**payload, "positionMs": 1001}, headers=headers).status_code == 400
+    result = client.put(url, json={**payload, "positionMs": 1000}, headers=headers)
+    assert result.status_code == 200
+    assert result.json()["data"]["durationMs"] == 1000
+    assert result.json()["data"]["completed"] is True
+
+
 def test_independent_sessions_reject_stale_update(progress_app):
     app, _, user_id = progress_app
     factory = app.state.runtime.db.session

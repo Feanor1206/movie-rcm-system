@@ -818,9 +818,14 @@ def _resolve_episode_context(db, episode_id: str, asset_id: str, user: User):
     return _valid_episode_context(ep, series, season, asset, playable, episode_id, user)
 
 
+def _watch_progress_duration(episode, asset):
+    durations = (episode.duration_ms, asset.duration_ms)
+    return min((duration for duration in durations if duration is not None and duration > 0), default=None)
+
+
 def _to_progress_response(progress: WatchProgress, ctx) -> dict:
     ep, series, season, asset = ctx
-    dur = asset.duration_ms
+    dur = _watch_progress_duration(ep, asset)
     completed = False
     if dur is not None and dur > 0:
         five_pct = max(1, dur // 20)
@@ -929,8 +934,9 @@ def _save_watch_progress(episode_id, request, authorization, body):
         ctx = _resolve_episode_context(db, episode_id, asset_id, user)
         if not ctx:
             return api_response(None, f"Không tìm thấy tập có thể phát: {episode_id}", False, 404)
-        _, _, _, asset = ctx
-        if asset.duration_ms is not None and asset.duration_ms > 0 and pos_ms > asset.duration_ms:
+        episode, _, _, asset = ctx
+        duration = _watch_progress_duration(episode, asset)
+        if duration is not None and pos_ms > duration:
             return api_response(None, "Vị trí xem vượt quá thời lượng video.", False, 400)
         current = db.query(WatchProgress).filter(WatchProgress.user_id == user.id, WatchProgress.episode_id == episode_id).first()
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -958,6 +964,11 @@ def _save_watch_progress(episode_id, request, authorization, body):
         except StaleDataError:
             db.rollback()
             return api_response(None, "Watch progress changed since it was loaded; refresh and retry.", False, 409)
+        except OperationalError as exc:
+            db.rollback()
+            if exc.orig.args[:2] == (1644, "Watch position exceeds episode duration_ms."):
+                return api_response(None, "Vị trí xem vượt quá thời lượng video.", False, 400)
+            raise
         except IntegrityError as exc:
             db.rollback()
             error = str(exc.orig)
