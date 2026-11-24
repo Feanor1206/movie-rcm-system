@@ -52,7 +52,7 @@ def progress_app(tmp_path):
                     id="episode",
                     series_id="series",
                     title="Episode",
-                    kind="standard",
+                    kind="regular",
                     record_json='{"status":"ready"}',
                 )
             )
@@ -74,7 +74,8 @@ def progress_app(tmp_path):
                 MediaAsset(
                     id="asset",
                     movie_id="the-last-orbit",
-                    kind="test",
+                    kind="feature",
+                    version="progress-fixture",
                     relative_path="test.mp4",
                     mime_type="video/mp4",
                     is_available=True,

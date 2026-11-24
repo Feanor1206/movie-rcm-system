@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import functools
 import hashlib
 import json
@@ -19,6 +19,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -70,6 +71,7 @@ DEFAULT_JWT_SECRET = "404E635266556A586E3272357538782F413F4428472B4B625064536756
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (CheckConstraint("HEX(role) IN (HEX('ROLE_USER'), HEX('ROLE_ADMIN'))", name="ck_user_role"),)
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     username = Column(String(50), nullable=False, unique=True)
     email = Column(String(100), nullable=False, unique=True)
@@ -83,6 +85,7 @@ class User(Base):
 class Movie(Base):
     __tablename__ = "movies"
     __table_args__ = (
+        CheckConstraint("rating BETWEEN 0 AND 10", name="ck_movie_rating_bounds"),
         Index("idx_movies_title", "title"),
         Index("idx_movies_year", "release_year"),
         Index("idx_movies_rating", "rating"),
@@ -191,6 +194,7 @@ class FavoriteItem(Base):
 class MediaAsset(Base):
     __tablename__ = "media_assets"
     __table_args__ = (
+        CheckConstraint("HEX(kind) IN (HEX('feature'), HEX('trailer'), HEX('extra'), HEX('opening'), HEX('ending'), HEX('dub'), HEX('audio_description'))", name="ck_media_kind"),
         UniqueConstraint("movie_id", "kind", "version", name="uq_movie_kind_version"),
         Index("idx_media_movie_id", "movie_id"),
         Index("idx_media_movie_kind", "movie_id", "kind"),
@@ -225,6 +229,7 @@ class MediaAsset(Base):
 
 class CatalogPackage(Base):
     __tablename__ = "catalog_packages"
+    __table_args__ = (CheckConstraint("HEX(status) IN (HEX('COMMITTED'))", name="ck_catalog_package_status"),)
     id = Column(String(100), primary_key=True)
     version = Column(String(50), nullable=False)
     revision = Column(Integer, nullable=False)
@@ -273,6 +278,7 @@ class CatalogGenre(Base):
 
 class CatalogAttributeScale(Base):
     __tablename__ = "catalog_attribute_scales"
+    __table_args__ = (CheckConstraint("minimum < maximum", name="ck_catalog_scale_bounds"),)
     id = Column(String(100), primary_key=True)
     name = Column(String(255), nullable=False)
     definition = Column(LongText)
@@ -290,12 +296,13 @@ class CatalogAttributeScale(Base):
 
 class CatalogSource(Base):
     __tablename__ = "catalog_sources"
+    __table_args__ = (CheckConstraint("HEX(kind) IN (HEX('manual'), HEX('official'), HEX('external_catalog'), HEX('subtitle'), HEX('transcript'), HEX('video_observation'), HEX('model_output'), HEX('other'))", name="ck_catalog_source_kind"),)
     id = Column(String(100), primary_key=True)
     kind = Column(String(50), nullable=False)
     title = Column(String(255), nullable=False)
     uri = Column(String(1000))
     note = Column(LongText)
-    retrieved_at = Column(String(100))
+    retrieved_at = Column(DateTime().with_variant(mysql.DATETIME(fsp=6), "mysql"))
     record_json = Column(LongText)
     raw_json = Column(LongText)
     revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
@@ -305,7 +312,10 @@ class CatalogSource(Base):
 
 class CatalogSeries(Base):
     __tablename__ = "catalog_series"
-    __table_args__ = (Index("idx_cat_series_title", "title"),)
+    __table_args__ = (
+        Index("idx_cat_series_title", "title"),
+        CheckConstraint("release_year_start <= release_year_end", name="ck_catalog_series_years"),
+    )
     id = Column(String(100), primary_key=True)
     title = Column(String(255), nullable=False)
     original_title = Column(String(255))
@@ -368,7 +378,10 @@ class CatalogSeries(Base):
 
 class CatalogSeason(Base):
     __tablename__ = "catalog_seasons"
-    __table_args__ = (UniqueConstraint("series_id", "id", name="uq_cat_season_series_id"),)
+    __table_args__ = (
+        UniqueConstraint("series_id", "id", name="uq_cat_season_series_id"),
+        CheckConstraint("kind IS NULL OR HEX(kind) IN (HEX('regular'), HEX('specials'), HEX('collection'), HEX('unknown'))", name="ck_catalog_season_kind"),
+    )
     id = Column(String(100), primary_key=True)
     series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE", name="fk_season_series"), nullable=False)
     number = Column(Integer)
@@ -376,7 +389,7 @@ class CatalogSeason(Base):
     synopsis = Column(LongText)
     kind = Column(String(50))
     translations_json = Column(LongText)
-    release_date = Column(String(50))
+    release_date = Column(Date)
     artworks_json = Column(LongText)
     attributes_json = Column(LongText)
     record_json = Column(LongText)
@@ -394,7 +407,7 @@ class CatalogSeason(Base):
             "synopsis": self.synopsis,
             "kind": self.kind,
             "translationsJson": self.translations_json,
-            "releaseDate": self.release_date,
+            "releaseDate": self.release_date.isoformat() if self.release_date else None,
             "artworksJson": self.artworks_json,
             "attributesJson": self.attributes_json,
             "recordJson": self.record_json,
@@ -408,6 +421,8 @@ class CatalogSeason(Base):
 class CatalogEpisode(Base):
     __tablename__ = "catalog_episodes"
     __table_args__ = (
+        CheckConstraint("duration_ms > 0", name="ck_catalog_episode_duration"),
+        CheckConstraint("HEX(kind) IN (HEX('regular'), HEX('special'), HEX('ova'), HEX('ona'), HEX('recap'), HEX('short'), HEX('pilot'), HEX('movie'), HEX('unknown'))", name="ck_catalog_episode_kind"),
         ForeignKeyConstraint(
             ["series_id", "season_id"], ["catalog_seasons.series_id", "catalog_seasons.id"],
             name="fk_episode_season_same_series",
@@ -425,7 +440,7 @@ class CatalogEpisode(Base):
     synopsis = Column(LongText)
     translations_json = Column(LongText)
     kind = Column(String(50), nullable=False)
-    release_date = Column(String(50))
+    release_date = Column(Date)
     duration_ms = Column(BigInteger)
     genre_ids_json = Column(LongText)
     primary_language = Column(String(50))
@@ -440,7 +455,10 @@ class CatalogEpisode(Base):
     artworks_json = Column(LongText)
     credits_json = Column(LongText)
     record_json = Column(LongText)
-    publication_status = Column(String(16))
+    publication_status = Column(
+        String(16), CheckConstraint("HEX(publication_status) IN (HEX('draft'), HEX('ready'), HEX('archived'))", name="ck_catalog_episode_publication"),
+        nullable=False, default="draft", server_default=text("'draft'"),
+    )
     raw_json = Column(LongText)
     revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
     opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
@@ -457,7 +475,7 @@ class CatalogEpisode(Base):
             "synopsis": self.synopsis,
             "translationsJson": self.translations_json,
             "kind": self.kind,
-            "releaseDate": self.release_date,
+            "releaseDate": self.release_date.isoformat() if self.release_date else None,
             "durationMs": self.duration_ms,
             "genreIdsJson": self.genre_ids_json,
             "primaryLanguage": self.primary_language,
@@ -614,6 +632,13 @@ class MovieGenre(Base):
 
 class CatalogMediaAsset(Base):
     __tablename__ = "catalog_media_assets"
+    __table_args__ = (
+        CheckConstraint("duration_ms > 0", name="ck_catalog_asset_duration"),
+        CheckConstraint("size_bytes >= 0", name="ck_catalog_asset_size"),
+        CheckConstraint("HEX(role) IN (HEX('feature'), HEX('trailer'), HEX('extra'), HEX('opening'), HEX('ending'), HEX('dub'), HEX('audio_description'))", name="ck_catalog_asset_role"),
+        CheckConstraint("HEX(access_policy) IN (HEX('private'), HEX('authenticated'), HEX('public'))", name="ck_catalog_asset_policy"),
+        CheckConstraint("HEX(content_type) IN (HEX('video'), HEX('audio'))", name="ck_catalog_asset_content"),
+    )
     id = Column(String(100), primary_key=True)
     content_type = Column(String(50), nullable=False, default="video", server_default=text("'video'"))
     role = Column(String(50), nullable=False, default="feature", server_default=text("'feature'"))
@@ -678,6 +703,7 @@ class CatalogEpisodeAsset(Base):
 class CatalogTextTrack(Base):
     __tablename__ = "catalog_text_tracks"
     __table_args__ = (
+        CheckConstraint("HEX(kind) IN (HEX('subtitle'), HEX('transcript'), HEX('ocr'))", name="ck_catalog_track_kind"),
         Index("idx_cat_track_asset", "media_asset_id"),
         Index("idx_cat_track_episode", "episode_id"),
         CheckConstraint(
@@ -707,6 +733,7 @@ class CatalogTextTrack(Base):
 class CatalogScene(Base):
     __tablename__ = "catalog_scenes"
     __table_args__ = (
+        CheckConstraint("start_ms >= 0 AND end_ms > start_ms", name="ck_catalog_scene_time_range"),
         Index("idx_cat_scene_ep", "episode_id"),
         Index("idx_cat_scene_asset", "media_asset_id"),
     )
@@ -763,6 +790,7 @@ class CatalogScene(Base):
 class CatalogSnapshot(Base):
     __tablename__ = "catalog_snapshots"
     __table_args__ = (
+        CheckConstraint("HEX(status) IN (HEX('PENDING'), HEX('BUILDING'), HEX('READY'), HEX('BLOCKED'), HEX('SYNC_FAILED'))", name="ck_catalog_snapshot_status"),
         Index("idx_cat_snap_status", "status"),
         Index("uq_cat_snap_version", "snapshot_version", unique=True),
     )
@@ -1163,6 +1191,34 @@ class CatalogConflictError(ValueError):
     pass
 
 
+CATALOG_DATE_PATTERN = r"[1-9][0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])"
+CATALOG_DATETIME_PATTERN = re.compile(
+    CATALOG_DATE_PATTERN + r"[T ]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]"
+    r"([.][0-9]{1,6})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])?"
+)
+
+
+def parse_catalog_date(value):
+    if value is None:
+        return None
+    if not isinstance(value, str) or not re.fullmatch(CATALOG_DATE_PATTERN, value):
+        raise ValueError("Ngày phải có dạng YYYY-MM-DD.")
+    return date.fromisoformat(value)
+
+
+def parse_catalog_datetime(value):
+    if value is None:
+        return None
+    if not isinstance(value, str) or not CATALOG_DATETIME_PATTERN.fullmatch(value):
+        raise ValueError("Thời điểm phải có dạng ISO 8601.")
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    if parsed.year < 1000:
+        raise ValueError("Thời điểm UTC nằm ngoài phạm vi DATETIME.")
+    return parsed
+
+
 def is_relative_media_path(value):
     return (
         isinstance(value, str)
@@ -1212,6 +1268,15 @@ def validate_catalog_input(data):
                 check_revision(record.get("revision", revision), f"{path}.record.revision")
             if collection in ("seasons", "episodes"):
                 check_id(item.get("series_id"), f"{path}.series_id")
+                try:
+                    parse_catalog_date(item.get("release_date") or (item.get("air_date") if collection == "episodes" else None))
+                except ValueError as exc:
+                    raise CatalogInputError(f"{path}.release_date", str(exc)) from exc
+            if collection == "sources":
+                try:
+                    parse_catalog_datetime(item.get("retrieved_at"))
+                except (OverflowError, ValueError) as exc:
+                    raise CatalogInputError(f"{path}.retrieved_at", str(exc)) from exc
             if collection == "episodes" and item.get("season_id") is not None:
                 check_id(item["season_id"], f"{path}.season_id")
             if collection == "segments":
@@ -1601,7 +1666,7 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.title = src.get("title") or src.get("name") or sid
             entity.uri = src.get("url") or src.get("uri")
             entity.note = src.get("note") or src.get("notes")
-            entity.retrieved_at = src.get("retrieved_at")
+            entity.retrieved_at = parse_catalog_datetime(src.get("retrieved_at"))
             entity.record_json = json.dumps(src.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
             entity.raw_json = json.dumps(src, ensure_ascii=False)
             entity.revision = int((src.get("record") or {}).get("revision") or revision)
@@ -1676,8 +1741,9 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.number = sea.get("number") if sea.get("number") is not None else sea.get("season_number")
             entity.title = sea.get("title", sea_id)
             entity.synopsis = sea.get("synopsis") or sea.get("description")
-            entity.kind = sea.get("kind", "standard")
-            entity.release_date = str(sea.get("release_date") or sea.get("release_year") or "") or None
+            kind = sea.get("kind", "regular")
+            entity.kind = "regular" if kind == "standard" else kind
+            entity.release_date = parse_catalog_date(sea.get("release_date") or None)
             entity.artworks_json = json.dumps(sea.get("artwork") or sea.get("artworks"), ensure_ascii=False) if (sea.get("artwork") or sea.get("artworks")) is not None else None
             entity.record_json = json.dumps(sea.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
             entity.raw_json = json.dumps(sea, ensure_ascii=False)
@@ -1700,8 +1766,9 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.aliases_json = json.dumps(ep.get("aliases"), ensure_ascii=False) if ep.get("aliases") is not None else None
             entity.synopsis = ep.get("synopsis")
             entity.translations_json = json.dumps(ep.get("translations"), ensure_ascii=False) if ep.get("translations") is not None else None
-            entity.kind = ep.get("kind") or ep.get("episode_type") or "standard"
-            entity.release_date = ep.get("release_date") or ep.get("air_date")
+            kind = ep.get("kind") or ep.get("episode_type") or "regular"
+            entity.kind = "regular" if kind in ("standard", "episode") else kind
+            entity.release_date = parse_catalog_date(ep.get("release_date") or ep.get("air_date"))
             entity.duration_ms = ep.get("duration_ms")
             entity.genre_ids_json = json.dumps(ep.get("genre_ids"), ensure_ascii=False) if ep.get("genre_ids") is not None else None
             entity.primary_language = ep.get("primary_language")

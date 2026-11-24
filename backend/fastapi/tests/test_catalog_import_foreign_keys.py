@@ -23,6 +23,7 @@ from services.database import (
     CatalogSeries,
     CatalogSeriesCharacter,
     CatalogSeriesGenre,
+    CatalogSource,
     CatalogTextTrack,
     DatabaseManager,
     MediaAsset,
@@ -263,6 +264,20 @@ def test_existing_database_backfills_publication_and_relationships(tmp_path):
     finally:
         if manager.engine:
             manager.engine.dispose()
+
+
+def test_catalog_temporal_fields_keep_an_iso_date_and_store_the_source_in_utc(catalog_db):
+    data = json.loads((ROOT / "docs/fixtures/rehearsal_catalog.json").read_text(encoding="utf-8"))
+    data["episodes"][0]["release_date"] = "2024-02-29"
+    data["seasons"][0]["release_date"] = "2024-02-01"
+    data["sources"][0]["retrieved_at"] = "2026-11-24T01:02:03.123456+07:00"
+    import_catalog_package(catalog_db, data)
+    episode = catalog_db.get(CatalogEpisode, data["episodes"][0]["id"])
+    season = catalog_db.get(CatalogSeason, data["seasons"][0]["id"])
+    source = catalog_db.get(CatalogSource, data["sources"][0]["id"])
+    assert episode.to_dict()["releaseDate"] == "2024-02-29"
+    assert season.to_dict()["releaseDate"] == "2024-02-01"
+    assert source.retrieved_at.isoformat() == "2026-11-23T18:02:03.123456"
 
 
 def test_remote_text_track_links_the_episode_and_exact_source(catalog_db):

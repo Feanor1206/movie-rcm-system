@@ -1,9 +1,10 @@
+from datetime import datetime
 import hashlib
 import json
 import logging
 from time import monotonic, sleep
 
-from sqlalchemy import inspect, select, text
+from sqlalchemy import CheckConstraint, Date, DateTime, String, inspect, select, text, type_coerce
 from sqlalchemy.schema import AddConstraint
 
 from .database import (
@@ -25,6 +26,8 @@ from .database import (
     _replace_episode_taxonomy,
     _replace_movie_genres,
     catalog_publication_status,
+    parse_catalog_date,
+    parse_catalog_datetime,
 )
 
 
@@ -42,6 +45,16 @@ REFERENCE_CONSTRAINTS = {
     "catalog_media_assets": {"fk_asset_related"},
 }
 LIBRARY_SNAPSHOTS = {"watchlist_items", "favorite_items"}
+TEMPORAL_FIELDS = {
+    "catalog_sources": ("retrieved_at", DateTime, "DATETIME(6)", parse_catalog_datetime),
+    "catalog_seasons": ("release_date", Date, "DATE", parse_catalog_date),
+    "catalog_episodes": ("release_date", Date, "DATE", parse_catalog_date),
+}
+DOMAIN_TABLES = (
+    "catalog_packages", "catalog_snapshots", "catalog_episodes", "users", "catalog_media_assets",
+    "catalog_sources", "catalog_seasons", "catalog_text_tracks", "media_assets", "movies", "catalog_series",
+    "catalog_scenes", "catalog_attribute_scales",
+)
 
 
 def upgrade_catalog_schema(engine):
@@ -72,7 +85,8 @@ def upgrade_catalog_schema(engine):
             tracks_rebuilt = _upgrade_text_tracks(connection)
             _backfill_taxonomy(connection, backfill_tables)
             rebuilt = _upgrade_references(connection)
-            if dialect == "sqlite" and (rebuilt or tracks_rebuilt):
+            domains_rebuilt = _upgrade_domains(connection)
+            if dialect == "sqlite" and (rebuilt or tracks_rebuilt or domains_rebuilt):
                 orphans = connection.exec_driver_sql("PRAGMA foreign_key_check").all()
                 if orphans:
                     raise ValueError(f"Các khóa ngoại SQLite có dữ liệu mồ côi: {orphans}")
@@ -163,6 +177,73 @@ def _upgrade_references(connection):
                 connection.execute(AddConstraint(constraint))
         for column in sorted(obsolete):
             connection.exec_driver_sql(f"ALTER TABLE {table.name} DROP COLUMN {column}")
+
+
+def _normalize_legacy_dates(connection, conversions):
+    pending = []
+    invalid = []
+    for table, field, parse in conversions:
+        for batch in _table_batches(connection, table, type_coerce(table.c[field], String())):
+            updates = []
+            for row_id, value in batch:
+                if value is None:
+                    continue
+                try:
+                    converted = parse(value)
+                except (OverflowError, TypeError, ValueError):
+                    invalid.append((table.name, row_id, field, value))
+                    continue
+                stored = (converted.isoformat(sep=" ", timespec="microseconds")
+                          if isinstance(converted, datetime) else converted.isoformat())
+                if stored != value:
+                    updates.append({"id": row_id, "value": stored})
+            if updates:
+                pending.append((table.name, field, updates))
+    if invalid:
+        raise ValueError(f"Ngày giờ cũ không chuyển đổi được: {invalid}")
+    for table, field, updates in pending:
+        connection.execute(text(f"UPDATE {table} SET {field}=:value, updated_at=updated_at WHERE id=:id"), updates)
+
+
+def _upgrade_domains(connection):
+    inspector = inspect(connection)
+    changes = []
+    conversions = []
+    for name in DOMAIN_TABLES:
+        table = Base.metadata.tables[name]
+        columns = {column["name"]: column for column in inspector.get_columns(name)}
+        present = {check["name"] for check in inspector.get_check_constraints(name)}
+        candidates = table.constraints.union(*(column.constraints for column in table.columns))
+        checks = sorted((check for check in candidates if isinstance(check, CheckConstraint) and check.name not in present),
+                        key=lambda check: check.name)
+        temporal_change = None
+        if name in TEMPORAL_FIELDS:
+            field, target, ddl, parse = TEMPORAL_FIELDS[name]
+            actual = columns[field]["type"]
+            if not isinstance(actual, target):
+                conversions.append((table, field, parse))
+                temporal_change = (field, ddl)
+            elif target is DateTime and connection.dialect.name == "mysql" and actual.fsp != 6:
+                temporal_change = (field, ddl)
+        publication_change = name == "catalog_episodes" and columns["publication_status"]["nullable"]
+        if checks or temporal_change or publication_change:
+            changes.append((table, checks, temporal_change, publication_change))
+    _normalize_legacy_dates(connection, conversions)
+    for table, checks, temporal_change, publication_change in changes:
+        if table.name in {"catalog_seasons", "catalog_episodes"}:
+            aliases = "HEX('standard'), HEX('episode')" if table.name == "catalog_episodes" else "HEX('standard')"
+            connection.exec_driver_sql(f"UPDATE {table.name} SET kind='regular', updated_at=updated_at WHERE HEX(kind) IN ({aliases})")
+        if connection.dialect.name == "sqlite":
+            _rebuild_sqlite_table(connection, table, inspector)
+            continue
+        if temporal_change:
+            field, ddl = temporal_change
+            connection.exec_driver_sql(f"ALTER TABLE {table.name} MODIFY COLUMN {field} {ddl} NULL")
+        if publication_change:
+            connection.exec_driver_sql("ALTER TABLE catalog_episodes MODIFY COLUMN publication_status VARCHAR(16) NOT NULL DEFAULT 'draft'")
+        for check in checks:
+            connection.exec_driver_sql(f"ALTER TABLE {table.name} ADD CONSTRAINT {check.name} CHECK ({check.sqltext})")
+    return bool(changes)
 
 
 def _upgrade_segments(connection):

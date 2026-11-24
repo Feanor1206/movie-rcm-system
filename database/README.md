@@ -45,6 +45,10 @@ Khởi động FastAPI để tạo lại liên kết tập–tệp từ `coverag
 
 [Migration 07](migrations/07_catalog_publication_and_tracks.sql) cập nhật phần catalog trên MySQL 8.0.16 trở lên. Kết quả đầu tiên liệt kê `table_name`, `row_id`, `reference_column` và `missing_id` của các dòng mồ côi. Nếu danh sách có dòng, MySQL CLI dừng ở bảng kiểm tra tạm. Đối chiếu mã với nguồn và sửa trên đúng schema trước khi chạy lại. Chạy theo chế độ dừng khi có lỗi của MySQL CLI. Script điền các bảng nối từ mã tìm thấy trong dữ liệu cũ và bỏ hai cột tiêu đề/ảnh đã chuyển sang JOIN.
 
+[Migration 08](migrations/08_catalog_value_domains.sql) đổi `release_date` của mùa/tập sang `DATE` và `retrieved_at` của nguồn sang `DATETIME(6)` theo UTC. Kết quả kiểm tra đầu tiên liệt kê mã và giá trị ngày giờ sai trước khi thay kiểu cột. Ngày phát hành yêu cầu đủ năm, tháng và ngày. Năm đứng riêng trong gói mới vẫn có trong bản gốc; cột ngày phát hành để trống nếu chưa xác định được ngày. Thời điểm có múi giờ được đổi sang UTC. Chuỗi thời điểm cũ thiếu múi giờ được hiểu là UTC. Hai tên loại cũ `standard` và `episode` được chuyển sang `regular` ở các cột trước đây dùng chúng.
+
+Các loại nội dung và trạng thái xuất bản lấy từ [hợp đồng catalog](../docs/contracts/animation-catalog-v1/dippie.catalog.v1.schema.json). Trạng thái gói `COMMITTED`, các trạng thái của snapshot và vai trò tài khoản lấy từ luồng ghi của FastAPI. So sánh theo `HEX` giữ đúng chữ hoa/thường và khoảng trắng trên cả MySQL và SQLite. Migration khai báo thêm các CHECK về giá trị số, khoảng thời gian và cận thang đo.
+
 MySQL 8.0.18 trở lên có thể chạy `EXPLAIN ANALYZE` trong truy vấn bên dưới.
 
 ```sql

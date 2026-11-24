@@ -21,7 +21,7 @@ def test_recommend_personalizes_only_from_authenticated_account(tmp_path):
             other = User(username='bob', email='bob@example.com', password='x')
             db.add_all([user, other, CatalogSeries(id='s', title='Series')])
             db.flush()
-            db.add(CatalogEpisode(id='watched', series_id='s', title='watched', kind='episode'))
+            db.add(CatalogEpisode(id='watched', series_id='s', title='watched', kind='regular'))
             db.add(CatalogMediaAsset(id='asset', storage_provider='local', storage_key='demo', relative_path='test.mp4'))
             db.add_all([Movie(id=name, title=name, release_year=2026, rating=0) for name in ('liked', 'other')])
             db.flush()

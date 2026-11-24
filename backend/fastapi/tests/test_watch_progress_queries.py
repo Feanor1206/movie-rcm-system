@@ -71,7 +71,7 @@ def test_recent_progress_keeps_cap_and_eligibility_with_bounded_queries(tmp_path
                         season_id=None if i == 30 else "season",
                         title=f"Episode {i}",
                         number=i,
-                        kind="standard",
+                        kind="regular",
                         record_json='{"status":"ready"}',
                     )
                 )
@@ -101,7 +101,8 @@ def test_recent_progress_keeps_cap_and_eligibility_with_bounded_queries(tmp_path
                         MediaAsset(
                             id=asset_id,
                             movie_id="the-last-orbit",
-                            kind=f"test{i}",
+                            kind="feature",
+                            version=f"test{i}",
                             relative_path="test.mp4",
                             mime_type="video/mp4",
                             is_available=i != 29,
