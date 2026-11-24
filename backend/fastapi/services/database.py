@@ -6,6 +6,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import secrets
 import threading
 from pathlib import Path
@@ -16,6 +17,7 @@ import jwt
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -31,13 +33,37 @@ from sqlalchemy import (
     event,
     func,
     insert,
+    inspect,
+    or_,
+    select,
     text,
 )
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.dialects import mysql, sqlite
 from sqlalchemy.engine import URL, make_url
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.functions import FunctionElement
 from sqlalchemy.exc import SQLAlchemyError
 
 Base = declarative_base()
+LongText = Text().with_variant(mysql.LONGTEXT(), "mysql")
+DoublePrecision = Float().with_variant(mysql.DOUBLE(asdecimal=False), "mysql")
+Timestamp = DateTime().with_variant(mysql.TIMESTAMP(), "mysql")
+GenreName = String(255).with_variant(mysql.VARCHAR(255, collation="utf8mb4_bin"), "mysql")
+
+
+class CurrentTimestampOnUpdate(FunctionElement):
+    inherit_cache = True
+
+
+@compiles(CurrentTimestampOnUpdate)
+def compile_timestamp_default(element, compiler, **kwargs):
+    return "CURRENT_TIMESTAMP"
+
+
+@compiles(CurrentTimestampOnUpdate, "mysql")
+def compile_mysql_timestamp_default(element, compiler, **kwargs):
+    return "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
 
 DEFAULT_JWT_SECRET = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
 
@@ -49,9 +75,9 @@ class User(Base):
     email = Column(String(100), nullable=False, unique=True)
     password = Column(String(255), nullable=False)
     full_name = Column(String(100))
-    role = Column(String(20), nullable=False, default="ROLE_USER")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    role = Column(String(20), nullable=False, default="ROLE_USER", server_default=text("'ROLE_USER'"))
+    created_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class Movie(Base):
@@ -64,15 +90,15 @@ class Movie(Base):
     id = Column(String(100), primary_key=True)
     title = Column(String(255), nullable=False)
     release_year = Column(Integer, nullable=False)
-    rating = Column(Float, nullable=False)
+    rating = Column(DoublePrecision, nullable=False)
     runtime = Column(String(20))
-    genres = Column(Text)
-    description = Column(Text)
+    genres = Column(LongText)
+    description = Column(LongText)
     poster = Column(String(500))
     backdrop = Column(String(500))
     video_url = Column(String(500))
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_response(self):
         genre_list = [g.strip() for g in (self.genres or "").split(",") if g.strip()]
@@ -98,19 +124,17 @@ class WatchlistItem(Base):
         Index("idx_watchlist_movie", "movie_id"),
     )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    movie_id = Column(String(100), nullable=False)
-    movie_title = Column(String(255), nullable=False)
-    poster_url = Column(String(500))
-    added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE", name="fk_watchlist_user"), nullable=False)
+    movie_id = Column(String(100), ForeignKey("movies.id", name="fk_watchlist_movie", ondelete="CASCADE"), nullable=False)
+    added_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
-    def to_dict(self):
+    def to_dict(self, movie):
         return {
             "id": self.id,
             "userId": self.user_id,
             "movieId": self.movie_id,
-            "movieTitle": self.movie_title,
-            "posterUrl": self.poster_url,
+            "movieTitle": movie.title,
+            "posterUrl": movie.poster,
             "addedAt": self.added_at.isoformat() if self.added_at else None,
         }
 
@@ -118,16 +142,17 @@ class WatchlistItem(Base):
 class MovieRating(Base):
     __tablename__ = "movie_ratings"
     __table_args__ = (
+        CheckConstraint("rating >= 1 AND rating <= 10", name="ck_movie_rating_range"),
         UniqueConstraint("user_id", "movie_id", name="uq_user_movie_rating"),
         Index("idx_ratings_user", "user_id"),
         Index("idx_ratings_movie", "movie_id"),
     )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    movie_id = Column(String(100), nullable=False)
+    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE", name="fk_rating_user"), nullable=False)
+    movie_id = Column(String(100), ForeignKey("movies.id", name="fk_rating_movie", ondelete="CASCADE"), nullable=False)
     rating = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -148,19 +173,17 @@ class FavoriteItem(Base):
         Index("idx_favorite_movie", "movie_id"),
     )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    movie_id = Column(String(100), nullable=False)
-    movie_title = Column(String(255), nullable=False)
-    poster_url = Column(String(500))
-    added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE", name="fk_favorite_user"), nullable=False)
+    movie_id = Column(String(100), ForeignKey("movies.id", name="fk_favorite_movie", ondelete="CASCADE"), nullable=False)
+    added_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
-    def to_dict(self):
+    def to_dict(self, movie):
         return {
             "id": self.id,
             "userId": self.user_id,
             "movieId": self.movie_id,
-            "movieTitle": self.movie_title,
-            "posterUrl": self.poster_url,
+            "movieTitle": movie.title,
+            "posterUrl": movie.poster,
             "addedAt": self.added_at.isoformat() if self.added_at else None,
         }
 
@@ -173,19 +196,19 @@ class MediaAsset(Base):
         Index("idx_media_movie_kind", "movie_id", "kind"),
     )
     id = Column(String(64), primary_key=True)
-    movie_id = Column(String(100), ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(String(100), ForeignKey("movies.id", ondelete="CASCADE", name="fk_media_movie"), nullable=False)
     kind = Column(String(20), nullable=False)
-    storage_provider = Column(String(30), nullable=False, default="local")
+    storage_provider = Column(String(30), nullable=False, default="local", server_default=text("'local'"))
     storage_key = Column(String(100))
     relative_path = Column(String(500), nullable=False)
-    version = Column(String(50), nullable=False, default="v1")
-    mime_type = Column(String(100), nullable=False, default="video/mp4")
+    version = Column(String(50), nullable=False, default="v1", server_default=text("'v1'"))
+    mime_type = Column(String(100), nullable=False, default="video/mp4", server_default=text("'video/mp4'"))
     byte_length = Column(BigInteger, nullable=False, default=0)
-    duration_seconds = Column(Float)
-    is_public = Column(Boolean, nullable=False, default=True)
-    is_available = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    duration_seconds = Column(DoublePrecision)
+    is_public = Column(Boolean, nullable=False, default=True, server_default=text("1"))
+    is_available = Column(Boolean, nullable=False, default=True, server_default=text("1"))
+    created_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dto(self):
         return {
@@ -209,13 +232,13 @@ class CatalogPackage(Base):
     import_mode = Column(String(50), nullable=False)
     reference_scope = Column(String(50), nullable=False)
     name = Column(String(200))
-    description = Column(Text)
+    description = Column(LongText)
     content_hash = Column(String(100), nullable=False)
     status = Column(String(50), nullable=False)
-    error_message = Column(Text)
-    opt_lock_version = Column(BigInteger, default=0)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    imported_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    error_message = Column(LongText)
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    created_at = Column(Timestamp, nullable=False, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    imported_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -238,31 +261,31 @@ class CatalogPackage(Base):
 class CatalogGenre(Base):
     __tablename__ = "catalog_genres"
     id = Column(String(100), primary_key=True)
-    labels_json = Column(Text, nullable=False)
-    aliases_json = Column(Text)
-    description = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    labels_json = Column(LongText, nullable=False)
+    aliases_json = Column(LongText)
+    description = Column(LongText)
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class CatalogAttributeScale(Base):
     __tablename__ = "catalog_attribute_scales"
     id = Column(String(100), primary_key=True)
     name = Column(String(255), nullable=False)
-    definition = Column(Text)
-    minimum = Column(Float, nullable=False)
-    maximum = Column(Float, nullable=False)
-    levels_json = Column(Text, nullable=False)
+    definition = Column(LongText)
+    minimum = Column(DoublePrecision, nullable=False)
+    maximum = Column(DoublePrecision, nullable=False)
+    levels_json = Column(LongText, nullable=False)
     version = Column(String(50))
-    source_ids_json = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    source_ids_json = Column(LongText)
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class CatalogSource(Base):
@@ -271,13 +294,13 @@ class CatalogSource(Base):
     kind = Column(String(50), nullable=False)
     title = Column(String(255), nullable=False)
     uri = Column(String(1000))
-    note = Column(Text)
+    note = Column(LongText)
     retrieved_at = Column(String(100))
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class CatalogSeries(Base):
@@ -286,30 +309,30 @@ class CatalogSeries(Base):
     id = Column(String(100), primary_key=True)
     title = Column(String(255), nullable=False)
     original_title = Column(String(255))
-    aliases_json = Column(Text)
-    synopsis = Column(Text)
-    translations_json = Column(Text)
-    genre_ids_json = Column(Text)
-    keywords_json = Column(Text)
-    themes_json = Column(Text)
-    origin_countries_json = Column(Text)
-    original_languages_json = Column(Text)
+    aliases_json = Column(LongText)
+    synopsis = Column(LongText)
+    translations_json = Column(LongText)
+    genre_ids_json = Column(LongText)
+    keywords_json = Column(LongText)
+    themes_json = Column(LongText)
+    origin_countries_json = Column(LongText)
+    original_languages_json = Column(LongText)
     release_year_start = Column(Integer)
     release_year_end = Column(Integer)
     release_status = Column(String(50))
-    character_ids_json = Column(Text)
-    artworks_json = Column(Text)
-    attributes_json = Column(Text)
-    ratings_json = Column(Text)
-    advisories_json = Column(Text)
-    credits_json = Column(Text)
-    external_ids_json = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    character_ids_json = Column(LongText)
+    artworks_json = Column(LongText)
+    attributes_json = Column(LongText)
+    ratings_json = Column(LongText)
+    advisories_json = Column(LongText)
+    credits_json = Column(LongText)
+    external_ids_json = Column(LongText)
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    created_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -347,20 +370,20 @@ class CatalogSeason(Base):
     __tablename__ = "catalog_seasons"
     __table_args__ = (UniqueConstraint("series_id", "id", name="uq_cat_season_series_id"),)
     id = Column(String(100), primary_key=True)
-    series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE"), nullable=False)
+    series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE", name="fk_season_series"), nullable=False)
     number = Column(Integer)
     title = Column(String(255), nullable=False)
-    synopsis = Column(Text)
+    synopsis = Column(LongText)
     kind = Column(String(50))
-    translations_json = Column(Text)
+    translations_json = Column(LongText)
     release_date = Column(String(50))
-    artworks_json = Column(Text)
-    attributes_json = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    artworks_json = Column(LongText)
+    attributes_json = Column(LongText)
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -391,35 +414,37 @@ class CatalogEpisode(Base):
         ),
         Index("idx_cat_ep_series_season", "series_id", "season_id"),
         Index("idx_cat_ep_season", "season_id"),
+        Index("idx_cat_ep_publication", "publication_status"),
     )
     id = Column(String(100), primary_key=True)
-    series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE"), nullable=False)
+    series_id = Column(String(100), ForeignKey("catalog_series.id", ondelete="CASCADE", name="fk_episode_series"), nullable=False)
     season_id = Column(String(100))
     number = Column(Integer)
     title = Column(String(255), nullable=False)
-    aliases_json = Column(Text)
-    synopsis = Column(Text)
-    translations_json = Column(Text)
+    aliases_json = Column(LongText)
+    synopsis = Column(LongText)
+    translations_json = Column(LongText)
     kind = Column(String(50), nullable=False)
     release_date = Column(String(50))
     duration_ms = Column(BigInteger)
-    genre_ids_json = Column(Text)
+    genre_ids_json = Column(LongText)
     primary_language = Column(String(50))
-    orders_json = Column(Text)
-    links_json = Column(Text)
-    character_ids_json = Column(Text)
-    plot_facts_json = Column(Text)
-    keywords_json = Column(Text)
-    themes_json = Column(Text)
-    attributes_json = Column(Text)
-    ratings_json = Column(Text)
-    artworks_json = Column(Text)
-    credits_json = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    orders_json = Column(LongText)
+    links_json = Column(LongText)
+    character_ids_json = Column(LongText)
+    plot_facts_json = Column(LongText)
+    keywords_json = Column(LongText)
+    themes_json = Column(LongText)
+    attributes_json = Column(LongText)
+    ratings_json = Column(LongText)
+    artworks_json = Column(LongText)
+    credits_json = Column(LongText)
+    record_json = Column(LongText)
+    publication_status = Column(String(16))
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -454,29 +479,45 @@ class CatalogEpisode(Base):
         }
 
 
+SEGMENT_TIME_RANGE = (
+    "(({row}episode_start_ms IS NULL AND {row}episode_end_ms IS NULL) OR "
+    "({row}episode_start_ms IS NOT NULL AND {row}episode_end_ms IS NOT NULL AND "
+    "{row}episode_start_ms >= 0 AND {row}episode_end_ms > {row}episode_start_ms))"
+)
+SEGMENT_SQLITE_TYPES = (
+    "(typeof({row}position) = 'integer' AND "
+    "typeof({row}episode_start_ms) IN ('null', 'integer') AND "
+    "typeof({row}episode_end_ms) IN ('null', 'integer'))"
+)
+
+
 class CatalogSegment(Base):
     __tablename__ = "catalog_segments"
-    __table_args__ = (Index("idx_cat_seg_ep", "episode_id"),)
+    __table_args__ = (
+        Index("uq_cat_segment_position", "episode_id", "position", unique=True),
+        CheckConstraint(SEGMENT_TIME_RANGE.format(row=""), name="ck_cat_segment_time_range"),
+        CheckConstraint(SEGMENT_SQLITE_TYPES.format(row=""), name="ck_cat_segment_integer_types").ddl_if(dialect="sqlite"),
+    )
     id = Column(String(100), primary_key=True)
-    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), nullable=False)
+    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE", name="fk_segment_episode"), nullable=False)
     position = Column(Integer, nullable=False)
     title = Column(String(255), nullable=False)
-    aliases_json = Column(Text)
-    synopsis = Column(Text)
-    translations_json = Column(Text)
+    aliases_json = Column(LongText)
+    synopsis = Column(LongText)
+    translations_json = Column(LongText)
     primary_language = Column(String(50))
-    character_ids_json = Column(Text)
-    plot_facts_json = Column(Text)
-    keywords_json = Column(Text)
-    themes_json = Column(Text)
-    attributes_json = Column(Text)
+    character_ids_json = Column(LongText)
+    plot_facts_json = Column(LongText)
+    keywords_json = Column(LongText)
+    themes_json = Column(LongText)
+    attributes_json = Column(LongText)
     episode_start_ms = Column(BigInteger)
     episode_end_ms = Column(BigInteger)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -506,30 +547,79 @@ class CatalogSegment(Base):
 class CatalogCharacter(Base):
     __tablename__ = "catalog_characters"
     id = Column(String(100), primary_key=True)
-    series_ids_json = Column(Text)
+    series_ids_json = Column(LongText)
     name = Column(String(255), nullable=False)
-    aliases_json = Column(Text)
-    description = Column(Text)
+    aliases_json = Column(LongText)
+    description = Column(LongText)
     role = Column(String(50))
-    traits_json = Column(Text)
-    relationships_json = Column(Text)
-    voice_credits_json = Column(Text)
-    artworks_json = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    traits_json = Column(LongText)
+    relationships_json = Column(LongText)
+    voice_credits_json = Column(LongText)
+    artworks_json = Column(LongText)
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+
+class CatalogEpisodeCharacter(Base):
+    __tablename__ = "catalog_episode_characters"
+    __table_args__ = (Index("idx_cat_ep_character", "character_id"),)
+
+    episode_id = Column(ForeignKey("catalog_episodes.id", ondelete="CASCADE"), primary_key=True)
+    character_id = Column(ForeignKey("catalog_characters.id", ondelete="CASCADE"), primary_key=True)
+
+
+class CatalogEpisodeGenre(Base):
+    __tablename__ = "catalog_episode_genres"
+    __table_args__ = (Index("idx_cat_ep_genre", "genre_id"),)
+
+    episode_id = Column(ForeignKey("catalog_episodes.id", ondelete="CASCADE"), primary_key=True)
+    genre_id = Column(ForeignKey("catalog_genres.id", ondelete="CASCADE"), primary_key=True)
+
+
+class MovieGenreTerm(Base):
+    __tablename__ = "movie_genre_terms"
+    name = Column(GenreName, primary_key=True)
+
+
+class CatalogSeriesGenre(Base):
+    __tablename__ = "catalog_series_genres"
+    __table_args__ = (Index("idx_cat_series_genre", "genre_id"),)
+    series_id = Column(ForeignKey("catalog_series.id", name="fk_catalog_series_genres_series_id", ondelete="CASCADE"), primary_key=True)
+    genre_id = Column(ForeignKey("catalog_genres.id", name="fk_catalog_series_genres_genre_id", ondelete="CASCADE"), primary_key=True)
+
+
+class CatalogSeriesCharacter(Base):
+    __tablename__ = "catalog_series_characters"
+    __table_args__ = (Index("idx_cat_series_character", "character_id"),)
+    series_id = Column(ForeignKey("catalog_series.id", name="fk_catalog_series_characters_series_id", ondelete="CASCADE"), primary_key=True)
+    character_id = Column(ForeignKey("catalog_characters.id", name="fk_catalog_series_characters_character_id", ondelete="CASCADE"), primary_key=True)
+
+
+class CatalogCharacterSeries(Base):
+    __tablename__ = "catalog_character_series"
+    __table_args__ = (Index("idx_cat_character_series", "series_id"),)
+    character_id = Column(ForeignKey("catalog_characters.id", name="fk_catalog_character_series_character_id", ondelete="CASCADE"), primary_key=True)
+    series_id = Column(ForeignKey("catalog_series.id", name="fk_catalog_character_series_series_id", ondelete="CASCADE"), primary_key=True)
+
+
+class MovieGenre(Base):
+    __tablename__ = "movie_genres"
+    __table_args__ = (Index("idx_movie_genre_name", "genre_name"),)
+    movie_id = Column(ForeignKey("movies.id", name="fk_movie_genres_movie_id", ondelete="CASCADE"), primary_key=True)
+    genre_name = Column(ForeignKey("movie_genre_terms.name", name="fk_movie_genres_genre_name", ondelete="CASCADE"), primary_key=True)
 
 
 class CatalogMediaAsset(Base):
     __tablename__ = "catalog_media_assets"
     id = Column(String(100), primary_key=True)
-    content_type = Column(String(50), nullable=False, default="video")
-    role = Column(String(50), nullable=False, default="feature")
+    content_type = Column(String(50), nullable=False, default="video", server_default=text("'video'"))
+    role = Column(String(50), nullable=False, default="feature", server_default=text("'feature'"))
     edition_label = Column(String(100))
-    spoken_languages_json = Column(Text)
-    embedded_subtitle_languages_json = Column(Text)
+    spoken_languages_json = Column(LongText)
+    embedded_subtitle_languages_json = Column(LongText)
     storage_provider = Column(String(50), nullable=False)
     storage_key = Column(String(100), nullable=False)
     relative_path = Column(String(500), nullable=False)
@@ -538,16 +628,16 @@ class CatalogMediaAsset(Base):
     size_bytes = Column(BigInteger)
     sha256 = Column(String(100))
     duration_ms = Column(BigInteger)
-    technical_json = Column(Text)
-    coverage_json = Column(Text)
-    related_asset_id = Column(String(100))
-    access_policy = Column(String(50), nullable=False, default="public")
-    enabled = Column(Boolean, nullable=False, default=True)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    technical_json = Column(LongText)
+    coverage_json = Column(LongText)
+    related_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", name="fk_asset_related", ondelete="SET NULL"))
+    access_policy = Column(String(50), nullable=False, default="public", server_default=text("'public'"))
+    enabled = Column(Boolean, nullable=False, default=True, server_default=text("1"))
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -581,28 +671,37 @@ class CatalogMediaAsset(Base):
 class CatalogEpisodeAsset(Base):
     __tablename__ = "catalog_episode_assets"
     __table_args__ = (Index("idx_cat_episode_assets_media", "media_asset_id"),)
-    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), primary_key=True)
-    media_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", ondelete="CASCADE"), primary_key=True)
+    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE", name="fk_cat_ep_asset_ep"), primary_key=True)
+    media_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", ondelete="CASCADE", name="fk_cat_ep_asset_media"), primary_key=True)
 
 
 class CatalogTextTrack(Base):
     __tablename__ = "catalog_text_tracks"
-    __table_args__ = (Index("idx_cat_track_asset", "media_asset_id"),)
+    __table_args__ = (
+        Index("idx_cat_track_asset", "media_asset_id"),
+        Index("idx_cat_track_episode", "episode_id"),
+        CheckConstraint(
+            "media_asset_id IS NOT NULL OR (episode_id IS NOT NULL AND source_id IS NOT NULL)",
+            name="ck_cat_text_track_origin",
+        ),
+    )
     id = Column(String(100), primary_key=True)
-    media_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", ondelete="CASCADE"), nullable=False)
+    media_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", ondelete="CASCADE", name="fk_text_track_asset"))
+    episode_id = Column(ForeignKey("catalog_episodes.id", ondelete="CASCADE", name="fk_cat_track_episode"))
+    source_id = Column(ForeignKey("catalog_sources.id", name="fk_cat_track_source"))
     language = Column(String(50), nullable=False)
     kind = Column(String(50), nullable=False)
     label = Column(String(255))
     format = Column(String(50), nullable=False)
-    is_default = Column(Boolean, nullable=False, default=False)
-    external_file_json = Column(Text)
-    cues_json = Column(Text)
-    provenance_json = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    is_default = Column(Boolean, nullable=False, default=False, server_default=text("0"))
+    external_file_json = Column(LongText)
+    cues_json = Column(LongText)
+    provenance_json = Column(LongText)
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class CatalogScene(Base):
@@ -612,27 +711,27 @@ class CatalogScene(Base):
         Index("idx_cat_scene_asset", "media_asset_id"),
     )
     id = Column(String(100), primary_key=True)
-    media_asset_id = Column(String(100))
-    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), nullable=False)
-    segment_id = Column(String(100))
+    media_asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", name="fk_scene_asset", ondelete="CASCADE"))
+    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE", name="fk_scene_episode"), nullable=False)
+    segment_id = Column(String(100), ForeignKey("catalog_segments.id", name="fk_scene_segment", ondelete="SET NULL"))
     start_ms = Column(BigInteger, nullable=False)
     end_ms = Column(BigInteger, nullable=False)
     title = Column(String(255))
-    summary = Column(Text)
-    visual_description = Column(Text)
-    visual_tags_json = Column(Text)
-    sound_events_json = Column(Text)
-    transcript_cue_ids_json = Column(Text)
-    character_ids_json = Column(Text)
-    keywords_json = Column(Text)
-    themes_json = Column(Text)
-    attributes_json = Column(Text)
-    provenance_json = Column(Text)
-    record_json = Column(Text)
-    raw_json = Column(Text)
-    revision = Column(Integer, nullable=False, default=1)
-    opt_lock_version = Column(BigInteger, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    summary = Column(LongText)
+    visual_description = Column(LongText)
+    visual_tags_json = Column(LongText)
+    sound_events_json = Column(LongText)
+    transcript_cue_ids_json = Column(LongText)
+    character_ids_json = Column(LongText)
+    keywords_json = Column(LongText)
+    themes_json = Column(LongText)
+    attributes_json = Column(LongText)
+    provenance_json = Column(LongText)
+    record_json = Column(LongText)
+    raw_json = Column(LongText)
+    revision = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    opt_lock_version = Column(BigInteger, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -663,17 +762,20 @@ class CatalogScene(Base):
 
 class CatalogSnapshot(Base):
     __tablename__ = "catalog_snapshots"
-    __table_args__ = (Index("idx_cat_snap_status", "status"),)
+    __table_args__ = (
+        Index("idx_cat_snap_status", "status"),
+        Index("uq_cat_snap_version", "snapshot_version", unique=True),
+    )
     id = Column(String(100), primary_key=True)
-    snapshot_version = Column(BigInteger, nullable=False, unique=True)
+    snapshot_version = Column(BigInteger, nullable=False)
     content_hash = Column(String(100), nullable=False)
     total_items = Column(Integer, nullable=False)
     status = Column(String(50), nullable=False)
-    retry_count = Column(Integer, default=0)
-    error_message = Column(Text)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    completed_at = Column(DateTime)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    retry_count = Column(Integer, default=0, server_default=text("0"))
+    error_message = Column(LongText)
+    created_at = Column(Timestamp, server_default=text("CURRENT_TIMESTAMP"), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    completed_at = Column(Timestamp)
+    updated_at = Column(Timestamp, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     def to_dict(self):
         return {
@@ -693,16 +795,17 @@ class CatalogSnapshot(Base):
 class WatchProgress(Base):
     __tablename__ = "watch_progress"
     __table_args__ = (
+        CheckConstraint("position_ms >= 0", name="ck_watch_progress_position"),
         UniqueConstraint("user_id", "episode_id", name="uq_watch_progress_user_episode"),
         Index("idx_watch_progress_user_updated", "user_id", "updated_at"),
     )
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE"), nullable=False)
-    asset_id = Column(String(100), nullable=False)
+    user_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey("users.id", ondelete="CASCADE", name="fk_watch_progress_user"), nullable=False)
+    episode_id = Column(String(100), ForeignKey("catalog_episodes.id", ondelete="CASCADE", name="fk_watch_progress_episode"), nullable=False)
+    asset_id = Column(String(100), ForeignKey("catalog_media_assets.id", name="fk_watch_progress_asset", ondelete="CASCADE"), nullable=False)
     position_ms = Column(BigInteger, nullable=False)
-    opt_lock_version = Column(BigInteger, nullable=False, default=0)
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    opt_lock_version = Column(BigInteger, nullable=False, default=0, server_default=text("0"))
+    updated_at = Column(Timestamp, nullable=False, server_default=CurrentTimestampOnUpdate(), default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     __mapper_args__ = {
         "version_id_col": opt_lock_version,
         "version_id_generator": lambda version: 0 if version is None else version + 1,
@@ -863,7 +966,9 @@ class DatabaseManager:
                                       "read_timeout": int(os.getenv("DB_READ_TIMEOUT", "15")),
                                       "write_timeout": int(os.getenv("DB_WRITE_TIMEOUT", "15"))},
                     )
-                Base.metadata.create_all(self.engine)
+                from .catalog_schema import upgrade_catalog_schema
+
+                upgrade_catalog_schema(self.engine)
                 self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False, expire_on_commit=False)
                 self.restore_media_metadata()
                 self._restore_episode_asset_links()
@@ -1006,13 +1111,23 @@ class DatabaseManager:
             db.commit()
 
 
-def is_published(record_json: str | None) -> bool:
-    if not record_json or "ready" not in record_json.lower():
-        return False
+def catalog_publication_status(record_json: str | None) -> str:
     try:
-        return str(json.loads(record_json).get("status", "")).lower() == "ready"
-    except Exception:
-        return False
+        status = str(json.loads(record_json or "{}").get("status", "")).lower()
+    except (AttributeError, TypeError, ValueError):
+        return "draft"
+    if status == "ready" and "ready" in record_json.lower():
+        return "ready"
+    return "archived" if status == "archived" else "draft"
+
+
+def is_published(record_json: str | None) -> bool:
+    return bool(record_json and "ready" in record_json.lower()) and catalog_publication_status(record_json) == "ready"
+
+
+@event.listens_for(CatalogEpisode.record_json, "set")
+def _set_episode_publication_status(episode, record_json, _old, _initiator):
+    episode.publication_status = catalog_publication_status(record_json)
 
 
 def compute_sha256(data) -> str:
@@ -1080,6 +1195,7 @@ def validate_catalog_input(data):
         if not isinstance(items, list):
             raise CatalogInputError(collection, "Cần một danh sách bản ghi.")
         ids = set()
+        positions = set()
         for index, item in enumerate(items):
             path = f"{collection}[{index}]"
             if not isinstance(item, dict):
@@ -1098,6 +1214,37 @@ def validate_catalog_input(data):
                 check_id(item.get("series_id"), f"{path}.series_id")
             if collection == "episodes" and item.get("season_id") is not None:
                 check_id(item["season_id"], f"{path}.season_id")
+            if collection == "segments":
+                check_id(item.get("episode_id"), f"{path}.episode_id")
+                position = item.get("position", 1)
+                if type(position) is not int or not 1 <= position <= 2_147_483_647:
+                    raise CatalogInputError(f"{path}.position", "Vị trí phân đoạn phải là số nguyên dương.")
+                key = (item["episode_id"], position)
+                if key in positions:
+                    raise CatalogInputError(f"{path}.position", "Vị trí phân đoạn phải duy nhất trong tập.")
+                positions.add(key)
+                start, end = item.get("episode_start_ms"), item.get("episode_end_ms")
+                if (start is not None or end is not None) and (
+                    type(start) is not int or type(end) is not int or not 0 <= start < end
+                ):
+                    raise CatalogInputError(path, "Phân đoạn cần đủ hai mốc và mốc kết thúc phải sau mốc bắt đầu.")
+            if collection == "text_tracks":
+                if item.get("media_asset_id") is None:
+                    check_id(item.get("episode_id"), f"{path}.episode_id")
+                    check_id(item.get("source_id"), f"{path}.source_id")
+                descriptor = item.get("external_file")
+                if descriptor is not None:
+                    file_path = f"{path}.external_file"
+                    if not isinstance(descriptor, dict) or set(descriptor) != {"storage_key", "relative_path", "sha256"}:
+                        raise CatalogInputError(file_path, "Thiếu thông tin lưu tệp phụ đề.")
+                    storage_key = descriptor["storage_key"]
+                    if not isinstance(storage_key, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", storage_key):
+                        raise CatalogInputError(f"{file_path}.storage_key", "Mã nơi lưu tệp phụ đề không hợp lệ.")
+                    if not is_relative_media_path(descriptor["relative_path"]):
+                        raise CatalogInputError(f"{file_path}.relative_path", "Đường dẫn tệp phụ đề phải là đường dẫn tương đối.")
+                    digest = descriptor["sha256"]
+                    if digest is not None and (not isinstance(digest, str) or not re.fullmatch(r"[a-fA-F0-9]{64}", digest)):
+                        raise CatalogInputError(f"{file_path}.sha256", "Mã SHA-256 của tệp phụ đề không hợp lệ.")
             if collection == "media_assets":
                 coverage = item.get("coverage")
                 if coverage is not None:
@@ -1179,6 +1326,40 @@ def _validate_catalog_asset_episodes(db, data, lock):
             raise CatalogInputError(paths[min(missing)], "Tập tham chiếu trong phạm vi tệp chưa tồn tại.")
 
 
+def _validate_catalog_references(db, data, lock):
+    rules = (
+        ("series", "genre_ids", "genres", True),
+        ("series", "character_ids", "characters", True),
+        ("characters", "series_ids", "series", True),
+        ("media_assets", "related_asset_id", "media_assets", False),
+        ("scenes", "media_asset_id", "media_assets", False),
+        ("scenes", "segment_id", "segments", False),
+    )
+    for collection, field, target, multiple in rules:
+        paths = {}
+        for index, item in enumerate(data.get(collection) or []):
+            value = item.get(field)
+            if value is None:
+                continue
+            path = f"{collection}[{index}].{field}"
+            reference_ids = value if multiple else [value]
+            if not isinstance(reference_ids, list) or any(not isinstance(ref, str) or not ref for ref in reference_ids):
+                raise CatalogInputError(path, "Mã định danh tham chiếu không hợp lệ.")
+            for reference_id in reference_ids:
+                paths.setdefault(reference_id, path)
+        if not paths:
+            continue
+        external = paths.keys() - {item["id"] for item in data.get(target) or []}
+        if external:
+            model = CATALOG_COLLECTIONS[target]
+            query = db.query(model.id).filter(model.id.in_(external))
+            if lock:
+                query = query.with_for_update()
+            missing = external - {row.id for row in query}
+            if missing:
+                raise CatalogInputError(paths[min(missing)], "Bản ghi tham chiếu chưa tồn tại.")
+
+
 def catalog_diff(db, data, revision, content_hash, existing_pkg, lock=False):
     counts = dict(toCreate=0, toUpdate=0, unchanged=0, conflicts=0)
     stored = {}
@@ -1225,6 +1406,7 @@ def catalog_diff(db, data, revision, content_hash, existing_pkg, lock=False):
             count(old_revision, item_revision, same_content)
     _validate_catalog_seasons(db, data, stored.get("seasons", {}), lock)
     _validate_catalog_asset_episodes(db, data, lock)
+    _validate_catalog_references(db, data, lock)
     return counts, stored
 
 
@@ -1259,6 +1441,57 @@ def _begin_catalog_write(db):
     connection = db.connection()
     if connection.dialect.name == "sqlite" and not connection.connection.driver_connection.in_transaction:
         connection.exec_driver_sql("BEGIN IMMEDIATE")
+
+
+def _replace_catalog_links(db, items, model, owner_column, field, reference_column):
+    if not items:
+        return
+    table = model.__table__
+    db.execute(delete(table).where(table.c[owner_column].in_([item["id"] for item in items])))
+    links = [
+        {owner_column: item["id"], reference_column: reference_id}
+        for item in items
+        for reference_id in dict.fromkeys(item.get(field) or [])
+    ]
+    if links:
+        db.execute(insert(table), links)
+
+
+def _replace_episode_taxonomy(db, episodes):
+    _replace_catalog_links(db, episodes, CatalogEpisodeCharacter, "episode_id", "character_ids", "character_id")
+    _replace_catalog_links(db, episodes, CatalogEpisodeGenre, "episode_id", "genre_ids", "genre_id")
+
+
+def _replace_movie_genres(connection, movies):
+    if not movies:
+        return
+    table = MovieGenre.__table__
+    terms = MovieGenreTerm.__table__
+    links = [
+        {"movie_id": movie_id, "genre_name": name}
+        for movie_id, genres in movies
+        for name in sorted({value.strip().lower() for value in (genres or "").split(",") if value.strip()})
+    ]
+    connection.execute(delete(table).where(table.c.movie_id.in_([movie_id for movie_id, _ in movies])))
+    if links:
+        names = [{"name": name} for name in sorted({link["genre_name"] for link in links})]
+        if connection.dialect.name == "mysql":
+            insert_terms = mysql.insert(terms)
+            connection.execute(insert_terms.on_duplicate_key_update(name=terms.c.name), names)
+        else:
+            connection.execute(sqlite.insert(terms).on_conflict_do_nothing(), names)
+        connection.execute(insert(table), links)
+
+
+@event.listens_for(Session, "after_flush")
+def _sync_changed_movie_genres(session, _flush_context):
+    movies = [
+        (movie.id, movie.genres)
+        for movie in session.new.union(session.dirty)
+        if isinstance(movie, Movie) and inspect(movie).attrs.genres.history.has_changes()
+    ]
+    for offset in range(0, len(movies), 500):
+        _replace_movie_genres(session.connection(), movies[offset:offset + 500])
 
 
 def import_catalog_package(db, data: dict) -> dict:
@@ -1500,6 +1733,27 @@ def import_catalog_package(db, data: dict) -> dict:
     segments = data.get("segments") or []
     if segments:
         existing = stored["segments"]
+        moving = [
+            existing[seg["id"]] for seg in segments if seg["id"] in existing
+            and (existing[seg["id"]].episode_id, existing[seg["id"]].position)
+            != (seg["episode_id"], seg.get("position", 1))
+        ]
+        if moving:
+            occupied = {entity.episode_id: set() for entity in moving}
+            rows = db.query(CatalogSegment.episode_id, CatalogSegment.position).filter(
+                CatalogSegment.episode_id.in_(occupied), CatalogSegment.position < 0,
+            )
+            for episode_id, position in rows:
+                occupied[episode_id].add(position)
+            temporary_positions = dict.fromkeys(occupied, -1)
+            for entity in moving:
+                episode_id = entity.episode_id
+                position = temporary_positions[episode_id]
+                while position in occupied[episode_id]:
+                    position -= 1
+                entity.position = position
+                temporary_positions[episode_id] = position - 1
+            db.flush()
         for seg in segments:
             seg_id = seg["id"]
             entity = existing.get(seg_id)
@@ -1507,7 +1761,7 @@ def import_catalog_package(db, data: dict) -> dict:
                 entity = CatalogSegment(id=seg_id)
                 db.add(entity)
             entity.episode_id = seg["episode_id"]
-            entity.position = int(seg.get("position") or 1)
+            entity.position = seg.get("position", 1)
             entity.title = seg.get("title", seg_id)
             entity.synopsis = seg.get("synopsis")
             entity.episode_start_ms = seg.get("episode_start_ms")
@@ -1542,6 +1796,12 @@ def import_catalog_package(db, data: dict) -> dict:
             entity.revision = int((c.get("record") or {}).get("revision") or revision)
             entity.updated_at = now
 
+    db.flush()
+    _replace_episode_taxonomy(db, episodes)
+    _replace_catalog_links(db, series_list, CatalogSeriesGenre, "series_id", "genre_ids", "genre_id")
+    _replace_catalog_links(db, series_list, CatalogSeriesCharacter, "series_id", "character_ids", "character_id")
+    _replace_catalog_links(db, characters, CatalogCharacterSeries, "character_id", "series_ids", "series_id")
+
     if media_assets:
         existing_cat_assets = stored["media_assets"]
         ids = [ma["id"] for ma in media_assets]
@@ -1566,6 +1826,7 @@ def import_catalog_package(db, data: dict) -> dict:
             if not entity:
                 entity = CatalogMediaAsset(id=mid)
                 db.add(entity)
+                existing_cat_assets[mid] = entity
             entity.content_type = ma.get("content_type") or "video"
             entity.role = ma.get("role", "feature")
             entity.edition_label = ma.get("edition_label") or ma.get("edition")
@@ -1605,6 +1866,8 @@ def import_catalog_package(db, data: dict) -> dict:
             legacy.is_available = entity.enabled
     db.flush()
     if media_assets:
+        for asset in media_assets:
+            existing_cat_assets[asset["id"]].related_asset_id = asset.get("related_asset_id")
         _sync_episode_asset_links(db, {
             asset["id"]: _coverage_episode_ids(asset.get("coverage")) for asset in media_assets
         })
@@ -1618,13 +1881,16 @@ def import_catalog_package(db, data: dict) -> dict:
             if not entity:
                 entity = CatalogTextTrack(id=tid)
                 db.add(entity)
-            entity.media_asset_id = tt["media_asset_id"]
+            entity.media_asset_id = tt.get("media_asset_id")
+            entity.episode_id = tt.get("episode_id")
+            entity.source_id = tt.get("source_id")
             entity.kind = tt.get("kind", "subtitles")
             entity.language = tt.get("language", "vi")
             entity.label = tt.get("label")
             entity.format = tt.get("format", "vtt")
             entity.external_file_json = json.dumps(tt.get("external_file"), ensure_ascii=False) if tt.get("external_file") is not None else None
             entity.cues_json = json.dumps(tt.get("cues"), ensure_ascii=False) if tt.get("cues") is not None else None
+            entity.provenance_json = json.dumps(tt.get("provenance"), ensure_ascii=False) if tt.get("provenance") is not None else None
             entity.record_json = json.dumps(tt.get("record") or {"status": "ready", "revision": revision}, ensure_ascii=False)
             entity.raw_json = json.dumps(tt, ensure_ascii=False)
             entity.revision = int((tt.get("record") or {}).get("revision") or revision)
@@ -1683,17 +1949,29 @@ def import_catalog_package(db, data: dict) -> dict:
 def export_eligible_catalog(db, include_draft: bool = False, include_private: bool = False) -> dict:
     def _filter_rows(model):
         check_access = model is CatalogMediaAsset and not include_private
-        columns = [model.raw_json, model.record_json]
+        check_record = model is not CatalogEpisode and not include_draft
+        columns = [model.raw_json]
+        if check_record:
+            columns.append(model.record_json)
         if check_access:
             columns.append(model.access_policy)
         rows = db.query(*columns).filter(model.raw_json.is_not(None))
-        if not include_draft:
+        if check_record:
             rows = rows.filter(func.lower(model.record_json).contains("ready"))
+        if model is CatalogEpisode and not include_draft:
+            rows = rows.filter(model.publication_status == "ready")
+        if model is CatalogTextTrack:
+            if not include_draft:
+                ready_episodes = select(CatalogEpisode.id).where(CatalogEpisode.publication_status == "ready")
+                rows = rows.filter(or_(model.episode_id.is_(None), model.episode_id.in_(ready_episodes)))
+            if not include_private:
+                public_assets = select(CatalogMediaAsset.id).where(CatalogMediaAsset.access_policy == "public")
+                rows = rows.filter(or_(model.media_asset_id.is_(None), model.media_asset_id.in_(public_assets)))
         out = []
         for row in rows:
             if not row.raw_json:
                 continue
-            if not include_draft and not is_published(row.record_json):
+            if check_record and not is_published(row.record_json):
                 continue
             if check_access and str(row.access_policy).lower() != "public":
                 continue
@@ -1719,9 +1997,16 @@ def export_eligible_catalog(db, include_draft: bool = False, include_private: bo
         "import_mode": latest_pkg.import_mode if latest_pkg else "upsert",
         "reference_scope": latest_pkg.reference_scope if latest_pkg else "self_contained",
     }
-    return {
+    catalog = {
         "schema_version": "dippie.catalog.v1",
         "package": pkg_meta,
         **{collection: _filter_rows(model) for collection, model in CATALOG_COLLECTIONS.items()},
     }
+    if not include_draft:
+        source_ids = {source.get("id") for source in catalog["sources"]}
+        catalog["text_tracks"] = [
+            track for track in catalog["text_tracks"]
+            if track.get("source_id") is None or track["source_id"] in source_ids
+        ]
+    return catalog
 

@@ -464,17 +464,13 @@ def get_catalog_series_detail(series_id: str, request: Request, authorization: s
         )
         pub_seasons = [s.to_dict() for s in seasons if is_admin or is_published(s.record_json)]
         pub_season_ids = {s["id"] for s in pub_seasons}
-        episodes = (
-            db.query(CatalogEpisode)
-            .filter(CatalogEpisode.series_id == series_id)
-            .order_by(CatalogEpisode.number.asc())
-            .all()
-        )
+        episodes = db.query(CatalogEpisode).filter(CatalogEpisode.series_id == series_id)
+        if not is_admin:
+            episodes = episodes.filter(CatalogEpisode.publication_status == "ready")
         pub_episodes = [
             e.to_dict()
-            for e in episodes
-            if (is_admin or is_published(e.record_json))
-            and (is_admin or not e.season_id or e.season_id in pub_season_ids)
+            for e in episodes.order_by(CatalogEpisode.number.asc())
+            if is_admin or not e.season_id or e.season_id in pub_season_ids
         ]
         return JSONResponse({"series": series.to_dict(), "seasons": pub_seasons, "episodes": pub_episodes})
 
@@ -567,11 +563,16 @@ def search_catalog(request: Request, q: str = Query(default=""), authorization: 
         results = []
         pub_series = {s.id: s for s in db.query(CatalogSeries).all() if is_admin or is_published(s.record_json)}
         pub_seasons = {s.id: s for s in db.query(CatalogSeason).all() if is_admin or is_published(s.record_json)}
+        episodes = db.query(
+            CatalogEpisode.id, CatalogEpisode.series_id, CatalogEpisode.season_id, CatalogEpisode.title,
+            CatalogEpisode.synopsis, CatalogEpisode.duration_ms, CatalogEpisode.plot_facts_json, CatalogEpisode.keywords_json,
+        )
+        if not is_admin:
+            episodes = episodes.filter(CatalogEpisode.publication_status == "ready")
         pub_episodes = {
             e.id: e
-            for e in db.query(CatalogEpisode).all()
-            if (is_admin or is_published(e.record_json))
-            and e.series_id in pub_series
+            for e in episodes
+            if e.series_id in pub_series
             and (is_admin or not e.season_id or e.season_id in pub_seasons)
         }
         allowed_assets = {a.id: a for a in db.query(CatalogMediaAsset).all() if _asset_allowed(a, user)}
@@ -628,8 +629,9 @@ def get_watchlist(request: Request, authorization: str | None = Header(default=N
         user = require_user(request, db, authorization)
         if not user:
             return api_response(None, "Chưa xác thực người dùng", False, 401)
-        items = db.query(WatchlistItem).filter(WatchlistItem.user_id == user.id).order_by(WatchlistItem.added_at.desc()).all()
-        return api_response(data=[i.to_dict() for i in items])
+        items = db.query(WatchlistItem, Movie).join(Movie).filter(
+            WatchlistItem.user_id == user.id).order_by(WatchlistItem.added_at.desc())
+        return api_response(data=[item.to_dict(movie) for item, movie in items])
 
 
 def _commit_library_item(db, item):
@@ -665,11 +667,11 @@ def add_watchlist(payload: MovieIdPayload, request: Request, authorization: str 
             return api_response(None, f"Phim không tồn tại trong danh mục: {movie_id}", False, 400)
         existing = db.query(WatchlistItem).filter(WatchlistItem.user_id == user.id, WatchlistItem.movie_id == movie_id).first()
         if existing:
-            return api_response(data=existing.to_dict(), message="Đã thêm phim vào danh sách xem sau")
-        item = WatchlistItem(user_id=user.id, movie_id=movie.id, movie_title=movie.title, poster_url=movie.poster)
+            return api_response(data=existing.to_dict(movie), message="Đã thêm phim vào danh sách xem sau")
+        item = WatchlistItem(user_id=user.id, movie_id=movie.id)
         db.add(item)
         item = _commit_library_item(db, item)
-        return api_response(data=item.to_dict(), message="Đã thêm phim vào danh sách xem sau")
+        return api_response(data=item.to_dict(movie), message="Đã thêm phim vào danh sách xem sau")
 
 
 @router.delete("/api/users/watchlist/{movie_id}")
@@ -689,8 +691,9 @@ def get_favorites(request: Request, authorization: str | None = Header(default=N
         user = require_user(request, db, authorization)
         if not user:
             return api_response(None, "Chưa xác thực người dùng", False, 401)
-        items = db.query(FavoriteItem).filter(FavoriteItem.user_id == user.id).order_by(FavoriteItem.added_at.desc()).all()
-        return api_response(data=[i.to_dict() for i in items])
+        items = db.query(FavoriteItem, Movie).join(Movie).filter(
+            FavoriteItem.user_id == user.id).order_by(FavoriteItem.added_at.desc())
+        return api_response(data=[item.to_dict(movie) for item, movie in items])
 
 
 @router.post("/api/users/favorites")
@@ -707,11 +710,11 @@ def add_favorite(payload: MovieIdPayload, request: Request, authorization: str |
             return api_response(None, f"Phim không tồn tại trong danh mục: {movie_id}", False, 400)
         existing = db.query(FavoriteItem).filter(FavoriteItem.user_id == user.id, FavoriteItem.movie_id == movie_id).first()
         if existing:
-            return api_response(data=existing.to_dict(), message="Đã thêm phim vào danh sách yêu thích")
-        item = FavoriteItem(user_id=user.id, movie_id=movie.id, movie_title=movie.title, poster_url=movie.poster)
+            return api_response(data=existing.to_dict(movie), message="Đã thêm phim vào danh sách yêu thích")
+        item = FavoriteItem(user_id=user.id, movie_id=movie.id)
         db.add(item)
         item = _commit_library_item(db, item)
-        return api_response(data=item.to_dict(), message="Đã thêm phim vào danh sách yêu thích")
+        return api_response(data=item.to_dict(movie), message="Đã thêm phim vào danh sách yêu thích")
 
 
 @router.delete("/api/users/favorites/{movie_id}")

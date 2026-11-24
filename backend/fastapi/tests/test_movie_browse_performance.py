@@ -93,3 +93,40 @@ def test_filtered_browse_loads_only_returned_movie_rows(tmp_path):
         finally:
             event.remove(Movie, 'load', record_load)
             app.state.runtime.db.engine.dispose()
+
+
+def test_public_catalog_detail_and_search_filter_drafts_before_loading_episodes(tmp_path):
+    app = create_app(sync_path=tmp_path / "sync.json", model_mode="light", load_default=False,
+                     database_url=f"sqlite:///{(tmp_path / 'catalog.db').as_posix()}")
+    with TestClient(app) as client:
+        manager = app.state.runtime.db
+        with manager.session() as db:
+            db.add(CatalogSeries(id="catalog", title="Phim", record_json='{"status":"ready"}'))
+            db.flush()
+            db.add_all([
+                CatalogEpisode(id="public", title="Bờ biển", series_id="catalog", kind="regular",
+                               record_json='{"status":"ready"}'),
+                CatalogEpisode(id="draft", title="Bờ biển chưa phát", series_id="catalog", kind="regular",
+                               record_json='{"status":"draft"}'),
+            ])
+            db.commit()
+        statements = []
+
+        def capture(_connection, _cursor, statement, _parameters, _context, _many):
+            if "FROM catalog_episodes" in statement:
+                statements.append(statement)
+
+        event.listen(manager.engine, "before_cursor_execute", capture)
+        try:
+            detail = client.get("/api/catalog/series/catalog")
+            assert detail.status_code == 200
+            assert [item["id"] for item in detail.json()["episodes"]] == ["public"]
+            assert len(statements) == 1 and "catalog_episodes.publication_status =" in statements[0]
+            statements.clear()
+            search = client.get("/api/catalog/search", params={"q": "BỜ BIỂN"})
+            assert search.status_code == 200
+            assert [item["id"] for item in search.json()] == ["public"]
+            assert len(statements) == 1 and "catalog_episodes.publication_status =" in statements[0]
+            assert "catalog_episodes.raw_json" not in statements[0]
+        finally:
+            event.remove(manager.engine, "before_cursor_execute", capture)

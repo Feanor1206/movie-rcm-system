@@ -13,6 +13,12 @@ Compose nạp lược đồ khi tạo cơ sở dữ liệu mới. Bản `docker-
 - Một tập thuộc một bộ. Nếu tập có mùa, khóa ngoại `(series_id, season_id)` yêu cầu mùa thuộc đúng bộ. Tập có thể để `season_id` là `NULL`. Muốn xóa hoặc đổi bộ của một mùa, xử lý các tập đang trỏ đến mùa đó trước.
 - `catalog_episode_assets` nối mỗi tập với những tệp có phạm vi phát tương ứng. Khóa chính `(episode_id, media_asset_id)` giúp tra tệp theo tập và chống liên kết trùng. `coverage_json` giữ mốc thời gian, phạm vi và dữ liệu xuất gói.
 - Xem trước và nhập kiểm tra tập, mùa và tập được tham chiếu trong phạm vi tệp. Khi nhập thành công, metadata và liên kết được lưu trong cùng giao dịch.
+- `catalog_episode_characters` và `catalog_episode_genres` dùng khóa chính ghép và khóa ngoại để tra tập theo nhân vật hoặc thể loại. Khi sửa một tập, lần nhập thay các liên kết của tập trong cùng giao dịch với bản ghi.
+- `catalog_series_genres`, `catalog_series_characters` và `catalog_character_series` tách quan hệ nhiều–nhiều của bộ và nhân vật. Danh sách nhân vật giới thiệu của một bộ và danh sách những bộ mà một nhân vật xuất hiện là hai quan hệ có vai trò riêng. `movie_genres` nối phim với tên thể loại viết thường, đã bỏ khoảng trắng đầu/cuối, trong `movie_genre_terms`. Luồng nhập ghi các bảng nối cùng giao dịch. JSON/CSV cũ giữ định dạng dữ liệu API và nguồn gói.
+- Danh sách xem sau, yêu thích và điểm người dùng tham chiếu `movies`. API danh sách lấy tiêu đề và ảnh hiện tại qua JOIN. Xóa phim dọn các mục phụ thuộc. Xóa tệp danh mục dọn tiến độ và cảnh gắn với tệp đó. Xóa phân đoạn hoặc tệp liên quan đặt khóa ngoại tùy chọn thành `NULL`.
+- `catalog_episodes.publication_status` nhận trạng thái khi nhập. Chỉ mục `idx_cat_ep_publication` hỗ trợ truy vấn xuất các tập `ready` cho CineBot.
+- Mỗi tập có một phân đoạn ở mỗi vị trí. Khoảng thời gian của đoạn có thể để trống cả hai đầu. Khi có mốc, điểm bắt đầu phải từ 0 trở lên và điểm kết thúc phải lớn hơn điểm bắt đầu.
+- `catalog_text_tracks` liên kết phụ đề theo tệp video hoặc theo cặp tập và nguồn cụ thể. Với tệp lưu ngoài DB, đường dẫn và SHA-256 nhận diện chính xác bản phụ đề đã dùng.
 
 ## Nâng cấp MySQL đang sử dụng
 
@@ -36,6 +42,26 @@ WHERE e.season_id IS NOT NULL AND s.id IS NULL;
 Khi truy vấn trả về 0 dòng, chạy tệp [migration 06](migrations/06_catalog_integrity.sql) trên schema đó. Migration có thể chạy lại. Nếu MySQL báo lỗi liên kết, kiểm tra và sửa các mã ở truy vấn trên theo nguồn trước khi chạy lại.
 
 Khởi động FastAPI để tạo lại liên kết tập–tệp từ `coverage_json`. FastAPI cập nhật các liên kết bị thiếu hoặc lệch và ghi log khi gặp JSON cũ không đọc được hoặc tham chiếu thiếu tập. Kiểm tra một tập có tệp và số liên kết trong bảng `catalog_episode_assets`.
+
+[Migration 07](migrations/07_catalog_publication_and_tracks.sql) cập nhật phần catalog trên MySQL 8.0.16 trở lên. Kết quả đầu tiên liệt kê `table_name`, `row_id`, `reference_column` và `missing_id` của các dòng mồ côi. Nếu danh sách có dòng, MySQL CLI dừng ở bảng kiểm tra tạm. Đối chiếu mã với nguồn và sửa trên đúng schema trước khi chạy lại. Chạy theo chế độ dừng khi có lỗi của MySQL CLI. Script điền các bảng nối từ mã tìm thấy trong dữ liệu cũ và bỏ hai cột tiêu đề/ảnh đã chuyển sang JOIN.
+
+MySQL 8.0.18 trở lên có thể chạy `EXPLAIN ANALYZE` trong truy vấn bên dưới.
+
+```sql
+SELECT episode_id, position, COUNT(*) AS occurrences
+FROM catalog_segments
+GROUP BY episode_id, position
+HAVING COUNT(*) > 1;
+
+SELECT id, episode_id, episode_start_ms, episode_end_ms
+FROM catalog_segments
+WHERE (episode_start_ms IS NULL) <> (episode_end_ms IS NULL)
+   OR episode_start_ms < 0
+   OR episode_end_ms <= episode_start_ms;
+
+EXPLAIN ANALYZE
+SELECT id, raw_json FROM catalog_episodes WHERE publication_status = 'ready';
+```
 
 Nếu cần quay lại phiên bản ứng dụng cũ, ứng dụng đó vẫn đọc được `coverage_json`. Nếu cần gỡ khóa ngoại mới trên MySQL, chạy `ALTER TABLE catalog_episodes DROP FOREIGN KEY fk_episode_season_same_series` trong thời gian bảo trì. Có thể giữ bảng nối và chỉ mục phụ. Bản SQLite đã tạo từ phiên bản cũ dùng kiểm tra ở bước nhập và tạo bảng nối khi khởi động. SQLite mới có khóa ngoại ghép ngay từ lúc tạo bảng.
 

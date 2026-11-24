@@ -2241,6 +2241,14 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
         },
         "media_asset_id": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "episode_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "source_id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
         },
@@ -2338,6 +2346,10 @@
         "cues",
         "provenance",
         "record"
+      ],
+      "anyOf": [
+        { "properties": { "media_asset_id": { "type": "string" } } },
+        { "required": ["episode_id", "source_id"] }
       ],
       "additionalProperties": false
     },

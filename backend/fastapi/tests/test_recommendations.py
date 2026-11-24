@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from main import create_app
 from services.catalog_sync import AcceptedSnapshot
-from services.database import CatalogEpisode, CatalogSeries, FavoriteItem, MovieRating, User, WatchProgress, create_jwt_token
+from services.database import CatalogEpisode, CatalogMediaAsset, CatalogSeries, FavoriteItem, Movie, MovieRating, User, WatchProgress, create_jwt_token
 
 
 def test_recommend_personalizes_only_from_authenticated_account(tmp_path):
@@ -22,7 +22,10 @@ def test_recommend_personalizes_only_from_authenticated_account(tmp_path):
             db.add_all([user, other, CatalogSeries(id='s', title='Series')])
             db.flush()
             db.add(CatalogEpisode(id='watched', series_id='s', title='watched', kind='episode'))
-            db.add_all([FavoriteItem(user_id=user.id, movie_id='liked', movie_title='liked'),
+            db.add(CatalogMediaAsset(id='asset', storage_provider='local', storage_key='demo', relative_path='test.mp4'))
+            db.add_all([Movie(id=name, title=name, release_year=2026, rating=0) for name in ('liked', 'other')])
+            db.flush()
+            db.add_all([FavoriteItem(user_id=user.id, movie_id='liked'),
                         MovieRating(user_id=other.id, movie_id='other', rating=10),
                         WatchProgress(user_id=user.id, episode_id='watched', asset_id='asset', position_ms=1000)])
             db.commit()
@@ -96,6 +99,8 @@ def test_old_viewed_items_are_excluded_even_when_affinity_history_is_bounded(tmp
         with app.state.runtime.db.session() as db:
             user = User(username='long_history', email='history@example.com', password='x')
             db.add(user)
+            ids = ['old', *(f'other-{n}' for n in range(101))]
+            db.add_all([Movie(id=name, title=name, release_year=2026, rating=0) for name in ids])
             db.flush()
             db.add(MovieRating(user_id=user.id, movie_id='old', rating=5))
             db.flush()

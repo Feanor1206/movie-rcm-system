@@ -1,4 +1,3 @@
-"""Validate catalog structure and internal consistency; never import or open media."""
 import argparse
 import json
 import re
@@ -150,7 +149,11 @@ def validate(data):
     for row in data['text_tracks']:
         if (row['format'] == 'inline') != (row['external_file'] is None):
             errors.append(f"track {row['id']}: inline requires no external file; other formats require one")
-        duration = tables['media_assets'].get(row['media_asset_id'], {}).get('duration_ms')
+        duration = (
+            tables['media_assets'].get(row['media_asset_id'], {}).get('duration_ms')
+            if row['media_asset_id'] is not None
+            else tables['episodes'].get(row.get('episode_id'), {}).get('duration_ms')
+        )
         starts = [cue['start_ms'] for cue in row['cues']]
         if starts != sorted(starts):
             errors.append(f"track {row['id']}: cues must be sorted by start_ms")
