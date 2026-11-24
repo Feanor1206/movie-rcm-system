@@ -283,3 +283,19 @@ ALTER TABLE media_assets ADD INDEX idx_media_movie_id (movie_id), ADD INDEX idx_
         for _ in range(2):
             mysql_database.run_sql(engine.url.database, MIGRATIONS / "10_catalog_query_indexes.sql")
         assert describe_schema(engine) == expected
+
+
+def test_mysql_fresh_demo_seeds_follow_normalized_library_schema(mysql_database):
+    with mysql_database.schema() as engine:
+        mysql_database.run_sql(engine.url.database, INIT_SCHEMA)
+        for name in ("01_seed_movies.sql", "02_seed_50_users.sql"):
+            mysql_database.run_sql(engine.url.database, ROOT / "database/seeds" / name)
+        with engine.connect() as db:
+            assert db.exec_driver_sql("SELECT COUNT(*) FROM users").scalar_one() == 50
+            assert db.exec_driver_sql("SELECT COUNT(*) FROM movie_ratings").scalar_one() == 30
+            assert db.exec_driver_sql("SELECT COUNT(*) FROM movie_genres").scalar_one() > 0
+            watchlist = db.exec_driver_sql(
+                "SELECT m.title FROM watchlist_items AS w JOIN movies AS m ON m.id=w.movie_id "
+                "WHERE w.user_id=1 ORDER BY m.title"
+            ).scalars().all()
+            assert watchlist == ["Afterlight", "Quiet Places"]

@@ -1,12 +1,23 @@
 # Cơ sở dữ liệu
 
-Các tệp SQL cho MySQL:
+Dippie dùng MySQL 8.0 và có chế độ demo SQLite. `schema/01_init.sql` là nguồn chuẩn của lược đồ MySQL. Bộ kiểm thử đối chiếu các bảng, cột, kiểu, chỉ mục, khóa ngoại và CHECK với SQLAlchemy trên MySQL thật.
 
-- `schema/`: lược đồ khởi tạo, bắt đầu từ `01_init.sql`.
-- `migrations/`: thay đổi bảng danh sách yêu thích, video, danh mục và tiến độ xem.
-- `seeds/`: dữ liệu phim và tài khoản demo.
+| Thư mục | Nội dung |
+| --- | --- |
+| `schema/` | Tạo lược đồ mới từ `01_init.sql` |
+| `migrations/` | Nâng cấp schema cũ theo thứ tự 02–10 |
+| `objects/` | View, hàm, thủ tục, trigger, tài khoản và bài thực hành giao dịch |
+| `seeds/` | Dữ liệu phim, tài khoản và thư viện mẫu |
+| `queries/` | Hai mươi truy vấn, câu SQL đối chiếu và phép đo 100.000 tập |
 
-Compose nạp lược đồ khi tạo cơ sở dữ liệu mới. Bản `docker-compose.dev.yml` nạp thêm dữ liệu demo; chỉ dùng trong môi trường thử nghiệm riêng.
+## Dựng MySQL mới
+
+1. Tạo schema trống với `utf8mb4`, sau đó nạp `schema/01_init.sql` vào schema đó.
+2. Nạp `views.sql`, `functions.sql`, `procedures.sql`, `triggers.sql` và `security.sql` theo thứ tự. Script PowerShell và Compose thực hiện bước này. Chạy `transactions_demo.sql` theo bài thực hành riêng.
+3. Với schema demo, nạp `seeds/01_seed_movies.sql` rồi `seeds/02_seed_50_users.sql`.
+4. Khởi động FastAPI và gọi `GET /api/health`. Nhập gói danh mục từ trang quản trị, rồi đối chiếu trạng thái snapshot và một tập vừa nhập.
+
+Compose thực hiện các bước SQL khi khởi tạo volume MySQL mới. `docker-compose.dev.yml` nạp thêm seed demo.
 
 ## Đối tượng MySQL và quyền tài khoản
 
@@ -50,13 +61,7 @@ Mở hai kết nối Workbench tới **schema demo có seed** và kiểm tra phi
 
 ## Nâng cấp MySQL đang sử dụng
 
-Tạm dừng FastAPI và các tiến trình ghi danh mục. Sao lưu schema ra ngoài thư mục Git trước khi nâng cấp. Ví dụ sau dùng bản demo MySQL cục bộ.
-
-```powershell
-$dippieBackup = Join-Path $env:USERPROFILE ('dippie-before-06-' + (Get-Date -Format yyyyMMdd-HHmmss) + '.sql')
-mysqldump --host=127.0.0.1 --port=18306 --user=root --password --single-transaction --no-tablespaces --set-gtid-purged=OFF --result-file="$dippieBackup" dippie_release
-if ($LASTEXITCODE -ne 0) { throw 'Sao lưu MySQL thất bại.' }
-```
+Tạm dừng FastAPI và các tiến trình ghi danh mục. Sao lưu bằng tài khoản cài đặt, rồi áp dụng các migration còn thiếu theo thứ tự số. Đối với schema đã qua 06, thứ tự là `07_catalog_publication_and_tracks.sql`, `08_catalog_value_domains.sql`, `09_audit_log.sql`, `10_catalog_query_indexes.sql`. Sau 10, nạp lại các đối tượng rồi khởi động FastAPI với tài khoản ứng dụng. [Sao lưu và khôi phục](../docs/database/backup-restore.md)
 
 Trong MySQL Workbench, chọn đúng schema và kiểm tra các tập có mùa bị thiếu hoặc khác bộ.
 
@@ -69,11 +74,11 @@ WHERE e.season_id IS NOT NULL AND s.id IS NULL;
 
 Khi truy vấn trả về 0 dòng, chạy tệp [migration 06](migrations/06_catalog_integrity.sql) trên schema đó. Migration có thể chạy lại. Nếu MySQL báo lỗi liên kết, kiểm tra và sửa các mã ở truy vấn trên theo nguồn trước khi chạy lại.
 
-Khởi động FastAPI để tạo lại liên kết tập–tệp từ `coverage_json`. FastAPI cập nhật các liên kết bị thiếu hoặc lệch và ghi log khi gặp JSON cũ không đọc được hoặc tham chiếu thiếu tập. Kiểm tra một tập có tệp và số liên kết trong bảng `catalog_episode_assets`.
+Khi khởi động sau migration, FastAPI tạo lại các liên kết tập–tệp từ `coverage_json`. FastAPI cập nhật liên kết bị thiếu hoặc lệch và ghi log khi gặp JSON cũ không đọc được hoặc tham chiếu thiếu tập. Kiểm tra một tập có tệp và số liên kết trong bảng `catalog_episode_assets`.
 
 [Migration 07](migrations/07_catalog_publication_and_tracks.sql) cập nhật phần catalog trên MySQL 8.0.16 trở lên. Kết quả đầu tiên liệt kê `table_name`, `row_id`, `reference_column` và `missing_id` của các dòng mồ côi. Nếu danh sách có dòng, MySQL CLI dừng ở bảng kiểm tra tạm. Đối chiếu mã với nguồn và sửa trên đúng schema trước khi chạy lại. Chạy theo chế độ dừng khi có lỗi của MySQL CLI. Script điền các bảng nối từ mã tìm thấy trong dữ liệu cũ và bỏ hai cột tiêu đề/ảnh đã chuyển sang JOIN.
 
-[Migration 08](migrations/08_catalog_value_domains.sql) đổi `release_date` của mùa/tập sang `DATE` và `retrieved_at` của nguồn sang `DATETIME(6)` theo UTC. Kết quả kiểm tra đầu tiên liệt kê mã và giá trị ngày giờ sai trước khi thay kiểu cột. Ngày phát hành yêu cầu đủ năm, tháng và ngày. Năm đứng riêng trong gói mới vẫn có trong bản gốc; cột ngày phát hành để trống nếu chưa xác định được ngày. Thời điểm có múi giờ được đổi sang UTC. Chuỗi thời điểm cũ thiếu múi giờ được hiểu là UTC. Hai tên loại cũ `standard` và `episode` được chuyển sang `regular` ở các cột trước đây dùng chúng.
+[Migration 08](migrations/08_catalog_value_domains.sql) đổi `release_date` của mùa/tập sang `DATE` và `retrieved_at` của nguồn sang `DATETIME(6)` theo UTC. Kết quả kiểm tra đầu tiên liệt kê mã và giá trị ngày giờ sai trước khi thay kiểu cột. Ngày phát hành yêu cầu đủ năm, tháng và ngày. Năm đứng riêng trong gói mới vẫn có trong bản gốc. Cột ngày phát hành để trống nếu chưa xác định được ngày. Thời điểm có múi giờ được đổi sang UTC. Chuỗi thời điểm cũ thiếu múi giờ được hiểu là UTC. Hai tên loại cũ `standard` và `episode` được chuyển sang `regular` ở các cột trước đây dùng chúng.
 
 Các loại nội dung và trạng thái xuất bản lấy từ [hợp đồng catalog](../docs/contracts/animation-catalog-v1/dippie.catalog.v1.schema.json). Trạng thái gói `COMMITTED`, các trạng thái của snapshot và vai trò tài khoản lấy từ luồng ghi của FastAPI. So sánh theo `HEX` giữ đúng chữ hoa/thường và khoảng trắng trên cả MySQL và SQLite. Migration khai báo thêm các CHECK về giá trị số, khoảng thời gian và cận thang đo.
 
@@ -95,7 +100,26 @@ EXPLAIN ANALYZE
 SELECT id, raw_json FROM catalog_episodes WHERE publication_status = 'ready';
 ```
 
-Nếu cần quay lại phiên bản ứng dụng cũ, ứng dụng đó vẫn đọc được `coverage_json`. Nếu cần gỡ khóa ngoại mới trên MySQL, chạy `ALTER TABLE catalog_episodes DROP FOREIGN KEY fk_episode_season_same_series` trong thời gian bảo trì. Có thể giữ bảng nối và chỉ mục phụ. Bản SQLite đã tạo từ phiên bản cũ dùng kiểm tra ở bước nhập và tạo bảng nối khi khởi động. SQLite mới có khóa ngoại ghép ngay từ lúc tạo bảng.
+Migration 09 thêm `audit_log`. Migration 10 thêm chỉ mục phục vụ tổng hợp tập theo trạng thái, bộ và thời lượng, đồng thời bỏ năm chỉ mục trùng tiền tố của UNIQUE. Chạy lại bộ nạp đối tượng để cập nhật `v_genre_stats`. [Truy vấn và phép đo](queries/README.md)
+
+Muốn quay lại bản ứng dụng cũ, khôi phục bản sao lưu trước migration vào schema mới và kiểm thử ứng dụng với schema đó. Bản SQLite demo dùng SQLAlchemy để thêm cấu trúc còn thiếu và giữ dữ liệu hiện có khi khởi động.
+
+## Kiểm thử
+
+```powershell
+python -m pytest -q tests backend/fastapi/tests
+$env:DIPPIE_RUN_MYSQL_TESTS = '1'
+python -m pytest -q -rs tests backend/fastapi/tests
+```
+
+Đặt `DIPPIE_TEST_MYSQL_BIN` tới thư mục `bin` nếu trình chạy chưa tìm thấy MySQL 8.0. Bộ kiểm thử MySQL dựng một máy chủ vòng lặp và schema tạm cho từng ca. Các ca chính của ứng dụng tiếp tục dùng SQLite.
+
+## Tài liệu lược đồ
+
+- [ERD và bản số của các khóa ngoại](../docs/database/erd.md)
+- [Khóa, phụ thuộc hàm và phân tích chuẩn hóa](../docs/database/normalization.md)
+- [Từ điển dữ liệu từng cột](../docs/database/data-dictionary.md)
+- [Quy trình và kết quả sao lưu–khôi phục](../docs/database/backup-restore.md)
 
 ## Kiểm tra độ phủ trước khi nhập
 
