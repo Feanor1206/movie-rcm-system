@@ -20,6 +20,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+} catch {}
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location -Path $root
@@ -177,6 +180,7 @@ function Get-PreviewRuntimeContract {
     $frontendEnvironment["PORT"] = [string]$FrontendPort
     $frontendEnvironment["HOSTNAME"] = "127.0.0.1"
     $frontendEnvironment["NODE_ENV"] = "production"
+    $frontendEnvironment["NEXT_TELEMETRY_DISABLED"] = "1"
     $frontendEnvironment["NEXT_PUBLIC_API_URL"] = "/api"
     $frontendEnvironment["NEXT_PUBLIC_SPRINGBOOT_API_URL"] = "/api"
     $frontendEnvironment["SPRINGBOOT_INTERNAL_URL"] = "http://127.0.0.1:$SpringPort"
@@ -274,6 +278,374 @@ function Test-RecordedProcessIdentity {
     }
 }
 
+function Test-TcpPortOpen {
+    param(
+        [string]$HostName = "127.0.0.1",
+        [int]$Port,
+        [int]$TimeoutMs = 500
+    )
+    $client = $null
+    try {
+        $client = [System.Net.Sockets.TcpClient]::new()
+        $task = $client.ConnectAsync($HostName, $Port)
+        if (-not $task.Wait($TimeoutMs)) { return $false }
+        return $client.Connected
+    } catch {
+        return $false
+    } finally {
+        if ($client) { $client.Dispose() }
+    }
+}
+
+function Get-JavaMajorVersion {
+    param([string]$JavaBin)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $out = & $JavaBin -version 2>&1 | Out-String
+        if ($out -match 'version\s+"(\d+)(?:\.(\d+))?') {
+            $major = [int]$Matches[1]
+            if ($major -eq 1 -and $Matches[2]) { return [int]$Matches[2] }
+            return $major
+        }
+        return 0
+    } catch {
+        return 0
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+}
+
+function Resolve-JavaRuntime {
+    param([switch]$RequireCompiler)
+
+    $candidateHomes = [System.Collections.Generic.List[string]]::new()
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    $addHome = {
+        param([string]$PathCandidate)
+        if ([string]::IsNullOrWhiteSpace($PathCandidate)) { return }
+        try {
+            $full = [System.IO.Path]::GetFullPath($PathCandidate.Trim().TrimEnd('\', '/'))
+            if ((Test-Path -LiteralPath $full -PathType Container) -and $seen.Add($full)) {
+                $candidateHomes.Add($full)
+            }
+        } catch {}
+    }
+
+    if ($env:JAVA_HOME) { & $addHome $env:JAVA_HOME }
+
+    foreach ($cmd in @(Get-Command java -All -ErrorAction SilentlyContinue)) {
+        try {
+            $src = $cmd.Source
+            if (-not $src -or -not (Test-Path -LiteralPath $src -PathType Leaf)) { continue }
+            $item = Get-Item -LiteralPath $src -Force
+            if ($item.LinkType -and $item.Target) {
+                $targetPath = if ($item.Target -is [System.Array]) { $item.Target[0] } else { $item.Target }
+                if ([System.IO.Path]::IsPathRooted($targetPath)) { $src = $targetPath }
+            }
+            $binDir = Split-Path $src -Parent
+            if ((Split-Path $binDir -Leaf) -ieq "bin") {
+                & $addHome (Split-Path $binDir -Parent)
+            }
+        } catch {}
+    }
+
+    $searchPatterns = @(
+        "C:\Program Files\Java\jdk*",
+        "C:\Program Files\Eclipse Adoptium\jdk*",
+        "C:\Program Files\Microsoft\jdk*",
+        "C:\Program Files\Amazon Corretto\jdk*",
+        "C:\Program Files\Zulu\zulu*",
+        "C:\Program Files\BellSoft\LibericaJDK*",
+        "C:\Program Files\Semeru\jdk*",
+        (Join-Path $env:LOCALAPPDATA "Programs\Eclipse Adoptium\jdk*"),
+        (Join-Path $env:USERPROFILE ".jdks\*"),
+        "C:\tools\jdk*",
+        "D:\Java\jdk*"
+    )
+    foreach ($pattern in $searchPatterns) {
+        $dirs = @(Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending)
+        foreach ($d in $dirs) { & $addHome $d.FullName }
+    }
+
+    $validCandidates = @()
+    foreach ($homeDir in $candidateHomes) {
+        $javaExe = Join-Path $homeDir "bin\java.exe"
+        if (-not (Test-Path -LiteralPath $javaExe -PathType Leaf)) { continue }
+        $javacExe = Join-Path $homeDir "bin\javac.exe"
+        $hasJavac = Test-Path -LiteralPath $javacExe -PathType Leaf
+        $major = Get-JavaMajorVersion -JavaBin $javaExe
+        if ($major -gt 0 -and $major -lt 17) { continue }
+        $validCandidates += [PSCustomObject]@{
+            JavaHome     = $homeDir
+            JavaBin      = $javaExe
+            HasJavac     = $hasJavac
+            MajorVersion = $major
+        }
+    }
+
+    $preferred = $validCandidates | Where-Object { $_.HasJavac } | Select-Object -First 1
+    if ($preferred) { return $preferred }
+    if (-not $RequireCompiler) {
+        $fallback = $validCandidates | Select-Object -First 1
+        if ($fallback) { return $fallback }
+        $pathJava = Get-Command java -ErrorAction SilentlyContinue
+        if ($pathJava -and (Test-Path -LiteralPath $pathJava.Source -PathType Leaf)) {
+            $major = Get-JavaMajorVersion -JavaBin $pathJava.Source
+            if ($major -eq 0 -or $major -ge 17) {
+                return [PSCustomObject]@{
+                    JavaHome     = ""
+                    JavaBin      = $pathJava.Source
+                    HasJavac     = $false
+                    MajorVersion = $major
+                }
+            }
+        }
+    }
+    return $null
+}
+
+function Test-PythonExecutableWorking {
+    param([string]$PythonExe)
+    if ([string]::IsNullOrWhiteSpace($PythonExe) -or -not (Test-Path -LiteralPath $PythonExe -PathType Leaf)) { return $false }
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $null = & $PythonExe -c "import sys; assert sys.version_info >= (3, 10)" 2>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+}
+
+function Test-FastApiPythonPackages {
+    param([string]$PythonExe)
+    if ([string]::IsNullOrWhiteSpace($PythonExe) -or -not (Test-Path -LiteralPath $PythonExe -PathType Leaf)) { return $false }
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $null = & $PythonExe -c "import fastapi, uvicorn, pydantic, dotenv, jsonschema, httpx, numpy, onnxruntime, tokenizers, torch, faiss, sqlalchemy, pymysql, jwt, bcrypt, cryptography" 2>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+}
+
+function Resolve-FastApiPython {
+    param(
+        [string]$RootDirectory,
+        [string]$FastApiDirectory
+    )
+
+    $venvDir = Join-Path $RootDirectory ".venv"
+    $venvPython = Join-Path $venvDir "Scripts\python.exe"
+    if (Test-PythonExecutableWorking -PythonExe $venvPython) {
+        if (Test-FastApiPythonPackages -PythonExe $venvPython) {
+            return $venvPython
+        }
+    }
+
+    $basePython = $null
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    foreach ($cmd in @(Get-Command python -All -ErrorAction SilentlyContinue)) {
+        if ($cmd.Source) { $candidates.Add($cmd.Source) }
+    }
+    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+        $prevEap = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $pyExe = (& $pyLauncher.Source -3 -c "import sys; print(sys.executable)" 2>$null | Select-Object -First 1)
+            if ($LASTEXITCODE -eq 0 -and $pyExe) { $candidates.Add([string]$pyExe) }
+        } catch {} finally {
+            $ErrorActionPreference = $prevEap
+        }
+    }
+    foreach ($pattern in @(
+        (Join-Path $env:LOCALAPPDATA "Programs\Python\Python3*\python.exe"),
+        "C:\Program Files\Python3*\python.exe",
+        "C:\Python3*\python.exe"
+    )) {
+        foreach ($found in @(Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue | Sort-Object FullName -Descending)) {
+            $candidates.Add($found.FullName)
+        }
+    }
+
+    foreach ($cand in $candidates) {
+        if ($cand -like "*\WindowsApps\python*.exe") { continue }
+        if (Test-PythonExecutableWorking -PythonExe $cand) {
+            $basePython = $cand
+            break
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf) -and $basePython) {
+        if (Test-FastApiPythonPackages -PythonExe $basePython) {
+            return $basePython
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
+        if (-not $basePython) {
+            throw "Không tìm thấy Python (>= 3.10) trên máy. Vui lòng cài đặt Python 3.11+ rồi chạy lại start-all."
+        }
+        Write-Host "  -> Chưa có môi trường ảo Python (.venv); đang tạo tại '$venvDir'..." -ForegroundColor Yellow
+        $prevEap = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            & $basePython -m venv $venvDir
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
+                throw "Tạo Python venv tại '$venvDir' thất bại."
+            }
+        } finally {
+            $ErrorActionPreference = $prevEap
+        }
+    }
+
+    $reqFile = Join-Path $FastApiDirectory "requirements.txt"
+    Write-Host "  -> Thiếu thư viện Python cho FastAPI; đang cài đặt từ requirements.txt vào .venv..." -ForegroundColor Yellow
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        & $venvPython -m pip install --disable-pip-version-check -r $reqFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "Cài đặt thư viện Python từ '$reqFile' thất bại (exit code $LASTEXITCODE)."
+        }
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+
+    if (-not (Test-FastApiPythonPackages -PythonExe $venvPython)) {
+        throw "Đã cài đặt requirements.txt nhưng vẫn thiếu module Python bắt buộc trong '$venvPython'."
+    }
+    return $venvPython
+}
+
+function Resolve-NodeToolchain {
+    $nodeExe = $null
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCmd -and (Test-Path -LiteralPath $nodeCmd.Source -PathType Leaf)) {
+        $nodeExe = $nodeCmd.Source
+    } else {
+        foreach ($cand in @(
+            "C:\Program Files\nodejs\node.exe",
+            (Join-Path $env:LOCALAPPDATA "Programs\nodejs\node.exe"),
+            "D:\nodejs\node.exe",
+            "D:\node.exe"
+        )) {
+            if (Test-Path -LiteralPath $cand -PathType Leaf) {
+                $nodeExe = $cand
+                break
+            }
+        }
+    }
+    if (-not $nodeExe) {
+        throw "Không tìm thấy Node.js trên máy. Vui lòng cài đặt Node.js 20+ rồi chạy lại start-all."
+    }
+
+    $nodeDir = Split-Path $nodeExe -Parent
+    $pathParts = @($env:PATH -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if (-not ($pathParts | Where-Object { $_.TrimEnd('\') -ieq $nodeDir.TrimEnd('\') })) {
+        $env:PATH = "$nodeDir;$env:PATH"
+    }
+
+    $npmCmd = Join-Path $nodeDir "npm.cmd"
+    if (-not (Test-Path -LiteralPath $npmCmd -PathType Leaf)) {
+        $npmFound = Get-Command npm.cmd -ErrorAction SilentlyContinue
+        if (-not $npmFound) { $npmFound = Get-Command npm -ErrorAction SilentlyContinue }
+        if ($npmFound) { $npmCmd = $npmFound.Source }
+    }
+
+    return [PSCustomObject]@{
+        NodeExe = $nodeExe
+        NpmCmd  = $npmCmd
+        NodeDir = $nodeDir
+    }
+}
+
+function Get-FrontendDependencyHash {
+    param([string]$FrontendDirectory)
+    $pkgLock = Join-Path $FrontendDirectory "package-lock.json"
+    $pkgJson = Join-Path $FrontendDirectory "package.json"
+    $targetFile = if (Test-Path -LiteralPath $pkgLock -PathType Leaf) { $pkgLock } else { $pkgJson }
+    if (-not (Test-Path -LiteralPath $targetFile -PathType Leaf)) { return "" }
+    return (Get-FileHash -LiteralPath $targetFile -Algorithm SHA256).Hash
+}
+
+function Test-FrontendDependenciesNeedInstall {
+    param([string]$FrontendDirectory)
+    $nextBin = Join-Path $FrontendDirectory "node_modules\next\dist\bin\next"
+    if (-not (Test-Path -LiteralPath $nextBin -PathType Leaf)) { return $true }
+
+    $pkgLock = Join-Path $FrontendDirectory "package-lock.json"
+    $installedLock = Join-Path $FrontendDirectory "node_modules\.package-lock.json"
+    if ((Test-Path -LiteralPath $pkgLock -PathType Leaf) -and -not (Test-Path -LiteralPath $installedLock -PathType Leaf)) {
+        return $true
+    }
+
+    $markerFile = Join-Path $FrontendDirectory "node_modules\.preview-deps.sha256"
+    if (Test-Path -LiteralPath $markerFile -PathType Leaf) {
+        $expectedHash = Get-FrontendDependencyHash -FrontendDirectory $FrontendDirectory
+        $actualHash = (Get-Content -LiteralPath $markerFile -Raw).Trim()
+        if ($expectedHash -and $actualHash -cne $expectedHash) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Ensure-FrontendDependencies {
+    param(
+        [string]$FrontendDirectory,
+        [string]$NpmCmd
+    )
+    if (-not (Test-FrontendDependenciesNeedInstall -FrontendDirectory $FrontendDirectory)) {
+        return
+    }
+    if (-not $NpmCmd -or -not (Test-Path -LiteralPath $NpmCmd -PathType Leaf)) {
+        throw "Không tìm thấy npm để cài đặt frontend/node_modules."
+    }
+
+    $pkgLock = Join-Path $FrontendDirectory "package-lock.json"
+    $installArgs = if (Test-Path -LiteralPath $pkgLock -PathType Leaf) { @("ci", "--no-audit", "--no-fund") } else { @("install", "--no-audit", "--no-fund") }
+    Write-Host "      Chưa có hoặc cần cập nhật frontend/node_modules; đang chạy npm $($installArgs[0])..." -ForegroundColor Yellow
+
+    $prevEap = $ErrorActionPreference
+    Push-Location $FrontendDirectory
+    try {
+        $ErrorActionPreference = "Continue"
+        & $NpmCmd @installArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "Cài đặt dependencies frontend thất bại (npm $($installArgs[0]) exit code $LASTEXITCODE)."
+        }
+    } finally {
+        $ErrorActionPreference = $prevEap
+        Pop-Location
+    }
+
+    $hash = Get-FrontendDependencyHash -FrontendDirectory $FrontendDirectory
+    if ($hash) {
+        $markerFile = Join-Path $FrontendDirectory "node_modules\.preview-deps.sha256"
+        [System.IO.File]::WriteAllText($markerFile, $hash, [System.Text.UTF8Encoding]::new($false))
+    }
+}
+
+function Get-LogTailText {
+    param([string]$Path, [int]$TailLines = 25)
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return "" }
+    try {
+        $lines = @(Get-Content -LiteralPath $Path -Tail $TailLines -ErrorAction SilentlyContinue)
+        return ($lines -join [Environment]::NewLine).Trim()
+    } catch {
+        return ""
+    }
+}
+
 $previewPaths = Get-PreviewPaths -BackendDirectory $backendDir -TargetDirectory $targetDir -DataDirectory $DataDirectory -StateFile $StateFile
 $DataDirectory = $previewPaths.DataDirectory
 $stateFile = $previewPaths.StateFile
@@ -366,29 +738,6 @@ try {
 
 
     Write-Host "`n[2/7] Kiểm tra môi trường Java & JDK..." -ForegroundColor Yellow
-    if (-not $env:JAVA_HOME) {
-        if (Test-Path "C:\Program Files\Java\jdk-25.0.3") {
-            $env:JAVA_HOME = "C:\Program Files\Java\jdk-25.0.3"
-        } else {
-            $candidate = Get-ChildItem "C:\Program Files\Java\jdk-*" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($candidate) { $env:JAVA_HOME = $candidate.FullName }
-        }
-    }
-
-    $javaBin = if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME "bin\java.exe"))) {
-        Join-Path $env:JAVA_HOME "bin\java.exe"
-    } elseif (Test-Path "C:\Program Files\Java\jdk-25.0.3\bin\java.exe") {
-        "C:\Program Files\Java\jdk-25.0.3\bin\java.exe"
-    } else {
-        (Get-Command java -ErrorAction Stop).Source
-    }
-    Write-Host "  -> Java executable: $javaBin" -ForegroundColor Green
-    Write-Host "  -> Process JAVA_HOME: $env:JAVA_HOME (chỉ áp dụng trong phiên làm việc này)" -ForegroundColor Gray
-
-
-
-
-    Write-Host "`n[3/7] Kiểm tra tính tươi mới của artifact Backend..." -ForegroundColor Yellow
     $jarFile = Join-Path $backendDir "target\moviercm-backend-0.0.1-SNAPSHOT.jar"
     $needsBuild = -not (Test-Path $jarFile)
 
@@ -406,11 +755,39 @@ try {
         }
     }
 
+    $javaRuntime = Resolve-JavaRuntime -RequireCompiler:$needsBuild
+    if (-not $javaRuntime) {
+        if ($needsBuild) {
+            throw "Không tìm thấy JDK >= 17 (có javac.exe) để biên dịch Spring Boot. Vui lòng cài đặt JDK 17+ hoặc chạy start-python-main.ps1."
+        }
+        throw "Không tìm thấy Java (>= 17) trên máy. Vui lòng cài đặt JDK 17+ hoặc chạy start-python-main.ps1."
+    }
+    if ($javaRuntime.JavaHome) {
+        $env:JAVA_HOME = $javaRuntime.JavaHome
+    }
+    $javaBin = $javaRuntime.JavaBin
+    Write-Host "  -> Java executable: $javaBin" -ForegroundColor Green
+    Write-Host "  -> Process JAVA_HOME: $env:JAVA_HOME (chỉ áp dụng trong phiên làm việc này)" -ForegroundColor Gray
+
+
+
+
+    Write-Host "`n[3/7] Kiểm tra tính tươi mới của artifact Backend..." -ForegroundColor Yellow
     if ($needsBuild) {
         Write-Host "  -> Đang đóng gói moviercm-backend-0.0.1-SNAPSHOT.jar bằng Maven..." -ForegroundColor Yellow
-        cmd.exe /c "cd /d `"$backendDir`" && mvnw.cmd clean package dependency:build-classpath `"-Dmdep.outputFile=target/cp.txt`" -DskipTests -q"
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $jarFile)) {
-            throw "Đóng gói backend jar thất bại. Vui lòng kiểm tra lỗi Maven."
+        $mvnwPath = Join-Path $backendDir "mvnw.cmd"
+        $prevEap = $ErrorActionPreference
+        Push-Location $backendDir
+        try {
+            $ErrorActionPreference = "Continue"
+            & $mvnwPath clean package "dependency:build-classpath" "-Dmdep.outputFile=target/cp.txt" -DskipTests -q
+            $mavenExit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $prevEap
+            Pop-Location
+        }
+        if ($mavenExit -ne 0 -or -not (Test-Path $jarFile)) {
+            throw "Đóng gói backend jar thất bại (exit code $mavenExit). Vui lòng kiểm tra lỗi Maven hoặc kết nối mạng để tải dependencies."
         }
         Write-Host "  -> Đóng gói thành công: $jarFile ($((Get-Item $jarFile).Length) bytes)." -ForegroundColor Green
     } else {
@@ -420,7 +797,7 @@ try {
 
 
 
-    Write-Host "`n[4/7] Thiết lập cấu hình đồng bộ bảo mật và Mô hình AI..." -ForegroundColor Yellow
+    Write-Host "`n[4/7] Thiết lập cấu hình đồng bộ bảo mật, CSDL và Mô hình AI..." -ForegroundColor Yellow
     if ($ModelMode -eq "off") {
         $SyncSecret = ""
     } elseif (-not $SyncSecret) {
@@ -440,6 +817,26 @@ try {
         -FrontendPort $FrontendPort `
         -DataDirectory $DataDirectory `
         -SyncSecret $SyncSecret
+
+    if (-not $env:SPRING_DATASOURCE_URL) {
+        $mysqlHost = if ($env:MYSQL_HOST) { $env:MYSQL_HOST } else { "localhost" }
+        $mysqlPort = if ($env:MYSQL_PORT) { [int]$env:MYSQL_PORT } else { 3306 }
+        if (-not (Test-TcpPortOpen -HostName $mysqlHost -Port $mysqlPort -TimeoutMs 500)) {
+            $h2Path = (Join-Path $DataDirectory "preview_h2_db").Replace("\", "/")
+            $sqlitePath = (Join-Path $DataDirectory "fastapi_preview.db").Replace("\", "/")
+            $runtimeContract.SpringEnvironment["SPRING_DATASOURCE_URL"] = "jdbc:h2:file:${h2Path};MODE=MySQL;NON_KEYWORDS=YEAR,USER;DB_CLOSE_DELAY=-1"
+            $runtimeContract.SpringEnvironment["SPRING_DATASOURCE_DRIVER_CLASS_NAME"] = "org.h2.Driver"
+            $runtimeContract.SpringEnvironment["SPRING_DATASOURCE_USERNAME"] = "sa"
+            $runtimeContract.SpringEnvironment["SPRING_DATASOURCE_PASSWORD"] = ""
+            $runtimeContract.SpringEnvironment["SPRING_SQL_INIT_MODE"] = "never"
+            if (-not $env:DATABASE_URL) {
+                $runtimeContract.FastApiEnvironment["DATABASE_URL"] = "sqlite:///$sqlitePath"
+            }
+            Write-Host "  -> Không phát hiện MySQL tại ${mysqlHost}:${mysqlPort}; tự động dùng CSDL nhúng cục bộ (H2 + SQLite)." -ForegroundColor Yellow
+        } else {
+            Write-Host "  -> Kết nối MySQL khả dụng tại ${mysqlHost}:${mysqlPort}." -ForegroundColor Green
+        }
+    }
 
     Write-Host "  -> Chế độ phục vụ AI (ModelMode): $ModelMode" -ForegroundColor Cyan
     if ($ModelMode -eq "cloud") {
@@ -497,7 +894,7 @@ try {
         }
         $faEnv["PYTHONPATH"] = $fastapiDir
 
-        $pythonExe = (Get-Command python -ErrorAction Stop).Source
+        $pythonExe = Resolve-FastApiPython -RootDirectory $root -FastApiDirectory $fastapiDir
         $faArgs = Get-FastApiArguments -FastApiPort $FastApiPort
         $faProc = Start-ChildServiceProcess -FileName $pythonExe -Arguments $faArgs -WorkingDirectory $fastapiDir -EnvironmentVariables $faEnv -StdOutFile $faLog -StdErrFile $faErr
 
@@ -519,13 +916,20 @@ try {
         $faReady = $false
         $deadline = [DateTime]::UtcNow.AddSeconds(90)
         while ([DateTime]::UtcNow -lt $deadline) {
-            if ($faProc.HasExited) { throw "FastAPI tiến trình PID $($faProc.Id) đã thoát bất thường với mã $($faProc.ExitCode)." }
+            if ($faProc.HasExited) {
+                $errTail = Get-LogTailText -Path $faErr
+                $outTail = Get-LogTailText -Path $faLog
+                throw "FastAPI tiến trình PID $($faProc.Id) đã thoát bất thường với mã $($faProc.ExitCode).`n$errTail`n$outTail"
+            }
             try {
                 $res = Invoke-WebRequest -Uri "http://127.0.0.1:$FastApiPort/health" -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
                 if ($res.StatusCode -eq 200) { $faReady = $true; break }
             } catch { Start-Sleep -Milliseconds 600 }
         }
-        if (-not $faReady) { throw "FastAPI không sẵn sàng trên cổng $FastApiPort sau 90 giây." }
+        if (-not $faReady) {
+            $errTail = Get-LogTailText -Path $faErr
+            throw "FastAPI không sẵn sàng trên cổng $FastApiPort sau 90 giây.`n$errTail"
+        }
         Write-Host "      FastAPI HEALTHY (200 OK)." -ForegroundColor Green
     } else {
         Write-Host "  [a] FastAPI không được khởi động trong ModelMode off." -ForegroundColor Gray
@@ -565,17 +969,27 @@ try {
     $sbReady = $false
     $deadline = [DateTime]::UtcNow.AddSeconds(90)
     while ([DateTime]::UtcNow -lt $deadline) {
-        if ($sbProc.HasExited) { throw "Spring Boot tiến trình PID $($sbProc.Id) đã thoát bất thường với mã $($sbProc.ExitCode)." }
+        if ($sbProc.HasExited) {
+            $errTail = Get-LogTailText -Path $sbErr
+            $outTail = Get-LogTailText -Path $sbLog
+            throw "Spring Boot tiến trình PID $($sbProc.Id) đã thoát bất thường với mã $($sbProc.ExitCode).`n$errTail`n$outTail"
+        }
         try {
             $res = Invoke-WebRequest -Uri "http://127.0.0.1:$SpringPort/api/health" -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
             if ($res.StatusCode -eq 200) { $sbReady = $true; break }
         } catch { Start-Sleep -Milliseconds 800 }
     }
-    if (-not $sbReady) { throw "Spring Boot không sẵn sàng trên cổng $SpringPort sau 60 giây." }
+    if (-not $sbReady) {
+        $outTail = Get-LogTailText -Path $sbLog
+        throw "Spring Boot không sẵn sàng trên cổng $SpringPort sau 90 giây.`n$outTail"
+    }
     Write-Host "      Spring Boot HEALTHY (200 OK)." -ForegroundColor Green
 
 
     Write-Host "  [c] Khởi động Next.js Frontend trên cổng $FrontendPort..." -ForegroundColor Yellow
+    $nodeToolchain = Resolve-NodeToolchain
+    Ensure-FrontendDependencies -FrontendDirectory $frontendDir -NpmCmd $nodeToolchain.NpmCmd
+
     $feEnv = [System.Collections.Generic.Dictionary[string, string]]::new()
     foreach ($key in [System.Environment]::GetEnvironmentVariables().Keys) {
         $feEnv[$key] = [System.Environment]::GetEnvironmentVariable($key)
@@ -583,7 +997,7 @@ try {
     foreach ($key in $runtimeContract.FrontendEnvironment.Keys) {
         $feEnv[$key] = $runtimeContract.FrontendEnvironment[$key]
     }
-    $nodeExe = (Get-Command node -ErrorAction Stop).Source
+    $nodeExe = $nodeToolchain.NodeExe
     $nextBin = Join-Path $frontendDir "node_modules\next\dist\bin\next"
     $buildIdPath = Join-Path $frontendDir ".next\BUILD_ID"
     $standaloneDir = Join-Path $frontendDir ".next\standalone"
@@ -612,7 +1026,11 @@ try {
         if (-not $buildProc.WaitForExit(300000)) { throw "Next.js standalone build timed out after 300 seconds." }
         $stackState.Processes = @($stackState.Processes | Where-Object { [int]$_.PID -ne $buildProc.Id })
         Save-StackState
-        if ($buildProc.ExitCode -ne 0) { throw "Next.js standalone build thất bại với mã thoát $($buildProc.ExitCode)." }
+        if ($buildProc.ExitCode -ne 0) {
+            $errTail = Get-LogTailText -Path $buildErr
+            $outTail = Get-LogTailText -Path $buildOut
+            throw "Next.js standalone build thất bại với mã thoát $($buildProc.ExitCode).`n$errTail`n$outTail"
+        }
         [System.IO.File]::WriteAllText($buildEnvironmentFile, $expectedBuildEnvironment, [System.Text.UTF8Encoding]::new($false))
     }
     if (-not (Test-Path -LiteralPath $standaloneServer -PathType Leaf)) { throw "Không tìm thấy frontend standalone server tại '$standaloneServer'." }
@@ -649,13 +1067,20 @@ try {
     $feReady = $false
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
     while ([DateTime]::UtcNow -lt $deadline) {
-        if ($feProc.HasExited) { throw "Next.js tiến trình PID $($feProc.Id) đã thoát bất thường với mã $($feProc.ExitCode)." }
+        if ($feProc.HasExited) {
+            $errTail = Get-LogTailText -Path $feErr
+            $outTail = Get-LogTailText -Path $feLog
+            throw "Next.js tiến trình PID $($feProc.Id) đã thoát bất thường với mã $($feProc.ExitCode).`n$errTail`n$outTail"
+        }
         try {
             $res = Invoke-WebRequest -Uri "http://127.0.0.1:$FrontendPort" -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
             if ($res.StatusCode -eq 200) { $feReady = $true; break }
         } catch { Start-Sleep -Milliseconds 600 }
     }
-    if (-not $feReady) { throw "Next.js không sẵn sàng trên cổng $FrontendPort sau 45 giây." }
+    if (-not $feReady) {
+        $errTail = Get-LogTailText -Path $feErr
+        throw "Next.js không sẵn sàng trên cổng $FrontendPort sau 45 giây.`n$errTail"
+    }
     Write-Host "      Next.js Frontend HEALTHY (200 OK)." -ForegroundColor Green
 
 

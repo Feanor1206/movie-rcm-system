@@ -24,7 +24,10 @@ $helperNames = @(
     "Get-SpringBootArguments",
     "Get-PreviewPortsToCheck",
     "Test-FrontendBuildStale",
-    "Test-RecordedProcessIdentity"
+    "Test-RecordedProcessIdentity",
+    "Test-TcpPortOpen",
+    "Get-FrontendDependencyHash",
+    "Test-FrontendDependenciesNeedInstall"
 )
 $helperAsts = @($launcherAst.FindAll({
     param($node)
@@ -202,7 +205,36 @@ try {
     Assert-True $refused "Unsafe stop must report failure, not a successful exit."
     Assert-True (Test-Path -LiteralPath $unownedDriveState) "Stop must preserve an incomplete Drive ownership record instead of using a shared default mount state."
 
-    Write-Host "PASS: launcher helpers enforce off/light/full/cloud branching, preview-only data paths, standalone build freshness, secret isolation, and process ownership."
+    $feDepsDir = Join-Path $tempRoot "frontend-deps"
+    $feNextBin = Join-Path $feDepsDir "node_modules\next\dist\bin\next"
+    $fePkgJson = Join-Path $feDepsDir "package.json"
+    $fePkgLock = Join-Path $feDepsDir "package-lock.json"
+    $feInstalledLock = Join-Path $feDepsDir "node_modules\.package-lock.json"
+    $feMarker = Join-Path $feDepsDir "node_modules\.preview-deps.sha256"
+    New-Item -ItemType Directory -Path (Split-Path $feNextBin -Parent) -Force | Out-Null
+    Set-Content -LiteralPath $fePkgJson -Value '{"name":"test"}' -NoNewline
+    Set-Content -LiteralPath $fePkgLock -Value '{"lockfileVersion":3}' -NoNewline
+    Assert-True (Test-FrontendDependenciesNeedInstall -FrontendDirectory $feDepsDir) "Missing next binary must trigger dependency install."
+    Set-Content -LiteralPath $feNextBin -Value "next" -NoNewline
+    Assert-True (Test-FrontendDependenciesNeedInstall -FrontendDirectory $feDepsDir) "Missing node_modules/.package-lock.json must trigger dependency install."
+    Set-Content -LiteralPath $feInstalledLock -Value "{}" -NoNewline
+    Assert-True (-not (Test-FrontendDependenciesNeedInstall -FrontendDirectory $feDepsDir)) "Installed next and lockfile without mismatch marker should be reusable."
+    Set-Content -LiteralPath $feMarker -Value "stale-hash" -NoNewline
+    Assert-True (Test-FrontendDependenciesNeedInstall -FrontendDirectory $feDepsDir) "Mismatched dependency hash marker must trigger dependency install."
+    Set-Content -LiteralPath $feMarker -Value (Get-FrontendDependencyHash -FrontendDirectory $feDepsDir) -NoNewline
+    Assert-True (-not (Test-FrontendDependenciesNeedInstall -FrontendDirectory $feDepsDir)) "Matching dependency hash marker should skip install."
+
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    $openPort = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+    try {
+        Assert-True (Test-TcpPortOpen -HostName "127.0.0.1" -Port $openPort -TimeoutMs 500) "Open loopback listener must report reachable."
+    } finally {
+        $listener.Stop()
+    }
+    Assert-True (-not (Test-TcpPortOpen -HostName "127.0.0.1" -Port $openPort -TimeoutMs 300)) "Stopped listener must report unreachable."
+
+    Write-Host "PASS: launcher helpers enforce off/light/full/cloud branching, preview-only data paths, standalone build freshness, secret isolation, process ownership, and dependency/port checks."
 } finally {
     [System.Environment]::SetEnvironmentVariable($script:testVariable, $originalValue, "Process")
     $resolvedTempRoot = [System.IO.Path]::GetFullPath($tempRoot)
